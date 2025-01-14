@@ -1,6 +1,7 @@
 import { BookingBlock } from "@/components/BookingBlock";
 import { EmployeeRow } from "@/components/EmployeeRow";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface Employee {
   id: number;
