@@ -3,14 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,22 +26,6 @@ const Login = () => {
           title: "Error",
           description: signInError.message,
         });
-        return;
-      }
-
-      // After successful login, check user role
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-
-        if (profile?.role === 'admin') {
-          navigate('/admin');
-        }
-        // For customers, the protected route will handle the redirect
       }
     } catch (error) {
       console.error("Error:", error);
@@ -86,7 +68,6 @@ const Login = () => {
             type="submit" 
             className="w-full"
             disabled={loading}
-            variant="default"
           >
             {loading ? "Signing in..." : "Sign in"}
           </Button>

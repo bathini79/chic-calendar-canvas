@@ -182,18 +182,14 @@ const App = () => {
             <Route 
               path="/" 
               element={
-                <ProtectedCustomerRoute>
-                  <CustomerDashboard />
-                </ProtectedCustomerRoute>
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
               } 
             />
             <Route 
               path="*" 
-              element={
-                <ProtectedCustomerRoute>
-                  <CustomerDashboard />
-                </ProtectedCustomerRoute>
-              } 
+              element={<Navigate to="/" replace />} 
             />
           </Routes>
         </BrowserRouter>
