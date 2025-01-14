@@ -16,11 +16,7 @@ const Auth = () => {
         navigate("/");
       }
       
-      if (event === 'USER_UPDATED') {
-        setError(null);
-      }
-
-      if (event === 'SIGNED_OUT') {
+      if (event === 'USER_UPDATED' || event === 'SIGNED_OUT') {
         setError(null);
       }
     });
@@ -41,7 +37,7 @@ const Auth = () => {
         </div>
         <div className="mt-8 bg-white dark:bg-gray-800 py-8 px-4 shadow-md rounded-lg space-y-4">
           {error && (
-            <Alert variant="destructive" className="mb-4">
+            <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
