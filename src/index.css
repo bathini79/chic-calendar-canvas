@@ -81,7 +81,8 @@
 }
 
 .time-slot {
-  @apply h-16 border-b border-r p-1 relative hover:bg-gray-50 transition-colors;
+  @apply border-b border-r p-1 relative hover:bg-gray-50 transition-colors;
+  height: 4rem;
 }
 
 .employee-row {
@@ -91,4 +92,7 @@
 .booking-block {
   @apply absolute rounded-md border p-2 shadow-sm cursor-pointer transition-all hover:shadow-md;
   min-height: 4rem;
+  width: calc(100% - 0.5rem);
+  margin: 0.25rem;
+  z-index: 10;
 }
