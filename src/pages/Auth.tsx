@@ -11,6 +11,14 @@ const Auth = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check if user is already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate("/");
+      }
+    });
+
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         navigate("/");
@@ -21,26 +29,26 @@ const Auth = () => {
       }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 px-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome</h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Please sign in with your email to continue
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-full max-w-md space-y-4 p-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-bold">Welcome Back</h1>
+          <p className="text-muted-foreground">
+            Sign in to your account to continue
           </p>
         </div>
-        <div className="mt-8 bg-white dark:bg-gray-800 py-8 px-4 shadow-md rounded-lg space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="bg-card p-6 rounded-lg shadow-sm">
           <SupabaseAuth
             supabaseClient={supabase}
             appearance={{
@@ -48,28 +56,27 @@ const Auth = () => {
               variables: {
                 default: {
                   colors: {
-                    brand: '#000000',
-                    brandAccent: '#333333',
+                    brand: 'black',
+                    brandAccent: '#666666',
                   },
                 },
               },
             }}
             providers={[]}
             view="sign_in"
-            showLinks={true}
             localization={{
               variables: {
                 sign_in: {
-                  email_label: 'Email',
+                  email_label: 'Email address',
                   password_label: 'Password',
                   button_label: 'Sign in',
                   loading_button_label: 'Signing in...',
                 },
                 sign_up: {
-                  email_label: 'Email',
-                  password_label: 'Password',
-                  button_label: 'Sign up',
-                  loading_button_label: 'Signing up...',
+                  email_label: 'Email address',
+                  password_label: 'Create a password',
+                  button_label: 'Create account',
+                  loading_button_label: 'Creating account...',
                 },
               },
             }}
