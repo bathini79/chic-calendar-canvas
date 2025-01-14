@@ -56,7 +56,23 @@ const Auth = () => {
             }}
             providers={[]}
             view="sign_in"
-            showLinks={false}
+            showLinks={true}
+            localization={{
+              variables: {
+                sign_in: {
+                  email_label: 'Email',
+                  password_label: 'Password',
+                  button_label: 'Sign in',
+                  loading_button_label: 'Signing in...',
+                },
+                sign_up: {
+                  email_label: 'Email',
+                  password_label: 'Password',
+                  button_label: 'Sign up',
+                  loading_button_label: 'Signing up...',
+                },
+              },
+            }}
           />
         </div>
       </div>
