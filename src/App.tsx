@@ -140,6 +140,26 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// New component for role-based root redirect
+const RoleBasedRedirect = () => {
+  const { isAuthenticated, userRole, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirect based on role
+  return <Navigate to={userRole === 'admin' ? '/admin' : '/customer'} replace />;
+};
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -172,13 +192,13 @@ const App = () => {
                 </ProtectedCustomerRoute>
               }
             />
-            {/* Redirect root to appropriate dashboard based on role */}
+            {/* Root route now uses RoleBasedRedirect */}
             <Route 
               path="/" 
-              element={<Navigate to="/customer" replace />} 
+              element={<RoleBasedRedirect />} 
             />
-            {/* Catch all route - redirect to appropriate dashboard */}
-            <Route path="*" element={<Navigate to="/customer" replace />} />
+            {/* Catch all route now uses RoleBasedRedirect */}
+            <Route path="*" element={<RoleBasedRedirect />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
