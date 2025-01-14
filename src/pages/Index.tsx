@@ -3,8 +3,9 @@ import { MetricCard } from "@/components/MetricCard";
 import { BookingBlock } from "@/components/BookingBlock";
 import { EmployeeRow } from "@/components/EmployeeRow";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, IndianRupee, Gift, UserCheck } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, IndianRupee, Gift, UserCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { format, addDays, subDays } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -12,6 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const MOCK_EMPLOYEES = [
   { id: 1, name: "Alex Johnson" },
@@ -28,7 +35,7 @@ const MOCK_BOOKINGS = [
     time: "10:00 AM",
     duration: 2,
     status: "confirmed" as const,
-    startPosition: 4 // Adjusted for 15-minute intervals (10:00 AM = 4 slots after 9:00 AM)
+    startPosition: 4
   },
   {
     id: 2,
@@ -38,13 +45,13 @@ const MOCK_BOOKINGS = [
     time: "11:30 AM",
     duration: 3,
     status: "pending" as const,
-    startPosition: 10 // Adjusted for 15-minute intervals (11:30 AM = 10 slots after 9:00 AM)
+    startPosition: 10
   },
 ];
 
 const generateTimeSlots = (interval: number) => {
   const slots = [];
-  const totalSlots = (4 * 60) / interval; // 4 hours from 9 AM to 1 PM
+  const totalSlots = (12 * 60) / interval; // 12 hours from 9 AM to 9 PM
   
   for (let i = 0; i < totalSlots; i++) {
     const minutes = i * interval;
@@ -60,12 +67,17 @@ const generateTimeSlots = (interval: number) => {
 const Index = () => {
   const { toast } = useToast();
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
-  const [interval, setInterval] = useState(15); // Default 15-minute intervals
+  const [interval, setInterval] = useState(15);
+  const [date, setDate] = useState<Date>(new Date());
 
   const timeSlots = generateTimeSlots(interval);
   const filteredBookings = selectedEmployee 
     ? MOCK_BOOKINGS.filter(b => b.employeeId === selectedEmployee)
     : MOCK_BOOKINGS;
+
+  const handlePreviousDay = () => setDate(prev => subDays(prev, 1));
+  const handleNextDay = () => setDate(prev => addDays(prev, 1));
+  const handleToday = () => setDate(new Date());
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -74,7 +86,7 @@ const Index = () => {
         <MetricCard
           title="Pending Confirmations"
           value="5"
-          icon={<Calendar className="h-4 w-4" />}
+          icon={<CalendarIcon className="h-4 w-4" />}
         />
         <MetricCard
           title="Upcoming Bookings"
@@ -99,8 +111,8 @@ const Index = () => {
       </div>
 
       {/* Calendar Controls */}
-      <div className="flex justify-between items-center">
-        <div className="space-x-2">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setSelectedEmployee(null)}>
             All Employees
           </Button>
@@ -115,6 +127,33 @@ const Index = () => {
           ))}
         </div>
         <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={handlePreviousDay}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="min-w-[240px]">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(date, "PPP")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(date) => date && setDate(date)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" size="icon" onClick={handleNextDay}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" onClick={handleToday}>
+              Today
+            </Button>
+          </div>
           <Select
             value={interval.toString()}
             onValueChange={(value) => setInterval(Number(value))}
@@ -142,7 +181,7 @@ const Index = () => {
       </div>
 
       {/* Calendar Grid */}
-      <div className="calendar-grid border rounded-lg">
+      <div className="calendar-grid border rounded-lg overflow-x-auto">
         {/* Employee Column */}
         <div className="border-r">
           <div className="h-16 border-b bg-muted" /> {/* Header spacer */}
@@ -152,13 +191,13 @@ const Index = () => {
         </div>
 
         {/* Time Slots */}
-        <div>
+        <div className="min-w-[800px]">
           {/* Time Headers */}
           <div className="grid h-16 border-b bg-muted" style={{
             gridTemplateColumns: `repeat(${timeSlots.length}, minmax(100px, 1fr))`
           }}>
             {timeSlots.map((time) => (
-              <div key={time} className="flex items-center justify-center border-r">
+              <div key={time} className="flex items-center justify-center border-r text-sm">
                 {time}
               </div>
             ))}
@@ -180,7 +219,7 @@ const Index = () => {
                   <BookingBlock 
                     key={booking.id} 
                     {...booking} 
-                    startPosition={booking.startPosition * (interval / 15)} // Adjust position based on interval
+                    startPosition={booking.startPosition * (interval / 15)}
                   />
                 ))}
             </div>
