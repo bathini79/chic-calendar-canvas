@@ -7,35 +7,105 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import CustomerDashboard from "./pages/CustomerDashboard";
 
 const queryClient = new QueryClient();
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+interface AuthState {
+  isAuthenticated: boolean | null;
+  userRole: string | null;
+  isLoading: boolean;
+}
+
+const useAuth = () => {
+  const [authState, setAuthState] = useState<AuthState>({
+    isAuthenticated: null,
+    userRole: null,
+    isLoading: true
+  });
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        setIsAuthenticated(!!session);
+        if (session) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+          
+          setAuthState({
+            isAuthenticated: true,
+            userRole: profile?.role || null,
+            isLoading: false
+          });
+        } else {
+          setAuthState({
+            isAuthenticated: false,
+            userRole: null,
+            isLoading: false
+          });
+        }
       } catch (error) {
         console.error('Error checking auth status:', error);
-        setIsAuthenticated(false);
-      } finally {
-        setIsLoading(false);
+        setAuthState({
+          isAuthenticated: false,
+          userRole: null,
+          isLoading: false
+        });
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-      setIsLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+        
+        setAuthState({
+          isAuthenticated: true,
+          userRole: profile?.role || null,
+          isLoading: false
+        });
+      } else {
+        setAuthState({
+          isAuthenticated: false,
+          userRole: null,
+          isLoading: false
+        });
+      }
     });
 
     checkAuth();
-
     return () => subscription.unsubscribe();
   }, []);
+
+  return authState;
+};
+
+const ProtectedAdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, userRole, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || userRole !== 'admin') {
+    return <Navigate to="/customer" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const ProtectedCustomerRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -47,6 +117,24 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/customer" replace />;
   }
 
   return <>{children}</>;
@@ -69,63 +157,33 @@ const App = () => {
               } 
             />
             <Route
-              path="/"
+              path="/admin"
               element={
-                <ProtectedRoute>
+                <ProtectedAdminRoute>
                   <Index />
-                </ProtectedRoute>
+                </ProtectedAdminRoute>
               }
             />
-            {/* Catch all route - redirect to home */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route
+              path="/customer"
+              element={
+                <ProtectedCustomerRoute>
+                  <CustomerDashboard />
+                </ProtectedCustomerRoute>
+              }
+            />
+            {/* Redirect root to appropriate dashboard based on role */}
+            <Route 
+              path="/" 
+              element={<Navigate to="/customer" replace />} 
+            />
+            {/* Catch all route - redirect to appropriate dashboard */}
+            <Route path="*" element={<Navigate to="/customer" replace />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
-};
-
-// Public route component to prevent authenticated users from accessing login page
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setIsAuthenticated(!!session);
-      } catch (error) {
-        console.error('Error checking auth status:', error);
-        setIsAuthenticated(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-      setIsLoading(false);
-    });
-
-    checkAuth();
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
 };
 
 export default App;
