@@ -57,6 +57,8 @@ const useAuth = () => {
       }
     };
 
+    checkAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         const { data: profile } = await supabase
@@ -79,32 +81,13 @@ const useAuth = () => {
       }
     });
 
-    checkAuth();
     return () => subscription.unsubscribe();
   }, []);
 
   return authState;
 };
 
-const ProtectedAdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, userRole, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated || userRole !== 'admin') {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-const ProtectedCustomerRoute = ({ children }: { children: React.ReactNode }) => {
+const ProtectedRoute = ({ children, allowedRole }: { children: React.ReactNode; allowedRole: string }) => {
   const { isAuthenticated, userRole, isLoading } = useAuth();
 
   if (isLoading) {
@@ -119,8 +102,8 @@ const ProtectedCustomerRoute = ({ children }: { children: React.ReactNode }) => 
     return <Navigate to="/login" replace />;
   }
 
-  if (userRole === 'admin') {
-    return <Navigate to="/admin" replace />;
+  if (userRole !== allowedRole) {
+    return <Navigate to={userRole === 'admin' ? '/admin' : '/customer'} replace />;
   }
 
   return <>{children}</>;
@@ -138,10 +121,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (isAuthenticated) {
-    if (userRole === 'admin') {
-      return <Navigate to="/admin" replace />;
-    }
-    return <Navigate to="/customer" replace />;
+    return <Navigate to={userRole === 'admin' ? '/admin' : '/customer'} replace />;
   }
 
   return <>{children}</>;
@@ -166,30 +146,26 @@ const App = () => {
             <Route
               path="/admin"
               element={
-                <ProtectedAdminRoute>
+                <ProtectedRoute allowedRole="admin">
                   <Index />
-                </ProtectedAdminRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/customer"
               element={
-                <ProtectedCustomerRoute>
+                <ProtectedRoute allowedRole="customer">
                   <CustomerDashboard />
-                </ProtectedCustomerRoute>
+                </ProtectedRoute>
               }
             />
             <Route 
               path="/" 
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              } 
+              element={<Navigate to="/login" replace />} 
             />
             <Route 
               path="*" 
-              element={<Navigate to="/" replace />} 
+              element={<Navigate to="/login" replace />} 
             />
           </Routes>
         </BrowserRouter>
