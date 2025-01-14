@@ -25,7 +25,6 @@ const useAuth = () => {
   });
 
   useEffect(() => {
-    // Initial session check
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -60,7 +59,6 @@ const useAuth = () => {
 
     checkSession();
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id);
       
@@ -93,7 +91,7 @@ const useAuth = () => {
   return authState;
 };
 
-const RequireAuth = ({ children, allowedRole }: { children: React.ReactNode; allowedRole: string }) => {
+const ProtectedRoute = ({ children, allowedRole }: { children: React.ReactNode; allowedRole: string }) => {
   const { isAuthenticated, userRole, isLoading } = useAuth();
 
   if (isLoading) {
@@ -109,13 +107,13 @@ const RequireAuth = ({ children, allowedRole }: { children: React.ReactNode; all
   }
 
   if (userRole !== allowedRole) {
-    return <Navigate to={userRole === 'admin' ? '/admin' : '/customer'} replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 };
 
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+const App = () => {
   const { isAuthenticated, userRole, isLoading } = useAuth();
 
   if (isLoading) {
@@ -126,15 +124,6 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (isAuthenticated && userRole) {
-    const redirectPath = userRole === 'admin' ? '/admin' : '/customer';
-    return <Navigate to={redirectPath} replace />;
-  }
-
-  return <>{children}</>;
-};
-
-const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -145,34 +134,42 @@ const App = () => {
             <Route 
               path="/login" 
               element={
-                <PublicRoute>
+                isAuthenticated ? (
+                  <Navigate to={userRole === 'admin' ? '/admin' : '/customer'} replace />
+                ) : (
                   <Login />
-                </PublicRoute>
+                )
               } 
             />
             <Route
               path="/admin"
               element={
-                <RequireAuth allowedRole="admin">
+                <ProtectedRoute allowedRole="admin">
                   <Index />
-                </RequireAuth>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/customer"
               element={
-                <RequireAuth allowedRole="customer">
+                <ProtectedRoute allowedRole="customer">
                   <CustomerDashboard />
-                </RequireAuth>
+                </ProtectedRoute>
               }
             />
             <Route 
               path="/" 
-              element={<Navigate to="/login" replace />} 
+              element={
+                isAuthenticated ? (
+                  <Navigate to={userRole === 'admin' ? '/admin' : '/customer'} replace />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              } 
             />
             <Route 
               path="*" 
-              element={<Navigate to="/login" replace />} 
+              element={<Navigate to="/" replace />} 
             />
           </Routes>
         </BrowserRouter>
