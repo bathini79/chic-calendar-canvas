@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarIcon, Clock, IndianRupee, Gift, UserCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { format, addDays, subDays } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Select,
   SelectContent,
@@ -66,23 +67,20 @@ const generateTimeSlots = (interval: number) => {
 
 const Index = () => {
   const { toast } = useToast();
-  const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
   const [interval, setInterval] = useState(15);
   const [date, setDate] = useState<Date>(new Date());
+  const isMobile = useIsMobile();
 
   const timeSlots = generateTimeSlots(interval);
-  const filteredBookings = selectedEmployee 
-    ? MOCK_BOOKINGS.filter(b => b.employeeId === selectedEmployee)
-    : MOCK_BOOKINGS;
 
   const handlePreviousDay = () => setDate(prev => subDays(prev, 1));
   const handleNextDay = () => setDate(prev => addDays(prev, 1));
   const handleToday = () => setDate(new Date());
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
+    <div className="container mx-auto py-4 md:py-8 space-y-4 md:space-y-8 px-2 md:px-8">
       {/* Metrics Section */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
         <MetricCard
           title="Pending Confirmations"
           value="5"
@@ -111,34 +109,20 @@ const Index = () => {
       </div>
 
       {/* Calendar Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setSelectedEmployee(null)}>
-            All Employees
-          </Button>
-          {MOCK_EMPLOYEES.map((emp) => (
-            <Button
-              key={emp.id}
-              variant={selectedEmployee === emp.id ? "default" : "outline"}
-              onClick={() => setSelectedEmployee(emp.id)}
-            >
-              {emp.name}
-            </Button>
-          ))}
-        </div>
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col space-y-4">
+        <div className="flex flex-wrap items-center gap-2 justify-between">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={handlePreviousDay}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="min-w-[240px]">
+                <Button variant="outline" className={isMobile ? "w-full" : "min-w-[240px]"}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {format(date, "PPP")}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
+              <PopoverContent className="w-auto p-0" align={isMobile ? "center" : "start"}>
                 <Calendar
                   mode="single"
                   selected={date}
@@ -150,33 +134,36 @@ const Index = () => {
             <Button variant="outline" size="icon" onClick={handleNextDay}>
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button variant="outline" onClick={handleToday}>
+            <Button variant="outline" onClick={handleToday} className="whitespace-nowrap">
               Today
             </Button>
           </div>
-          <Select
-            value={interval.toString()}
-            onValueChange={(value) => setInterval(Number(value))}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select interval" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="15">15 minutes</SelectItem>
-              <SelectItem value="30">30 minutes</SelectItem>
-              <SelectItem value="60">1 hour</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button 
-            onClick={() => {
-              toast({
-                title: "Coming Soon",
-                description: "New booking functionality will be added in the next update.",
-              });
-            }}
-          >
-            + New Booking
-          </Button>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <Select
+              value={interval.toString()}
+              onValueChange={(value) => setInterval(Number(value))}
+            >
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Select interval" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">15 minutes</SelectItem>
+                <SelectItem value="30">30 minutes</SelectItem>
+                <SelectItem value="60">1 hour</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button 
+              onClick={() => {
+                toast({
+                  title: "Coming Soon",
+                  description: "New booking functionality will be added in the next update.",
+                });
+              }}
+              className="whitespace-nowrap"
+            >
+              + New Booking
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -213,7 +200,7 @@ const Index = () => {
               {timeSlots.map((_, i) => (
                 <div key={i} className="time-slot" />
               ))}
-              {filteredBookings
+              {MOCK_BOOKINGS
                 .filter((b) => b.employeeId === emp.id)
                 .map((booking) => (
                   <BookingBlock 
