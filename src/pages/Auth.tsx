@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -15,12 +16,14 @@ const Auth = () => {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
 
   useEffect(() => {
+    // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         navigate("/");
       }
     });
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
         navigate("/");
@@ -36,14 +39,14 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      const { error } = mode === "signin" 
+      const { error } = mode === "signin"
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({ email, password });
 
       if (error) throw error;
-      
+
       if (mode === "signup") {
-        setError("Check your email for the confirmation link.");
+        toast.success("Check your email for the confirmation link.");
       }
     } catch (error: any) {
       setError(error.message);
@@ -67,7 +70,7 @@ const Auth = () => {
         </div>
 
         {error && (
-          <Alert variant={error.includes("confirmation") ? "default" : "destructive"}>
+          <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
