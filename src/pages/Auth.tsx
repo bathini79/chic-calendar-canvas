@@ -19,9 +19,7 @@ const Auth = () => {
       if (event === 'USER_UPDATED') {
         setError(null);
       }
-    });
 
-    const authListener = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setError(null);
       }
@@ -29,25 +27,8 @@ const Auth = () => {
 
     return () => {
       subscription.unsubscribe();
-      authListener.data.subscription.unsubscribe();
     };
   }, [navigate]);
-
-  const getErrorMessage = (error: string) => {
-    try {
-      const errorObj = JSON.parse(error);
-      switch (errorObj.code) {
-        case 'user_already_exists':
-          return 'This email is already registered. Please sign in instead.';
-        case 'invalid_credentials':
-          return 'Invalid email or password. Please check your credentials.';
-        default:
-          return errorObj.message || 'An error occurred during authentication.';
-      }
-    } catch {
-      return error;
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 px-4">
@@ -78,17 +59,6 @@ const Auth = () => {
               },
             }}
             providers={["google"]}
-            onError={(err: AuthError) => {
-              if (err.message.includes('422')) {
-                try {
-                  setError(getErrorMessage(err.message));
-                } catch {
-                  setError(err.message);
-                }
-              } else {
-                setError(err.message);
-              }
-            }}
           />
         </div>
       </div>
