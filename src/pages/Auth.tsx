@@ -16,13 +16,11 @@ const Auth = () => {
         navigate("/");
       }
       
-      // Handle auth errors
       if (event === 'USER_UPDATED') {
-        setError(null); // Clear any previous errors
+        setError(null);
       }
     });
 
-    // Set up error listener
     const authListener = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setError(null);
@@ -36,14 +34,18 @@ const Auth = () => {
   }, [navigate]);
 
   const getErrorMessage = (error: string) => {
-    const errorObj = JSON.parse(error);
-    switch (errorObj.code) {
-      case 'user_already_exists':
-        return 'This email is already registered. Please sign in instead.';
-      case 'invalid_credentials':
-        return 'Invalid email or password. Please check your credentials.';
-      default:
-        return errorObj.message || 'An error occurred during authentication.';
+    try {
+      const errorObj = JSON.parse(error);
+      switch (errorObj.code) {
+        case 'user_already_exists':
+          return 'This email is already registered. Please sign in instead.';
+        case 'invalid_credentials':
+          return 'Invalid email or password. Please check your credentials.';
+        default:
+          return errorObj.message || 'An error occurred during authentication.';
+      }
+    } catch {
+      return error;
     }
   };
 
@@ -51,9 +53,9 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome back</h2>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome</h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Please sign in to your account
+            Please sign in with Google to continue
           </p>
         </div>
         <div className="mt-8 bg-white dark:bg-gray-800 py-8 px-4 shadow-md rounded-lg space-y-4">
@@ -75,6 +77,7 @@ const Auth = () => {
                 },
               },
             }}
+            providers={["google"]}
             onError={(err: AuthError) => {
               if (err.message.includes('422')) {
                 try {
