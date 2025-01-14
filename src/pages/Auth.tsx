@@ -1,86 +1,121 @@
-import { useEffect, useState } from "react";
-import { Auth as SupabaseAuth } from "@supabase/auth-ui-react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AuthError } from "@supabase/supabase-js";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
 
   useEffect(() => {
-    // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         navigate("/");
       }
     });
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+      if (event === "SIGNED_IN" && session) {
         navigate("/");
-      }
-      
-      if (event === 'USER_UPDATED' || event === 'SIGNED_OUT') {
-        setError(null);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const { error } = mode === "signin" 
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
+
+      if (error) throw error;
+      
+      if (mode === "signup") {
+        setError("Check your email for the confirmation link.");
+      }
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md space-y-4 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">Welcome Back</h1>
+          <h1 className="text-2xl font-bold">
+            {mode === "signin" ? "Welcome back" : "Create an account"}
+          </h1>
           <p className="text-muted-foreground">
-            Sign in to your account to continue
+            {mode === "signin" 
+              ? "Enter your credentials to access your account" 
+              : "Enter your details to create your account"}
           </p>
         </div>
 
         {error && (
-          <Alert variant="destructive">
+          <Alert variant={error.includes("confirmation") ? "default" : "destructive"}>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <div className="bg-card p-6 rounded-lg shadow-sm">
-          <SupabaseAuth
-            supabaseClient={supabase}
-            appearance={{
-              theme: ThemeSupa,
-              variables: {
-                default: {
-                  colors: {
-                    brand: 'black',
-                    brandAccent: '#666666',
-                  },
-                },
-              },
-            }}
-            providers={[]}
-            view="sign_in"
-            localization={{
-              variables: {
-                sign_in: {
-                  email_label: 'Email address',
-                  password_label: 'Password',
-                  button_label: 'Sign in',
-                  loading_button_label: 'Signing in...',
-                },
-                sign_up: {
-                  email_label: 'Email address',
-                  password_label: 'Create a password',
-                  button_label: 'Create account',
-                  loading_button_label: 'Creating account...',
-                },
-              },
-            }}
-          />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email address</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="name@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <Button 
+            type="submit" 
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading 
+              ? (mode === "signin" ? "Signing in..." : "Creating account...") 
+              : (mode === "signin" ? "Sign in" : "Create account")}
+          </Button>
+        </form>
+
+        <div className="text-center">
+          <Button
+            variant="link"
+            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+          >
+            {mode === "signin" 
+              ? "Don't have an account? Sign up" 
+              : "Already have an account? Sign in"}
+          </Button>
         </div>
       </div>
     </div>
