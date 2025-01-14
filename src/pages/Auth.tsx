@@ -32,7 +32,7 @@ const Auth = () => {
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome</h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Please sign in with Google to continue
+            Please sign in with your email to continue
           </p>
         </div>
         <div className="mt-8 bg-white dark:bg-gray-800 py-8 px-4 shadow-md rounded-lg space-y-4">
@@ -54,7 +54,7 @@ const Auth = () => {
                 },
               },
             }}
-            providers={["google"]}
+            providers={[]}
             view="sign_in"
             showLinks={false}
           />
