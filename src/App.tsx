@@ -98,50 +98,13 @@ const ProtectedAdminRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!isAuthenticated || userRole !== 'admin') {
-    return <Navigate to="/customer" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-const ProtectedCustomerRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
 };
 
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/customer" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-// New component for role-based root redirect
-const RoleBasedRedirect = () => {
+const ProtectedCustomerRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, userRole, isLoading } = useAuth();
 
   if (isLoading) {
@@ -156,8 +119,32 @@ const RoleBasedRedirect = () => {
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect based on role
-  return <Navigate to={userRole === 'admin' ? '/admin' : '/customer'} replace />;
+  if (userRole === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, userRole, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    if (userRole === 'admin') {
+      return <Navigate to="/admin" replace />;
+    }
+    return <Navigate to="/customer" replace />;
+  }
+
+  return <>{children}</>;
 };
 
 const App = () => {
@@ -192,13 +179,22 @@ const App = () => {
                 </ProtectedCustomerRoute>
               }
             />
-            {/* Root route now uses RoleBasedRedirect */}
             <Route 
               path="/" 
-              element={<RoleBasedRedirect />} 
+              element={
+                <ProtectedCustomerRoute>
+                  <CustomerDashboard />
+                </ProtectedCustomerRoute>
+              } 
             />
-            {/* Catch all route now uses RoleBasedRedirect */}
-            <Route path="*" element={<RoleBasedRedirect />} />
+            <Route 
+              path="*" 
+              element={
+                <ProtectedCustomerRoute>
+                  <CustomerDashboard />
+                </ProtectedCustomerRoute>
+              } 
+            />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
