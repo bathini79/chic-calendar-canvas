@@ -12,20 +12,21 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 const queryClient = new QueryClient();
 
 interface AuthState {
-  isAuthenticated: boolean | null;
+  isAuthenticated: boolean;
   userRole: string | null;
   isLoading: boolean;
 }
 
 const useAuth = () => {
   const [authState, setAuthState] = useState<AuthState>({
-    isAuthenticated: null,
+    isAuthenticated: false,
     userRole: null,
     isLoading: true
   });
 
   useEffect(() => {
-    const checkAuth = async () => {
+    // Initial session check
+    const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
@@ -34,7 +35,7 @@ const useAuth = () => {
             .select('role')
             .eq('id', session.user.id)
             .single();
-          
+
           setAuthState({
             isAuthenticated: true,
             userRole: profile?.role || null,
@@ -48,7 +49,7 @@ const useAuth = () => {
           });
         }
       } catch (error) {
-        console.error('Error checking auth status:', error);
+        console.error('Auth check error:', error);
         setAuthState({
           isAuthenticated: false,
           userRole: null,
@@ -57,16 +58,19 @@ const useAuth = () => {
       }
     };
 
-    checkAuth();
+    checkSession();
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
+      
       if (session) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', session.user.id)
           .single();
-        
+
         setAuthState({
           isAuthenticated: true,
           userRole: profile?.role || null,
@@ -81,19 +85,21 @@ const useAuth = () => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   return authState;
 };
 
-const ProtectedRoute = ({ children, allowedRole }: { children: React.ReactNode; allowedRole: string }) => {
+const RequireAuth = ({ children, allowedRole }: { children: React.ReactNode; allowedRole: string }) => {
   const { isAuthenticated, userRole, isLoading } = useAuth();
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
       </div>
     );
   }
@@ -115,13 +121,14 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
       </div>
     );
   }
 
-  if (isAuthenticated) {
-    return <Navigate to={userRole === 'admin' ? '/admin' : '/customer'} replace />;
+  if (isAuthenticated && userRole) {
+    const redirectPath = userRole === 'admin' ? '/admin' : '/customer';
+    return <Navigate to={redirectPath} replace />;
   }
 
   return <>{children}</>;
@@ -146,17 +153,17 @@ const App = () => {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRole="admin">
+                <RequireAuth allowedRole="admin">
                   <Index />
-                </ProtectedRoute>
+                </RequireAuth>
               }
             />
             <Route
               path="/customer"
               element={
-                <ProtectedRoute allowedRole="customer">
+                <RequireAuth allowedRole="customer">
                   <CustomerDashboard />
-                </ProtectedRoute>
+                </RequireAuth>
               }
             />
             <Route 

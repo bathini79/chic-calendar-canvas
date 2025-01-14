@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { AuthError } from "@supabase/supabase-js";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -15,24 +16,26 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (signInError) {
+      if (error) {
+        console.error('Login error:', error);
         toast({
           variant: "destructive",
           title: "Error",
-          description: signInError.message,
+          description: error.message,
         });
       }
     } catch (error) {
-      console.error("Error:", error);
+      const authError = error as AuthError;
+      console.error('Login error:', authError);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "An unexpected error occurred during login",
       });
     } finally {
       setLoading(false);
@@ -53,6 +56,7 @@ const Login = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              className="w-full"
             />
           </div>
           <div>
@@ -62,6 +66,7 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              className="w-full"
             />
           </div>
           <Button 
