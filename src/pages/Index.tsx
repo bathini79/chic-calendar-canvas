@@ -50,6 +50,7 @@ const generateTimeSlots = (interval: number) => {
 const Index = () => {
   const [interval, setInterval] = useState(15);
   const [date, setDate] = useState<Date>(new Date());
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const timeSlots = generateTimeSlots(interval);
 
@@ -61,11 +62,14 @@ const Index = () => {
         setDate={setDate}
         interval={interval}
         setInterval={setInterval}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
       />
       <BookingGrid 
         employees={MOCK_EMPLOYEES}
         bookings={MOCK_BOOKINGS}
         timeSlots={timeSlots}
+        viewMode={viewMode}
       />
     </div>
   );
