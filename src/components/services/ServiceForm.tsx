@@ -98,7 +98,7 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
           name="original_price"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Original Price</FormLabel>
+              <FormLabel>Original Price (₹)</FormLabel>
               <FormControl>
                 <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
               </FormControl>
@@ -112,7 +112,7 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
           name="selling_price"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Selling Price</FormLabel>
+              <FormLabel>Selling Price (₹)</FormLabel>
               <FormControl>
                 <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
               </FormControl>

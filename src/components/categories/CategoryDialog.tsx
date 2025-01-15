@@ -54,11 +54,11 @@ export const CategoryDialog = ({
 
     try {
       if (category) {
-        // Update existing category
+        // Update existing category - using the id directly, not as an object
         const { error } = await supabase
           .from("categories")
           .update({ name: values.name })
-          .eq("id", category.id);
+          .eq("id", category.id); // Use category.id directly
 
         if (error) {
           if (error.code === "42501") {
