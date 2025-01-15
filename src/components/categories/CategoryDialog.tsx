@@ -54,11 +54,10 @@ export const CategoryDialog = ({
 
     try {
       if (category) {
-        // Update existing category - using the id directly, not as an object
         const { error } = await supabase
           .from("categories")
           .update({ name: values.name })
-          .eq("id", category.id); // Use category.id directly
+          .eq("id", category.id);
 
         if (error) {
           if (error.code === "42501") {
@@ -78,16 +77,13 @@ export const CategoryDialog = ({
         }
 
         toast({
-          title: "Category updated",
-          description: "The category has been successfully updated.",
+          title: "Success",
+          description: "Category updated successfully",
         });
       } else {
-        // Create new category
-        const { error } = await supabase.from("categories").insert([
-          {
-            name: values.name,
-          },
-        ]);
+        const { error } = await supabase
+          .from("categories")
+          .insert([{ name: values.name }]);
 
         if (error) {
           if (error.code === "42501") {
@@ -107,13 +103,14 @@ export const CategoryDialog = ({
         }
 
         toast({
-          title: "Category created",
-          description: "The category has been successfully created.",
+          title: "Success",
+          description: "Category created successfully",
         });
       }
 
       onSuccess();
       onOpenChange(false);
+      form.reset();
     } catch (error: any) {
       toast({
         variant: "destructive",

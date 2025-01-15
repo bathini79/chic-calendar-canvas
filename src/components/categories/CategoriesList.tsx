@@ -21,22 +21,41 @@ const CategoriesList = ({ categories, onEdit, onDelete }: CategoriesListProps) =
   const { toast } = useToast();
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("categories").delete().eq("id", id);
+    try {
+      const { error } = await supabase
+        .from("categories")
+        .delete()
+        .eq("id", id);
 
-    if (error) {
+      if (error) {
+        if (error.code === "42501") {
+          toast({
+            variant: "destructive",
+            title: "Permission denied",
+            description: "You don't have permission to delete categories. Only admin users can perform this action.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Error deleting category",
+            description: error.message,
+          });
+        }
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: "Category deleted successfully",
+      });
+      onDelete();
+    } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Error deleting category",
+        title: "Error",
         description: error.message,
       });
-      return;
     }
-
-    toast({
-      title: "Category deleted",
-      description: "The category has been successfully deleted.",
-    });
-    onDelete();
   };
 
   return (
