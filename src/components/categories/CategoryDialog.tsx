@@ -1,8 +1,10 @@
 import { useForm } from "react-hook-form";
+import { useSession } from "@supabase/auth-helpers-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -32,6 +34,8 @@ export const CategoryDialog = ({
   onSuccess,
 }: CategoryDialogProps) => {
   const { toast } = useToast();
+  const session = useSession();
+  
   const form = useForm({
     defaultValues: {
       name: category?.name || "",
@@ -39,50 +43,84 @@ export const CategoryDialog = ({
   });
 
   const onSubmit = async (values: { name: string }) => {
-    if (category) {
-      // Update existing category
-      const { error } = await supabase
-        .from("categories")
-        .update({ name: values.name })
-        .eq("id", category.id);
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error updating category",
-          description: error.message,
-        });
-        return;
-      }
-
+    if (!session) {
       toast({
-        title: "Category updated",
-        description: "The category has been successfully updated.",
+        variant: "destructive",
+        title: "Authentication required",
+        description: "You must be logged in to perform this action.",
       });
-    } else {
-      // Create new category
-      const { error } = await supabase.from("categories").insert([
-        {
-          name: values.name,
-        },
-      ]);
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error creating category",
-          description: error.message,
-        });
-        return;
-      }
-
-      toast({
-        title: "Category created",
-        description: "The category has been successfully created.",
-      });
+      return;
     }
 
-    onSuccess();
+    try {
+      if (category) {
+        // Update existing category
+        const { error } = await supabase
+          .from("categories")
+          .update({ name: values.name })
+          .eq("id", category.id);
+
+        if (error) {
+          if (error.code === "42501") {
+            toast({
+              variant: "destructive",
+              title: "Permission denied",
+              description: "You don't have permission to update categories. Only admin users can perform this action.",
+            });
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Error updating category",
+              description: error.message,
+            });
+          }
+          return;
+        }
+
+        toast({
+          title: "Category updated",
+          description: "The category has been successfully updated.",
+        });
+      } else {
+        // Create new category
+        const { error } = await supabase.from("categories").insert([
+          {
+            name: values.name,
+          },
+        ]);
+
+        if (error) {
+          if (error.code === "42501") {
+            toast({
+              variant: "destructive",
+              title: "Permission denied",
+              description: "You don't have permission to create categories. Only admin users can perform this action.",
+            });
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Error creating category",
+              description: error.message,
+            });
+          }
+          return;
+        }
+
+        toast({
+          title: "Category created",
+          description: "The category has been successfully created.",
+        });
+      }
+
+      onSuccess();
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    }
   };
 
   return (
@@ -92,6 +130,12 @@ export const CategoryDialog = ({
           <DialogTitle>
             {category ? "Edit Category" : "Create Category"}
           </DialogTitle>
+          <DialogDescription>
+            {category 
+              ? "Update the details of an existing category."
+              : "Create a new category for organizing services."
+            }
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
