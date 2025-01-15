@@ -54,8 +54,8 @@ const Services = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-[1400px] mx-auto">
-      <div className="flex justify-between items-center">
+    <div className="flex-1 p-6">
+      <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
           <SidebarTrigger />
           <h1 className="text-2xl font-bold">Services</h1>
@@ -63,26 +63,32 @@ const Services = () => {
       </div>
 
       <Tabs defaultValue="services" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="services" className="flex items-center gap-2">
+        <TabsList className="mb-6 bg-transparent border-b w-full justify-start rounded-none h-auto p-0 space-x-8">
+          <TabsTrigger 
+            value="services" 
+            className="flex items-center gap-2 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-0 pb-4"
+          >
             <Scissors className="h-4 w-4" />
             Services
           </TabsTrigger>
-          <TabsTrigger value="categories" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="categories" 
+            className="flex items-center gap-2 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-0 pb-4"
+          >
             <List className="h-4 w-4" />
             Categories
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="services" className="space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <div className="relative w-full sm:w-auto">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <TabsContent value="services" className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="relative w-full sm:w-[300px]">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search services..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 w-full"
+                className="pl-9"
               />
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -104,7 +110,7 @@ const Services = () => {
                   <List className="h-4 w-4" />
                 </Button>
               </div>
-              <Button onClick={handleCreateService} className="w-full sm:w-auto">
+              <Button onClick={handleCreateService}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Service
               </Button>
@@ -118,7 +124,7 @@ const Services = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="categories" className="space-y-4">
+        <TabsContent value="categories" className="space-y-6">
           <div className="flex justify-end">
             <Button onClick={handleCreateCategory}>
               <Plus className="h-4 w-4 mr-2" />

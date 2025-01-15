@@ -72,13 +72,13 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {filteredServices?.map((service) => (
-        <Card key={service.id}>
+        <Card key={service.id} className="flex flex-col">
           <CardHeader>
-            <CardTitle>{service.name}</CardTitle>
+            <CardTitle className="text-lg">{service.name}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             <div className="space-y-4">
               <div>
                 <span className="text-sm text-muted-foreground">Categories</span>
@@ -104,7 +104,7 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-end gap-2">
+          <CardFooter className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" size="icon" onClick={() => onEdit(service)}>
               <Edit className="h-4 w-4" />
             </Button>
