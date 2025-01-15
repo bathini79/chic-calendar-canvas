@@ -3,7 +3,7 @@ import { MetricsDashboard } from "@/components/dashboard/MetricsDashboard";
 import { CalendarControls } from "@/components/calendar/CalendarControls";
 import { BookingGrid } from "@/components/calendar/BookingGrid";
 import { supabase } from "@/integrations/supabase/client";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useNavigate } from "react-router-dom";
 
@@ -83,15 +83,15 @@ const Index = () => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen">
+      <div className="flex h-screen w-full overflow-hidden bg-background">
         <AppSidebar />
-        <main className="flex-1">
-          <div className="h-full p-4">
-            <div className="mx-auto max-w-[1400px] space-y-6">
-              <div className="flex items-center gap-4">
-                <SidebarTrigger />
-                <h1 className="text-2xl font-bold">Bookings</h1>
-              </div>
+        <SidebarInset>
+          <div className="flex h-full flex-col px-4 py-6">
+            <div className="flex items-center gap-4 mb-6">
+              <SidebarTrigger />
+              <h1 className="text-2xl font-bold">Bookings</h1>
+            </div>
+            <div className="flex-1 space-y-6 overflow-auto">
               <MetricsDashboard />
               <CalendarControls 
                 date={date}
@@ -109,7 +109,7 @@ const Index = () => {
               />
             </div>
           </div>
-        </main>
+        </SidebarInset>
       </div>
     </SidebarProvider>
   );
