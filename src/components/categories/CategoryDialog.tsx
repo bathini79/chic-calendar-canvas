@@ -1,3 +1,4 @@
+import React from "react";
 import { useForm } from "react-hook-form";
 import { useSession } from "@supabase/auth-helpers-react";
 import { Button } from "@/components/ui/button";
