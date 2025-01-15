@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import CategoriesList from "@/components/categories/CategoriesList";
-import CategoryDialog from "@/components/categories/CategoryDialog";
+import { CategoryDialog } from "@/components/categories/CategoryDialog";
 
 const Categories = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
