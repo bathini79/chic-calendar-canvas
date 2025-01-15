@@ -44,14 +44,15 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
         if (deleteError) throw deleteError;
 
         if (data.categories.length > 0) {
+          // Create the services_categories entries using just the category IDs
+          const serviceCategoriesData = data.categories.map((categoryId: string) => ({
+            service_id: initialData.id,
+            category_id: categoryId,
+          }));
+
           const { error: categoriesError } = await supabase
             .from('services_categories')
-            .insert(
-              data.categories.map((categoryId: string) => ({
-                service_id: initialData.id,
-                category_id: categoryId,
-              }))
-            );
+            .insert(serviceCategoriesData);
           
           if (categoriesError) throw categoriesError;
         }
@@ -74,14 +75,15 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
         if (serviceError) throw serviceError;
 
         if (data.categories.length > 0) {
+          // Create the services_categories entries using just the category IDs
+          const serviceCategoriesData = data.categories.map((categoryId: string) => ({
+            service_id: newService.id,
+            category_id: categoryId,
+          }));
+
           const { error: categoriesError } = await supabase
             .from('services_categories')
-            .insert(
-              data.categories.map((categoryId: string) => ({
-                service_id: newService.id,
-                category_id: categoryId,
-              }))
-            );
+            .insert(serviceCategoriesData);
           
           if (categoriesError) throw categoriesError;
         }
