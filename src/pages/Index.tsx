@@ -83,29 +83,31 @@ const Index = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex">
+      <div className="flex min-h-screen">
         <AppSidebar />
-        <main className="flex-1 p-4 lg:pl-4">
-          <div className="max-w-[1400px] mx-auto space-y-6">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <h1 className="text-2xl font-bold">Bookings</h1>
+        <main className="flex-1">
+          <div className="h-full p-4">
+            <div className="mx-auto max-w-[1400px] space-y-6">
+              <div className="flex items-center gap-4">
+                <SidebarTrigger />
+                <h1 className="text-2xl font-bold">Bookings</h1>
+              </div>
+              <MetricsDashboard />
+              <CalendarControls 
+                date={date}
+                setDate={setDate}
+                interval={interval}
+                setInterval={setInterval}
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+              />
+              <BookingGrid 
+                employees={MOCK_EMPLOYEES}
+                bookings={MOCK_BOOKINGS}
+                timeSlots={timeSlots}
+                viewMode={viewMode}
+              />
             </div>
-            <MetricsDashboard />
-            <CalendarControls 
-              date={date}
-              setDate={setDate}
-              interval={interval}
-              setInterval={setInterval}
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-            />
-            <BookingGrid 
-              employees={MOCK_EMPLOYEES}
-              bookings={MOCK_BOOKINGS}
-              timeSlots={timeSlots}
-              viewMode={viewMode}
-            />
           </div>
         </main>
       </div>
