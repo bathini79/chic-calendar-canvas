@@ -6,6 +6,7 @@ import { FormDialog } from "@/components/ui/form-dialog";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { categoryFormSchema, type CategoryFormValues } from "@/lib/validations/form-schemas";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CategoryDialogProps {
   open: boolean;
@@ -61,20 +62,26 @@ export function CategoryDialog({
       form={form}
       onSubmit={onSubmit}
       submitLabel={category ? "Update" : "Create"}
+      className="max-h-[90vh]"
+      contentClassName="p-0"
     >
-      <FormField
-        control={form.control}
-        name="name"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Name</FormLabel>
-            <FormControl>
-              <Input {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+      <ScrollArea className="max-h-[calc(90vh-200px)]">
+        <div className="p-6">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </ScrollArea>
     </FormDialog>
   );
 }
