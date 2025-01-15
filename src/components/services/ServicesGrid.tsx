@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash } from "lucide-react";
+import { Edit, Image as ImageIcon, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
@@ -75,6 +75,19 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
       {filteredServices?.map((service) => (
         <Card key={service.id} className="relative group">
+          {service.image_urls && service.image_urls.length > 0 ? (
+            <div className="relative aspect-video">
+              <img
+                src={service.image_urls[0]}
+                alt={service.name}
+                className="w-full h-full object-cover rounded-t-lg"
+              />
+            </div>
+          ) : (
+            <div className="relative aspect-video bg-muted flex items-center justify-center rounded-t-lg">
+              <ImageIcon className="h-8 w-8 text-muted-foreground" />
+            </div>
+          )}
           <CardHeader className="pb-4">
             <CardTitle className="text-lg flex justify-between items-start">
               <span className="line-clamp-1">{service.name}</span>

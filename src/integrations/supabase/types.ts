@@ -121,6 +121,7 @@ export type Database = {
           description: string | null
           duration: number
           id: string
+          image_urls: string[] | null
           name: string
           original_price: number
           selling_price: number
@@ -133,6 +134,7 @@ export type Database = {
           description?: string | null
           duration: number
           id?: string
+          image_urls?: string[] | null
           name: string
           original_price: number
           selling_price: number
@@ -145,6 +147,7 @@ export type Database = {
           description?: string | null
           duration?: number
           id?: string
+          image_urls?: string[] | null
           name?: string
           original_price?: number
           selling_price?: number

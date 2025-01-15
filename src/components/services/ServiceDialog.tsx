@@ -30,6 +30,7 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
             original_price: data.original_price,
             selling_price: data.selling_price,
             duration: data.duration,
+            image_urls: data.image_urls,
           })
           .eq('id', initialData.id);
         
@@ -68,6 +69,7 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
             original_price: data.original_price,
             selling_price: data.selling_price,
             duration: data.duration,
+            image_urls: data.image_urls,
           })
           .select()
           .single();
