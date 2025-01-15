@@ -141,6 +141,7 @@ export type Database = {
           created_at: string
           description: string | null
           duration: number
+          gender: string | null
           id: string
           image_urls: string[] | null
           name: string
@@ -154,6 +155,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration: number
+          gender?: string | null
           id?: string
           image_urls?: string[] | null
           name: string
@@ -167,6 +169,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration?: number
+          gender?: string | null
           id?: string
           image_urls?: string[] | null
           name?: string
