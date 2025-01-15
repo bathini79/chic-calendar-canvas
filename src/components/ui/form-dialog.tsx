@@ -27,6 +27,8 @@ interface FormDialogProps {
   children: React.ReactNode;
   submitLabel?: string;
   cancelLabel?: string;
+  className?: string;
+  contentClassName?: string;
 }
 
 export function FormDialog({
@@ -39,31 +41,35 @@ export function FormDialog({
   children,
   submitLabel = "Submit",
   cancelLabel = "Cancel",
+  className,
+  contentClassName,
 }: FormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className={className}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {children}
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                {cancelLabel}
-              </Button>
-              <Button type="submit">
-                {submitLabel}
-              </Button>
-            </div>
-          </form>
-        </Form>
+        <div className={contentClassName}>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {children}
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  {cancelLabel}
+                </Button>
+                <Button type="submit">
+                  {submitLabel}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </div>
       </DialogContent>
     </Dialog>
   );
