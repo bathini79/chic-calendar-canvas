@@ -151,12 +151,37 @@ export type Database = {
           status?: Database["public"]["Enums"]["service_status"] | null
           updated_at?: string
         }
+        Relationships: []
+      }
+      services_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          service_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          service_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          service_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "services_category_id_fkey"
+            foreignKeyName: "services_categories_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_categories_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
             referencedColumns: ["id"]
           },
         ]

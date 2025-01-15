@@ -9,19 +9,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CategoryMultiSelect } from "@/components/categories/CategoryMultiSelect";
+import { useState } from "react";
 
 interface ServiceFormData {
   name: string;
-  category_id: string;
+  categories: string[];
   original_price: number;
   selling_price: number;
   duration: number;
@@ -35,33 +28,39 @@ interface ServiceFormProps {
 }
 
 export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProps) {
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    initialData?.categories || []
+  );
+
   const form = useForm<ServiceFormData>({
-    defaultValues: initialData || {
-      name: "",
-      category_id: "",
-      original_price: 0,
-      selling_price: 0,
-      duration: 30,
-      description: "",
+    defaultValues: {
+      ...initialData,
+      categories: selectedCategories,
     },
   });
 
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
+  const handleCategorySelect = (categoryId: string) => {
+    const newCategories = [...selectedCategories, categoryId];
+    setSelectedCategories(newCategories);
+    form.setValue('categories', newCategories);
+  };
+
+  const handleCategoryRemove = (categoryId: string) => {
+    const newCategories = selectedCategories.filter(id => id !== categoryId);
+    setSelectedCategories(newCategories);
+    form.setValue('categories', newCategories);
+  };
+
+  const handleSubmit = (data: ServiceFormData) => {
+    onSubmit({
+      ...data,
+      categories: selectedCategories,
+    });
+  };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="name"
@@ -78,24 +77,17 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
 
         <FormField
           control={form.control}
-          name="category_id"
-          render={({ field }) => (
+          name="categories"
+          render={() => (
             <FormItem>
-              <FormLabel>Category</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {categories?.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormLabel>Categories</FormLabel>
+              <FormControl>
+                <CategoryMultiSelect
+                  selectedCategories={selectedCategories}
+                  onCategorySelect={handleCategorySelect}
+                  onCategoryRemove={handleCategoryRemove}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

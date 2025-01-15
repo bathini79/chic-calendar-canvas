@@ -21,19 +21,71 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
   const handleSubmit = async (data: any) => {
     try {
       if (initialData) {
-        const { error } = await supabase
+        // Update service
+        const { error: serviceError } = await supabase
           .from('services')
-          .update(data)
+          .update({
+            name: data.name,
+            description: data.description,
+            original_price: data.original_price,
+            selling_price: data.selling_price,
+            duration: data.duration,
+          })
           .eq('id', initialData.id);
         
-        if (error) throw error;
+        if (serviceError) throw serviceError;
+
+        // Update service categories
+        const { error: deleteError } = await supabase
+          .from('services_categories')
+          .delete()
+          .eq('service_id', initialData.id);
+        
+        if (deleteError) throw deleteError;
+
+        if (data.categories.length > 0) {
+          const { error: categoriesError } = await supabase
+            .from('services_categories')
+            .insert(
+              data.categories.map((categoryId: string) => ({
+                service_id: initialData.id,
+                category_id: categoryId,
+              }))
+            );
+          
+          if (categoriesError) throw categoriesError;
+        }
+        
         toast.success('Service updated successfully');
       } else {
-        const { error } = await supabase
+        // Create service
+        const { data: newService, error: serviceError } = await supabase
           .from('services')
-          .insert(data);
+          .insert({
+            name: data.name,
+            description: data.description,
+            original_price: data.original_price,
+            selling_price: data.selling_price,
+            duration: data.duration,
+          })
+          .select()
+          .single();
         
-        if (error) throw error;
+        if (serviceError) throw serviceError;
+
+        if (data.categories.length > 0) {
+          const { error: categoriesError } = await supabase
+            .from('services_categories')
+            .insert(
+              data.categories.map((categoryId: string) => ({
+                service_id: newService.id,
+                category_id: categoryId,
+              }))
+            );
+          
+          if (categoriesError) throw categoriesError;
+        }
+        
         toast.success('Service created successfully');
       }
       
