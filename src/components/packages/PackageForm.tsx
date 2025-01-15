@@ -172,7 +172,19 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
       setCalculatedPrice(Math.max(0, basePrice));
       form.setValue('price', Math.max(0, basePrice));
     }
-  }, [selectedServices, form.watch('discount_type'), form.watch('discount_value'), services]);
+  }, [selectedServices, services]);
+
+  // Calculate total duration based on selected services
+  useEffect(() => {
+    if (services) {
+      const totalDuration = selectedServices.reduce((total, serviceId) => {
+        const service = services.find(s => s.id === serviceId);
+        return total + (service?.duration || 0);
+      }, 0);
+
+      form.setValue('duration', totalDuration);
+    }
+  }, [selectedServices, services]);
 
   return (
     <Form {...form}>
