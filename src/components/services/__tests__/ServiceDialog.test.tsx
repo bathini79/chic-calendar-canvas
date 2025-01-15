@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ServiceDialog } from '../ServiceDialog';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // Mock the supabase client
 vi.mock('@/integrations/supabase/client', () => ({
@@ -35,7 +35,8 @@ describe('ServiceDialog', () => {
   const queryClient = new QueryClient();
   const defaultProps = {
     open: true,
-    onOpenChange: vi.fn()
+    onOpenChange: vi.fn(),
+    initialData: undefined
   };
 
   const renderComponent = (props = defaultProps) => {

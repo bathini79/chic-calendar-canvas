@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ServicesGrid } from '../ServicesGrid';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // Mock the supabase client
 vi.mock('@/integrations/supabase/client', () => ({
@@ -18,12 +18,6 @@ vi.mock('@/integrations/supabase/client', () => ({
             categories: []
           }
         ],
-        error: null
-      })
-    }),
-    delete: () => ({
-      eq: () => ({
-        data: null,
         error: null
       })
     })
