@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MetricsDashboard } from "@/components/dashboard/MetricsDashboard";
 import { CalendarControls } from "@/components/calendar/CalendarControls";
 import { BookingGrid } from "@/components/calendar/BookingGrid";
@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { LogOut } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { useNavigate } from "react-router-dom";
 
 const MOCK_EMPLOYEES = [
   { 
@@ -68,12 +69,24 @@ const Index = () => {
   const [interval, setInterval] = useState(15);
   const [date, setDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const navigate = useNavigate();
 
-  const timeSlots = generateTimeSlots(interval);
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/auth");
+      }
+    };
+    checkAuth();
+  }, [navigate]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    navigate("/auth");
   };
+
+  const timeSlots = generateTimeSlots(interval);
 
   return (
     <SidebarProvider>
