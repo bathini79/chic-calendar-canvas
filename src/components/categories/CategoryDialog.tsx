@@ -42,6 +42,19 @@ export const CategoryDialog = ({
     },
   });
 
+  // Reset form when category changes
+  React.useEffect(() => {
+    if (category) {
+      form.reset({
+        name: category.name,
+      });
+    } else {
+      form.reset({
+        name: "",
+      });
+    }
+  }, [category, form]);
+
   const onSubmit = async (values: { name: string }) => {
     if (!session) {
       toast({

@@ -22,6 +22,31 @@ const CategoriesList = ({ categories, onEdit, onDelete }: CategoriesListProps) =
 
   const handleDelete = async (id: string) => {
     try {
+      // First check if category is being used by any services
+      const { data: servicesUsingCategory, error: checkError } = await supabase
+        .from("services_categories")
+        .select("service_id")
+        .eq("category_id", id);
+
+      if (checkError) {
+        toast({
+          variant: "destructive",
+          title: "Error checking category usage",
+          description: checkError.message,
+        });
+        return;
+      }
+
+      if (servicesUsingCategory && servicesUsingCategory.length > 0) {
+        toast({
+          variant: "destructive",
+          title: "Cannot delete category",
+          description: `This category is being used by ${servicesUsingCategory.length} service(s). Please remove it from all services first.`,
+        });
+        return;
+      }
+
+      // If category is not being used, proceed with deletion
       const { error } = await supabase
         .from("categories")
         .delete()
