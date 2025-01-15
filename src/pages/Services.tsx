@@ -53,7 +53,7 @@ const Services = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="flex-1 space-y-6 p-8">
       <div className="flex flex-col space-y-6">
         <h1 className="text-2xl font-bold">Services</h1>
 
