@@ -83,10 +83,10 @@ const Index = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex">
         <AppSidebar />
-        <div className="flex-1 pl-4 md:pl-4 lg:pl-6 pr-4 md:pr-4 lg:pr-6">
-          <div className="py-4 md:py-6 lg:py-8 space-y-4 md:space-y-6 lg:space-y-8 max-w-[1400px] mx-auto">
+        <main className="flex-1 p-4 lg:pl-4">
+          <div className="max-w-[1400px] mx-auto space-y-6">
             <div className="flex items-center gap-4">
               <SidebarTrigger />
               <h1 className="text-2xl font-bold">Bookings</h1>
@@ -107,7 +107,7 @@ const Index = () => {
               viewMode={viewMode}
             />
           </div>
-        </div>
+        </main>
       </div>
     </SidebarProvider>
   );
