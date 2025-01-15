@@ -3,7 +3,7 @@ import { MetricsDashboard } from "@/components/dashboard/MetricsDashboard";
 import { CalendarControls } from "@/components/calendar/CalendarControls";
 import { BookingGrid } from "@/components/calendar/BookingGrid";
 import { supabase } from "@/integrations/supabase/client";
-import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useNavigate } from "react-router-dom";
 
@@ -82,16 +82,15 @@ const Index = () => {
   const timeSlots = generateTimeSlots(interval);
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden bg-background">
+    <SidebarProvider defaultOpen>
+      <div className="flex min-h-screen bg-background">
         <AppSidebar />
-        <SidebarInset>
-          <div className="flex h-full flex-col px-4 py-6">
-            <div className="flex items-center gap-4 mb-6">
-              <SidebarTrigger />
+        <SidebarInset className="flex-1">
+          <div className="container mx-auto p-4 md:p-6 space-y-6">
+            <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold">Bookings</h1>
             </div>
-            <div className="flex-1 space-y-6 overflow-auto">
+            <div className="space-y-6">
               <MetricsDashboard />
               <CalendarControls 
                 date={date}
