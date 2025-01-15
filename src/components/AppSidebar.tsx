@@ -6,12 +6,12 @@ import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { CollapsibleSection } from "@/components/ui/collapsible-section"
 
 const items = [
   {
@@ -68,32 +68,33 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
+          <CollapsibleSection title="Dashboard" defaultOpen={true}>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton 
+                      onClick={handleNavigation(item.url)}
+                      data-active={location.pathname === item.url}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+                <SidebarMenuItem className="mt-auto">
                   <SidebarMenuButton 
-                    onClick={handleNavigation(item.url)}
-                    data-active={location.pathname === item.url}
+                    onClick={handleLogout}
+                    variant="outline"
+                    className="bg-black text-white hover:bg-black/90"
                   >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.title}</span>
+                    <LogOut className="h-4 w-4" />
+                    <span>Logout</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
-              <SidebarMenuItem className="mt-auto">
-                <SidebarMenuButton 
-                  onClick={handleLogout}
-                  variant="outline"
-                  className="bg-black text-white hover:bg-black/90"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </CollapsibleSection>
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
