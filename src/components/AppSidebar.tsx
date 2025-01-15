@@ -11,7 +11,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
 } from "@/components/ui/sidebar"
 
 const items = [
@@ -67,16 +66,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-2">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleLogout}>
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
@@ -93,6 +82,16 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem className="mt-auto">
+                <SidebarMenuButton 
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="bg-black text-white hover:bg-black/90"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
