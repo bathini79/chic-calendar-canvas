@@ -53,94 +53,119 @@ const Services = () => {
   };
 
   return (
-    <div className="w-full h-full p-6">
-      <div className="flex justify-between items-center mb-8">
+    <div className="w-full min-h-screen bg-background p-6">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Services</h1>
       </div>
 
       <Tabs defaultValue="services" className="w-full">
-        <div className="flex justify-between items-center mb-6 border-b w-full">
-          <TabsList className="bg-transparent h-auto p-0">
-            <TabsTrigger 
-              value="services" 
-              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 pb-3"
-            >
-              <div className="flex items-center gap-2">
+        <div className="flex flex-col space-y-6">
+          <div className="flex items-center border-b">
+            <TabsList className="bg-transparent h-auto p-0">
+              <TabsTrigger 
+                value="services" 
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 pb-3 flex items-center gap-2"
+              >
                 <LayoutGrid className="h-4 w-4" />
                 Services
-              </div>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="categories" 
-              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 pb-3"
-            >
-              <div className="flex items-center gap-2">
+              </TabsTrigger>
+              <TabsTrigger 
+                value="categories" 
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 pb-3 flex items-center gap-2"
+              >
                 <List className="h-4 w-4" />
                 Categories
-              </div>
-            </TabsTrigger>
-          </TabsList>
-        </div>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-        <TabsContent value="services" className="space-y-8 w-full">
-          <div className="flex justify-between items-center gap-4">
-            <div className="relative w-[300px]">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search services..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="border rounded-md p-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setViewMode('grid')}
-                  className={viewMode === 'grid' ? 'bg-secondary' : ''}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setViewMode('list')}
-                  className={viewMode === 'list' ? 'bg-secondary' : ''}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
+          <TabsContent value="services" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="relative w-[300px]">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search services..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="flex items-center border rounded-lg overflow-hidden">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewMode('grid')}
+                    className={`rounded-none ${viewMode === 'grid' ? 'bg-secondary' : ''}`}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewMode('list')}
+                    className={`rounded-none ${viewMode === 'list' ? 'bg-secondary' : ''}`}
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <Button onClick={handleCreateService}>
+              <Button onClick={handleCreateService} className="ml-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Service
               </Button>
             </div>
-          </div>
 
-          {viewMode === 'grid' ? (
-            <ServicesGrid searchQuery={searchQuery} onEdit={handleEditService} />
-          ) : (
-            <ServicesList searchQuery={searchQuery} onEdit={handleEditService} />
-          )}
-        </TabsContent>
+            {viewMode === 'grid' ? (
+              <ServicesGrid searchQuery={searchQuery} onEdit={handleEditService} />
+            ) : (
+              <ServicesList searchQuery={searchQuery} onEdit={handleEditService} />
+            )}
+          </TabsContent>
 
-        <TabsContent value="categories" className="space-y-6 w-full">
-          <div className="flex justify-end">
-            <Button onClick={handleCreateCategory}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Category
-            </Button>
-          </div>
-          {categories && (
-            <CategoriesList
-              categories={categories}
-              onEdit={handleEditCategory}
-              onDelete={refetchCategories}
-            />
-          )}
-        </TabsContent>
+          <TabsContent value="categories" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="relative w-[300px]">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search categories..."
+                    className="pl-9"
+                  />
+                </div>
+                <div className="flex items-center border rounded-lg overflow-hidden">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewMode('grid')}
+                    className={`rounded-none ${viewMode === 'grid' ? 'bg-secondary' : ''}`}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewMode('list')}
+                    className={`rounded-none ${viewMode === 'list' ? 'bg-secondary' : ''}`}
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <Button onClick={handleCreateCategory}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Category
+              </Button>
+            </div>
+            {categories && (
+              <CategoriesList
+                categories={categories}
+                onEdit={handleEditCategory}
+                onDelete={refetchCategories}
+              />
+            )}
+          </TabsContent>
+        </div>
       </Tabs>
 
       <ServiceDialog

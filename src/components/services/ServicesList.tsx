@@ -79,7 +79,7 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
   }
 
   return (
-    <div className="w-full border rounded-lg overflow-hidden">
+    <div className="border rounded-lg overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
@@ -88,7 +88,7 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
             <TableHead>Original Price</TableHead>
             <TableHead>Selling Price</TableHead>
             <TableHead>Duration</TableHead>
-            <TableHead className="text-right w-[100px]">Actions</TableHead>
+            <TableHead className="w-[100px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -107,13 +107,15 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
               <TableCell>₹{service.original_price}</TableCell>
               <TableCell>₹{service.selling_price}</TableCell>
               <TableCell>{service.duration} min</TableCell>
-              <TableCell className="text-right space-x-2">
-                <Button variant="outline" size="icon" onClick={() => onEdit(service)}>
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={() => handleDelete(service.id)}>
-                  <Trash className="h-4 w-4" />
-                </Button>
+              <TableCell>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="icon" onClick={() => onEdit(service)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(service.id)}>
+                    <Trash className="h-4 w-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
