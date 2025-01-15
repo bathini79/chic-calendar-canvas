@@ -19,10 +19,6 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleError = (error: Error) => {
-    setErrorMessage(error.message);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="container max-w-md space-y-6 p-8">
@@ -77,7 +73,6 @@ const Auth = () => {
               },
             }}
             providers={[]}
-            onError={handleError}
           />
         </div>
       </div>
