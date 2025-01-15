@@ -83,22 +83,22 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Service Name</TableHead>
-            <TableHead>Categories</TableHead>
+            <TableHead className="w-[200px]">Service Name</TableHead>
+            <TableHead className="w-[250px]">Categories</TableHead>
             <TableHead>Original Price</TableHead>
             <TableHead>Selling Price</TableHead>
             <TableHead>Duration</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-right w-[100px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredServices?.map((service) => (
             <TableRow key={service.id}>
-              <TableCell>{service.name}</TableCell>
+              <TableCell className="font-medium">{service.name}</TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">
                   {service.categories.map((category: any) => (
-                    <Badge key={category.id} variant="secondary">
+                    <Badge key={category.id} variant="secondary" className="text-xs">
                       {category.name}
                     </Badge>
                   ))}

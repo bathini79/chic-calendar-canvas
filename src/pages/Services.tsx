@@ -53,9 +53,9 @@ const Services = () => {
   };
 
   return (
-    <div className="w-full p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Services</h1>
+    <div className="container mx-auto px-4 py-6">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Services</h1>
       </div>
 
       <Tabs defaultValue="services" className="w-full">
@@ -63,7 +63,7 @@ const Services = () => {
           <TabsList className="bg-transparent h-auto p-0">
             <TabsTrigger 
               value="services" 
-              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 pb-2"
+              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 pb-3"
             >
               <div className="flex items-center gap-2">
                 <LayoutGrid className="h-4 w-4" />
@@ -72,7 +72,7 @@ const Services = () => {
             </TabsTrigger>
             <TabsTrigger 
               value="categories" 
-              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 pb-2"
+              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 pb-3"
             >
               <div className="flex items-center gap-2">
                 <List className="h-4 w-4" />
@@ -82,7 +82,7 @@ const Services = () => {
           </TabsList>
         </div>
 
-        <TabsContent value="services" className="space-y-6">
+        <TabsContent value="services" className="space-y-8">
           <div className="flex justify-between items-center gap-4">
             <div className="relative w-[300px]">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -93,7 +93,7 @@ const Services = () => {
                 className="pl-9"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
               <div className="border rounded-md p-1">
                 <Button
                   variant="ghost"
