@@ -1,6 +1,8 @@
 import React from "react";
 import { useForm } from "react-hook-form";
 import { useSession } from "@supabase/auth-helpers-react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +23,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+const formSchema = z.object({
+  name: z.string().min(1, "Category name is required"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
 interface CategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,7 +45,8 @@ export const CategoryDialog = ({
   const { toast } = useToast();
   const session = useSession();
   
-  const form = useForm({
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       name: category?.name || "",
     },
@@ -56,7 +65,7 @@ export const CategoryDialog = ({
     }
   }, [category, form]);
 
-  const onSubmit = async (values: { name: string }) => {
+  const onSubmit = async (values: FormValues) => {
     if (!session) {
       toast({
         variant: "destructive",
