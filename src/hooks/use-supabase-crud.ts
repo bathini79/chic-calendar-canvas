@@ -2,8 +2,10 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@supabase/auth-helpers-react";
 
+type TableNames = 'categories' | 'package_services' | 'packages' | 'services' | 'profiles' | 'services_categories';
+
 interface CrudOptions {
-  table: string;
+  table: TableNames;
   requireAuth?: boolean;
   adminOnly?: boolean;
 }
