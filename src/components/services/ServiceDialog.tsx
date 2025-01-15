@@ -44,7 +44,7 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
         if (deleteError) throw deleteError;
 
         if (data.categories.length > 0) {
-          // Create the services_categories entries using just the category IDs
+          // Create services_categories entries with just the category IDs
           const serviceCategoriesData = data.categories.map((categoryId: string) => ({
             service_id: initialData.id,
             category_id: categoryId,
@@ -75,7 +75,7 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
         if (serviceError) throw serviceError;
 
         if (data.categories.length > 0) {
-          // Create the services_categories entries using just the category IDs
+          // Create services_categories entries with just the category IDs
           const serviceCategoriesData = data.categories.map((categoryId: string) => ({
             service_id: newService.id,
             category_id: categoryId,
