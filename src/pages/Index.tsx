@@ -2,9 +2,7 @@ import { useState, useEffect } from "react";
 import { MetricsDashboard } from "@/components/dashboard/MetricsDashboard";
 import { CalendarControls } from "@/components/calendar/CalendarControls";
 import { BookingGrid } from "@/components/calendar/BookingGrid";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useNavigate } from "react-router-dom";
@@ -81,28 +79,17 @@ const Index = () => {
     checkAuth();
   }, [navigate]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/auth");
-  };
-
   const timeSlots = generateTimeSlots(interval);
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <div className="flex-1 pl-4 md:pl-6 pr-4 md:pr-6">
-          <div className="py-4 md:py-8 space-y-4 md:space-y-8">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <SidebarTrigger />
-                <h1 className="text-2xl font-bold">Bookings</h1>
-              </div>
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
+        <div className="flex-1 pl-4 md:pl-4 lg:pl-6 pr-4 md:pr-4 lg:pr-6">
+          <div className="py-4 md:py-6 lg:py-8 space-y-4 md:space-y-6 lg:space-y-8 max-w-[1400px] mx-auto">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger />
+              <h1 className="text-2xl font-bold">Bookings</h1>
             </div>
             <MetricsDashboard />
             <CalendarControls 
