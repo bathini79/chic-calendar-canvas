@@ -3,7 +3,7 @@ import { MetricsDashboard } from "@/components/dashboard/MetricsDashboard";
 import { CalendarControls } from "@/components/calendar/CalendarControls";
 import { BookingGrid } from "@/components/calendar/BookingGrid";
 import { supabase } from "@/integrations/supabase/client";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useNavigate } from "react-router-dom";
 
@@ -85,6 +85,7 @@ const Index = () => {
     <SidebarProvider defaultOpen>
       <div className="flex min-h-screen bg-background">
         <AppSidebar />
+        <SidebarRail />
         <SidebarInset className="flex-1">
           <div className="container mx-auto p-4 md:p-6 space-y-6">
             <div className="flex items-center gap-4">
