@@ -148,7 +148,8 @@ const Services = () => {
       <CategoryDialog
         open={categoryDialogOpen}
         onOpenChange={setCategoryDialogOpen}
-        initialData={selectedCategory}
+        category={selectedCategory}
+        onSuccess={refetchCategories}
       />
     </SidebarProvider>
   );

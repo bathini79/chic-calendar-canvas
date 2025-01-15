@@ -25,7 +25,7 @@ interface CategoryDialogProps {
   onSuccess: () => void;
 }
 
-const CategoryDialog = ({
+export const CategoryDialog = ({
   open,
   onOpenChange,
   category,
@@ -126,5 +126,3 @@ const CategoryDialog = ({
     </Dialog>
   );
 };
-
-export default CategoryDialog;
