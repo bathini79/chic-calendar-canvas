@@ -80,9 +80,9 @@ const Services = () => {
           </div>
 
           <TabsContent value="services" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="relative w-[300px]">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative w-full sm:max-w-[300px]">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search services..."
@@ -91,6 +91,8 @@ const Services = () => {
                     className="pl-9"
                   />
                 </div>
+              </div>
+              <div className="flex gap-2 items-center justify-between sm:justify-end">
                 <div className="flex items-center border rounded-lg overflow-hidden">
                   <Button
                     variant="ghost"
@@ -109,11 +111,11 @@ const Services = () => {
                     <List className="h-4 w-4" />
                   </Button>
                 </div>
+                <Button onClick={handleCreateService}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Service
+                </Button>
               </div>
-              <Button onClick={handleCreateService} className="ml-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Service
-              </Button>
             </div>
 
             {viewMode === 'grid' ? (
@@ -124,15 +126,17 @@ const Services = () => {
           </TabsContent>
 
           <TabsContent value="categories" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="relative w-[300px]">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative w-full sm:max-w-[300px]">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search categories..."
                     className="pl-9"
                   />
                 </div>
+              </div>
+              <div className="flex gap-2 items-center justify-between sm:justify-end">
                 <div className="flex items-center border rounded-lg overflow-hidden">
                   <Button
                     variant="ghost"
@@ -151,11 +155,11 @@ const Services = () => {
                     <List className="h-4 w-4" />
                   </Button>
                 </div>
+                <Button onClick={handleCreateCategory}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Category
+                </Button>
               </div>
-              <Button onClick={handleCreateCategory}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Category
-              </Button>
             </div>
             {categories && (
               <CategoriesList
