@@ -28,6 +28,13 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
             name: data.name,
             description: data.description,
             price: data.price,
+            duration: data.duration,
+            is_customizable: data.is_customizable,
+            customizable_services: data.customizable_services,
+            status: data.status,
+            discount_type: data.discount_type,
+            discount_value: data.discount_value,
+            image_urls: data.image_urls,
           })
           .eq('id', initialData.id);
         
@@ -41,7 +48,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
         
         if (deleteError) throw deleteError;
 
-        // Insert new services if any are selected
+        // Insert new services
         if (data.services && data.services.length > 0) {
           const packageServicesData = data.services.map((serviceId: string) => ({
             package_id: initialData.id,
@@ -64,13 +71,20 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
             name: data.name,
             description: data.description,
             price: data.price,
+            duration: data.duration,
+            is_customizable: data.is_customizable,
+            customizable_services: data.customizable_services,
+            status: data.status,
+            discount_type: data.discount_type,
+            discount_value: data.discount_value,
+            image_urls: data.image_urls,
           })
           .select()
           .single();
         
         if (packageError) throw packageError;
 
-        // Insert services if any are selected
+        // Insert services
         if (data.services && data.services.length > 0) {
           const packageServicesData = data.services.map((serviceId: string) => ({
             package_id: newPackage.id,

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ServiceMultiSelect } from "./ServiceMultiSelect";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Switch } from "@/components/ui/switch";
@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Image, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 const formSchema = z.object({
   name: z.string().min(1, "Package name is required"),
@@ -26,12 +27,11 @@ const formSchema = z.object({
   description: z.string().optional(),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
   is_customizable: z.boolean().default(false),
-  start_date: z.string().optional(),
-  end_date: z.string().optional(),
   status: z.enum(['active', 'inactive']).default('active'),
   discount_type: z.enum(['none', 'percentage', 'fixed']).default('none'),
   discount_value: z.number().min(0).default(0),
   image_urls: z.array(z.string()).optional(),
+  customizable_services: z.array(z.string()).default([]),
 });
 
 type PackageFormData = z.infer<typeof formSchema>;
@@ -46,8 +46,26 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
   const [selectedServices, setSelectedServices] = useState<string[]>(
     initialData?.services?.map((service: any) => service.id) || []
   );
+  const [customizableServices, setCustomizableServices] = useState<string[]>(
+    initialData?.customizable_services || []
+  );
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
+  const [calculatedPrice, setCalculatedPrice] = useState(0);
+
+  // Fetch all services to calculate total price
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const form = useForm<PackageFormData>({
     resolver: zodResolver(formSchema),
@@ -58,14 +76,48 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
       description: initialData?.description || '',
       duration: initialData?.duration || 0,
       is_customizable: initialData?.is_customizable || false,
-      start_date: initialData?.start_date || '',
-      end_date: initialData?.end_date || '',
       status: initialData?.status || 'active',
       discount_type: initialData?.discount_type || 'none',
       discount_value: initialData?.discount_value || 0,
       image_urls: images,
+      customizable_services: customizableServices,
     },
   });
+
+  // Calculate total price based on selected services
+  useEffect(() => {
+    if (services) {
+      const basePrice = selectedServices.reduce((total, serviceId) => {
+        const service = services.find(s => s.id === serviceId);
+        return total + (service?.selling_price || 0);
+      }, 0);
+
+      // Apply discount if any
+      const discountType = form.watch('discount_type');
+      const discountValue = form.watch('discount_value');
+      
+      let finalPrice = basePrice;
+      if (discountType === 'percentage') {
+        finalPrice = basePrice * (1 - (discountValue / 100));
+      } else if (discountType === 'fixed') {
+        finalPrice = basePrice - discountValue;
+      }
+
+      setCalculatedPrice(Math.max(0, finalPrice));
+      form.setValue('price', Math.max(0, finalPrice));
+    }
+  }, [selectedServices, form.watch('discount_type'), form.watch('discount_value'), services]);
+
+  // Calculate total duration
+  useEffect(() => {
+    if (services) {
+      const totalDuration = selectedServices.reduce((total, serviceId) => {
+        const service = services.find(s => s.id === serviceId);
+        return total + (service?.duration || 0);
+      }, 0);
+      form.setValue('duration', totalDuration);
+    }
+  }, [selectedServices, services]);
 
   const handleServiceSelect = (serviceId: string) => {
     const newServices = [...selectedServices, serviceId];
@@ -77,6 +129,18 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     const newServices = selectedServices.filter(id => id !== serviceId);
     setSelectedServices(newServices);
     form.setValue('services', newServices);
+  };
+
+  const handleCustomizableServiceSelect = (serviceId: string) => {
+    const newServices = [...customizableServices, serviceId];
+    setCustomizableServices(newServices);
+    form.setValue('customizable_services', newServices);
+  };
+
+  const handleCustomizableServiceRemove = (serviceId: string) => {
+    const newServices = customizableServices.filter(id => id !== serviceId);
+    setCustomizableServices(newServices);
+    form.setValue('customizable_services', newServices);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,9 +239,15 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Price (₹) *</FormLabel>
+                <FormLabel>Price (₹)</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                  <Input 
+                    type="number" 
+                    {...field} 
+                    value={calculatedPrice}
+                    disabled
+                    className="bg-muted"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -189,9 +259,14 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
             name="duration"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Duration (minutes) *</FormLabel>
+                <FormLabel>Duration (minutes)</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                  <Input 
+                    type="number" 
+                    {...field}
+                    disabled
+                    className="bg-muted"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -220,55 +295,28 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
           )}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {form.watch('is_customizable') && (
           <FormField
             control={form.control}
-            name="start_date"
-            render={({ field }) => (
+            name="customizable_services"
+            render={() => (
               <FormItem>
-                <FormLabel>Start Date</FormLabel>
+                <FormLabel>Customizable Services</FormLabel>
                 <FormControl>
-                  <Input type="date" {...field} />
+                  <ServiceMultiSelect
+                    selectedServices={customizableServices}
+                    onServiceSelect={handleCustomizableServiceSelect}
+                    onServiceRemove={handleCustomizableServiceRemove}
+                  />
                 </FormControl>
+                <div className="text-sm text-muted-foreground">
+                  Select services that customers can add to this package
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
-
-          <FormField
-            control={form.control}
-            name="end_date"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>End Date</FormLabel>
-                <FormControl>
-                  <Input type="date" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
-          control={form.control}
-          name="status"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Status</FormLabel>
-              <FormControl>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  {...field}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
@@ -297,7 +345,9 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
             name="discount_value"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Discount Value</FormLabel>
+                <FormLabel>
+                  {form.watch('discount_type') === 'percentage' ? 'Discount (%)' : 'Discount Amount (₹)'}
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -311,6 +361,26 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Status</FormLabel>
+              <FormControl>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  {...field}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}
