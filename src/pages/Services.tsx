@@ -6,6 +6,13 @@ import { AppSidebar } from "@/components/AppSidebar";
 
 const Services = () => {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedService, setSelectedService] = useState<any>(null);
+
+  const handleEdit = (service: any) => {
+    setSelectedService(service);
+    setOpen(true);
+  };
 
   return (
     <SidebarProvider defaultOpen>
@@ -16,9 +23,16 @@ const Services = () => {
           <div className="container mx-auto p-4 md:p-6 space-y-6">
             <div className="flex items-center justify-between">
               <h1 className="text-2xl font-bold">Services</h1>
-              <ServiceDialog open={open} onOpenChange={setOpen} />
+              <ServiceDialog 
+                open={open} 
+                onOpenChange={setOpen}
+                initialData={selectedService}
+              />
             </div>
-            <ServicesGrid />
+            <ServicesGrid 
+              searchQuery={searchQuery}
+              onEdit={handleEdit}
+            />
           </div>
         </SidebarInset>
       </div>
