@@ -35,7 +35,7 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
         
         if (serviceError) throw serviceError;
 
-        // Update service categories
+        // Delete existing categories
         const { error: deleteError } = await supabase
           .from('services_categories')
           .delete()
@@ -43,8 +43,8 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
         
         if (deleteError) throw deleteError;
 
-        if (data.categories.length > 0) {
-          // Create services_categories entries with just the category IDs
+        // Insert new categories if any are selected
+        if (data.categories && data.categories.length > 0) {
           const serviceCategoriesData = data.categories.map((categoryId: string) => ({
             service_id: initialData.id,
             category_id: categoryId,
@@ -59,7 +59,7 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
         
         toast.success('Service updated successfully');
       } else {
-        // Create service
+        // Create new service
         const { data: newService, error: serviceError } = await supabase
           .from('services')
           .insert({
@@ -74,8 +74,8 @@ export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialog
         
         if (serviceError) throw serviceError;
 
-        if (data.categories.length > 0) {
-          // Create services_categories entries with just the category IDs
+        // Insert categories if any are selected
+        if (data.categories && data.categories.length > 0) {
           const serviceCategoriesData = data.categories.map((categoryId: string) => ({
             service_id: newService.id,
             category_id: categoryId,
