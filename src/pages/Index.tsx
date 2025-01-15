@@ -4,9 +4,21 @@ import { CalendarControls } from "@/components/calendar/CalendarControls";
 import { BookingGrid } from "@/components/calendar/BookingGrid";
 
 const MOCK_EMPLOYEES = [
-  { id: 1, name: "Alex Johnson" },
-  { id: 2, name: "Sarah Smith" },
-  { id: 3, name: "Michael Brown" },
+  { 
+    id: 1, 
+    name: "Alex Johnson",
+    image: "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952"
+  },
+  { 
+    id: 2, 
+    name: "Sarah Smith",
+    image: "https://images.unsplash.com/photo-1649972904349-6e44c42644a7"
+  },
+  { 
+    id: 3, 
+    name: "Michael Brown",
+    image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158"
+  },
 ];
 
 const MOCK_BOOKINGS = [
