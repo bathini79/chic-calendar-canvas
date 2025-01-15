@@ -9,6 +9,84 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      package_services: {
+        Row: {
+          package_id: string
+          service_id: string
+        }
+        Insert: {
+          package_id: string
+          service_id: string
+        }
+        Update: {
+          package_id?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_services_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packages: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -36,6 +114,53 @@ export type Database = {
         }
         Relationships: []
       }
+      services: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          description: string | null
+          duration: number
+          id: string
+          name: string
+          original_price: number
+          selling_price: number
+          status: Database["public"]["Enums"]["service_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          duration: number
+          id?: string
+          name: string
+          original_price: number
+          selling_price: number
+          status?: Database["public"]["Enums"]["service_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          duration?: number
+          id?: string
+          name?: string
+          original_price?: number
+          selling_price?: number
+          status?: Database["public"]["Enums"]["service_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -44,6 +169,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      service_status: "active" | "inactive" | "archived"
       user_role: "customer" | "employee" | "admin" | "superadmin"
     }
     CompositeTypes: {
