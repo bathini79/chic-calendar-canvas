@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, List, Plus, Search } from "lucide-react";
+import { LayoutGrid, List, Plus, Search, Scissors } from "lucide-react";
 import { ServicesGrid } from "@/components/services/ServicesGrid";
 import { ServicesList } from "@/components/services/ServicesList";
 import { ServiceDialog } from "@/components/services/ServiceDialog";
@@ -53,27 +53,23 @@ const Services = () => {
   };
 
   return (
-    <div className="flex-1 p-8 max-w-[1600px] mx-auto">
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Services</h1>
+    <div className="flex-1 space-y-6 p-8">
+      <div className="flex flex-col space-y-6">
+        <h1 className="text-2xl font-bold">Services</h1>
 
         <Tabs defaultValue="services" className="w-full">
-          <TabsList className="w-full border-b rounded-none p-0 h-auto bg-transparent space-x-8">
-            <TabsTrigger 
-              value="services" 
-              className="border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 rounded-none"
-            >
+          <TabsList>
+            <TabsTrigger value="services" className="flex items-center gap-2">
+              <Scissors className="h-4 w-4" />
               Services
             </TabsTrigger>
-            <TabsTrigger 
-              value="categories" 
-              className="border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 rounded-none"
-            >
+            <TabsTrigger value="categories" className="flex items-center gap-2">
+              <List className="h-4 w-4" />
               Categories
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="services" className="space-y-6 mt-6">
+          <TabsContent value="services" className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="relative w-full sm:w-[300px]">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -103,7 +99,7 @@ const Services = () => {
                     <List className="h-4 w-4" />
                   </Button>
                 </div>
-                <Button onClick={() => setServiceDialogOpen(true)}>
+                <Button onClick={handleCreateService}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Service
                 </Button>
@@ -117,9 +113,9 @@ const Services = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="categories" className="space-y-6 mt-6">
+          <TabsContent value="categories" className="space-y-6">
             <div className="flex justify-end">
-              <Button onClick={() => setCategoryDialogOpen(true)} variant="default">
+              <Button onClick={handleCreateCategory}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Category
               </Button>
