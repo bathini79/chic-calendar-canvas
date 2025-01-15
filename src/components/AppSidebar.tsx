@@ -69,31 +69,29 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <CollapsibleSection title="Dashboard" defaultOpen={true}>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      onClick={handleNavigation(item.url)}
-                      data-active={location.pathname === item.url}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-                <SidebarMenuItem className="mt-auto">
+            <SidebarMenu>
+              {items.map((item) => (
+                <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
-                    onClick={handleLogout}
-                    variant="outline"
-                    className="bg-black text-white hover:bg-black/90"
+                    onClick={handleNavigation(item.url)}
+                    data-active={location.pathname === item.url}
                   >
-                    <LogOut className="h-4 w-4" />
-                    <span>Logout</span>
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
+              ))}
+              <SidebarMenuItem className="mt-auto">
+                <SidebarMenuButton 
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="bg-black text-white hover:bg-black/90"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
           </CollapsibleSection>
         </SidebarGroup>
       </SidebarContent>
