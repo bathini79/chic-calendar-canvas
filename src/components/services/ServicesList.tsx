@@ -104,8 +104,8 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
                   ))}
                 </div>
               </TableCell>
-              <TableCell>${service.original_price}</TableCell>
-              <TableCell>${service.selling_price}</TableCell>
+              <TableCell>₹{service.original_price}</TableCell>
+              <TableCell>₹{service.selling_price}</TableCell>
               <TableCell>{service.duration} min</TableCell>
               <TableCell className="text-right space-x-2">
                 <Button variant="outline" size="icon" onClick={() => onEdit(service)}>

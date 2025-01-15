@@ -92,11 +92,11 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Original Price</span>
-                <span>${service.original_price}</span>
+                <span>₹{service.original_price}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Selling Price</span>
-                <span>${service.selling_price}</span>
+                <span>₹{service.selling_price}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Duration</span>
