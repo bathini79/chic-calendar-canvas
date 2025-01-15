@@ -3,6 +3,8 @@ import { MetricsDashboard } from "@/components/dashboard/MetricsDashboard";
 import { CalendarControls } from "@/components/calendar/CalendarControls";
 import { BookingGrid } from "@/components/calendar/BookingGrid";
 import { supabase } from "@/integrations/supabase/client";
+import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
 import { useNavigate } from "react-router-dom";
 
 const MOCK_EMPLOYEES = [
@@ -80,28 +82,36 @@ const Index = () => {
   const timeSlots = generateTimeSlots(interval);
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold">Bookings</h1>
+    <SidebarProvider defaultOpen>
+      <div className="flex min-h-screen bg-background">
+        <AppSidebar />
+        <SidebarRail />
+        <SidebarInset className="flex-1">
+          <div className="container mx-auto p-4 md:p-6 space-y-6">
+            <div className="flex items-center gap-4">
+              <h1 className="text-2xl font-bold">Bookings</h1>
+            </div>
+            <div className="space-y-6">
+              <MetricsDashboard />
+              <CalendarControls 
+                date={date}
+                setDate={setDate}
+                interval={interval}
+                setInterval={setInterval}
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+              />
+              <BookingGrid 
+                employees={MOCK_EMPLOYEES}
+                bookings={MOCK_BOOKINGS}
+                timeSlots={timeSlots}
+                viewMode={viewMode}
+              />
+            </div>
+          </div>
+        </SidebarInset>
       </div>
-      <div className="space-y-6">
-        <MetricsDashboard />
-        <CalendarControls 
-          date={date}
-          setDate={setDate}
-          interval={interval}
-          setInterval={setInterval}
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-        />
-        <BookingGrid 
-          employees={MOCK_EMPLOYEES}
-          bookings={MOCK_BOOKINGS}
-          timeSlots={timeSlots}
-          viewMode={viewMode}
-        />
-      </div>
-    </div>
+    </SidebarProvider>
   );
 };
 

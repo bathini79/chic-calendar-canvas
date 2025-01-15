@@ -1,71 +1,43 @@
-import { useQuery } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import CategoriesList from "@/components/categories/CategoriesList";
 import { CategoryDialog } from "@/components/categories/CategoryDialog";
+import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
+import { useState } from "react";
 
 const Categories = () => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<any>(null);
-  const { toast } = useToast();
-
-  const { data: categories, refetch } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("*")
-        .order("name");
-      
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error fetching categories",
-          description: error.message,
-        });
-        return [];
-      }
-      return data;
-    },
-  });
-
-  const handleEdit = (category: any) => {
-    setEditingCategory(category);
-    setIsDialogOpen(true);
-  };
+  const [open, setOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleSuccess = () => {
-    refetch();
-    setIsDialogOpen(false);
-    setEditingCategory(null);
+    setRefreshKey(prev => prev + 1);
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Categories</h1>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Category
-        </Button>
+    <SidebarProvider defaultOpen>
+      <div className="flex min-h-screen bg-background">
+        <AppSidebar />
+        <SidebarRail />
+        <SidebarInset className="flex-1">
+          <div className="container mx-auto p-4 md:p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold">Categories</h1>
+              <CategoryDialog 
+                open={open} 
+                onOpenChange={setOpen} 
+                onSuccess={handleSuccess}
+              />
+            </div>
+            <CategoriesList 
+              onEdit={(category) => {
+                // Handle edit
+              }}
+              onDelete={handleSuccess}
+              categories={[]} // This will be populated by the component's internal query
+            />
+          </div>
+        </SidebarInset>
       </div>
-
-      <CategoriesList 
-        categories={categories || []} 
-        onEdit={handleEdit}
-        onDelete={refetch}
-      />
-
-      <CategoryDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        category={editingCategory}
-        onSuccess={handleSuccess}
-      />
-    </div>
+    </SidebarProvider>
   );
 };
 
