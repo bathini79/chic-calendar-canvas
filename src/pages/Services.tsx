@@ -2,7 +2,7 @@ import { useState } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, List, Plus, Search, Tag } from "lucide-react";
+import { LayoutGrid, List, Plus, Search, Scissors } from "lucide-react";
 import { ServicesGrid } from "@/components/services/ServicesGrid";
 import { ServicesList } from "@/components/services/ServicesList";
 import { ServiceDialog } from "@/components/services/ServiceDialog";
@@ -58,8 +58,8 @@ const Services = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <div className="flex-1">
-          <div className="container mx-auto py-4 md:py-8 space-y-4 md:space-y-8 px-2 md:px-8">
+        <div className="flex-1 overflow-hidden">
+          <div className="p-4 md:p-6 space-y-4 max-w-[1400px] mx-auto">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <SidebarTrigger />
@@ -67,51 +67,53 @@ const Services = () => {
               </div>
             </div>
 
-            <Tabs defaultValue="services">
-              <TabsList>
-                <TabsTrigger value="services">
-                  <List className="h-4 w-4 mr-2" />
+            <Tabs defaultValue="services" className="w-full">
+              <TabsList className="mb-4">
+                <TabsTrigger value="services" className="flex items-center gap-2">
+                  <Scissors className="h-4 w-4" />
                   Services
                 </TabsTrigger>
-                <TabsTrigger value="categories">
-                  <Tag className="h-4 w-4 mr-2" />
+                <TabsTrigger value="categories" className="flex items-center gap-2">
+                  <List className="h-4 w-4" />
                   Categories
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="services" className="space-y-4">
-                <div className="flex justify-end items-center gap-2">
-                  <div className="relative">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div className="relative w-full sm:w-auto">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search services..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8"
+                      className="pl-8 w-full"
                     />
                   </div>
-                  <div className="border rounded-md p-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setViewMode('grid')}
-                      className={viewMode === 'grid' ? 'bg-secondary' : ''}
-                    >
-                      <LayoutGrid className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setViewMode('list')}
-                      className={viewMode === 'list' ? 'bg-secondary' : ''}
-                    >
-                      <List className="h-4 w-4" />
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="border rounded-md p-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setViewMode('grid')}
+                        className={viewMode === 'grid' ? 'bg-secondary' : ''}
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setViewMode('list')}
+                        className={viewMode === 'list' ? 'bg-secondary' : ''}
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Button onClick={handleCreateService} className="w-full sm:w-auto">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Service
                     </Button>
                   </div>
-                  <Button onClick={handleCreateService}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Service
-                  </Button>
                 </div>
 
                 {viewMode === 'grid' ? (

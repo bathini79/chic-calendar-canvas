@@ -1,3 +1,4 @@
+import React from "react";
 import { Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +23,6 @@ const CategoriesList = ({ categories, onEdit, onDelete }: CategoriesListProps) =
 
   const handleDelete = async (id: string) => {
     try {
-      // First check if category is being used by any services
       const { data: servicesUsingCategory, error: checkError } = await supabase
         .from("services_categories")
         .select("service_id")
@@ -46,7 +46,6 @@ const CategoriesList = ({ categories, onEdit, onDelete }: CategoriesListProps) =
         return;
       }
 
-      // If category is not being used, proceed with deletion
       const { error } = await supabase
         .from("categories")
         .delete()
@@ -84,44 +83,46 @@ const CategoriesList = ({ categories, onEdit, onDelete }: CategoriesListProps) =
   };
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Created At</TableHead>
-            <TableHead>Updated At</TableHead>
-            <TableHead className="w-[100px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {categories.map((category) => (
-            <TableRow key={category.id}>
-              <TableCell>{category.name}</TableCell>
-              <TableCell>{new Date(category.created_at).toLocaleDateString()}</TableCell>
-              <TableCell>{new Date(category.updated_at).toLocaleDateString()}</TableCell>
-              <TableCell>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onEdit(category)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(category.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
+    <div className="rounded-md border overflow-hidden">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40%]">Name</TableHead>
+              <TableHead className="w-[25%]">Created At</TableHead>
+              <TableHead className="w-[25%]">Updated At</TableHead>
+              <TableHead className="w-[10%] text-right">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {categories.map((category) => (
+              <TableRow key={category.id}>
+                <TableCell className="font-medium">{category.name}</TableCell>
+                <TableCell>{new Date(category.created_at).toLocaleDateString()}</TableCell>
+                <TableCell>{new Date(category.updated_at).toLocaleDateString()}</TableCell>
+                <TableCell>
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onEdit(category)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(category.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 };
