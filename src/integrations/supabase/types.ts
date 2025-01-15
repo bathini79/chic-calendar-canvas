@@ -64,25 +64,49 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          discount_type: string | null
+          discount_value: number | null
+          duration: number | null
+          end_date: string | null
           id: string
+          image_urls: string[] | null
+          is_customizable: boolean | null
           name: string
           price: number
+          start_date: string | null
+          status: Database["public"]["Enums"]["service_status"] | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           description?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
+          duration?: number | null
+          end_date?: string | null
           id?: string
+          image_urls?: string[] | null
+          is_customizable?: boolean | null
           name: string
           price: number
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["service_status"] | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           description?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
+          duration?: number | null
+          end_date?: string | null
           id?: string
+          image_urls?: string[] | null
+          is_customizable?: boolean | null
           name?: string
           price?: number
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["service_status"] | null
           updated_at?: string
         }
         Relationships: []
