@@ -104,14 +104,6 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
     form.setValue('image_urls', newImages);
   };
 
-  const calculateProfit = () => {
-    const originalPrice = form.watch('original_price');
-    const sellingPrice = form.watch('selling_price');
-    return sellingPrice - originalPrice;
-  };
-
-  const profit = calculateProfit();
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -202,11 +194,6 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
               </FormItem>
             )}
           />
-        </div>
-
-        <div className="bg-muted/50 p-4 rounded-lg">
-          <p className="text-sm font-medium">Profit Calculation</p>
-          <p className="text-2xl font-bold text-primary mt-1">₹{profit}</p>
         </div>
 
         <FormField

@@ -84,6 +84,19 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     },
   });
 
+  // Calculate service price with discount
+  const calculateServicePrice = (servicePrice: number) => {
+    const discountType = form.watch('discount_type');
+    const discountValue = form.watch('discount_value');
+    
+    if (discountType === 'percentage') {
+      return servicePrice * (1 - (discountValue / 100));
+    } else if (discountType === 'fixed') {
+      return Math.max(0, servicePrice - (discountValue / selectedServices.length));
+    }
+    return servicePrice;
+  };
+
   // Calculate total price based on selected services
   useEffect(() => {
     if (services) {
@@ -92,97 +105,10 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
         return total + (service?.selling_price || 0);
       }, 0);
 
-      // Apply discount if any
-      const discountType = form.watch('discount_type');
-      const discountValue = form.watch('discount_value');
-      
-      let finalPrice = basePrice;
-      if (discountType === 'percentage') {
-        finalPrice = basePrice * (1 - (discountValue / 100));
-      } else if (discountType === 'fixed') {
-        finalPrice = basePrice - discountValue;
-      }
-
-      setCalculatedPrice(Math.max(0, finalPrice));
-      form.setValue('price', Math.max(0, finalPrice));
+      setCalculatedPrice(Math.max(0, basePrice));
+      form.setValue('price', Math.max(0, basePrice));
     }
   }, [selectedServices, form.watch('discount_type'), form.watch('discount_value'), services]);
-
-  // Calculate total duration
-  useEffect(() => {
-    if (services) {
-      const totalDuration = selectedServices.reduce((total, serviceId) => {
-        const service = services.find(s => s.id === serviceId);
-        return total + (service?.duration || 0);
-      }, 0);
-      form.setValue('duration', totalDuration);
-    }
-  }, [selectedServices, services]);
-
-  const handleServiceSelect = (serviceId: string) => {
-    const newServices = [...selectedServices, serviceId];
-    setSelectedServices(newServices);
-    form.setValue('services', newServices);
-  };
-
-  const handleServiceRemove = (serviceId: string) => {
-    const newServices = selectedServices.filter(id => id !== serviceId);
-    setSelectedServices(newServices);
-    form.setValue('services', newServices);
-  };
-
-  const handleCustomizableServiceSelect = (serviceId: string) => {
-    const newServices = [...customizableServices, serviceId];
-    setCustomizableServices(newServices);
-    form.setValue('customizable_services', newServices);
-  };
-
-  const handleCustomizableServiceRemove = (serviceId: string) => {
-    const newServices = customizableServices.filter(id => id !== serviceId);
-    setCustomizableServices(newServices);
-    form.setValue('customizable_services', newServices);
-  };
-
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-    try {
-      const newImages = [...images];
-
-      for (const file of files) {
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${crypto.randomUUID()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('packages')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('packages')
-          .getPublicUrl(filePath);
-
-        newImages.push(publicUrl);
-      }
-
-      setImages(newImages);
-      form.setValue('image_urls', newImages);
-      toast.success('Images uploaded successfully');
-    } catch (error: any) {
-      toast.error('Error uploading images');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const removeImage = (index: number) => {
-    const newImages = images.filter((_, i) => i !== index);
-    setImages(newImages);
-    form.setValue('image_urls', newImages);
-  };
 
   return (
     <Form {...form}>
@@ -222,11 +148,43 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
             <FormItem>
               <FormLabel>Services *</FormLabel>
               <FormControl>
-                <ServiceMultiSelect
-                  selectedServices={selectedServices}
-                  onServiceSelect={handleServiceSelect}
-                  onServiceRemove={handleServiceRemove}
-                />
+                <div className="space-y-4">
+                  <ServiceMultiSelect
+                    selectedServices={selectedServices}
+                    onServiceSelect={handleServiceSelect}
+                    onServiceRemove={handleServiceRemove}
+                  />
+                  {selectedServices.length > 0 && services && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm font-medium">Selected Services:</p>
+                      <div className="space-y-2">
+                        {selectedServices.map(serviceId => {
+                          const service = services.find(s => s.id === serviceId);
+                          if (!service) return null;
+                          
+                          const originalPrice = service.selling_price;
+                          const discountedPrice = calculateServicePrice(originalPrice);
+                          
+                          return (
+                            <div key={serviceId} className="flex justify-between items-center p-2 bg-muted rounded-lg">
+                              <span>{service.name}</span>
+                              <div className="text-right">
+                                {discountedPrice !== originalPrice ? (
+                                  <div className="space-y-1">
+                                    <span className="text-sm line-through text-muted-foreground">₹{originalPrice}</span>
+                                    <span className="text-sm font-medium text-primary ml-2">₹{discountedPrice.toFixed(2)}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm">₹{originalPrice}</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
