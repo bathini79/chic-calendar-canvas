@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 interface Employee {
   id: number;
   name: string;
+  image?: string;
 }
 
 interface Booking {
@@ -68,7 +69,7 @@ export function BookingGrid({ employees, bookings, timeSlots, viewMode }: Bookin
                   const employee = employees.find(emp => emp.id === booking.employeeId);
                   return (
                     <div key={booking.id} className="flex items-center gap-4 p-2 border rounded-lg">
-                      <EmployeeRow name={employee?.name || ''} />
+                      <EmployeeRow name={employee?.name || ''} image={employee?.image} />
                       <div className={cn(
                         "flex-1 p-2 rounded-md",
                         {
@@ -97,7 +98,7 @@ export function BookingGrid({ employees, bookings, timeSlots, viewMode }: Bookin
       <div className="border-r">
         <div className="h-16 border-b bg-muted" /> {/* Header spacer */}
         {employees.map((emp) => (
-          <EmployeeRow key={emp.id} name={emp.name} />
+          <EmployeeRow key={emp.id} name={emp.name} image={emp.image} />
         ))}
       </div>
 
