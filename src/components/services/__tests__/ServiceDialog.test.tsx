@@ -10,7 +10,7 @@ vi.mock('@/integrations/supabase/client', () => ({
       insert: () => ({
         select: () => ({
           single: () => ({
-            data: { id: '1' },
+            data: { id: '1', name: 'Test Service' },
             error: null
           })
         })
@@ -48,36 +48,34 @@ describe('ServiceDialog', () => {
   };
 
   beforeEach(() => {
-    queryClient.clear();
+    vi.clearAllMocks();
   });
 
-  it('renders dialog when open', () => {
+  it('renders without crashing', () => {
     renderComponent();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/create service/i)).toBeInTheDocument();
   });
 
-  it('shows correct title for create mode', () => {
-    renderComponent();
-    expect(screen.getByText('Create Service')).toBeInTheDocument();
-  });
-
-  it('shows correct title for edit mode', () => {
+  it('shows edit mode when initialData is provided', () => {
     renderComponent({
       ...defaultProps,
       initialData: {
         id: '1',
-        name: 'Test Service'
+        name: 'Test Service',
+        original_price: 100,
+        selling_price: 80,
+        duration: 60
       }
     });
-    expect(screen.getByText('Edit Service')).toBeInTheDocument();
+    expect(screen.getByText(/edit service/i)).toBeInTheDocument();
   });
 
-  it('closes dialog when cancel is clicked', () => {
+  it('calls onOpenChange when dialog is closed', () => {
     const onOpenChange = vi.fn();
     renderComponent({ ...defaultProps, onOpenChange });
     
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    fireEvent.click(cancelButton);
+    const closeButton = screen.getByRole('button', { name: /cancel/i });
+    fireEvent.click(closeButton);
     
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

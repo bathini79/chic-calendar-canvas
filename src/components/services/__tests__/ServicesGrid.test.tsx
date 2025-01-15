@@ -40,13 +40,13 @@ describe('ServicesGrid', () => {
   };
 
   beforeEach(() => {
-    queryClient.clear();
+    vi.clearAllMocks();
   });
 
-  it('renders services grid correctly', async () => {
+  it('renders services grid', async () => {
     renderComponent();
     
-    // Wait for the service to appear
+    // Wait for the service to be rendered
     const serviceName = await screen.findByText('Test Service');
     expect(serviceName).toBeInTheDocument();
   });
@@ -62,7 +62,10 @@ describe('ServicesGrid', () => {
     const onEdit = vi.fn();
     renderComponent({ ...defaultProps, onEdit });
     
-    const editButton = await screen.findByRole('button', { name: /edit/i });
+    // Wait for the service to be rendered
+    await screen.findByText('Test Service');
+    
+    const editButton = screen.getByRole('button', { name: /edit/i });
     fireEvent.click(editButton);
     
     expect(onEdit).toHaveBeenCalled();
