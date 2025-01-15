@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, List, Plus, Search, Scissors } from "lucide-react";
+import { LayoutGrid, List, Plus, Search } from "lucide-react";
 import { ServicesGrid } from "@/components/services/ServicesGrid";
 import { ServicesList } from "@/components/services/ServicesList";
 import { ServiceDialog } from "@/components/services/ServiceDialog";
@@ -54,35 +53,38 @@ const Services = () => {
   };
 
   return (
-    <div className="flex-1 p-6">
+    <div className="w-full p-6">
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <SidebarTrigger />
-          <h1 className="text-2xl font-bold">Services</h1>
-        </div>
+        <h1 className="text-2xl font-bold">Services</h1>
       </div>
 
       <Tabs defaultValue="services" className="w-full">
-        <TabsList className="mb-6 bg-transparent border-b w-full justify-start rounded-none h-auto p-0 space-x-8">
-          <TabsTrigger 
-            value="services" 
-            className="flex items-center gap-2 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-0 pb-4"
-          >
-            <Scissors className="h-4 w-4" />
-            Services
-          </TabsTrigger>
-          <TabsTrigger 
-            value="categories" 
-            className="flex items-center gap-2 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-0 pb-4"
-          >
-            <List className="h-4 w-4" />
-            Categories
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex justify-between items-center mb-6 border-b">
+          <TabsList className="bg-transparent h-auto p-0">
+            <TabsTrigger 
+              value="services" 
+              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 pb-2"
+            >
+              <div className="flex items-center gap-2">
+                <LayoutGrid className="h-4 w-4" />
+                Services
+              </div>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="categories" 
+              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 pb-2"
+            >
+              <div className="flex items-center gap-2">
+                <List className="h-4 w-4" />
+                Categories
+              </div>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="services" className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="relative w-full sm:w-[300px]">
+          <div className="flex justify-between items-center gap-4">
+            <div className="relative w-[300px]">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search services..."
@@ -91,7 +93,7 @@ const Services = () => {
                 className="pl-9"
               />
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2">
               <div className="border rounded-md p-1">
                 <Button
                   variant="ghost"

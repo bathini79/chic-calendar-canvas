@@ -79,7 +79,7 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
   }
 
   return (
-    <div className="border rounded-lg">
+    <div className="w-full border rounded-lg overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
