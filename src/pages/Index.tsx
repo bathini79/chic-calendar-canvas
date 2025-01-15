@@ -2,6 +2,9 @@ import { useState } from "react";
 import { MetricsDashboard } from "@/components/dashboard/MetricsDashboard";
 import { CalendarControls } from "@/components/calendar/CalendarControls";
 import { BookingGrid } from "@/components/calendar/BookingGrid";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { LogOut } from "lucide-react";
 
 const MOCK_EMPLOYEES = [
   { 
@@ -66,8 +69,19 @@ const Index = () => {
 
   const timeSlots = generateTimeSlots(interval);
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
     <div className="container mx-auto py-4 md:py-8 space-y-4 md:space-y-8 px-2 md:px-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <Button variant="outline" onClick={handleLogout}>
+          <LogOut className="h-4 w-4 mr-2" />
+          Logout
+        </Button>
+      </div>
       <MetricsDashboard />
       <CalendarControls 
         date={date}
