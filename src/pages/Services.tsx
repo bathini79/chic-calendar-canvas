@@ -116,6 +116,7 @@ const Services = () => {
                 view={viewMode}
                 onViewChange={setViewMode}
                 onCreateClick={handleCreateService}
+                type="service"
               />
             </div>
 
@@ -139,6 +140,7 @@ const Services = () => {
                 view={categoryViewMode}
                 onViewChange={setCategoryViewMode}
                 onCreateClick={handleCreateCategory}
+                type="category"
               />
             </div>
             {categories && categoryViewMode === 'grid' ? (
@@ -169,6 +171,7 @@ const Services = () => {
                 view={packageViewMode}
                 onViewChange={setPackageViewMode}
                 onCreateClick={handleCreatePackage}
+                type="package"
               />
             </div>
             {packageViewMode === 'grid' ? (

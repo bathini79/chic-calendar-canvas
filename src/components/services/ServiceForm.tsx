@@ -16,15 +16,17 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const formSchema = z.object({
   name: z.string().min(1, "Service name is required"),
-  categories: z.array(z.string()).min(1, "At least one category is required"),
+  category: z.string().min(1, "Category is required"),
   original_price: z.number().min(0, "Price must be greater than or equal to 0"),
   selling_price: z.number().min(0, "Price must be greater than or equal to 0"),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
   description: z.string().optional(),
   image_urls: z.array(z.string()).optional(),
+  gender: z.enum(['all', 'male', 'female']).default('all'),
 });
 
 type ServiceFormData = z.infer<typeof formSchema>;
@@ -36,8 +38,8 @@ interface ServiceFormProps {
 }
 
 export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProps) {
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(
-    initialData?.categories?.map((cat: any) => cat.id) || []
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    initialData?.categories?.[0]?.id || ''
   );
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
@@ -46,25 +48,19 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: initialData?.name || '',
-      categories: selectedCategories,
+      category: selectedCategory,
       original_price: initialData?.original_price || 0,
       selling_price: initialData?.selling_price || 0,
       duration: initialData?.duration || 0,
       description: initialData?.description || '',
       image_urls: images,
+      gender: initialData?.gender || 'all',
     },
   });
 
   const handleCategorySelect = (categoryId: string) => {
-    const newCategories = [...selectedCategories, categoryId];
-    setSelectedCategories(newCategories);
-    form.setValue('categories', newCategories);
-  };
-
-  const handleCategoryRemove = (categoryId: string) => {
-    const newCategories = selectedCategories.filter(id => id !== categoryId);
-    setSelectedCategories(newCategories);
-    form.setValue('categories', newCategories);
+    setSelectedCategory(categoryId);
+    form.setValue('category', categoryId);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,17 +104,17 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
     form.setValue('image_urls', newImages);
   };
 
-  const handleSubmit = (data: ServiceFormData) => {
-    onSubmit({
-      ...data,
-      categories: selectedCategories,
-      image_urls: images,
-    });
+  const calculateProfit = () => {
+    const originalPrice = form.watch('original_price');
+    const sellingPrice = form.watch('selling_price');
+    return sellingPrice - originalPrice;
   };
+
+  const profit = calculateProfit();
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="name"
@@ -135,15 +131,19 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
 
         <FormField
           control={form.control}
-          name="categories"
-          render={() => (
+          name="category"
+          render={({ field }) => (
             <FormItem>
-              <FormLabel>Categories *</FormLabel>
+              <FormLabel>Category *</FormLabel>
               <FormControl>
                 <CategoryMultiSelect
-                  selectedCategories={selectedCategories}
+                  selectedCategories={[field.value]}
                   onCategorySelect={handleCategorySelect}
-                  onCategoryRemove={handleCategoryRemove}
+                  onCategoryRemove={() => {
+                    setSelectedCategory('');
+                    field.onChange('');
+                  }}
+                  maxSelections={1}
                 />
               </FormControl>
               <FormMessage />
@@ -153,31 +153,61 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
 
         <FormField
           control={form.control}
-          name="original_price"
+          name="gender"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Original Price (₹) *</FormLabel>
-              <FormControl>
-                <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
-              </FormControl>
+              <FormLabel>Gender *</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="all">All Genders</SelectItem>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="selling_price"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Selling Price (₹) *</FormLabel>
-              <FormControl>
-                <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="original_price"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Original Price (₹) *</FormLabel>
+                <FormControl>
+                  <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="selling_price"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Selling Price (₹) *</FormLabel>
+                <FormControl>
+                  <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="bg-muted/50 p-4 rounded-lg">
+          <p className="text-sm font-medium">Profit Calculation</p>
+          <p className="text-2xl font-bold text-primary mt-1">₹{profit}</p>
+        </div>
 
         <FormField
           control={form.control}

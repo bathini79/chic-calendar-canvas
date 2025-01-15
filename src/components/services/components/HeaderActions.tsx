@@ -1,4 +1,3 @@
-import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ViewToggle } from "./ViewToggle";
 
@@ -6,15 +5,33 @@ interface HeaderActionsProps {
   view: 'grid' | 'list';
   onViewChange: (view: 'grid' | 'list') => void;
   onCreateClick: () => void;
+  type?: 'service' | 'category' | 'package';
 }
 
-export function HeaderActions({ view, onViewChange, onCreateClick }: HeaderActionsProps) {
+export function HeaderActions({ 
+  view, 
+  onViewChange, 
+  onCreateClick,
+  type = 'service'
+}: HeaderActionsProps) {
+  const getButtonText = () => {
+    switch (type) {
+      case 'service':
+        return 'Add Service';
+      case 'category':
+        return 'Add Category';
+      case 'package':
+        return 'Add Package';
+      default:
+        return 'Add New';
+    }
+  };
+
   return (
-    <div className="flex gap-2 items-center justify-between sm:justify-end">
+    <div className="flex items-center gap-2">
       <ViewToggle view={view} onViewChange={onViewChange} />
       <Button onClick={onCreateClick}>
-        <Plus className="h-4 w-4 mr-2" />
-        Add Service
+        {getButtonText()}
       </Button>
     </div>
   );

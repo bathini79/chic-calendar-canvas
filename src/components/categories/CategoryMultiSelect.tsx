@@ -16,12 +16,14 @@ interface CategoryMultiSelectProps {
   selectedCategories: string[];
   onCategorySelect: (categoryId: string) => void;
   onCategoryRemove: (categoryId: string) => void;
+  maxSelections?: number;
 }
 
 export function CategoryMultiSelect({
   selectedCategories,
   onCategorySelect,
   onCategoryRemove,
+  maxSelections,
 }: CategoryMultiSelectProps) {
   const { data: categories } = useQuery({
     queryKey: ['categories'],
@@ -36,9 +38,14 @@ export function CategoryMultiSelect({
     },
   });
 
+  const isSelectionDisabled = maxSelections ? selectedCategories.length >= maxSelections : false;
+
   return (
     <div className="space-y-2">
-      <Select onValueChange={onCategorySelect}>
+      <Select 
+        onValueChange={onCategorySelect}
+        disabled={isSelectionDisabled}
+      >
         <SelectTrigger>
           <SelectValue placeholder="Select categories" />
         </SelectTrigger>
@@ -57,7 +64,7 @@ export function CategoryMultiSelect({
         </SelectContent>
       </Select>
       <div className="flex flex-wrap gap-2">
-        {categories?.filter(cat => selectedCategories.includes(cat.id)).map((category) => (
+        {categories?.filter(category => selectedCategories.includes(category.id)).map((category) => (
           <Badge key={category.id} variant="secondary">
             {category.name}
             <Button
