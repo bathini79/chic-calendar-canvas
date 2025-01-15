@@ -7,12 +7,14 @@ import { ServiceDialog } from "@/components/services/ServiceDialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CategoriesList from "@/components/categories/CategoriesList";
+import CategoriesGrid from "@/components/categories/CategoriesGrid";
 import { CategoryDialog } from "@/components/categories/CategoryDialog";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 const Services = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [categoryViewMode, setCategoryViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -141,16 +143,16 @@ const Services = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setViewMode('grid')}
-                    className={`rounded-none ${viewMode === 'grid' ? 'bg-secondary' : ''}`}
+                    onClick={() => setCategoryViewMode('grid')}
+                    className={`rounded-none ${categoryViewMode === 'grid' ? 'bg-secondary' : ''}`}
                   >
                     <LayoutGrid className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setViewMode('list')}
-                    className={`rounded-none ${viewMode === 'list' ? 'bg-secondary' : ''}`}
+                    onClick={() => setCategoryViewMode('list')}
+                    className={`rounded-none ${categoryViewMode === 'list' ? 'bg-secondary' : ''}`}
                   >
                     <List className="h-4 w-4" />
                   </Button>
@@ -161,9 +163,15 @@ const Services = () => {
                 </Button>
               </div>
             </div>
-            {categories && (
-              <CategoriesList
+            {categories && categoryViewMode === 'grid' ? (
+              <CategoriesGrid
                 categories={categories}
+                onEdit={handleEditCategory}
+                onDelete={refetchCategories}
+              />
+            ) : (
+              <CategoriesList
+                categories={categories || []}
                 onEdit={handleEditCategory}
                 onDelete={refetchCategories}
               />
