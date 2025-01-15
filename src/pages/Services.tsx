@@ -1,16 +1,15 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { LayoutGrid, List, Plus, Search } from "lucide-react";
-import { ServicesGrid } from "@/components/services/ServicesGrid";
-import { ServicesList } from "@/components/services/ServicesList";
-import { ServiceDialog } from "@/components/services/ServiceDialog";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CategoriesList from "@/components/categories/CategoriesList";
-import CategoriesGrid from "@/components/categories/CategoriesGrid";
-import { CategoryDialog } from "@/components/categories/CategoryDialog";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LayoutGrid, List } from "lucide-react";
+import { SearchInput } from "@/components/services/components/SearchInput";
+import { HeaderActions } from "@/components/services/components/HeaderActions";
+import { ServicesContent } from "@/components/services/components/ServicesContent";
+import { ServiceDialog } from "@/components/services/ServiceDialog";
+import { CategoryDialog } from "@/components/categories/CategoryDialog";
+import CategoriesList from "@/components/categories/CategoriesList";
+import CategoriesGrid from "@/components/categories/CategoriesGrid";
 
 const Services = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -84,84 +83,40 @@ const Services = () => {
           <TabsContent value="services" className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
-                <div className="relative w-full sm:max-w-[300px]">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search services..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search services..."
+                />
               </div>
-              <div className="flex gap-2 items-center justify-between sm:justify-end">
-                <div className="flex items-center border rounded-lg overflow-hidden">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setViewMode('grid')}
-                    className={`rounded-none ${viewMode === 'grid' ? 'bg-secondary' : ''}`}
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setViewMode('list')}
-                    className={`rounded-none ${viewMode === 'list' ? 'bg-secondary' : ''}`}
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Button onClick={handleCreateService}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Service
-                </Button>
-              </div>
+              <HeaderActions
+                view={viewMode}
+                onViewChange={setViewMode}
+                onCreateClick={handleCreateService}
+              />
             </div>
 
-            {viewMode === 'grid' ? (
-              <ServicesGrid searchQuery={searchQuery} onEdit={handleEditService} />
-            ) : (
-              <ServicesList searchQuery={searchQuery} onEdit={handleEditService} />
-            )}
+            <ServicesContent
+              view={viewMode}
+              searchQuery={searchQuery}
+              onEdit={handleEditService}
+            />
           </TabsContent>
 
           <TabsContent value="categories" className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
-                <div className="relative w-full sm:max-w-[300px]">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search categories..."
-                    className="pl-9"
-                  />
-                </div>
+                <SearchInput
+                  value=""
+                  onChange={() => {}}
+                  placeholder="Search categories..."
+                />
               </div>
-              <div className="flex gap-2 items-center justify-between sm:justify-end">
-                <div className="flex items-center border rounded-lg overflow-hidden">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setCategoryViewMode('grid')}
-                    className={`rounded-none ${categoryViewMode === 'grid' ? 'bg-secondary' : ''}`}
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setCategoryViewMode('list')}
-                    className={`rounded-none ${categoryViewMode === 'list' ? 'bg-secondary' : ''}`}
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Button onClick={handleCreateCategory}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Category
-                </Button>
-              </div>
+              <HeaderActions
+                view={categoryViewMode}
+                onViewChange={setCategoryViewMode}
+                onCreateClick={handleCreateCategory}
+              />
             </div>
             {categories && categoryViewMode === 'grid' ? (
               <CategoriesGrid
