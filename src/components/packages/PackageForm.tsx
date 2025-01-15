@@ -84,6 +84,70 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     },
   });
 
+  // Handler functions
+  const handleServiceSelect = (serviceId: string) => {
+    setSelectedServices([...selectedServices, serviceId]);
+    form.setValue('services', [...selectedServices, serviceId]);
+  };
+
+  const handleServiceRemove = (serviceId: string) => {
+    const updatedServices = selectedServices.filter(id => id !== serviceId);
+    setSelectedServices(updatedServices);
+    form.setValue('services', updatedServices);
+  };
+
+  const handleCustomizableServiceSelect = (serviceId: string) => {
+    setCustomizableServices([...customizableServices, serviceId]);
+    form.setValue('customizable_services', [...customizableServices, serviceId]);
+  };
+
+  const handleCustomizableServiceRemove = (serviceId: string) => {
+    const updatedServices = customizableServices.filter(id => id !== serviceId);
+    setCustomizableServices(updatedServices);
+    form.setValue('customizable_services', updatedServices);
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const newImages = [...images];
+
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${crypto.randomUUID()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('services')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('services')
+          .getPublicUrl(filePath);
+
+        newImages.push(publicUrl);
+      }
+
+      setImages(newImages);
+      form.setValue('image_urls', newImages);
+      toast.success('Images uploaded successfully');
+    } catch (error: any) {
+      toast.error('Error uploading images');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = images.filter((_, i) => i !== index);
+    setImages(newImages);
+    form.setValue('image_urls', newImages);
+  };
+
   // Calculate service price with discount
   const calculateServicePrice = (servicePrice: number) => {
     const discountType = form.watch('discount_type');
