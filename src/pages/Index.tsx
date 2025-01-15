@@ -5,6 +5,8 @@ import { BookingGrid } from "@/components/calendar/BookingGrid";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut } from "lucide-react";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
 
 const MOCK_EMPLOYEES = [
   { 
@@ -74,30 +76,40 @@ const Index = () => {
   };
 
   return (
-    <div className="container mx-auto py-4 md:py-8 space-y-4 md:space-y-8 px-2 md:px-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Button variant="outline" onClick={handleLogout}>
-          <LogOut className="h-4 w-4 mr-2" />
-          Logout
-        </Button>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AppSidebar />
+        <div className="flex-1">
+          <div className="container mx-auto py-4 md:py-8 space-y-4 md:space-y-8 px-2 md:px-8">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <SidebarTrigger />
+                <h1 className="text-2xl font-bold">Bookings</h1>
+              </div>
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+            <MetricsDashboard />
+            <CalendarControls 
+              date={date}
+              setDate={setDate}
+              interval={interval}
+              setInterval={setInterval}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+            />
+            <BookingGrid 
+              employees={MOCK_EMPLOYEES}
+              bookings={MOCK_BOOKINGS}
+              timeSlots={timeSlots}
+              viewMode={viewMode}
+            />
+          </div>
+        </div>
       </div>
-      <MetricsDashboard />
-      <CalendarControls 
-        date={date}
-        setDate={setDate}
-        interval={interval}
-        setInterval={setInterval}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-      />
-      <BookingGrid 
-        employees={MOCK_EMPLOYEES}
-        bookings={MOCK_BOOKINGS}
-        timeSlots={timeSlots}
-        viewMode={viewMode}
-      />
-    </div>
+    </SidebarProvider>
   );
 };
 
