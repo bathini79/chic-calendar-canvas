@@ -10,7 +10,6 @@ import CategoriesList from "@/components/categories/CategoriesList";
 import { CategoryDialog } from "@/components/categories/CategoryDialog";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
 
 const Services = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -54,105 +53,81 @@ const Services = () => {
   };
 
   return (
-    <div className="p-6 space-y-8 max-w-[1400px] mx-auto animate-fade-in">
-      <div className="flex flex-col space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Services Management</h1>
-        </div>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex flex-col space-y-6">
+        <h1 className="text-2xl font-bold">Services</h1>
 
         <Tabs defaultValue="services" className="w-full">
-          <div className="flex flex-col space-y-6">
-            <TabsList className="w-full sm:w-auto justify-start border-b">
-              <TabsTrigger 
-                value="services" 
-                className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-8"
-              >
-                <Scissors className="h-4 w-4 mr-2" />
-                Services
-              </TabsTrigger>
-              <TabsTrigger 
-                value="categories"
-                className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-8"
-              >
-                <List className="h-4 w-4 mr-2" />
-                Categories
-              </TabsTrigger>
-            </TabsList>
+          <TabsList>
+            <TabsTrigger value="services" className="flex items-center gap-2">
+              <Scissors className="h-4 w-4" />
+              Services
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="flex items-center gap-2">
+              <List className="h-4 w-4" />
+              Categories
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="services" className="space-y-6">
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-card p-4 rounded-lg shadow-sm">
-                <div className="relative w-full sm:w-[300px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    placeholder="Search services..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 w-full"
-                  />
-                </div>
-                <div className="flex items-center gap-4 w-full sm:w-auto">
-                  <div className="flex items-center gap-2 p-1 bg-muted rounded-lg">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setViewMode('grid')}
-                      className={cn(
-                        "gap-2",
-                        viewMode === 'grid' && "bg-background shadow-sm"
-                      )}
-                    >
-                      <LayoutGrid className="h-4 w-4" />
-                      <span className="hidden sm:inline">Grid View</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setViewMode('list')}
-                      className={cn(
-                        "gap-2",
-                        viewMode === 'list' && "bg-background shadow-sm"
-                      )}
-                    >
-                      <List className="h-4 w-4" />
-                      <span className="hidden sm:inline">List View</span>
-                    </Button>
-                  </div>
-                  <Button 
-                    onClick={handleCreateService}
-                    className="gap-2 shadow-sm hover:shadow-md transition-shadow"
+          <TabsContent value="services" className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="relative w-full sm:w-[300px]">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search services..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 w-full"
+                />
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="border rounded-md p-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setViewMode('grid')}
+                    className={viewMode === 'grid' ? 'bg-secondary' : ''}
                   >
-                    <Plus className="h-4 w-4" />
-                    Add Service
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setViewMode('list')}
+                    className={viewMode === 'list' ? 'bg-secondary' : ''}
+                  >
+                    <List className="h-4 w-4" />
                   </Button>
                 </div>
-              </div>
-
-              {viewMode === 'grid' ? (
-                <ServicesGrid searchQuery={searchQuery} onEdit={handleEditService} />
-              ) : (
-                <ServicesList searchQuery={searchQuery} onEdit={handleEditService} />
-              )}
-            </TabsContent>
-
-            <TabsContent value="categories" className="space-y-6">
-              <div className="flex justify-end">
-                <Button 
-                  onClick={handleCreateCategory}
-                  className="gap-2 shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Category
+                <Button onClick={handleCreateService}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Service
                 </Button>
               </div>
-              {categories && (
-                <CategoriesList
-                  categories={categories}
-                  onEdit={handleEditCategory}
-                  onDelete={refetchCategories}
-                />
-              )}
-            </TabsContent>
-          </div>
+            </div>
+
+            {viewMode === 'grid' ? (
+              <ServicesGrid searchQuery={searchQuery} onEdit={handleEditService} />
+            ) : (
+              <ServicesList searchQuery={searchQuery} onEdit={handleEditService} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="categories" className="space-y-6">
+            <div className="flex justify-end">
+              <Button onClick={handleCreateCategory}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Category
+              </Button>
+            </div>
+            {categories && (
+              <CategoriesList
+                categories={categories}
+                onEdit={handleEditCategory}
+                onDelete={refetchCategories}
+              />
+            )}
+          </TabsContent>
         </Tabs>
       </div>
 
