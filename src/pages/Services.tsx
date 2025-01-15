@@ -53,13 +53,13 @@ const Services = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="w-full h-full p-6">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Services</h1>
       </div>
 
       <Tabs defaultValue="services" className="w-full">
-        <div className="flex justify-between items-center mb-6 border-b">
+        <div className="flex justify-between items-center mb-6 border-b w-full">
           <TabsList className="bg-transparent h-auto p-0">
             <TabsTrigger 
               value="services" 
@@ -82,7 +82,7 @@ const Services = () => {
           </TabsList>
         </div>
 
-        <TabsContent value="services" className="space-y-8">
+        <TabsContent value="services" className="space-y-8 w-full">
           <div className="flex justify-between items-center gap-4">
             <div className="relative w-[300px]">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -126,7 +126,7 @@ const Services = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="categories" className="space-y-6">
+        <TabsContent value="categories" className="space-y-6 w-full">
           <div className="flex justify-end">
             <Button onClick={handleCreateCategory}>
               <Plus className="h-4 w-4 mr-2" />

@@ -14,16 +14,18 @@ function App() {
     <SessionContextProvider supabaseClient={supabase}>
       <Router>
         <SidebarProvider defaultOpen>
-          <div className="flex min-h-screen bg-background">
+          <div className="flex min-h-screen w-full bg-background">
             <AppSidebar />
             <SidebarRail />
-            <SidebarInset className="flex-1">
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/services" element={<Services />} />
-                <Route path="/categories" element={<Categories />} />
-                <Route path="/auth" element={<Auth />} />
-              </Routes>
+            <SidebarInset className="flex-1 w-full">
+              <main className="w-full">
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/services" element={<Services />} />
+                  <Route path="/categories" element={<Categories />} />
+                  <Route path="/auth" element={<Auth />} />
+                </Routes>
+              </main>
             </SidebarInset>
           </div>
         </SidebarProvider>
