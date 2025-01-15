@@ -22,20 +22,25 @@ interface ServiceFormData {
 }
 
 interface ServiceFormProps {
-  initialData?: ServiceFormData;
+  initialData?: any;
   onSubmit: (data: ServiceFormData) => void;
   onCancel: () => void;
 }
 
 export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProps) {
+  // Initialize selectedCategories with IDs only
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
-    initialData?.categories || []
+    initialData?.categories?.map((cat: any) => cat.id) || []
   );
 
   const form = useForm<ServiceFormData>({
     defaultValues: {
-      ...initialData,
+      name: initialData?.name || '',
       categories: selectedCategories,
+      original_price: initialData?.original_price || 0,
+      selling_price: initialData?.selling_price || 0,
+      duration: initialData?.duration || 0,
+      description: initialData?.description || '',
     },
   });
 
