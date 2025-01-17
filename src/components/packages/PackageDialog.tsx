@@ -19,6 +19,21 @@ interface PackageDialogProps {
 export function PackageDialog({ open, onOpenChange, initialData }: PackageDialogProps) {
   const queryClient = useQueryClient();
 
+  // If we have initialData, fetch the associated services
+  const fetchPackageServices = async (packageId: string) => {
+    const { data: packageServices, error } = await supabase
+      .from('package_services')
+      .select('service_id')
+      .eq('package_id', packageId);
+    
+    if (error) {
+      console.error('Error fetching package services:', error);
+      return [];
+    }
+
+    return packageServices.map(ps => ps.service_id);
+  };
+
   const handleSubmit = async (data: any) => {
     try {
       if (initialData) {
@@ -112,6 +127,18 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
     }
   };
 
+  // If we have initialData, fetch the services before rendering the form
+  const enhancedInitialData = async () => {
+    if (initialData?.id) {
+      const services = await fetchPackageServices(initialData.id);
+      return {
+        ...initialData,
+        services,
+      };
+    }
+    return initialData;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] p-0">
@@ -121,7 +148,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
         <ScrollArea className="max-h-[calc(90vh-80px)]">
           <div className="p-6 pt-0">
             <PackageForm
-              initialData={initialData}
+              initialData={enhancedInitialData()}
               onSubmit={handleSubmit}
               onCancel={() => onOpenChange(false)}
             />

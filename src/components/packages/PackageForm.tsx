@@ -43,9 +43,7 @@ interface PackageFormProps {
 }
 
 export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProps) {
-  const [selectedServices, setSelectedServices] = useState<string[]>(
-    initialData?.services?.map((service: any) => service.id) || []
-  );
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [customizableServices, setCustomizableServices] = useState<string[]>(
     initialData?.customizable_services || []
   );
@@ -66,6 +64,33 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
       return data;
     },
   });
+
+  // Initialize form with async initialData
+  useEffect(() => {
+    const initializeForm = async () => {
+      if (initialData) {
+        const resolvedData = await initialData;
+        setSelectedServices(resolvedData?.services || []);
+        setCustomizableServices(resolvedData?.customizable_services || []);
+        setImages(resolvedData?.image_urls || []);
+        form.reset({
+          name: resolvedData?.name || '',
+          services: resolvedData?.services || [],
+          price: resolvedData?.price || 0,
+          description: resolvedData?.description || '',
+          duration: resolvedData?.duration || 0,
+          is_customizable: resolvedData?.is_customizable || false,
+          status: resolvedData?.status || 'active',
+          discount_type: resolvedData?.discount_type || 'none',
+          discount_value: resolvedData?.discount_value || 0,
+          image_urls: resolvedData?.image_urls || [],
+          customizable_services: resolvedData?.customizable_services || [],
+        });
+      }
+    };
+
+    initializeForm();
+  }, [initialData, form]);
 
   const form = useForm<PackageFormData>({
     resolver: zodResolver(formSchema),
