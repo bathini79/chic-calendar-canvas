@@ -22,7 +22,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
   const handleSubmit = async (data: any) => {
     try {
       if (initialData) {
-        // Update package
+        // First update the package
         const { error: packageError } = await supabase
           .from('packages')
           .update({
@@ -41,26 +41,27 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
         
         if (packageError) throw packageError;
 
-        // Delete existing services
-        const { error: deleteError } = await supabase
-          .from('package_services')
-          .delete()
-          .eq('package_id', initialData.id);
-        
-        if (deleteError) throw deleteError;
-
-        // Insert new services
+        // Then handle package services update
         if (data.services && data.services.length > 0) {
+          // First delete existing services
+          const { error: deleteError } = await supabase
+            .from('package_services')
+            .delete()
+            .eq('package_id', initialData.id);
+          
+          if (deleteError) throw deleteError;
+
+          // Then insert new services
           const packageServicesData = data.services.map((serviceId: string) => ({
             package_id: initialData.id,
             service_id: serviceId,
           }));
 
-          const { error: servicesError } = await supabase
+          const { error: insertError } = await supabase
             .from('package_services')
             .insert(packageServicesData);
           
-          if (servicesError) throw servicesError;
+          if (insertError) throw insertError;
         }
         
         toast.success('Package updated successfully');
@@ -85,7 +86,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
         
         if (packageError) throw packageError;
 
-        // Insert services
+        // Insert services for new package
         if (data.services && data.services.length > 0) {
           const packageServicesData = data.services.map((serviceId: string) => ({
             package_id: newPackage.id,
@@ -102,9 +103,11 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
         toast.success('Package created successfully');
       }
       
-      queryClient.invalidateQueries({ queryKey: ['packages'] });
+      // Invalidate queries to refresh the data
+      await queryClient.invalidateQueries({ queryKey: ['packages'] });
       onOpenChange(false);
     } catch (error: any) {
+      console.error('Error:', error);
       toast.error(error.message);
     }
   };
