@@ -172,20 +172,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     form.setValue('image_urls', newImages);
   };
 
-  // Calculate service price with discount
-  const calculateServicePrice = (servicePrice: number) => {
-    const discountType = form.watch('discount_type');
-    const discountValue = form.watch('discount_value');
-    
-    if (discountType === 'percentage') {
-      return servicePrice * (1 - (discountValue / 100));
-    } else if (discountType === 'fixed') {
-      return Math.max(0, servicePrice - (discountValue / selectedServices.length));
-    }
-    return servicePrice;
-  };
-
-  // Calculate total price based on selected services
+  // Calculate total price based on selected services and apply discount
   useEffect(() => {
     if (services) {
       const basePrice = selectedServices.reduce((total, serviceId) => {
@@ -193,10 +180,20 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
         return total + (service?.selling_price || 0);
       }, 0);
 
-      setCalculatedPrice(Math.max(0, basePrice));
-      form.setValue('price', Math.max(0, basePrice));
+      const discountType = form.watch('discount_type');
+      const discountValue = form.watch('discount_value') || 0;
+
+      let finalPrice = basePrice;
+      if (discountType === 'percentage') {
+        finalPrice = basePrice * (1 - (discountValue / 100));
+      } else if (discountType === 'fixed') {
+        finalPrice = Math.max(0, basePrice - discountValue);
+      }
+
+      setCalculatedPrice(Math.max(0, finalPrice));
+      form.setValue('price', Math.max(0, finalPrice));
     }
-  }, [selectedServices, services]);
+  }, [selectedServices, services, form.watch('discount_type'), form.watch('discount_value')]);
 
   // Calculate total duration based on selected services
   useEffect(() => {
@@ -262,22 +259,10 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
                           const service = services.find(s => s.id === serviceId);
                           if (!service) return null;
                           
-                          const originalPrice = service.selling_price;
-                          const discountedPrice = calculateServicePrice(originalPrice);
-                          
                           return (
                             <div key={serviceId} className="flex justify-between items-center p-2 bg-muted rounded-lg">
                               <span>{service.name}</span>
-                              <div className="text-right">
-                                {discountedPrice !== originalPrice ? (
-                                  <div className="space-y-1">
-                                    <span className="text-sm line-through text-muted-foreground">₹{originalPrice}</span>
-                                    <span className="text-sm font-medium text-primary ml-2">₹{discountedPrice.toFixed(2)}</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-sm">₹{originalPrice}</span>
-                                )}
-                              </div>
+                              <span className="text-sm">₹{service.selling_price}</span>
                             </div>
                           );
                         })}
@@ -297,7 +282,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Price (₹)</FormLabel>
+                <FormLabel>Total Price (₹)</FormLabel>
                 <FormControl>
                   <Input 
                     type="number" 
@@ -410,7 +395,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
                   <Input
                     type="number"
                     {...field}
-                    onChange={e => field.onChange(parseFloat(e.target.value))}
+                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
                     disabled={form.watch('discount_type') === 'none'}
                   />
                 </FormControl>
