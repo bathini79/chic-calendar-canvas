@@ -51,6 +51,23 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
   const [calculatedPrice, setCalculatedPrice] = useState(0);
 
+  const form = useForm<PackageFormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: initialData?.name || '',
+      services: selectedServices,
+      price: initialData?.price || 0,
+      description: initialData?.description || '',
+      duration: initialData?.duration || 0,
+      is_customizable: initialData?.is_customizable || false,
+      status: initialData?.status || 'active',
+      discount_type: initialData?.discount_type || 'none',
+      discount_value: initialData?.discount_value || 0,
+      image_urls: images,
+      customizable_services: customizableServices,
+    },
+  });
+
   // Fetch all services to calculate total price
   const { data: services } = useQuery({
     queryKey: ['services'],
@@ -92,24 +109,6 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     initializeForm();
   }, [initialData, form]);
 
-  const form = useForm<PackageFormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: initialData?.name || '',
-      services: selectedServices,
-      price: initialData?.price || 0,
-      description: initialData?.description || '',
-      duration: initialData?.duration || 0,
-      is_customizable: initialData?.is_customizable || false,
-      status: initialData?.status || 'active',
-      discount_type: initialData?.discount_type || 'none',
-      discount_value: initialData?.discount_value || 0,
-      image_urls: images,
-      customizable_services: customizableServices,
-    },
-  });
-
-  // Handler functions
   const handleServiceSelect = (serviceId: string) => {
     setSelectedServices([...selectedServices, serviceId]);
     form.setValue('services', [...selectedServices, serviceId]);
