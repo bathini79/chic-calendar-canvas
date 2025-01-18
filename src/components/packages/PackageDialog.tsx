@@ -9,6 +9,7 @@ import { PackageForm } from "./PackageForm";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
 
 interface PackageDialogProps {
   open: boolean;
@@ -18,26 +19,38 @@ interface PackageDialogProps {
 
 export function PackageDialog({ open, onOpenChange, initialData }: PackageDialogProps) {
   const queryClient = useQueryClient();
+  const [enhancedData, setEnhancedData] = useState<any>(null);
 
-  // If we have initialData, fetch the associated services
-  const fetchPackageServices = async (packageId: string) => {
-    const { data: packageServices, error } = await supabase
-      .from('package_services')
-      .select('service_id')
-      .eq('package_id', packageId);
-    
-    if (error) {
-      console.error('Error fetching package services:', error);
-      return [];
-    }
+  // Fetch package services when initialData changes
+  useEffect(() => {
+    const fetchPackageData = async () => {
+      if (initialData?.id) {
+        const { data: packageServices, error } = await supabase
+          .from('package_services')
+          .select('service_id')
+          .eq('package_id', initialData.id);
+        
+        if (error) {
+          console.error('Error fetching package services:', error);
+          return;
+        }
 
-    return packageServices.map(ps => ps.service_id);
-  };
+        setEnhancedData({
+          ...initialData,
+          services: packageServices.map(ps => ps.service_id),
+        });
+      } else {
+        setEnhancedData(null);
+      }
+    };
+
+    fetchPackageData();
+  }, [initialData]);
 
   const handleSubmit = async (data: any) => {
     try {
       if (initialData) {
-        // First update the package
+        // Update package
         const { error: packageError } = await supabase
           .from('packages')
           .update({
@@ -56,7 +69,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
         
         if (packageError) throw packageError;
 
-        // Then handle package services update
+        // Handle package services update
         if (data.services && data.services.length > 0) {
           // First delete existing services
           const { error: deleteError } = await supabase
@@ -127,18 +140,6 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
     }
   };
 
-  // If we have initialData, fetch the services before rendering the form
-  const enhancedInitialData = async () => {
-    if (initialData?.id) {
-      const services = await fetchPackageServices(initialData.id);
-      return {
-        ...initialData,
-        services,
-      };
-    }
-    return initialData;
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] p-0">
@@ -148,7 +149,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
         <ScrollArea className="max-h-[calc(90vh-80px)]">
           <div className="p-6 pt-0">
             <PackageForm
-              initialData={enhancedInitialData()}
+              initialData={enhancedData}
               onSubmit={handleSubmit}
               onCancel={() => onOpenChange(false)}
             />
