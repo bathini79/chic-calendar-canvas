@@ -43,14 +43,15 @@ const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
 export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShiftDialogProps) {
   const queryClient = useQueryClient();
   const [scheduleType, setScheduleType] = useState("1");
+  const [currentWeek, setCurrentWeek] = useState(0);
   const [dayConfigs, setDayConfigs] = useState<Record<string, DayConfig>>(() => {
     const configs: Record<string, DayConfig> = {};
     DAYS.forEach(day => {
       configs[day.value] = {
         enabled: false,
         shifts: [{
-          startTime: "10:00",
-          endTime: day.value === "6" ? "17:00" : "19:00"
+          startTime: "09:00",
+          endTime: day.value === "6" ? "17:00" : "18:00"
         }]
       };
     });
@@ -64,7 +65,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
         ...prev[dayValue],
         shifts: [
           ...prev[dayValue].shifts,
-          { startTime: "10:00", endTime: "19:00" }
+          { startTime: "09:00", endTime: "18:00" }
         ]
       }
     }));
@@ -86,28 +87,32 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
       const endDate = addWeeks(startDate, parseInt(scheduleType));
       const shifts = [];
 
-      for (let date = startDate; date <= endDate; date.setDate(date.getDate() + 1)) {
-        const dayOfWeek = date.getDay().toString();
-        const dayConfig = dayConfigs[dayOfWeek];
+      for (let week = 0; week < parseInt(scheduleType); week++) {
+        const weekStart = addWeeks(startDate, week);
         
-        if (dayConfig.enabled) {
-          dayConfig.shifts.forEach(shift => {
-            const [startHour] = shift.startTime.split(':');
-            const [endHour] = shift.endTime.split(':');
-            
-            const shiftStart = new Date(date);
-            shiftStart.setHours(parseInt(startHour), 0, 0);
-            
-            const shiftEnd = new Date(date);
-            shiftEnd.setHours(parseInt(endHour), 0, 0);
+        for (let date = new Date(weekStart); date <= addWeeks(weekStart, 1); date.setDate(date.getDate() + 1)) {
+          const dayOfWeek = date.getDay().toString();
+          const dayConfig = dayConfigs[dayOfWeek];
+          
+          if (dayConfig.enabled) {
+            dayConfig.shifts.forEach(shift => {
+              const [startHour] = shift.startTime.split(':');
+              const [endHour] = shift.endTime.split(':');
+              
+              const shiftStart = new Date(date);
+              shiftStart.setHours(parseInt(startHour), 0, 0);
+              
+              const shiftEnd = new Date(date);
+              shiftEnd.setHours(parseInt(endHour), 0, 0);
 
-            shifts.push({
-              employee_id: employee.id,
-              start_time: shiftStart.toISOString(),
-              end_time: shiftEnd.toISOString(),
-              status: 'pending'
+              shifts.push({
+                employee_id: employee.id,
+                start_time: shiftStart.toISOString(),
+                end_time: shiftEnd.toISOString(),
+                status: 'pending'
+              });
             });
-          });
+          }
         }
       }
 
@@ -149,18 +154,36 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
               </Select>
             </div>
 
-            <div className="bg-purple-50 p-4 rounded-lg flex gap-3">
-              <div className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-purple-100">
+            {parseInt(scheduleType) > 1 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Current week</label>
+                <Select value={currentWeek.toString()} onValueChange={(value) => setCurrentWeek(parseInt(value))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: parseInt(scheduleType) }, (_, i) => (
+                      <SelectItem key={i} value={i.toString()}>
+                        Week {i + 1}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="bg-gray-50 p-4 rounded-lg flex gap-3">
+              <div className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-gray-100">
                 ℹ️
               </div>
-              <p className="text-sm text-purple-900">
+              <p className="text-sm text-gray-900">
                 Team members will not be scheduled on business closed periods.
               </p>
             </div>
           </div>
 
           <div className="space-y-6">
-            <h3 className="font-semibold">Week 1 of {scheduleType}</h3>
+            <h3 className="font-semibold">Week {currentWeek + 1} of {scheduleType}</h3>
             <div className="space-y-4">
               {DAYS.map((day) => {
                 const dayConfig = dayConfigs[day.value];
@@ -259,7 +282,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
                           
                           <Button
                             variant="link"
-                            className="text-purple-600 p-0 h-auto font-normal"
+                            className="text-gray-600 p-0 h-auto font-normal"
                             onClick={() => handleAddShift(day.value)}
                           >
                             Add a shift
