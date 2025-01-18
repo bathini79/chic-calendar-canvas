@@ -30,6 +30,110 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_availability: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          employee_id: string | null
+          end_time: string
+          id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          employee_id?: string | null
+          end_time: string
+          id?: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          employee_id?: string | null
+          end_time?: string
+          id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_availability_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_skills: {
+        Row: {
+          created_at: string
+          employee_id: string
+          service_id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          service_id: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_skills_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_skills_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          photo_url: string | null
+          status: Database["public"]["Enums"]["employee_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          photo_url?: string | null
+          status?: Database["public"]["Enums"]["employee_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          photo_url?: string | null
+          status?: Database["public"]["Enums"]["employee_status"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       package_services: {
         Row: {
           package_id: string
@@ -213,6 +317,47 @@ export type Database = {
           },
         ]
       }
+      time_off_requests: {
+        Row: {
+          created_at: string
+          employee_id: string | null
+          end_date: string
+          id: string
+          reason: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["shift_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id?: string | null
+          end_date: string
+          id?: string
+          reason?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string | null
+          end_date?: string
+          id?: string
+          reason?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_off_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -221,7 +366,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      employee_status: "active" | "inactive"
       service_status: "active" | "inactive" | "archived"
+      shift_status: "pending" | "approved" | "declined"
       user_role: "customer" | "employee" | "admin" | "superadmin"
     }
     CompositeTypes: {
