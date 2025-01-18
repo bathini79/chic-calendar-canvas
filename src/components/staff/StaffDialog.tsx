@@ -1,7 +1,6 @@
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -104,19 +103,12 @@ export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
-        <DialogHeader className="p-6 pb-4">
-          <DialogTitle className="text-2xl font-bold">
-            {initialData ? 'Edit Staff Member' : 'Add Staff Member'}
-          </DialogTitle>
-          <DialogDescription>
-            {initialData 
-              ? 'Update the staff member\'s information and skills below.'
-              : 'Fill in the details below to add a new staff member to your team.'}
-          </DialogDescription>
+      <DialogContent className="max-h-[90vh] p-0">
+        <DialogHeader className="p-6 pb-0">
+          <DialogTitle>{initialData ? 'Edit Staff Member' : 'Add Staff Member'}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="max-h-[calc(90vh-140px)] px-6">
-          <div className="pb-6">
+        <ScrollArea className="max-h-[calc(90vh-80px)]">
+          <div className="p-6 pt-0">
             <StaffForm
               initialData={initialData}
               onSubmit={handleSubmit}
