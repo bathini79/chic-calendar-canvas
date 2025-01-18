@@ -6,8 +6,7 @@ import { ShiftDialog } from "./ShiftDialog";
 import { RegularShiftDialog } from "./RegularShiftDialog";
 import { Button } from "../ui/button";
 import { ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-react";
-import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, addMonths } from "date-fns";
-import { Separator } from "@/components/ui/separator";
+import { format, addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import { toast } from "sonner";
 
 export function ShiftPlanner() {
@@ -35,37 +34,42 @@ export function ShiftPlanner() {
     },
   });
 
-  // Query for shifts within a larger date range to handle repeating shifts
+  // Query for shifts within the current week
   const { data: shifts, isLoading: shiftsLoading } = useQuery({
     queryKey: ['shifts', format(currentWeek, 'yyyy-MM-dd')],
     queryFn: async () => {
-      // Query for shifts in a wider date range (3 months) to catch all repeating patterns
-      const rangeStart = startOfWeek(subWeeks(currentWeek, 6));
-      const rangeEnd = endOfWeek(addWeeks(currentWeek, 6));
+      const weekStart = startOfWeek(currentWeek);
+      const weekEnd = endOfWeek(currentWeek);
       
       const { data, error } = await supabase
         .from('shifts')
         .select('*')
-        .gte('start_time', rangeStart.toISOString())
-        .lte('end_time', rangeEnd.toISOString());
+        .gte('start_time', weekStart.toISOString())
+        .lte('end_time', weekEnd.toISOString());
       
       if (error) {
         toast.error("Failed to load shifts");
         throw error;
       }
+      return data;
+    },
+  });
 
-      // Process shifts to handle repetition
-      const processedShifts = data.map(shift => {
-        const shiftStart = new Date(shift.start_time);
-        const shiftEnd = new Date(shift.end_time);
-        return {
-          ...shift,
-          start_time: shiftStart.toISOString(),
-          end_time: shiftEnd.toISOString(),
-        };
-      });
-
-      return processedShifts;
+  // Query for recurring shifts
+  const { data: recurringShifts } = useQuery({
+    queryKey: ['recurring_shifts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('recurring_shifts')
+        .select('*')
+        .gte('effective_from', startOfWeek(currentWeek).toISOString())
+        .or(`effective_until.is.null,effective_until.gte.${endOfWeek(currentWeek).toISOString()}`);
+      
+      if (error) {
+        toast.error("Failed to load recurring shifts");
+        throw error;
+      }
+      return data;
     },
   });
 
@@ -138,6 +142,7 @@ export function ShiftPlanner() {
               <WeeklyCalendar
                 employee={employee}
                 shifts={shifts?.filter((s) => s.employee_id === employee.id) || []}
+                recurringShifts={recurringShifts?.filter((s) => s.employee_id === employee.id) || []}
                 onDateClick={(date) => handleDateClick(date, employee)}
                 onSetRegularShifts={handleSetRegularShifts}
                 currentWeek={currentWeek}
