@@ -27,6 +27,10 @@ interface DayConfig {
   shifts: DayShift[];
 }
 
+interface WeekConfig {
+  days: Record<string, DayConfig>;
+}
+
 const DAYS = [
   { label: "Monday", value: "1", duration: "9h" },
   { label: "Tuesday", value: "2", duration: "9h" },
@@ -42,22 +46,30 @@ const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
   return `${hour}:00`;
 });
 
+const createDefaultDayConfig = (dayValue: string): DayConfig => ({
+  enabled: false,
+  shifts: [{
+    startTime: "09:00",
+    endTime: dayValue === "6" ? "17:00" : "18:00"
+  }]
+});
+
+const createDefaultWeekConfig = (): Record<string, DayConfig> => {
+  const config: Record<string, DayConfig> = {};
+  DAYS.forEach(day => {
+    config[day.value] = createDefaultDayConfig(day.value);
+  });
+  return config;
+};
+
 export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShiftDialogProps) {
   const queryClient = useQueryClient();
   const [scheduleType, setScheduleType] = useState("1");
   const [currentWeek, setCurrentWeek] = useState(0);
-  const [dayConfigs, setDayConfigs] = useState<Record<string, DayConfig>>(() => {
-    const configs: Record<string, DayConfig> = {};
-    DAYS.forEach(day => {
-      configs[day.value] = {
-        enabled: false,
-        shifts: [{
-          startTime: "09:00",
-          endTime: day.value === "6" ? "17:00" : "18:00"
-        }]
-      };
-    });
-    return configs;
+  const [weekConfigs, setWeekConfigs] = useState<WeekConfig[]>(() => {
+    return Array(4).fill(null).map(() => ({
+      days: createDefaultWeekConfig()
+    }));
   });
 
   // Fetch existing shifts for the selected date range
@@ -82,42 +94,56 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
     enabled: !!employee,
   });
 
-  const handleAddShift = (dayValue: string) => {
-    setDayConfigs(prev => ({
-      ...prev,
-      [dayValue]: {
-        ...prev[dayValue],
-        shifts: [
-          ...prev[dayValue].shifts,
-          { startTime: "09:00", endTime: "18:00" }
-        ]
-      }
-    }));
+  const handleAddShift = (weekIndex: number, dayValue: string) => {
+    setWeekConfigs(prev => {
+      const newConfigs = [...prev];
+      newConfigs[weekIndex] = {
+        days: {
+          ...newConfigs[weekIndex].days,
+          [dayValue]: {
+            ...newConfigs[weekIndex].days[dayValue],
+            shifts: [
+              ...newConfigs[weekIndex].days[dayValue].shifts,
+              { startTime: "09:00", endTime: "18:00" }
+            ]
+          }
+        }
+      };
+      return newConfigs;
+    });
   };
 
-  const handleRemoveShift = (dayValue: string, shiftIndex: number) => {
-    setDayConfigs(prev => ({
-      ...prev,
-      [dayValue]: {
-        ...prev[dayValue],
-        shifts: prev[dayValue].shifts.filter((_, index) => index !== shiftIndex)
-      }
-    }));
+  const handleRemoveShift = (weekIndex: number, dayValue: string, shiftIndex: number) => {
+    setWeekConfigs(prev => {
+      const newConfigs = [...prev];
+      newConfigs[weekIndex] = {
+        days: {
+          ...newConfigs[weekIndex].days,
+          [dayValue]: {
+            ...newConfigs[weekIndex].days[dayValue],
+            shifts: newConfigs[weekIndex].days[dayValue].shifts.filter((_, index) => index !== shiftIndex)
+          }
+        }
+      };
+      return newConfigs;
+    });
   };
 
   const handleSubmit = async () => {
     try {
       const startDate = startOfWeek(new Date());
       const shifts = [];
+      const totalWeeks = parseInt(scheduleType);
 
       // Create shifts for each week in the schedule
-      for (let week = 0; week < parseInt(scheduleType); week++) {
+      for (let week = 0; week < totalWeeks; week++) {
+        const weekConfig = weekConfigs[week];
         const weekStart = addWeeks(startDate, week);
         
         // Create shifts for each day in the week
         for (let date = new Date(weekStart); date <= endOfWeek(weekStart); date.setDate(date.getDate() + 1)) {
           const dayOfWeek = date.getDay().toString();
-          const dayConfig = dayConfigs[dayOfWeek];
+          const dayConfig = weekConfig.days[dayOfWeek];
           
           if (dayConfig.enabled) {
             // Create shifts for each time slot in the day
@@ -131,12 +157,18 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
               const shiftEnd = new Date(date);
               shiftEnd.setHours(parseInt(endHour), 0, 0);
 
-              shifts.push({
-                employee_id: employee.id,
-                start_time: shiftStart.toISOString(),
-                end_time: shiftEnd.toISOString(),
-                status: 'pending'
-              });
+              // Create recurring shifts for future weeks based on the pattern
+              for (let futureWeek = week; futureWeek < totalWeeks * 2; futureWeek += totalWeeks) {
+                const futureShiftStart = addWeeks(shiftStart, futureWeek);
+                const futureShiftEnd = addWeeks(shiftEnd, futureWeek);
+
+                shifts.push({
+                  employee_id: employee.id,
+                  start_time: futureShiftStart.toISOString(),
+                  end_time: futureShiftEnd.toISOString(),
+                  status: 'pending'
+                });
+              }
             });
           }
         }
@@ -148,7 +180,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
         .delete()
         .eq('employee_id', employee.id)
         .gte('start_time', startDate.toISOString())
-        .lte('end_time', endOfWeek(addWeeks(startDate, parseInt(scheduleType) - 1)).toISOString());
+        .lte('end_time', endOfWeek(addWeeks(startDate, parseInt(scheduleType) * 2 - 1)).toISOString());
 
       if (deleteError) throw deleteError;
 
@@ -230,7 +262,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
             
             <div className="space-y-4 divide-y">
               {DAYS.map((day) => {
-                const dayConfig = dayConfigs[day.value];
+                const dayConfig = weekConfigs[currentWeek].days[day.value];
                 const dayShifts = existingShifts?.filter(shift => 
                   new Date(shift.start_time).getDay().toString() === day.value
                 );
@@ -239,21 +271,27 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
                   <div key={day.value} className="pt-4 first:pt-0">
                     <div className="flex items-start gap-3">
                       <Checkbox
-                        id={day.value}
+                        id={`${currentWeek}-${day.value}`}
                         checked={dayConfig.enabled}
                         onCheckedChange={(checked) => {
-                          setDayConfigs(prev => ({
-                            ...prev,
-                            [day.value]: {
-                              ...prev[day.value],
-                              enabled: checked as boolean
-                            }
-                          }));
+                          setWeekConfigs(prev => {
+                            const newConfigs = [...prev];
+                            newConfigs[currentWeek] = {
+                              days: {
+                                ...newConfigs[currentWeek].days,
+                                [day.value]: {
+                                  ...newConfigs[currentWeek].days[day.value],
+                                  enabled: checked as boolean
+                                }
+                              }
+                            };
+                            return newConfigs;
+                          });
                         }}
                       />
                       <div className="flex-1 space-y-3">
                         <div className="flex items-center gap-2">
-                          <label htmlFor={day.value} className="text-sm font-medium">
+                          <label htmlFor={`${currentWeek}-${day.value}`} className="text-sm font-medium">
                             {day.label}
                           </label>
                           <Badge variant="secondary" className="text-xs">
@@ -268,15 +306,11 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
                                 <Select
                                   value={shift.startTime}
                                   onValueChange={(value) => {
-                                    setDayConfigs(prev => ({
-                                      ...prev,
-                                      [day.value]: {
-                                        ...prev[day.value],
-                                        shifts: prev[day.value].shifts.map((s, i) => 
-                                          i === index ? { ...s, startTime: value } : s
-                                        )
-                                      }
-                                    }));
+                                    setWeekConfigs(prev => {
+                                      const newConfigs = [...prev];
+                                      newConfigs[currentWeek].days[day.value].shifts[index].startTime = value;
+                                      return newConfigs;
+                                    });
                                   }}
                                 >
                                   <SelectTrigger className="w-[120px]">
@@ -296,15 +330,11 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
                                 <Select
                                   value={shift.endTime}
                                   onValueChange={(value) => {
-                                    setDayConfigs(prev => ({
-                                      ...prev,
-                                      [day.value]: {
-                                        ...prev[day.value],
-                                        shifts: prev[day.value].shifts.map((s, i) => 
-                                          i === index ? { ...s, endTime: value } : s
-                                        )
-                                      }
-                                    }));
+                                    setWeekConfigs(prev => {
+                                      const newConfigs = [...prev];
+                                      newConfigs[currentWeek].days[day.value].shifts[index].endTime = value;
+                                      return newConfigs;
+                                    });
                                   }}
                                 >
                                   <SelectTrigger className="w-[120px]">
@@ -322,7 +352,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleRemoveShift(day.value, index)}
+                                  onClick={() => handleRemoveShift(currentWeek, day.value, index)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -332,7 +362,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
                             <Button
                               variant="ghost"
                               className="text-muted-foreground"
-                              onClick={() => handleAddShift(day.value)}
+                              onClick={() => handleAddShift(currentWeek, day.value)}
                             >
                               <Plus className="h-4 w-4 mr-1" />
                               Add a shift
