@@ -10,8 +10,8 @@ const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
+    <Router>
+      <QueryClientProvider client={queryClient}>
         <div className="flex min-h-screen">
           <AppSidebar />
           <main className="flex-1">
@@ -23,8 +23,8 @@ function App() {
           </main>
         </div>
         <Toaster />
-      </Router>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </Router>
   );
 }
 
