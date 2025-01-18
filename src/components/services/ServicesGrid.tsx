@@ -17,12 +17,14 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
+      // First fetch services
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
         .select('*');
       
       if (servicesError) throw servicesError;
 
+      // Then fetch categories for these services
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('services_categories')
         .select(`
@@ -35,11 +37,12 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
       
       if (categoriesError) throw categoriesError;
 
+      // Map categories to services
       return servicesData.map(service => ({
         ...service,
         categories: categoriesData
           .filter(sc => sc.service_id === service.id)
-          .map(sc => sc.categories),
+          .map(sc => sc.categories) || [],
       }));
     },
   });
@@ -62,8 +65,8 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
 
   const filteredServices = services?.filter(service =>
     service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    service.categories.some((cat: any) => 
-      cat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    service.categories?.some((cat: any) => 
+      cat?.name?.toLowerCase().includes(searchQuery.toLowerCase())
     )
   );
 
@@ -105,7 +108,7 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
             <div>
               <span className="text-sm text-muted-foreground">Categories</span>
               <div className="flex flex-wrap gap-1 mt-1">
-                {service.categories.map((category: any) => (
+                {service.categories?.map((category: any) => (
                   <Badge key={category.id} variant="secondary" className="text-xs">
                     {category.name}
                   </Badge>
