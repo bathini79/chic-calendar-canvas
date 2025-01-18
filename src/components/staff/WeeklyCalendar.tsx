@@ -1,7 +1,7 @@
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { EmployeeRow } from "../EmployeeRow";
 import { Button } from "../ui/button";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,16 +17,18 @@ interface WeeklyCalendarProps {
   shifts: any[];
   onDateClick: (date: Date) => void;
   onSetRegularShifts: (employee: any) => void;
+  currentWeek: Date;
 }
 
 export function WeeklyCalendar({ 
   employee, 
   shifts, 
   onDateClick,
-  onSetRegularShifts 
+  onSetRegularShifts,
+  currentWeek
 }: WeeklyCalendarProps) {
   const queryClient = useQueryClient();
-  const startDate = startOfWeek(new Date());
+  const startDate = startOfWeek(currentWeek);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
 
   const getShiftsForDate = (date: Date) => {
@@ -106,12 +108,15 @@ export function WeeklyCalendar({
           return (
             <div
               key={date.toString()}
-              className="min-h-[80px] p-2 border rounded-lg bg-accent/10 relative group"
+              className="min-h-[80px] p-2 border rounded-lg bg-accent/5 relative group"
             >
-              <div className="text-xs text-muted-foreground mb-1">
-                {format(date, 'EEE, d MMM')}
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                <span>{format(date, 'EEE, d MMM')}</span>
                 {totalHours > 0 && (
-                  <span className="ml-1">({Math.round(totalHours)}h)</span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {Math.round(totalHours)}h
+                  </span>
                 )}
               </div>
               
@@ -129,7 +134,7 @@ export function WeeklyCalendar({
                   {dayShifts.map((shift) => (
                     <div
                       key={shift.id}
-                      className="text-xs p-1.5 rounded bg-accent/50 text-accent-foreground group/shift relative"
+                      className="text-xs p-1.5 rounded bg-accent/10 text-accent-foreground group/shift relative"
                     >
                       {formatShiftTime(shift.start_time, shift.end_time)}
                       <Button
