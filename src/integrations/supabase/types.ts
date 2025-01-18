@@ -236,7 +236,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name?: string | null
-          id?: string
+          id: string
           role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string
         }
@@ -275,7 +275,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
-          duration?: number
+          duration: number
           gender?: string | null
           id?: string
           image_urls?: string[] | null
@@ -373,7 +373,7 @@ export type Database = {
           created_at?: string
           employee_id?: string | null
           end_date: string
-          id?: string
+          id: string
           reason?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["shift_status"] | null
@@ -383,7 +383,7 @@ export type Database = {
           created_at?: string
           employee_id?: string | null
           end_date?: string
-          id?: string
+          id: string
           reason?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["shift_status"] | null
@@ -392,6 +392,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "time_off_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_shifts: {
+        Row: {
+          id: string;
+          employee_id: string;
+          day_of_week: number;
+          start_time: string;
+          end_time: string;
+          effective_from: string;
+          effective_until: string | null;
+          created_at: string;
+          updated_at: string;
+        }
+        Insert: {
+          id?: string;
+          employee_id: string;
+          day_of_week: number;
+          start_time: string;
+          end_time: string;
+          effective_from: string;
+          effective_until?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }
+        Update: {
+          id?: string;
+          employee_id?: string;
+          day_of_week?: number;
+          start_time?: string;
+          end_time?: string;
+          effective_from?: string;
+          effective_until?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_shifts_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
@@ -428,7 +472,7 @@ export type Tables<
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
     ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
         Database[PublicTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
   ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
       Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
@@ -440,10 +484,10 @@ export type Tables<
         PublicSchema["Views"])
     ? (PublicSchema["Tables"] &
         PublicSchema["Views"])[PublicTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
+      Row: infer R
+    }
+    ? R
+    : never
     : never
 
 export type TablesInsert<
@@ -482,10 +526,10 @@ export type TablesUpdate<
     : never
   : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
     ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
+      Update: infer U
+    }
+    ? U
+    : never
     : never
 
 export type Enums<

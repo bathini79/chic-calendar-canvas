@@ -3,11 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, Clock, Edit, Trash } from "lucide-react";
+import { Edit, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
-import { AvailabilityDialog } from "./AvailabilityDialog";
-import { TimeOffDialog } from "./TimeOffDialog";
 
 interface StaffGridProps {
   searchQuery: string;
@@ -15,10 +13,6 @@ interface StaffGridProps {
 }
 
 export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
-  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-  const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false);
-  const [timeOffDialogOpen, setTimeOffDialogOpen] = useState(false);
-
   const { data: staff, isLoading, error } = useQuery({
     queryKey: ['employees', searchQuery],
     queryFn: async () => {
@@ -88,94 +82,53 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
   }
 
   return (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {staff?.map((member) => (
-          <Card key={member.id} className="relative">
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center space-y-4">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={member.photo_url} alt={member.name} />
-                  <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div className="text-center">
-                  <h3 className="font-semibold text-lg">{member.name}</h3>
-                  <p className="text-sm text-muted-foreground">{member.email}</p>
-                </div>
-                <div className="flex flex-wrap gap-1 justify-center">
-                  {member.employee_skills?.map((skill: any) => (
-                    <span
-                      key={skill.service.id}
-                      className="text-xs bg-muted px-2 py-1 rounded-full"
-                    >
-                      {skill.service.name}
-                    </span>
-                  ))}
-                </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {staff?.map((member) => (
+        <Card key={member.id} className="relative">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center space-y-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={member.photo_url} alt={member.name} />
+                <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="text-center">
+                <h3 className="font-semibold text-lg">{member.name}</h3>
+                <p className="text-sm text-muted-foreground">{member.email}</p>
               </div>
-            </CardContent>
-            <CardFooter className="flex flex-wrap justify-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={() => {
-                  setSelectedEmployee(member.id);
-                  setAvailabilityDialogOpen(true);
-                }}
-              >
-                <Clock className="h-4 w-4" />
-                Availability
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={() => {
-                  setSelectedEmployee(member.id);
-                  setTimeOffDialogOpen(true);
-                }}
-              >
-                <Calendar className="h-4 w-4" />
-                Time Off
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={() => handleDelete(member.id)}
-              >
-                <Trash className="h-4 w-4" />
-                Delete
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={() => onEdit(member)}
-              >
-                <Edit className="h-4 w-4" />
-                Edit
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
-
-      {selectedEmployee && (
-        <>
-          <AvailabilityDialog
-            open={availabilityDialogOpen}
-            onOpenChange={setAvailabilityDialogOpen}
-            employeeId={selectedEmployee}
-          />
-          <TimeOffDialog
-            open={timeOffDialogOpen}
-            onOpenChange={setTimeOffDialogOpen}
-            employeeId={selectedEmployee}
-          />
-        </>
-      )}
-    </>
+              <div className="flex flex-wrap gap-1 justify-center">
+                {member.employee_skills?.map((skill: any) => (
+                  <span
+                    key={skill.service.id}
+                    className="text-xs bg-muted px-2 py-1 rounded-full"
+                  >
+                    {skill.service.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-wrap justify-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => handleDelete(member.id)}
+            >
+              <Trash className="h-4 w-4" />
+              Delete
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => onEdit(member)}
+            >
+              <Edit className="h-4 w-4" />
+              Edit
+            </Button>
+          </CardFooter>
+        </Card>
+      ))}
+    </div>
   );
 }
