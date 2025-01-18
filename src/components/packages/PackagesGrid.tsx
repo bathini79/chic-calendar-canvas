@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Card,
@@ -8,8 +8,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge"; // Added this import
-import { Edit } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Edit, Trash } from "lucide-react";
+import { toast } from "sonner";
 
 interface PackagesGridProps {
   searchQuery: string;
@@ -17,6 +18,8 @@ interface PackagesGridProps {
 }
 
 export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
+  const queryClient = useQueryClient();
+
   const { data: packages, isLoading } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
@@ -38,6 +41,31 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
     },
   });
 
+  const handleDelete = async (id: string) => {
+    try {
+      // First delete package_services entries
+      const { error: servicesError } = await supabase
+        .from('package_services')
+        .delete()
+        .eq('package_id', id);
+      
+      if (servicesError) throw servicesError;
+
+      // Then delete the package
+      const { error: packageError } = await supabase
+        .from('packages')
+        .delete()
+        .eq('id', id);
+      
+      if (packageError) throw packageError;
+      
+      queryClient.invalidateQueries({ queryKey: ['packages'] });
+      toast.success('Package deleted successfully');
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
   const filteredPackages = packages?.filter(pkg =>
     pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     pkg.description?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -57,14 +85,22 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
                 <CardTitle className="text-xl">{pkg.name}</CardTitle>
                 <CardDescription>₹{pkg.price}</CardDescription>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => onEdit(pkg)}
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onEdit(pkg)}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(pkg.id)}
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
