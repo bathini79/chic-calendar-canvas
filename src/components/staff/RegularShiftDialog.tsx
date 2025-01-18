@@ -3,11 +3,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { addWeeks, format, startOfWeek } from "date-fns";
+import { addWeeks, format, startOfWeek, endOfWeek } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Trash2, CalendarCheck, Plus } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface RegularShiftDialogProps {
   open: boolean;
@@ -56,6 +57,28 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
       };
     });
     return configs;
+  });
+
+  // Fetch existing shifts for the selected date range
+  const { data: existingShifts, isLoading: shiftsLoading } = useQuery({
+    queryKey: ['shifts', employee?.id, scheduleType],
+    queryFn: async () => {
+      if (!employee) return [];
+      
+      const startDate = startOfWeek(new Date());
+      const endDate = endOfWeek(addWeeks(startDate, parseInt(scheduleType)));
+      
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('employee_id', employee.id)
+        .gte('start_time', startDate.toISOString())
+        .lte('end_time', endDate.toISOString());
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employee,
   });
 
   const handleAddShift = (dayValue: string) => {
@@ -172,14 +195,14 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
               </div>
             )}
 
-            <div className="bg-gray-50 p-4 rounded-lg flex gap-3">
-              <div className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-gray-100">
-                ℹ️
-              </div>
-              <p className="text-sm text-gray-900">
-                Team members will not be scheduled on business closed periods.
-              </p>
-            </div>
+            {existingShifts && existingShifts.length > 0 && (
+              <Alert>
+                <CalendarCheck className="h-4 w-4" />
+                <AlertDescription>
+                  There are {existingShifts.length} existing shifts in this period
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -187,6 +210,10 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
             <div className="space-y-4">
               {DAYS.map((day) => {
                 const dayConfig = dayConfigs[day.value];
+                const dayShifts = existingShifts?.filter(shift => 
+                  new Date(shift.start_time).getDay().toString() === day.value
+                );
+
                 return (
                   <div key={day.value} className="flex items-start gap-3">
                     <Checkbox
@@ -285,13 +312,32 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
                             className="text-gray-600 p-0 h-auto font-normal"
                             onClick={() => handleAddShift(day.value)}
                           >
+                            <Plus className="h-4 w-4 mr-1" />
                             Add a shift
                           </Button>
+
+                          {dayShifts && dayShifts.length > 0 && (
+                            <div className="mt-2 text-sm text-muted-foreground">
+                              Existing shifts:
+                              {dayShifts.map((shift, index) => (
+                                <div key={index} className="ml-2">
+                                  {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
 
-                      {!dayConfig.enabled && (
-                        <p className="text-sm text-muted-foreground">No shifts</p>
+                      {!dayConfig.enabled && dayShifts && dayShifts.length > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          Existing shifts:
+                          {dayShifts.map((shift, index) => (
+                            <div key={index}>
+                              {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>

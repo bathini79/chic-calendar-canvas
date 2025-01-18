@@ -1,7 +1,7 @@
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { EmployeeRow } from "../EmployeeRow";
 import { Button } from "../ui/button";
-import { MoreHorizontal, Plus, Clock } from "lucide-react";
+import { MoreHorizontal, Plus, Clock, CalendarCheck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 interface WeeklyCalendarProps {
   employee: any;
@@ -39,6 +40,14 @@ export function WeeklyCalendar({
 
   const formatShiftTime = (start: string, end: string) => {
     return `${format(new Date(start), 'h:mma')} - ${format(new Date(end), 'h:mma')}`.toLowerCase();
+  };
+
+  const calculateTotalHours = (shifts: any[]) => {
+    return shifts.reduce((acc, shift) => {
+      const start = new Date(shift.start_time);
+      const end = new Date(shift.end_time);
+      return acc + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    }, 0);
   };
 
   const handleDeleteAllShifts = async () => {
@@ -85,6 +94,7 @@ export function WeeklyCalendar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onSetRegularShifts(employee)}>
+              <CalendarCheck className="h-4 w-4 mr-2" />
               Set regular shifts
             </DropdownMenuItem>
             <DropdownMenuItem 
@@ -99,11 +109,7 @@ export function WeeklyCalendar({
       <div className="grid grid-cols-7 gap-2">
         {weekDays.map((date) => {
           const dayShifts = getShiftsForDate(date);
-          const totalHours = dayShifts.reduce((acc, shift) => {
-            const start = new Date(shift.start_time);
-            const end = new Date(shift.end_time);
-            return acc + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-          }, 0);
+          const totalHours = calculateTotalHours(dayShifts);
           
           return (
             <div
@@ -113,10 +119,10 @@ export function WeeklyCalendar({
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                 <span>{format(date, 'EEE, d MMM')}</span>
                 {totalHours > 0 && (
-                  <span className="flex items-center gap-1">
+                  <Badge variant="secondary" className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {Math.round(totalHours)}h
-                  </span>
+                  </Badge>
                 )}
               </div>
               
@@ -134,7 +140,13 @@ export function WeeklyCalendar({
                   {dayShifts.map((shift) => (
                     <div
                       key={shift.id}
-                      className="text-xs p-1.5 rounded bg-accent/10 text-accent-foreground group/shift relative"
+                      className={`text-xs p-1.5 rounded ${
+                        shift.status === 'approved' 
+                          ? 'bg-green-100 text-green-800'
+                          : shift.status === 'declined'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-accent/10 text-accent-foreground'
+                      } group/shift relative`}
                     >
                       {formatShiftTime(shift.start_time, shift.end_time)}
                       <Button
