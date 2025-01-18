@@ -1,18 +1,30 @@
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { EmployeeRow } from "../EmployeeRow";
 import { Button } from "../ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface WeeklyCalendarProps {
   employee: any;
   shifts: any[];
   onDateClick: (date: Date) => void;
+  onSetRegularShifts: (employee: any) => void;
 }
 
-export function WeeklyCalendar({ employee, shifts, onDateClick }: WeeklyCalendarProps) {
+export function WeeklyCalendar({ 
+  employee, 
+  shifts, 
+  onDateClick,
+  onSetRegularShifts 
+}: WeeklyCalendarProps) {
   const queryClient = useQueryClient();
   const startDate = startOfWeek(new Date());
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
@@ -24,7 +36,23 @@ export function WeeklyCalendar({ employee, shifts, onDateClick }: WeeklyCalendar
   };
 
   const formatShiftTime = (start: string, end: string) => {
-    return `${format(new Date(start), 'ha')} - ${format(new Date(end), 'ha')}`;
+    return `${format(new Date(start), 'h:mma')} - ${format(new Date(end), 'h:mma')}`;
+  };
+
+  const handleDeleteAllShifts = async () => {
+    try {
+      const { error } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('employee_id', employee.id);
+
+      if (error) throw error;
+      
+      toast.success("All shifts deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    } catch (error: any) {
+      toast.error(error.message);
+    }
   };
 
   const handleDeleteShift = async (shiftId: string) => {
@@ -45,8 +73,26 @@ export function WeeklyCalendar({ employee, shifts, onDateClick }: WeeklyCalendar
 
   return (
     <div className="grid grid-cols-[250px_1fr] gap-4">
-      <div className="flex items-center">
+      <div className="flex items-center justify-between pr-4">
         <EmployeeRow name={employee.name} image={employee.photo_url} />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onSetRegularShifts(employee)}>
+              Set regular shifts
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              className="text-destructive"
+              onClick={handleDeleteAllShifts}
+            >
+              Delete all shifts
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="grid grid-cols-7 gap-2">
         {weekDays.map((date) => {

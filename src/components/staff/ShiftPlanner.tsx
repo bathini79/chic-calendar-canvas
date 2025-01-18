@@ -3,11 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { WeeklyCalendar } from "./WeeklyCalendar";
 import { ShiftDialog } from "./ShiftDialog";
-import { format, startOfWeek, addDays } from "date-fns";
+import { RegularShiftDialog } from "./RegularShiftDialog";
 
 export function ShiftPlanner() {
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
+  const [regularShiftDialogOpen, setRegularShiftDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const { data: employees, isLoading } = useQuery({
@@ -36,40 +37,35 @@ export function ShiftPlanner() {
     },
   });
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
+  const handleDateClick = (date: Date, employee: any) => {
+    setSelectedDate(date);
+    setSelectedEmployee(employee);
+    setShiftDialogOpen(true);
+  };
 
-  const startDate = startOfWeek(new Date());
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
+  const handleSetRegularShifts = (employee: any) => {
+    setSelectedEmployee(employee);
+    setRegularShiftDialogOpen(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-48 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-[250px_1fr] gap-4 mb-4">
-        <div className="font-medium">Team Member</div>
-        <div className="grid grid-cols-7 gap-4">
-          {weekDays.map((date) => (
-            <div
-              key={date.toString()}
-              className="text-center font-medium p-2"
-            >
-              {format(date, 'EEE, d MMM')}
-            </div>
-          ))}
-        </div>
-      </div>
-
       <div className="space-y-4">
         {employees?.map((employee) => (
           <WeeklyCalendar
             key={employee.id}
             employee={employee}
             shifts={shifts?.filter((s) => s.employee_id === employee.id) || []}
-            onDateClick={(date) => {
-              setSelectedDate(date);
-              setSelectedEmployee(employee);
-              setShiftDialogOpen(true);
-            }}
+            onDateClick={(date) => handleDateClick(date, employee)}
+            onSetRegularShifts={handleSetRegularShifts}
           />
         ))}
       </div>
@@ -82,6 +78,12 @@ export function ShiftPlanner() {
           start_time: selectedDate.toISOString(),
           end_time: selectedDate.toISOString(),
         } : undefined}
+      />
+
+      <RegularShiftDialog
+        open={regularShiftDialogOpen}
+        onOpenChange={setRegularShiftDialogOpen}
+        employee={selectedEmployee}
       />
     </div>
   );
