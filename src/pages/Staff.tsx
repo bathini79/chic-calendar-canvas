@@ -4,6 +4,8 @@ import { HeaderActions } from "@/components/services/components/HeaderActions";
 import { StaffGrid } from "@/components/staff/StaffGrid";
 import { StaffList } from "@/components/staff/StaffList";
 import { StaffDialog } from "@/components/staff/StaffDialog";
+import { TimeOffList } from "@/components/staff/TimeOffList";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Staff() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -27,35 +29,46 @@ export default function Staff() {
         <h1 className="text-3xl font-bold">Staff Management</h1>
       </div>
 
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <SearchInput
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search staff..."
+      <Tabs defaultValue="staff" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="staff">Staff Members</TabsTrigger>
+          <TabsTrigger value="time-off">Time Off Requests</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="staff" className="space-y-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <SearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search staff..."
+              />
+            </div>
+            <HeaderActions
+              view={viewMode}
+              onViewChange={setViewMode}
+              onCreateClick={handleCreate}
+              type="staff"
             />
           </div>
-          <HeaderActions
-            view={viewMode}
-            onViewChange={setViewMode}
-            onCreateClick={handleCreate}
-            type="staff"
-          />
-        </div>
 
-        {viewMode === 'grid' ? (
-          <StaffGrid
-            searchQuery={searchQuery}
-            onEdit={handleEdit}
-          />
-        ) : (
-          <StaffList
-            searchQuery={searchQuery}
-            onEdit={handleEdit}
-          />
-        )}
-      </div>
+          {viewMode === 'grid' ? (
+            <StaffGrid
+              searchQuery={searchQuery}
+              onEdit={handleEdit}
+            />
+          ) : (
+            <StaffList
+              searchQuery={searchQuery}
+              onEdit={handleEdit}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="time-off">
+          <TimeOffList />
+        </TabsContent>
+      </Tabs>
 
       <StaffDialog
         open={dialogOpen}
