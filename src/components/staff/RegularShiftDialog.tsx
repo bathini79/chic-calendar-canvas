@@ -7,8 +7,9 @@ import { addWeeks, format, startOfWeek, endOfWeek } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { Trash2, CalendarCheck, Plus } from "lucide-react";
+import { Trash2, CalendarCheck, Plus, Clock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 interface RegularShiftDialogProps {
   open: boolean;
@@ -157,7 +158,10 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
-          <DialogTitle>Set {employee?.name}'s regular shifts</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarCheck className="h-5 w-5 text-primary" />
+            Set {employee?.name}'s regular shifts
+          </DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-[300px,1fr] gap-6">
@@ -196,8 +200,8 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
             )}
 
             {existingShifts && existingShifts.length > 0 && (
-              <Alert>
-                <CalendarCheck className="h-4 w-4" />
+              <Alert className="bg-accent/50">
+                <Clock className="h-4 w-4" />
                 <AlertDescription>
                   There are {existingShifts.length} existing shifts in this period
                 </AlertDescription>
@@ -206,8 +210,12 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
           </div>
 
           <div className="space-y-6">
-            <h3 className="font-semibold">Week {currentWeek + 1} of {scheduleType}</h3>
-            <div className="space-y-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <CalendarCheck className="h-4 w-4" />
+              Week {currentWeek + 1} of {scheduleType}
+            </h3>
+            
+            <div className="space-y-4 divide-y">
               {DAYS.map((day) => {
                 const dayConfig = dayConfigs[day.value];
                 const dayShifts = existingShifts?.filter(shift => 
@@ -215,130 +223,132 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
                 );
 
                 return (
-                  <div key={day.value} className="flex items-start gap-3">
-                    <Checkbox
-                      id={day.value}
-                      checked={dayConfig.enabled}
-                      onCheckedChange={(checked) => {
-                        setDayConfigs(prev => ({
-                          ...prev,
-                          [day.value]: {
-                            ...prev[day.value],
-                            enabled: checked as boolean
-                          }
-                        }));
-                      }}
-                    />
-                    <div className="flex-1 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <label htmlFor={day.value} className="text-sm font-medium">
-                          {day.label}
-                        </label>
-                        <span className="text-sm text-muted-foreground">
-                          {day.duration}
-                        </span>
+                  <div key={day.value} className="pt-4 first:pt-0">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id={day.value}
+                        checked={dayConfig.enabled}
+                        onCheckedChange={(checked) => {
+                          setDayConfigs(prev => ({
+                            ...prev,
+                            [day.value]: {
+                              ...prev[day.value],
+                              enabled: checked as boolean
+                            }
+                          }));
+                        }}
+                      />
+                      <div className="flex-1 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <label htmlFor={day.value} className="text-sm font-medium">
+                            {day.label}
+                          </label>
+                          <Badge variant="secondary" className="text-xs">
+                            {day.duration}
+                          </Badge>
+                        </div>
+
+                        {dayConfig.enabled && (
+                          <div className="space-y-2">
+                            {dayConfig.shifts.map((shift, index) => (
+                              <div key={index} className="flex items-center gap-2 bg-accent/5 p-2 rounded-md">
+                                <Select
+                                  value={shift.startTime}
+                                  onValueChange={(value) => {
+                                    setDayConfigs(prev => ({
+                                      ...prev,
+                                      [day.value]: {
+                                        ...prev[day.value],
+                                        shifts: prev[day.value].shifts.map((s, i) => 
+                                          i === index ? { ...s, startTime: value } : s
+                                        )
+                                      }
+                                    }));
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TIME_SLOTS.map((time) => (
+                                      <SelectItem key={time} value={time}>
+                                        {format(new Date().setHours(parseInt(time)), 'h:mm a')}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+
+                                <span>-</span>
+
+                                <Select
+                                  value={shift.endTime}
+                                  onValueChange={(value) => {
+                                    setDayConfigs(prev => ({
+                                      ...prev,
+                                      [day.value]: {
+                                        ...prev[day.value],
+                                        shifts: prev[day.value].shifts.map((s, i) => 
+                                          i === index ? { ...s, endTime: value } : s
+                                        )
+                                      }
+                                    }));
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TIME_SLOTS.map((time) => (
+                                      <SelectItem key={time} value={time}>
+                                        {format(new Date().setHours(parseInt(time)), 'h:mm a')}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveShift(day.value, index)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            
+                            <Button
+                              variant="ghost"
+                              className="text-muted-foreground"
+                              onClick={() => handleAddShift(day.value)}
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add a shift
+                            </Button>
+
+                            {dayShifts && dayShifts.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                <p className="text-sm text-muted-foreground">Existing shifts:</p>
+                                {dayShifts.map((shift, index) => (
+                                  <div key={index} className="text-sm bg-accent/10 px-2 py-1 rounded">
+                                    {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {!dayConfig.enabled && dayShifts && dayShifts.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground">Existing shifts:</p>
+                            {dayShifts.map((shift, index) => (
+                              <div key={index} className="text-sm bg-accent/10 px-2 py-1 rounded">
+                                {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-
-                      {dayConfig.enabled && (
-                        <div className="space-y-2">
-                          {dayConfig.shifts.map((shift, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <Select
-                                value={shift.startTime}
-                                onValueChange={(value) => {
-                                  setDayConfigs(prev => ({
-                                    ...prev,
-                                    [day.value]: {
-                                      ...prev[day.value],
-                                      shifts: prev[day.value].shifts.map((s, i) => 
-                                        i === index ? { ...s, startTime: value } : s
-                                      )
-                                    }
-                                  }));
-                                }}
-                              >
-                                <SelectTrigger className="w-[120px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {TIME_SLOTS.map((time) => (
-                                    <SelectItem key={time} value={time}>
-                                      {format(new Date().setHours(parseInt(time)), 'h:mm a')}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-
-                              <span>-</span>
-
-                              <Select
-                                value={shift.endTime}
-                                onValueChange={(value) => {
-                                  setDayConfigs(prev => ({
-                                    ...prev,
-                                    [day.value]: {
-                                      ...prev[day.value],
-                                      shifts: prev[day.value].shifts.map((s, i) => 
-                                        i === index ? { ...s, endTime: value } : s
-                                      )
-                                    }
-                                  }));
-                                }}
-                              >
-                                <SelectTrigger className="w-[120px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {TIME_SLOTS.map((time) => (
-                                    <SelectItem key={time} value={time}>
-                                      {format(new Date().setHours(parseInt(time)), 'h:mm a')}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveShift(day.value, index)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                          
-                          <Button
-                            variant="link"
-                            className="text-gray-600 p-0 h-auto font-normal"
-                            onClick={() => handleAddShift(day.value)}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add a shift
-                          </Button>
-
-                          {dayShifts && dayShifts.length > 0 && (
-                            <div className="mt-2 text-sm text-muted-foreground">
-                              Existing shifts:
-                              {dayShifts.map((shift, index) => (
-                                <div key={index} className="ml-2">
-                                  {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {!dayConfig.enabled && dayShifts && dayShifts.length > 0 && (
-                        <div className="text-sm text-muted-foreground">
-                          Existing shifts:
-                          {dayShifts.map((shift, index) => (
-                            <div key={index}>
-                              {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
