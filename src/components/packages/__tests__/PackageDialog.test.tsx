@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PackageDialog } from '../PackageDialog';
-import { vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the components and hooks
 vi.mock('@tanstack/react-query', () => ({
