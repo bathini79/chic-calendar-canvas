@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutGrid, List, Package, Users } from "lucide-react";
+import { LayoutGrid, List, Package } from "lucide-react";
 import { SearchInput } from "@/components/services/components/SearchInput";
 import { HeaderActions } from "@/components/services/components/HeaderActions";
 import { ServicesContent } from "@/components/services/components/ServicesContent";
@@ -13,24 +13,18 @@ import { PackagesGrid } from "@/components/packages/PackagesGrid";
 import { PackagesList } from "@/components/packages/PackagesList";
 import CategoriesList from "@/components/categories/CategoriesList";
 import CategoriesGrid from "@/components/categories/CategoriesGrid";
-import { StaffGrid } from "@/components/staff/StaffGrid";
-import { StaffList } from "@/components/staff/StaffList";
-import { StaffDialog } from "@/components/staff/StaffDialog";
 
 const Services = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [categoryViewMode, setCategoryViewMode] = useState<'grid' | 'list'>('grid');
   const [packageViewMode, setPackageViewMode] = useState<'grid' | 'list'>('grid');
-  const [staffViewMode, setStaffViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [packageDialogOpen, setPackageDialogOpen] = useState(false);
-  const [staffDialogOpen, setStaffDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
 
   const { data: categories, refetch: refetchCategories } = useQuery({
     queryKey: ['categories'],
@@ -75,16 +69,6 @@ const Services = () => {
     setPackageDialogOpen(true);
   };
 
-  const handleEditStaff = (staff: any) => {
-    setSelectedStaff(staff);
-    setStaffDialogOpen(true);
-  };
-
-  const handleCreateStaff = () => {
-    setSelectedStaff(null);
-    setStaffDialogOpen(true);
-  };
-
   return (
     <div className="w-full min-h-screen bg-background p-6">
       <div className="flex justify-between items-center mb-6">
@@ -115,13 +99,6 @@ const Services = () => {
               >
                 <Package className="h-4 w-4" />
                 Packages
-              </TabsTrigger>
-              <TabsTrigger 
-                value="staff" 
-                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 pb-3 flex items-center gap-2"
-              >
-                <Users className="h-4 w-4" />
-                Staff
               </TabsTrigger>
             </TabsList>
           </div>
@@ -209,35 +186,6 @@ const Services = () => {
               />
             )}
           </TabsContent>
-
-          <TabsContent value="staff" className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <SearchInput
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  placeholder="Search staff..."
-                />
-              </div>
-              <HeaderActions
-                view={staffViewMode}
-                onViewChange={setStaffViewMode}
-                onCreateClick={handleCreateStaff}
-                type="staff"
-              />
-            </div>
-            {staffViewMode === 'grid' ? (
-              <StaffGrid
-                searchQuery={searchQuery}
-                onEdit={handleEditStaff}
-              />
-            ) : (
-              <StaffList
-                searchQuery={searchQuery}
-                onEdit={handleEditStaff}
-              />
-            )}
-          </TabsContent>
         </div>
       </Tabs>
 
@@ -256,12 +204,6 @@ const Services = () => {
         open={packageDialogOpen}
         onOpenChange={setPackageDialogOpen}
         initialData={selectedPackage}
-      />
-
-      <StaffDialog
-        open={staffDialogOpen}
-        onOpenChange={setStaffDialogOpen}
-        initialData={selectedStaff}
       />
     </div>
   );

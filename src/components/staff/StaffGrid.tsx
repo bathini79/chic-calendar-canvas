@@ -81,40 +81,48 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end gap-2">
+            <CardFooter className="flex justify-center gap-2">
               <Button
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
                 onClick={() => {
                   setSelectedEmployee(member.id);
                   setAvailabilityDialogOpen(true);
                 }}
               >
                 <Clock className="h-4 w-4" />
+                Set Availability
               </Button>
               <Button
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
                 onClick={() => {
                   setSelectedEmployee(member.id);
                   setTimeOffDialogOpen(true);
                 }}
               >
                 <Calendar className="h-4 w-4" />
+                Time Off
               </Button>
               <Button
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
                 onClick={() => handleDelete(member.id)}
               >
                 <Trash className="h-4 w-4" />
+                Delete
               </Button>
               <Button
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
                 onClick={() => onEdit(member)}
               >
                 <Edit className="h-4 w-4" />
+                Edit
               </Button>
             </CardFooter>
           </Card>
