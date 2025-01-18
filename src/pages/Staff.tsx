@@ -5,6 +5,7 @@ import { StaffGrid } from "@/components/staff/StaffGrid";
 import { StaffList } from "@/components/staff/StaffList";
 import { StaffDialog } from "@/components/staff/StaffDialog";
 import { TimeOffList } from "@/components/staff/TimeOffList";
+import { ShiftList } from "@/components/staff/ShiftList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Staff() {
@@ -32,6 +33,7 @@ export default function Staff() {
       <Tabs defaultValue="staff" className="space-y-6">
         <TabsList>
           <TabsTrigger value="staff">Staff Members</TabsTrigger>
+          <TabsTrigger value="shifts">Shifts</TabsTrigger>
           <TabsTrigger value="time-off">Time Off Requests</TabsTrigger>
         </TabsList>
 
@@ -63,6 +65,10 @@ export default function Staff() {
               onEdit={handleEdit}
             />
           )}
+        </TabsContent>
+
+        <TabsContent value="shifts">
+          <ShiftList />
         </TabsContent>
 
         <TabsContent value="time-off">

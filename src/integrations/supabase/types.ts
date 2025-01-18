@@ -320,6 +320,44 @@ export type Database = {
           },
         ]
       }
+      shifts: {
+        Row: {
+          created_at: string
+          employee_id: string | null
+          end_time: string
+          id: string
+          start_time: string
+          status: Database["public"]["Enums"]["shift_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id?: string | null
+          end_time: string
+          id?: string
+          start_time: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string | null
+          end_time?: string
+          id?: string
+          start_time?: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_off_requests: {
         Row: {
           created_at: string
