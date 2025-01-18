@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 interface WeeklyCalendarProps {
   employee: any;
   shifts: any[];
+  recurringShifts: any[];
   onDateClick: (date: Date) => void;
   onSetRegularShifts: (employee: any) => void;
   currentWeek: Date;
@@ -23,7 +24,8 @@ interface WeeklyCalendarProps {
 
 export function WeeklyCalendar({ 
   employee, 
-  shifts, 
+  shifts,
+  recurringShifts,
   onDateClick,
   onSetRegularShifts,
   currentWeek
@@ -33,13 +35,24 @@ export function WeeklyCalendar({
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
 
   const getShiftsForDate = (date: Date) => {
-    return shifts.filter((shift) => 
+    const regularShifts = shifts.filter((shift) => 
       isSameDay(new Date(shift.start_time), date)
     );
+
+    const dayOfWeek = date.getDay();
+    const recurringForDay = recurringShifts.filter(shift => 
+      shift.day_of_week === dayOfWeek &&
+      (!shift.effective_until || new Date(shift.effective_until) >= date) &&
+      new Date(shift.effective_from) <= date
+    );
+
+    return [...regularShifts, ...recurringForDay];
   };
 
-  const formatShiftTime = (start: string, end: string) => {
-    return `${format(new Date(start), 'h:mma')} - ${format(new Date(end), 'h:mma')}`.toLowerCase();
+  const formatShiftTime = (start: string | Date, end: string | Date) => {
+    const startDate = typeof start === 'string' ? new Date(start) : start;
+    const endDate = typeof end === 'string' ? new Date(end) : end;
+    return `${format(startDate, 'h:mma')} - ${format(endDate, 'h:mma')}`.toLowerCase();
   };
 
   const calculateTotalHours = (shifts: any[]) => {
@@ -126,22 +139,31 @@ export function WeeklyCalendar({
               
               {dayShifts.length > 0 ? (
                 <div className="space-y-1 pt-2">
-                  {dayShifts.map((shift) => (
-                    <div
-                      key={shift.id}
-                      className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status)} group/shift relative`}
-                    >
-                      {formatShiftTime(shift.start_time, shift.end_time)}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute -right-1 -top-1 h-4 w-4 opacity-0 group-hover/shift:opacity-100 transition-opacity"
-                        onClick={() => handleDeleteShift(shift.id)}
+                  {dayShifts.map((shift) => {
+                    const isRecurring = !shift.start_time;
+                    const shiftTime = isRecurring
+                      ? `${shift.start_time} - ${shift.end_time}`
+                      : formatShiftTime(shift.start_time, shift.end_time);
+
+                    return (
+                      <div
+                        key={shift.id}
+                        className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status)} group/shift relative`}
                       >
-                        <span className="text-xs text-destructive">×</span>
-                      </Button>
-                    </div>
-                  ))}
+                        {shiftTime}
+                        {!isRecurring && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute -right-1 -top-1 h-4 w-4 opacity-0 group-hover/shift:opacity-100 transition-opacity"
+                            onClick={() => handleDeleteShift(shift.id)}
+                          >
+                            <span className="text-xs text-destructive">×</span>
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-xs text-muted-foreground pt-2">
