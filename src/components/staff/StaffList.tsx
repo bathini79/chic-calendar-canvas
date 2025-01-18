@@ -28,8 +28,7 @@ export function StaffList({ searchQuery, onEdit }: StaffListProps) {
           *,
           employee_skills(
             service:services(*)
-          ),
-          employee_availability(*)
+          )
         `)
         .ilike('name', `%${searchQuery}%`)
         .order('name');
@@ -63,6 +62,7 @@ export function StaffList({ searchQuery, onEdit }: StaffListProps) {
             <TableHead>Staff Member</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Phone</TableHead>
+            <TableHead>Type</TableHead>
             <TableHead>Skills</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -82,6 +82,9 @@ export function StaffList({ searchQuery, onEdit }: StaffListProps) {
               </TableCell>
               <TableCell>{member.email}</TableCell>
               <TableCell>{member.phone || '-'}</TableCell>
+              <TableCell>
+                <span className="capitalize">{member.employment_type}</span>
+              </TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">
                   {member.employee_skills?.map((skill: any) => (

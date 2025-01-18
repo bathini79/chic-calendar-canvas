@@ -105,6 +105,7 @@ export type Database = {
         Row: {
           created_at: string
           email: string
+          employment_type: Database["public"]["Enums"]["employee_type"]
           id: string
           name: string
           phone: string | null
@@ -115,6 +116,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email: string
+          employment_type?: Database["public"]["Enums"]["employee_type"]
           id?: string
           name: string
           phone?: string | null
@@ -125,6 +127,7 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string
+          employment_type?: Database["public"]["Enums"]["employee_type"]
           id?: string
           name?: string
           phone?: string | null
@@ -367,6 +370,7 @@ export type Database = {
     }
     Enums: {
       employee_status: "active" | "inactive"
+      employee_type: "stylist" | "operations"
       service_status: "active" | "inactive" | "archived"
       shift_status: "pending" | "approved" | "declined"
       user_role: "customer" | "employee" | "admin" | "superadmin"
