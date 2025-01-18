@@ -1,15 +1,13 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { addWeeks, format, startOfWeek, endOfWeek } from "date-fns";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { Trash2, CalendarCheck, Plus, Clock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { CalendarCheck, Clock } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { DAYS } from "./types/shift-types";
+import { DayConfiguration } from "./DayConfiguration";
+import { useScheduleState } from "./hooks/useScheduleState";
 
 interface RegularShiftDialogProps {
   open: boolean;
@@ -17,60 +15,16 @@ interface RegularShiftDialogProps {
   employee: any;
 }
 
-interface DayShift {
-  startTime: string;
-  endTime: string;
-}
-
-interface DayConfig {
-  enabled: boolean;
-  shifts: DayShift[];
-}
-
-interface WeekConfig {
-  days: Record<string, DayConfig>;
-}
-
-const DAYS = [
-  { label: "Monday", value: "1", duration: "9h" },
-  { label: "Tuesday", value: "2", duration: "9h" },
-  { label: "Wednesday", value: "3", duration: "9h" },
-  { label: "Thursday", value: "4", duration: "9h" },
-  { label: "Friday", value: "5", duration: "9h" },
-  { label: "Saturday", value: "6", duration: "7h" },
-  { label: "Sunday", value: "0", duration: "0h" },
-];
-
-const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
-  const hour = i.toString().padStart(2, '0');
-  return `${hour}:00`;
-});
-
-const createDefaultDayConfig = (dayValue: string): DayConfig => ({
-  enabled: false,
-  shifts: [{
-    startTime: "09:00",
-    endTime: dayValue === "6" ? "17:00" : "18:00"
-  }]
-});
-
-const createDefaultWeekConfig = (): Record<string, DayConfig> => {
-  const config: Record<string, DayConfig> = {};
-  DAYS.forEach(day => {
-    config[day.value] = createDefaultDayConfig(day.value);
-  });
-  return config;
-};
-
 export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShiftDialogProps) {
-  const queryClient = useQueryClient();
-  const [scheduleType, setScheduleType] = useState("1");
-  const [currentWeek, setCurrentWeek] = useState(0);
-  const [weekConfigs, setWeekConfigs] = useState<WeekConfig[]>(() => {
-    return Array(4).fill(null).map(() => ({
-      days: createDefaultWeekConfig()
-    }));
-  });
+  const {
+    scheduleType,
+    setScheduleType,
+    currentWeek,
+    setCurrentWeek,
+    weekConfigs,
+    setWeekConfigs,
+    handleSubmit
+  } = useScheduleState(employee);
 
   // Fetch existing shifts for the selected date range
   const { data: existingShifts, isLoading: shiftsLoading } = useQuery({
@@ -78,8 +32,10 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
     queryFn: async () => {
       if (!employee) return [];
       
-      const startDate = startOfWeek(new Date());
-      const endDate = endOfWeek(addWeeks(startDate, parseInt(scheduleType)));
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - startDate.getDay()); // Start of current week
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + (parseInt(scheduleType) * 7) - 1);
       
       const { data, error } = await supabase
         .from('shifts')
@@ -94,108 +50,10 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
     enabled: !!employee,
   });
 
-  const handleAddShift = (weekIndex: number, dayValue: string) => {
-    setWeekConfigs(prev => {
-      const newConfigs = [...prev];
-      newConfigs[weekIndex] = {
-        days: {
-          ...newConfigs[weekIndex].days,
-          [dayValue]: {
-            ...newConfigs[weekIndex].days[dayValue],
-            shifts: [
-              ...newConfigs[weekIndex].days[dayValue].shifts,
-              { startTime: "09:00", endTime: "18:00" }
-            ]
-          }
-        }
-      };
-      return newConfigs;
-    });
-  };
-
-  const handleRemoveShift = (weekIndex: number, dayValue: string, shiftIndex: number) => {
-    setWeekConfigs(prev => {
-      const newConfigs = [...prev];
-      newConfigs[weekIndex] = {
-        days: {
-          ...newConfigs[weekIndex].days,
-          [dayValue]: {
-            ...newConfigs[weekIndex].days[dayValue],
-            shifts: newConfigs[weekIndex].days[dayValue].shifts.filter((_, index) => index !== shiftIndex)
-          }
-        }
-      };
-      return newConfigs;
-    });
-  };
-
-  const handleSubmit = async () => {
-    try {
-      const startDate = startOfWeek(new Date());
-      const shifts = [];
-      const totalWeeks = parseInt(scheduleType);
-
-      // Create shifts for each week in the schedule
-      for (let week = 0; week < totalWeeks; week++) {
-        const weekConfig = weekConfigs[week];
-        const weekStart = addWeeks(startDate, week);
-        
-        // Create shifts for each day in the week
-        for (let date = new Date(weekStart); date <= endOfWeek(weekStart); date.setDate(date.getDate() + 1)) {
-          const dayOfWeek = date.getDay().toString();
-          const dayConfig = weekConfig.days[dayOfWeek];
-          
-          if (dayConfig.enabled) {
-            // Create shifts for each time slot in the day
-            dayConfig.shifts.forEach(shift => {
-              const [startHour] = shift.startTime.split(':');
-              const [endHour] = shift.endTime.split(':');
-              
-              const shiftStart = new Date(date);
-              shiftStart.setHours(parseInt(startHour), 0, 0);
-              
-              const shiftEnd = new Date(date);
-              shiftEnd.setHours(parseInt(endHour), 0, 0);
-
-              // Create recurring shifts for future weeks based on the pattern
-              for (let futureWeek = week; futureWeek < totalWeeks * 2; futureWeek += totalWeeks) {
-                const futureShiftStart = addWeeks(shiftStart, futureWeek);
-                const futureShiftEnd = addWeeks(shiftEnd, futureWeek);
-
-                shifts.push({
-                  employee_id: employee.id,
-                  start_time: futureShiftStart.toISOString(),
-                  end_time: futureShiftEnd.toISOString(),
-                  status: 'pending'
-                });
-              }
-            });
-          }
-        }
-      }
-
-      // Delete existing shifts in the date range
-      const { error: deleteError } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('employee_id', employee.id)
-        .gte('start_time', startDate.toISOString())
-        .lte('end_time', endOfWeek(addWeeks(startDate, parseInt(scheduleType) * 2 - 1)).toISOString());
-
-      if (deleteError) throw deleteError;
-
-      // Insert new shifts
-      const { error: insertError } = await supabase
-        .from('shifts')
-        .insert(shifts);
-
-      if (insertError) throw insertError;
-
-      toast.success("Regular shifts created successfully");
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+  const handleSave = async () => {
+    const success = await handleSubmit();
+    if (success) {
       onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message);
     }
   };
 
@@ -229,7 +87,10 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
             {parseInt(scheduleType) > 1 && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Current week</label>
-                <Select value={currentWeek.toString()} onValueChange={(value) => setCurrentWeek(parseInt(value))}>
+                <Select
+                  value={currentWeek.toString()}
+                  onValueChange={(value) => setCurrentWeek(parseInt(value))}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -268,132 +129,26 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
                 );
 
                 return (
-                  <div key={day.value} className="pt-4 first:pt-0">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        id={`${currentWeek}-${day.value}`}
-                        checked={dayConfig.enabled}
-                        onCheckedChange={(checked) => {
-                          setWeekConfigs(prev => {
-                            const newConfigs = [...prev];
-                            newConfigs[currentWeek] = {
-                              days: {
-                                ...newConfigs[currentWeek].days,
-                                [day.value]: {
-                                  ...newConfigs[currentWeek].days[day.value],
-                                  enabled: checked as boolean
-                                }
-                              }
-                            };
-                            return newConfigs;
-                          });
-                        }}
-                      />
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <label htmlFor={`${currentWeek}-${day.value}`} className="text-sm font-medium">
-                            {day.label}
-                          </label>
-                          <Badge variant="secondary" className="text-xs">
-                            {day.duration}
-                          </Badge>
-                        </div>
-
-                        {dayConfig.enabled && (
-                          <div className="space-y-2">
-                            {dayConfig.shifts.map((shift, index) => (
-                              <div key={index} className="flex items-center gap-2 bg-accent/5 p-2 rounded-md">
-                                <Select
-                                  value={shift.startTime}
-                                  onValueChange={(value) => {
-                                    setWeekConfigs(prev => {
-                                      const newConfigs = [...prev];
-                                      newConfigs[currentWeek].days[day.value].shifts[index].startTime = value;
-                                      return newConfigs;
-                                    });
-                                  }}
-                                >
-                                  <SelectTrigger className="w-[120px]">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {TIME_SLOTS.map((time) => (
-                                      <SelectItem key={time} value={time}>
-                                        {format(new Date().setHours(parseInt(time)), 'h:mm a')}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-
-                                <span>-</span>
-
-                                <Select
-                                  value={shift.endTime}
-                                  onValueChange={(value) => {
-                                    setWeekConfigs(prev => {
-                                      const newConfigs = [...prev];
-                                      newConfigs[currentWeek].days[day.value].shifts[index].endTime = value;
-                                      return newConfigs;
-                                    });
-                                  }}
-                                >
-                                  <SelectTrigger className="w-[120px]">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {TIME_SLOTS.map((time) => (
-                                      <SelectItem key={time} value={time}>
-                                        {format(new Date().setHours(parseInt(time)), 'h:mm a')}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRemoveShift(currentWeek, day.value, index)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ))}
-                            
-                            <Button
-                              variant="ghost"
-                              className="text-muted-foreground"
-                              onClick={() => handleAddShift(currentWeek, day.value)}
-                            >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Add a shift
-                            </Button>
-
-                            {dayShifts && dayShifts.length > 0 && (
-                              <div className="mt-2 space-y-1">
-                                <p className="text-sm text-muted-foreground">Existing shifts:</p>
-                                {dayShifts.map((shift, index) => (
-                                  <div key={index} className="text-sm bg-accent/10 px-2 py-1 rounded">
-                                    {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {!dayConfig.enabled && dayShifts && dayShifts.length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground">Existing shifts:</p>
-                            {dayShifts.map((shift, index) => (
-                              <div key={index} className="text-sm bg-accent/10 px-2 py-1 rounded">
-                                {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  <DayConfiguration
+                    key={day.value}
+                    dayLabel={day.label}
+                    dayValue={day.value}
+                    duration={day.duration}
+                    config={dayConfig}
+                    existingShifts={dayShifts}
+                    onConfigChange={(newConfig) => {
+                      setWeekConfigs(prev => {
+                        const newConfigs = [...prev];
+                        newConfigs[currentWeek] = {
+                          days: {
+                            ...newConfigs[currentWeek].days,
+                            [day.value]: newConfig
+                          }
+                        };
+                        return newConfigs;
+                      });
+                    }}
+                  />
                 );
               })}
             </div>
@@ -404,7 +159,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSave}>
             Save changes
           </Button>
         </div>
