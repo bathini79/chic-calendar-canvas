@@ -62,7 +62,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
 
   // Fetch existing shifts for the selected date range
   const { data: existingShifts, isLoading: shiftsLoading } = useQuery({
-    queryKey: ['shifts', employee?.id, scheduleType],
+    queryKey: ['shifts', employee?.id, scheduleType, currentWeek],
     queryFn: async () => {
       if (!employee) return [];
       
@@ -108,17 +108,19 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
   const handleSubmit = async () => {
     try {
       const startDate = startOfWeek(new Date());
-      const endDate = addWeeks(startDate, parseInt(scheduleType));
       const shifts = [];
 
+      // Create shifts for each week in the schedule
       for (let week = 0; week < parseInt(scheduleType); week++) {
         const weekStart = addWeeks(startDate, week);
         
+        // Create shifts for each day in the week
         for (let date = new Date(weekStart); date <= addWeeks(weekStart, 1); date.setDate(date.getDate() + 1)) {
           const dayOfWeek = date.getDay().toString();
           const dayConfig = dayConfigs[dayOfWeek];
           
           if (dayConfig.enabled) {
+            // Create shifts for each time slot in the day
             dayConfig.shifts.forEach(shift => {
               const [startHour] = shift.startTime.split(':');
               const [endHour] = shift.endTime.split(':');
@@ -140,11 +142,22 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
         }
       }
 
-      const { error } = await supabase
+      // Delete existing shifts in the date range
+      const { error: deleteError } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('employee_id', employee.id)
+        .gte('start_time', startDate.toISOString())
+        .lte('end_time', addWeeks(startDate, parseInt(scheduleType)).toISOString());
+
+      if (deleteError) throw deleteError;
+
+      // Insert new shifts
+      const { error: insertError } = await supabase
         .from('shifts')
         .insert(shifts);
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
       toast.success("Regular shifts created successfully");
       queryClient.invalidateQueries({ queryKey: ['shifts'] });

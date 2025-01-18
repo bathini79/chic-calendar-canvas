@@ -50,19 +50,14 @@ export function WeeklyCalendar({
     }, 0);
   };
 
-  const handleDeleteAllShifts = async () => {
-    try {
-      const { error } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('employee_id', employee.id);
-
-      if (error) throw error;
-      
-      toast.success("All shifts deleted successfully");
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-    } catch (error: any) {
-      toast.error(error.message);
+  const getShiftStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'declined':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-accent/10 text-accent-foreground';
     }
   };
 
@@ -96,12 +91,6 @@ export function WeeklyCalendar({
             <DropdownMenuItem onClick={() => onSetRegularShifts(employee)}>
               <CalendarCheck className="h-4 w-4 mr-2" />
               Set regular shifts
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              className="text-destructive"
-              onClick={handleDeleteAllShifts}
-            >
-              Delete all shifts
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -140,13 +129,7 @@ export function WeeklyCalendar({
                   {dayShifts.map((shift) => (
                     <div
                       key={shift.id}
-                      className={`text-xs p-1.5 rounded ${
-                        shift.status === 'approved' 
-                          ? 'bg-green-100 text-green-800'
-                          : shift.status === 'declined'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-accent/10 text-accent-foreground'
-                      } group/shift relative`}
+                      className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status)} group/shift relative`}
                     >
                       {formatShiftTime(shift.start_time, shift.end_time)}
                       <Button
