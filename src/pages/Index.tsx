@@ -4,6 +4,7 @@ import { CalendarControls } from "@/components/calendar/CalendarControls";
 import { BookingGrid } from "@/components/calendar/BookingGrid";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const MOCK_EMPLOYEES = [
   { 
@@ -94,12 +95,14 @@ const Index = () => {
           viewMode={viewMode}
           setViewMode={setViewMode}
         />
-        <BookingGrid 
-          employees={MOCK_EMPLOYEES}
-          bookings={MOCK_BOOKINGS}
-          timeSlots={timeSlots}
-          viewMode={viewMode}
-        />
+        <TooltipProvider>
+          <BookingGrid 
+            employees={MOCK_EMPLOYEES}
+            bookings={MOCK_BOOKINGS}
+            timeSlots={timeSlots}
+            viewMode={viewMode}
+          />
+        </TooltipProvider>
       </div>
     </div>
   );
