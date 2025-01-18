@@ -4,8 +4,6 @@ import { HeaderActions } from "@/components/services/components/HeaderActions";
 import { StaffGrid } from "@/components/staff/StaffGrid";
 import { StaffList } from "@/components/staff/StaffList";
 import { StaffDialog } from "@/components/staff/StaffDialog";
-import { TimeOffList } from "@/components/staff/TimeOffList";
-import { ShiftList } from "@/components/staff/ShiftList";
 import { ShiftPlanner } from "@/components/staff/ShiftPlanner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -35,8 +33,6 @@ export default function Staff() {
         <TabsList>
           <TabsTrigger value="staff">Staff Members</TabsTrigger>
           <TabsTrigger value="planner">Shift Planner</TabsTrigger>
-          <TabsTrigger value="shifts">Shifts</TabsTrigger>
-          <TabsTrigger value="time-off">Time Off Requests</TabsTrigger>
         </TabsList>
 
         <TabsContent value="staff" className="space-y-6">
@@ -71,14 +67,6 @@ export default function Staff() {
 
         <TabsContent value="planner">
           <ShiftPlanner />
-        </TabsContent>
-
-        <TabsContent value="shifts">
-          <ShiftList />
-        </TabsContent>
-
-        <TabsContent value="time-off">
-          <TimeOffList />
         </TabsContent>
       </Tabs>
 

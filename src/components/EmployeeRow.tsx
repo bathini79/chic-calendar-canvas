@@ -12,7 +12,7 @@ export function EmployeeRow({ name, image }: EmployeeRowProps) {
     .join("");
 
   return (
-    <div className="employee-row">
+    <div className="flex items-center gap-3">
       <Avatar>
         <AvatarImage src={image} alt={name} />
         <AvatarFallback>{initials}</AvatarFallback>
