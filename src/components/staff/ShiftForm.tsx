@@ -11,8 +11,6 @@ import {
 import { Input } from "@/components/ui/input";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
   SelectContent,
@@ -26,38 +24,27 @@ const formSchema = z.object({
   start_time: z.string().min(1, "Start time is required"),
   end_time: z.string().min(1, "End time is required"),
   status: z.enum(['pending', 'approved', 'declined']).default('pending'),
+  duration_weeks: z.enum(['1', '2', '3', '4']).default('1'),
 });
 
 type ShiftFormData = z.infer<typeof formSchema>;
 
 interface ShiftFormProps {
   initialData?: any;
+  employee?: any;
   onSubmit: (data: ShiftFormData) => void;
   onCancel: () => void;
 }
 
-export function ShiftForm({ initialData, onSubmit, onCancel }: ShiftFormProps) {
+export function ShiftForm({ initialData, employee, onSubmit, onCancel }: ShiftFormProps) {
   const form = useForm<ShiftFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      employee_id: initialData?.employee_id || '',
+      employee_id: employee?.id || initialData?.employee_id || '',
       start_time: initialData?.start_time ? new Date(initialData.start_time).toISOString().slice(0, 16) : '',
       end_time: initialData?.end_time ? new Date(initialData.end_time).toISOString().slice(0, 16) : '',
       status: initialData?.status || 'pending',
-    },
-  });
-
-  const { data: employees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('id, name, email')
-        .eq('status', 'active')
-        .order('name');
-      
-      if (error) throw error;
-      return data;
+      duration_weeks: '1',
     },
   });
 
@@ -66,22 +53,21 @@ export function ShiftForm({ initialData, onSubmit, onCancel }: ShiftFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
-          name="employee_id"
+          name="duration_weeks"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Employee *</FormLabel>
+              <FormLabel>Duration (Weeks)</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select employee" />
+                    <SelectValue placeholder="Select duration" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {employees?.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="1">1 Week</SelectItem>
+                  <SelectItem value="2">2 Weeks</SelectItem>
+                  <SelectItem value="3">3 Weeks</SelectItem>
+                  <SelectItem value="4">4 Weeks</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />

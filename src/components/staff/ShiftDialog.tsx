@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ShiftForm } from "./ShiftForm";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,9 +8,10 @@ interface ShiftDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: any;
+  employee?: any;
 }
 
-export function ShiftDialog({ open, onOpenChange, initialData }: ShiftDialogProps) {
+export function ShiftDialog({ open, onOpenChange, initialData, employee }: ShiftDialogProps) {
   const queryClient = useQueryClient();
 
   const handleSubmit = async (data: any) => {
@@ -46,9 +47,13 @@ export function ShiftDialog({ open, onOpenChange, initialData }: ShiftDialogProp
           <DialogTitle>
             {initialData ? 'Edit Shift' : 'Create Shift'}
           </DialogTitle>
+          <DialogDescription>
+            {employee?.name ? `Assign shifts for ${employee.name}` : 'Assign shifts'}
+          </DialogDescription>
         </DialogHeader>
         <ShiftForm
           initialData={initialData}
+          employee={employee}
           onSubmit={handleSubmit}
           onCancel={() => onOpenChange(false)}
         />
