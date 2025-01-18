@@ -58,6 +58,29 @@ export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProp
           
           if (insertError) throw insertError;
         }
+
+        // Update availability
+        if (data.availability && data.availability.length > 0) {
+          // First delete existing availability
+          const { error: deleteAvailError } = await supabase
+            .from('employee_availability')
+            .delete()
+            .eq('employee_id', initialData.id);
+          
+          if (deleteAvailError) throw deleteAvailError;
+
+          // Then insert new availability
+          const availabilityData = data.availability.map((avail: any) => ({
+            employee_id: initialData.id,
+            ...avail,
+          }));
+
+          const { error: insertAvailError } = await supabase
+            .from('employee_availability')
+            .insert(availabilityData);
+          
+          if (insertAvailError) throw insertAvailError;
+        }
         
         toast.success('Staff member updated successfully');
       } else {
@@ -89,6 +112,20 @@ export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProp
           
           if (skillsError) throw skillsError;
         }
+
+        // Insert availability for new employee
+        if (data.availability && data.availability.length > 0) {
+          const availabilityData = data.availability.map((avail: any) => ({
+            employee_id: newEmployee.id,
+            ...avail,
+          }));
+
+          const { error: availError } = await supabase
+            .from('employee_availability')
+            .insert(availabilityData);
+          
+          if (availError) throw availError;
+        }
         
         toast.success('Staff member created successfully');
       }
@@ -103,7 +140,7 @@ export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] p-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle>{initialData ? 'Edit Staff Member' : 'Add Staff Member'}</DialogTitle>
         </DialogHeader>

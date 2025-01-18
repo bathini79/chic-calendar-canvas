@@ -28,7 +28,8 @@ export function StaffList({ searchQuery, onEdit }: StaffListProps) {
           *,
           employee_skills(
             service:services(*)
-          )
+          ),
+          employee_availability(*)
         `)
         .ilike('name', `%${searchQuery}%`)
         .order('name');
