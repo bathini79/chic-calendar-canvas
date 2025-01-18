@@ -31,6 +31,7 @@ export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProp
             phone: data.phone,
             photo_url: data.photo_url,
             status: data.status,
+            employment_type: data.employment_type,
           })
           .eq('id', initialData.id);
         
@@ -58,29 +59,6 @@ export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProp
           
           if (insertError) throw insertError;
         }
-
-        // Update availability
-        if (data.availability && data.availability.length > 0) {
-          // First delete existing availability
-          const { error: deleteAvailError } = await supabase
-            .from('employee_availability')
-            .delete()
-            .eq('employee_id', initialData.id);
-          
-          if (deleteAvailError) throw deleteAvailError;
-
-          // Then insert new availability
-          const availabilityData = data.availability.map((avail: any) => ({
-            employee_id: initialData.id,
-            ...avail,
-          }));
-
-          const { error: insertAvailError } = await supabase
-            .from('employee_availability')
-            .insert(availabilityData);
-          
-          if (insertAvailError) throw insertAvailError;
-        }
         
         toast.success('Staff member updated successfully');
       } else {
@@ -93,6 +71,7 @@ export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProp
             phone: data.phone,
             photo_url: data.photo_url,
             status: data.status,
+            employment_type: data.employment_type,
           })
           .select()
           .single();
@@ -112,20 +91,6 @@ export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProp
           
           if (skillsError) throw skillsError;
         }
-
-        // Insert availability for new employee
-        if (data.availability && data.availability.length > 0) {
-          const availabilityData = data.availability.map((avail: any) => ({
-            employee_id: newEmployee.id,
-            ...avail,
-          }));
-
-          const { error: availError } = await supabase
-            .from('employee_availability')
-            .insert(availabilityData);
-          
-          if (availError) throw availError;
-        }
         
         toast.success('Staff member created successfully');
       }
@@ -140,19 +105,15 @@ export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
-        <DialogHeader className="p-6 pb-0">
+      <DialogContent>
+        <DialogHeader>
           <DialogTitle>{initialData ? 'Edit Staff Member' : 'Add Staff Member'}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="max-h-[calc(90vh-80px)]">
-          <div className="p-6 pt-0">
-            <StaffForm
-              initialData={initialData}
-              onSubmit={handleSubmit}
-              onCancel={() => onOpenChange(false)}
-            />
-          </div>
-        </ScrollArea>
+        <StaffForm
+          initialData={initialData}
+          onSubmit={handleSubmit}
+          onCancel={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );
