@@ -1,4 +1,4 @@
-import { useForm } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -9,16 +9,16 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ServiceMultiSelect } from "./ServiceMultiSelect";
 import { useState, useEffect } from "react";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Image, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { PriceSection } from "./form/PriceSection";
+import { ServicesSection } from "./form/ServicesSection";
+import { ImageUploadSection } from "./form/ImageUploadSection";
+import { CustomizationSection } from "./form/CustomizationSection";
 
 const formSchema = z.object({
   name: z.string().min(1, "Package name is required"),
@@ -47,7 +47,6 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
   const [customizableServices, setCustomizableServices] = useState<string[]>(
     initialData?.customizable_services || []
   );
-  const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
   const [calculatedPrice, setCalculatedPrice] = useState(0);
 
@@ -84,29 +83,24 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
 
   // Initialize form with async initialData
   useEffect(() => {
-    const initializeForm = async () => {
-      if (initialData) {
-        const resolvedData = await initialData;
-        setSelectedServices(resolvedData?.services || []);
-        setCustomizableServices(resolvedData?.customizable_services || []);
-        setImages(resolvedData?.image_urls || []);
-        form.reset({
-          name: resolvedData?.name || '',
-          services: resolvedData?.services || [],
-          price: resolvedData?.price || 0,
-          description: resolvedData?.description || '',
-          duration: resolvedData?.duration || 0,
-          is_customizable: resolvedData?.is_customizable || false,
-          status: resolvedData?.status || 'active',
-          discount_type: resolvedData?.discount_type || 'none',
-          discount_value: resolvedData?.discount_value || 0,
-          image_urls: resolvedData?.image_urls || [],
-          customizable_services: resolvedData?.customizable_services || [],
-        });
-      }
-    };
-
-    initializeForm();
+    if (initialData) {
+      setSelectedServices(initialData?.services || []);
+      setCustomizableServices(initialData?.customizable_services || []);
+      setImages(initialData?.image_urls || []);
+      form.reset({
+        name: initialData?.name || '',
+        services: initialData?.services || [],
+        price: initialData?.price || 0,
+        description: initialData?.description || '',
+        duration: initialData?.duration || 0,
+        is_customizable: initialData?.is_customizable || false,
+        status: initialData?.status || 'active',
+        discount_type: initialData?.discount_type || 'none',
+        discount_value: initialData?.discount_value || 0,
+        image_urls: initialData?.image_urls || [],
+        customizable_services: initialData?.customizable_services || [],
+      });
+    }
   }, [initialData, form]);
 
   const handleServiceSelect = (serviceId: string) => {
@@ -129,47 +123,6 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     const updatedServices = customizableServices.filter(id => id !== serviceId);
     setCustomizableServices(updatedServices);
     form.setValue('customizable_services', updatedServices);
-  };
-
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-    try {
-      const newImages = [...images];
-
-      for (const file of files) {
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${crypto.randomUUID()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('services')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('services')
-          .getPublicUrl(filePath);
-
-        newImages.push(publicUrl);
-      }
-
-      setImages(newImages);
-      form.setValue('image_urls', newImages);
-      toast.success('Images uploaded successfully');
-    } catch (error: any) {
-      toast.error('Error uploading images');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const removeImage = (index: number) => {
-    const newImages = images.filter((_, i) => i !== index);
-    setImages(newImages);
-    form.setValue('image_urls', newImages);
   };
 
   // Calculate total price based on selected services and apply discount
@@ -208,7 +161,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
   }, [selectedServices, services]);
 
   return (
-    <Form {...form}>
+    <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
@@ -238,172 +191,19 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="services"
-          render={() => (
-            <FormItem>
-              <FormLabel>Services *</FormLabel>
-              <FormControl>
-                <div className="space-y-4">
-                  <ServiceMultiSelect
-                    selectedServices={selectedServices}
-                    onServiceSelect={handleServiceSelect}
-                    onServiceRemove={handleServiceRemove}
-                  />
-                  {selectedServices.length > 0 && services && (
-                    <div className="mt-4 space-y-2">
-                      <p className="text-sm font-medium">Selected Services:</p>
-                      <div className="space-y-2">
-                        {selectedServices.map(serviceId => {
-                          const service = services.find(s => s.id === serviceId);
-                          if (!service) return null;
-                          
-                          return (
-                            <div key={serviceId} className="flex justify-between items-center p-2 bg-muted rounded-lg">
-                              <span>{service.name}</span>
-                              <span className="text-sm">₹{service.selling_price}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+        <ServicesSection
+          selectedServices={selectedServices}
+          onServiceSelect={handleServiceSelect}
+          onServiceRemove={handleServiceRemove}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Total Price (₹)</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="number" 
-                    {...field} 
-                    value={calculatedPrice}
-                    disabled
-                    className="bg-muted"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <PriceSection calculatedPrice={calculatedPrice} />
 
-          <FormField
-            control={form.control}
-            name="duration"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Duration (minutes)</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="number" 
-                    {...field}
-                    disabled
-                    className="bg-muted"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
-          control={form.control}
-          name="is_customizable"
-          render={({ field }) => (
-            <FormItem className="flex items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <FormLabel>Allow Customization</FormLabel>
-                <div className="text-sm text-muted-foreground">
-                  Customers can add/remove optional services
-                </div>
-              </div>
-              <FormControl>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-            </FormItem>
-          )}
+        <CustomizationSection
+          customizableServices={customizableServices}
+          onCustomizableServiceSelect={handleCustomizableServiceSelect}
+          onCustomizableServiceRemove={handleCustomizableServiceRemove}
         />
-
-        {form.watch('is_customizable') && (
-          <FormField
-            control={form.control}
-            name="customizable_services"
-            render={() => (
-              <FormItem>
-                <FormLabel>Customizable Services</FormLabel>
-                <FormControl>
-                  <ServiceMultiSelect
-                    selectedServices={customizableServices}
-                    onServiceSelect={handleCustomizableServiceSelect}
-                    onServiceRemove={handleCustomizableServiceRemove}
-                  />
-                </FormControl>
-                <div className="text-sm text-muted-foreground">
-                  Select services that customers can add to this package
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="discount_type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Discount Type</FormLabel>
-                <FormControl>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    {...field}
-                  >
-                    <option value="none">None</option>
-                    <option value="percentage">Percentage</option>
-                    <option value="fixed">Fixed Amount</option>
-                  </select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="discount_value"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  {form.watch('discount_type') === 'percentage' ? 'Discount (%)' : 'Discount Amount (₹)'}
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    {...field}
-                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                    disabled={form.watch('discount_type') === 'none'}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
 
         <FormField
           control={form.control}
@@ -425,56 +225,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="image_urls"
-          render={() => (
-            <FormItem>
-              <FormLabel>Images</FormLabel>
-              <FormControl>
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-4">
-                    {images.map((url, index) => (
-                      <div key={url} className="relative group">
-                        <img
-                          src={url}
-                          alt={`Package image ${index + 1}`}
-                          className="w-24 h-24 object-cover rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="relative"
-                      disabled={uploading}
-                    >
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleImageUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <Image className="h-4 w-4 mr-2" />
-                      {uploading ? 'Uploading...' : 'Upload Images'}
-                    </Button>
-                  </div>
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <ImageUploadSection images={images} setImages={setImages} />
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onCancel}>
@@ -485,6 +236,6 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
           </Button>
         </div>
       </form>
-    </Form>
+    </FormProvider>
   );
 }
