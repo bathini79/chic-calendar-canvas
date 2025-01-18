@@ -2,6 +2,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { useFormContext } from "react-hook-form";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface PriceSectionProps {
   calculatedPrice: number;
@@ -36,26 +37,89 @@ export function PriceSection({ calculatedPrice, selectedServices, services }: Pr
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <FormField
-        control={form.control}
-        name="price"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Total Price (₹)</FormLabel>
-            <FormControl>
-              <Input 
-                type="number" 
-                {...field} 
-                value={calculatedPrice}
-                disabled
-                className="bg-muted"
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="discount_type"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Discount Type</FormLabel>
+              <FormControl>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select discount type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="fixed">Fixed Amount</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="discount_value"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                {form.watch('discount_type') === 'percentage' ? 'Discount (%)' : 'Discount Amount (₹)'}
+              </FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  {...field}
+                  onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                  disabled={form.watch('discount_type') === 'none'}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <Card className="bg-muted/50">
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="text-sm font-medium">Services Breakdown</div>
+            <div className="space-y-2">
+              {selectedServices.map(serviceId => {
+                const service = services.find(s => s.id === serviceId);
+                if (!service) return null;
+                
+                const discountedPrice = getServicePrice(serviceId);
+                
+                return (
+                  <div key={serviceId} className="flex justify-between items-center p-2 bg-background rounded-lg">
+                    <span className="font-medium">{service.name}</span>
+                    <div className="text-sm space-x-2">
+                      {discountedPrice !== service.selling_price && (
+                        <span className="text-muted-foreground line-through">₹{service.selling_price}</span>
+                      )}
+                      <span className="font-medium">₹{discountedPrice.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="pt-4 border-t">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold">Total Price</span>
+                <span className="font-semibold text-lg">₹{calculatedPrice.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <FormField
         control={form.control}
@@ -75,78 +139,6 @@ export function PriceSection({ calculatedPrice, selectedServices, services }: Pr
           </FormItem>
         )}
       />
-
-      <FormField
-        control={form.control}
-        name="discount_type"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Discount Type</FormLabel>
-            <FormControl>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select discount type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="percentage">Percentage</SelectItem>
-                    <SelectItem value="fixed">Fixed Amount</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="discount_value"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>
-              {form.watch('discount_type') === 'percentage' ? 'Discount (%)' : 'Discount Amount (₹)'}
-            </FormLabel>
-            <FormControl>
-              <Input
-                type="number"
-                {...field}
-                onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                disabled={form.watch('discount_type') === 'none'}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      {selectedServices.length > 0 && services && (
-        <div className="col-span-2 mt-4 space-y-2">
-          <p className="text-sm font-medium">Selected Services with Applied Discount:</p>
-          <div className="space-y-2">
-            {selectedServices.map(serviceId => {
-              const service = services.find(s => s.id === serviceId);
-              if (!service) return null;
-              
-              const discountedPrice = getServicePrice(serviceId);
-              
-              return (
-                <div key={serviceId} className="flex justify-between items-center p-2 bg-muted rounded-lg">
-                  <span>{service.name}</span>
-                  <div className="text-sm space-x-2">
-                    {discountedPrice !== service.selling_price && (
-                      <span className="line-through text-muted-foreground">₹{service.selling_price}</span>
-                    )}
-                    <span>₹{discountedPrice.toFixed(2)}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
