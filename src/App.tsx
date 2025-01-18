@@ -1,37 +1,30 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { SessionContextProvider } from '@supabase/auth-helpers-react';
-import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/sonner";
 import { AppSidebar } from "@/components/AppSidebar";
-import Index from "./pages/Index";
-import Services from "./pages/Services";
-import Categories from "./pages/Categories";
-import Auth from "./pages/Auth";
-import { Toaster } from "@/components/ui/toaster";
-import { supabase } from "@/integrations/supabase/client";
+import Services from "@/pages/Services";
+import Staff from "@/pages/Staff";
+import Index from "@/pages/Index";
+
+const queryClient = new QueryClient();
 
 function App() {
   return (
-    <SessionContextProvider supabaseClient={supabase}>
+    <QueryClientProvider client={queryClient}>
       <Router>
-        <SidebarProvider defaultOpen>
-          <div className="flex min-h-screen w-full bg-background">
-            <AppSidebar />
-            <SidebarRail />
-            <SidebarInset className="flex-1 w-full">
-              <main className="w-full">
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/services" element={<Services />} />
-                  <Route path="/categories" element={<Categories />} />
-                  <Route path="/auth" element={<Auth />} />
-                </Routes>
-              </main>
-            </SidebarInset>
-          </div>
-        </SidebarProvider>
+        <div className="flex min-h-screen">
+          <AppSidebar />
+          <main className="flex-1">
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/staff" element={<Staff />} />
+            </Routes>
+          </main>
+        </div>
         <Toaster />
       </Router>
-    </SessionContextProvider>
+    </QueryClientProvider>
   );
 }
 

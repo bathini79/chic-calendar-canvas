@@ -1,101 +1,37 @@
-import { Calendar, Users, Settings, Grid, LogOut } from "lucide-react"
-import { useNavigate, useLocation } from "react-router-dom"
-import { supabase } from "@/integrations/supabase/client"
-import { useToast } from "@/hooks/use-toast"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar"
-
-const items = [
-  {
-    title: "Bookings",
-    url: "/",
-    icon: Calendar,
-  },
-  {
-    title: "Services",
-    url: "/services",
-    icon: Grid,
-  },
-  {
-    title: "Staff",
-    url: "/staff",
-    icon: Users,
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-  },
-]
+import { NavLink } from "react-router-dom";
+import { LayoutGrid, Users } from "lucide-react";
 
 export function AppSidebar() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { toast } = useToast()
-
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      navigate("/auth")
-      toast({
-        title: "Logged out successfully",
-        description: "You have been logged out of your account.",
-      })
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error logging out",
-        description: error.message,
-      })
-    }
-  }
-
-  const handleNavigation = (url: string) => (e: React.MouseEvent) => {
-    e.preventDefault()
-    navigate(url)
-  }
-
   return (
-    <Sidebar>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    onClick={handleNavigation(item.url)}
-                    data-active={location.pathname === item.url}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              <SidebarMenuItem className="mt-auto">
-                <SidebarMenuButton 
-                  onClick={handleLogout}
-                  variant="outline"
-                  className="bg-black text-white hover:bg-black/90"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-  )
+    <aside className="w-64 bg-background border-r min-h-screen p-4">
+      <nav className="space-y-2">
+        <NavLink
+          to="/services"
+          className={({ isActive }) =>
+            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            }`
+          }
+        >
+          <LayoutGrid className="w-5 h-5" />
+          <span>Services</span>
+        </NavLink>
+        <NavLink
+          to="/staff"
+          className={({ isActive }) =>
+            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            }`
+          }
+        >
+          <Users className="w-5 h-5" />
+          <span>Staff</span>
+        </NavLink>
+      </nav>
+    </aside>
+  );
 }
