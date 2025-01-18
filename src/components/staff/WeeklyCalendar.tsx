@@ -40,11 +40,16 @@ export function WeeklyCalendar({
     );
 
     const dayOfWeek = date.getDay();
-    const recurringForDay = recurringShifts.filter(shift => 
-      shift.day_of_week === dayOfWeek &&
-      (!shift.effective_until || new Date(shift.effective_until) >= date) &&
-      new Date(shift.effective_from) <= date
-    );
+    const recurringForDay = recurringShifts.filter(shift => {
+      const effectiveFrom = new Date(shift.effective_from);
+      const effectiveUntil = shift.effective_until ? new Date(shift.effective_until) : null;
+      
+      return (
+        shift.day_of_week === dayOfWeek &&
+        effectiveFrom <= date &&
+        (!effectiveUntil || effectiveUntil >= date)
+      );
+    });
 
     return [...regularShifts, ...recurringForDay];
   };
