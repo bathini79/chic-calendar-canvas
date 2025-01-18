@@ -3,11 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, Clock, Edit, Trash } from "lucide-react";
+import { Clock, Edit, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { AvailabilityDialog } from "./AvailabilityDialog";
-import { TimeOffDialog } from "./TimeOffDialog";
 
 interface StaffGridProps {
   searchQuery: string;
@@ -17,7 +16,6 @@ interface StaffGridProps {
 export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false);
-  const [timeOffDialogOpen, setTimeOffDialogOpen] = useState(false);
 
   const { data: staff, refetch } = useQuery({
     queryKey: ['employees'],
@@ -95,16 +93,6 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => {
-                  setSelectedEmployee(member.id);
-                  setTimeOffDialogOpen(true);
-                }}
-              >
-                <Calendar className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
                 onClick={() => handleDelete(member.id)}
               >
                 <Trash className="h-4 w-4" />
@@ -122,18 +110,11 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
       </div>
 
       {selectedEmployee && (
-        <>
-          <AvailabilityDialog
-            open={availabilityDialogOpen}
-            onOpenChange={setAvailabilityDialogOpen}
-            employeeId={selectedEmployee}
-          />
-          <TimeOffDialog
-            open={timeOffDialogOpen}
-            onOpenChange={setTimeOffDialogOpen}
-            employeeId={selectedEmployee}
-          />
-        </>
+        <AvailabilityDialog
+          open={availabilityDialogOpen}
+          onOpenChange={setAvailabilityDialogOpen}
+          employeeId={selectedEmployee}
+        />
       )}
     </>
   );
