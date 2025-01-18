@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Edit, Trash } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
 
 interface StaffGridProps {
   searchQuery: string;
@@ -13,33 +12,23 @@ interface StaffGridProps {
 }
 
 export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
-  const { data: staff, isLoading, error } = useQuery({
-    queryKey: ['employees', searchQuery],
+  const { data: staff, refetch } = useQuery({
+    queryKey: ['employees'],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('employees')
-          .select(`
-            *,
-            employee_skills(
-              service:services(*)
-            )
-          `)
-          .ilike('name', `%${searchQuery}%`)
-          .order('name');
-        
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
-        }
-        
-        return data;
-      } catch (error: any) {
-        console.error('Query error:', error);
-        throw new Error(error.message || 'Failed to fetch staff members');
-      }
+      const { data, error } = await supabase
+        .from('employees')
+        .select(`
+          *,
+          employee_skills(
+            service:services(*)
+          )
+        `)
+        .ilike('name', `%${searchQuery}%`)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
     },
-    retry: 2,
   });
 
   const handleDelete = async (id: string) => {
@@ -52,34 +41,11 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
       if (error) throw error;
 
       toast.success("Staff member deleted successfully");
+      refetch();
     } catch (error: any) {
-      console.error('Delete error:', error);
       toast.error(error.message);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="w-full h-48 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="w-full p-4 text-center">
-        <p className="text-destructive">Error loading staff members. Please try again later.</p>
-        <Button 
-          variant="outline" 
-          className="mt-2"
-          onClick={() => window.location.reload()}
-        >
-          Retry
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
