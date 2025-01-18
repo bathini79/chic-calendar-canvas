@@ -16,12 +16,14 @@ interface ServiceMultiSelectProps {
   selectedServices: string[];
   onServiceSelect: (serviceId: string) => void;
   onServiceRemove: (serviceId: string) => void;
+  excludeServices?: string[];
 }
 
 export function ServiceMultiSelect({
   selectedServices,
   onServiceSelect,
   onServiceRemove,
+  excludeServices = [],
 }: ServiceMultiSelectProps) {
   const { data: services } = useQuery({
     queryKey: ['services'],
@@ -36,6 +38,10 @@ export function ServiceMultiSelect({
     },
   });
 
+  const availableServices = services?.filter(
+    service => !selectedServices.includes(service.id) && !excludeServices.includes(service.id)
+  );
+
   return (
     <div className="space-y-2">
       <Select onValueChange={onServiceSelect}>
@@ -44,11 +50,10 @@ export function ServiceMultiSelect({
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            {services?.map((service) => (
+            {availableServices?.map((service) => (
               <SelectItem 
                 key={service.id} 
                 value={service.id}
-                disabled={selectedServices.includes(service.id)}
               >
                 {service.name}
               </SelectItem>

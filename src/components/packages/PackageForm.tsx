@@ -67,7 +67,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     },
   });
 
-  // Fetch all services to calculate total price
+  // Fetch all services
   const { data: services } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -197,10 +197,15 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
           onServiceRemove={handleServiceRemove}
         />
 
-        <PriceSection calculatedPrice={calculatedPrice} />
+        <PriceSection 
+          calculatedPrice={calculatedPrice} 
+          selectedServices={selectedServices}
+          services={services || []}
+        />
 
         <CustomizationSection
           customizableServices={customizableServices}
+          selectedServices={selectedServices}
           onCustomizableServiceSelect={handleCustomizableServiceSelect}
           onCustomizableServiceRemove={handleCustomizableServiceRemove}
         />

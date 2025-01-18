@@ -5,12 +5,14 @@ import { useFormContext } from "react-hook-form";
 
 interface CustomizationSectionProps {
   customizableServices: string[];
+  selectedServices: string[];
   onCustomizableServiceSelect: (serviceId: string) => void;
   onCustomizableServiceRemove: (serviceId: string) => void;
 }
 
 export function CustomizationSection({
   customizableServices,
+  selectedServices,
   onCustomizableServiceSelect,
   onCustomizableServiceRemove,
 }: CustomizationSectionProps) {
@@ -51,10 +53,11 @@ export function CustomizationSection({
                   selectedServices={customizableServices}
                   onServiceSelect={onCustomizableServiceSelect}
                   onServiceRemove={onCustomizableServiceRemove}
+                  excludeServices={selectedServices}
                 />
               </FormControl>
               <div className="text-sm text-muted-foreground">
-                Select services that customers can add to this package
+                Select additional services that customers can add to this package
               </div>
             </FormItem>
           )}
