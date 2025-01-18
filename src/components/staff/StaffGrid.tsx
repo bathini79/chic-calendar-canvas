@@ -19,23 +19,33 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
   const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false);
   const [timeOffDialogOpen, setTimeOffDialogOpen] = useState(false);
 
-  const { data: staff, refetch } = useQuery({
-    queryKey: ['employees'],
+  const { data: staff, isLoading, error } = useQuery({
+    queryKey: ['employees', searchQuery],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select(`
-          *,
-          employee_skills(
-            service:services(*)
-          )
-        `)
-        .ilike('name', `%${searchQuery}%`)
-        .order('name');
-      
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from('employees')
+          .select(`
+            *,
+            employee_skills(
+              service:services(*)
+            )
+          `)
+          .ilike('name', `%${searchQuery}%`)
+          .order('name');
+        
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
+        
+        return data;
+      } catch (error: any) {
+        console.error('Query error:', error);
+        throw new Error(error.message || 'Failed to fetch staff members');
+      }
     },
+    retry: 2,
   });
 
   const handleDelete = async (id: string) => {
@@ -48,17 +58,40 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
       if (error) throw error;
 
       toast.success("Staff member deleted successfully");
-      refetch();
     } catch (error: any) {
+      console.error('Delete error:', error);
       toast.error(error.message);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-48 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full p-4 text-center">
+        <p className="text-destructive">Error loading staff members. Please try again later.</p>
+        <Button 
+          variant="outline" 
+          className="mt-2"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {staff?.map((member) => (
-          <Card key={member.id}>
+          <Card key={member.id} className="relative">
             <CardContent className="pt-6">
               <div className="flex flex-col items-center space-y-4">
                 <Avatar className="h-20 w-20">
@@ -81,7 +114,7 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-center gap-2">
+            <CardFooter className="flex flex-wrap justify-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -92,7 +125,7 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
                 }}
               >
                 <Clock className="h-4 w-4" />
-                Set Availability
+                Availability
               </Button>
               <Button
                 variant="outline"
