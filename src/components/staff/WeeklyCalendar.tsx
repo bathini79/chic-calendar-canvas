@@ -35,19 +35,28 @@ export function WeeklyCalendar({
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
 
   const getShiftsForDate = (date: Date) => {
+    // Get regular shifts
     const regularShifts = shifts.filter((shift) => 
       isSameDay(new Date(shift.start_time), date)
     );
 
+    // Get recurring shifts for the day
     const dayOfWeek = date.getDay();
     const recurringForDay = recurringShifts.filter(shift => {
+      // Convert date strings to Date objects once
       const effectiveFrom = new Date(shift.effective_from);
       const effectiveUntil = shift.effective_until ? new Date(shift.effective_until) : null;
+      const shiftDate = new Date(date);
       
+      // Set hours to 0 for date comparison
+      effectiveFrom.setHours(0, 0, 0, 0);
+      if (effectiveUntil) effectiveUntil.setHours(23, 59, 59, 999);
+      shiftDate.setHours(0, 0, 0, 0);
+
       return (
         shift.day_of_week === dayOfWeek &&
-        effectiveFrom <= date &&
-        (!effectiveUntil || effectiveUntil >= date)
+        shiftDate >= effectiveFrom &&
+        (!effectiveUntil || shiftDate <= effectiveUntil)
       );
     });
 
