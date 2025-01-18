@@ -115,7 +115,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
         const weekStart = addWeeks(startDate, week);
         
         // Create shifts for each day in the week
-        for (let date = new Date(weekStart); date <= addWeeks(weekStart, 1); date.setDate(date.getDate() + 1)) {
+        for (let date = new Date(weekStart); date <= endOfWeek(weekStart); date.setDate(date.getDate() + 1)) {
           const dayOfWeek = date.getDay().toString();
           const dayConfig = dayConfigs[dayOfWeek];
           
@@ -148,7 +148,7 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
         .delete()
         .eq('employee_id', employee.id)
         .gte('start_time', startDate.toISOString())
-        .lte('end_time', addWeeks(startDate, parseInt(scheduleType)).toISOString());
+        .lte('end_time', endOfWeek(addWeeks(startDate, parseInt(scheduleType) - 1)).toISOString());
 
       if (deleteError) throw deleteError;
 
