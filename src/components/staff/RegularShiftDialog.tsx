@@ -7,6 +7,7 @@ import { addWeeks, format, startOfWeek } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
 
 interface RegularShiftDialogProps {
   open: boolean;
@@ -14,14 +15,24 @@ interface RegularShiftDialogProps {
   employee: any;
 }
 
+interface DayShift {
+  startTime: string;
+  endTime: string;
+}
+
+interface DayConfig {
+  enabled: boolean;
+  shifts: DayShift[];
+}
+
 const DAYS = [
-  { label: "Monday", value: "1" },
-  { label: "Tuesday", value: "2" },
-  { label: "Wednesday", value: "3" },
-  { label: "Thursday", value: "4" },
-  { label: "Friday", value: "5" },
-  { label: "Saturday", value: "6" },
-  { label: "Sunday", value: "0" },
+  { label: "Monday", value: "1", duration: "9h" },
+  { label: "Tuesday", value: "2", duration: "9h" },
+  { label: "Wednesday", value: "3", duration: "9h" },
+  { label: "Thursday", value: "4", duration: "9h" },
+  { label: "Friday", value: "5", duration: "9h" },
+  { label: "Saturday", value: "6", duration: "7h" },
+  { label: "Sunday", value: "0", duration: "0h" },
 ];
 
 const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
@@ -31,34 +42,71 @@ const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
 
 export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShiftDialogProps) {
   const queryClient = useQueryClient();
-  const [duration, setDuration] = useState("1");
-  const [selectedDays, setSelectedDays] = useState<string[]>([]);
-  const [startTime, setStartTime] = useState("10:00");
-  const [endTime, setEndTime] = useState("19:00");
+  const [scheduleType, setScheduleType] = useState("1");
+  const [dayConfigs, setDayConfigs] = useState<Record<string, DayConfig>>(() => {
+    const configs: Record<string, DayConfig> = {};
+    DAYS.forEach(day => {
+      configs[day.value] = {
+        enabled: false,
+        shifts: [{
+          startTime: "10:00",
+          endTime: day.value === "6" ? "17:00" : "19:00"
+        }]
+      };
+    });
+    return configs;
+  });
+
+  const handleAddShift = (dayValue: string) => {
+    setDayConfigs(prev => ({
+      ...prev,
+      [dayValue]: {
+        ...prev[dayValue],
+        shifts: [
+          ...prev[dayValue].shifts,
+          { startTime: "10:00", endTime: "19:00" }
+        ]
+      }
+    }));
+  };
+
+  const handleRemoveShift = (dayValue: string, shiftIndex: number) => {
+    setDayConfigs(prev => ({
+      ...prev,
+      [dayValue]: {
+        ...prev[dayValue],
+        shifts: prev[dayValue].shifts.filter((_, index) => index !== shiftIndex)
+      }
+    }));
+  };
 
   const handleSubmit = async () => {
     try {
       const startDate = startOfWeek(new Date());
-      const endDate = addWeeks(startDate, parseInt(duration));
+      const endDate = addWeeks(startDate, parseInt(scheduleType));
       const shifts = [];
 
       for (let date = startDate; date <= endDate; date.setDate(date.getDate() + 1)) {
         const dayOfWeek = date.getDay().toString();
-        if (selectedDays.includes(dayOfWeek)) {
-          const [startHour] = startTime.split(':');
-          const [endHour] = endTime.split(':');
-          
-          const shiftStart = new Date(date);
-          shiftStart.setHours(parseInt(startHour), 0, 0);
-          
-          const shiftEnd = new Date(date);
-          shiftEnd.setHours(parseInt(endHour), 0, 0);
+        const dayConfig = dayConfigs[dayOfWeek];
+        
+        if (dayConfig.enabled) {
+          dayConfig.shifts.forEach(shift => {
+            const [startHour] = shift.startTime.split(':');
+            const [endHour] = shift.endTime.split(':');
+            
+            const shiftStart = new Date(date);
+            shiftStart.setHours(parseInt(startHour), 0, 0);
+            
+            const shiftEnd = new Date(date);
+            shiftEnd.setHours(parseInt(endHour), 0, 0);
 
-          shifts.push({
-            employee_id: employee.id,
-            start_time: shiftStart.toISOString(),
-            end_time: shiftEnd.toISOString(),
-            status: 'pending'
+            shifts.push({
+              employee_id: employee.id,
+              start_time: shiftStart.toISOString(),
+              end_time: shiftEnd.toISOString(),
+              status: 'pending'
+            });
           });
         }
       }
@@ -79,87 +127,158 @@ export function RegularShiftDialog({ open, onOpenChange, employee }: RegularShif
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
           <DialogTitle>Set {employee?.name}'s regular shifts</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Schedule type</label>
-            <Select value={duration} onValueChange={setDuration}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 week</SelectItem>
-                <SelectItem value="2">2 weeks</SelectItem>
-                <SelectItem value="3">3 weeks</SelectItem>
-                <SelectItem value="4">4 weeks</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Working days</label>
-            <div className="grid grid-cols-2 gap-2">
-              {DAYS.map((day) => (
-                <div key={day.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={day.value}
-                    checked={selectedDays.includes(day.value)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedDays([...selectedDays, day.value]);
-                      } else {
-                        setSelectedDays(selectedDays.filter(d => d !== day.value));
-                      }
-                    }}
-                  />
-                  <label htmlFor={day.value} className="text-sm">
-                    {day.label}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-[300px,1fr] gap-6">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Start time</label>
-              <Select value={startTime} onValueChange={setStartTime}>
+              <label className="text-sm font-medium">Schedule type</label>
+              <Select value={scheduleType} onValueChange={setScheduleType}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIME_SLOTS.map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {format(new Date().setHours(parseInt(time)), 'h:mm a')}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="1">1 week</SelectItem>
+                  <SelectItem value="2">2 weeks</SelectItem>
+                  <SelectItem value="3">3 weeks</SelectItem>
+                  <SelectItem value="4">4 weeks</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">End time</label>
-              <Select value={endTime} onValueChange={setEndTime}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIME_SLOTS.map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {format(new Date().setHours(parseInt(time)), 'h:mm a')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="bg-purple-50 p-4 rounded-lg flex gap-3">
+              <div className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-purple-100">
+                ℹ️
+              </div>
+              <p className="text-sm text-purple-900">
+                Team members will not be scheduled on business closed periods.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="font-semibold">Week 1 of {scheduleType}</h3>
+            <div className="space-y-4">
+              {DAYS.map((day) => {
+                const dayConfig = dayConfigs[day.value];
+                return (
+                  <div key={day.value} className="flex items-start gap-3">
+                    <Checkbox
+                      id={day.value}
+                      checked={dayConfig.enabled}
+                      onCheckedChange={(checked) => {
+                        setDayConfigs(prev => ({
+                          ...prev,
+                          [day.value]: {
+                            ...prev[day.value],
+                            enabled: checked as boolean
+                          }
+                        }));
+                      }}
+                    />
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <label htmlFor={day.value} className="text-sm font-medium">
+                          {day.label}
+                        </label>
+                        <span className="text-sm text-muted-foreground">
+                          {day.duration}
+                        </span>
+                      </div>
+
+                      {dayConfig.enabled && (
+                        <div className="space-y-2">
+                          {dayConfig.shifts.map((shift, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <Select
+                                value={shift.startTime}
+                                onValueChange={(value) => {
+                                  setDayConfigs(prev => ({
+                                    ...prev,
+                                    [day.value]: {
+                                      ...prev[day.value],
+                                      shifts: prev[day.value].shifts.map((s, i) => 
+                                        i === index ? { ...s, startTime: value } : s
+                                      )
+                                    }
+                                  }));
+                                }}
+                              >
+                                <SelectTrigger className="w-[120px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {TIME_SLOTS.map((time) => (
+                                    <SelectItem key={time} value={time}>
+                                      {format(new Date().setHours(parseInt(time)), 'h:mm a')}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              <span>-</span>
+
+                              <Select
+                                value={shift.endTime}
+                                onValueChange={(value) => {
+                                  setDayConfigs(prev => ({
+                                    ...prev,
+                                    [day.value]: {
+                                      ...prev[day.value],
+                                      shifts: prev[day.value].shifts.map((s, i) => 
+                                        i === index ? { ...s, endTime: value } : s
+                                      )
+                                    }
+                                  }));
+                                }}
+                              >
+                                <SelectTrigger className="w-[120px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {TIME_SLOTS.map((time) => (
+                                    <SelectItem key={time} value={time}>
+                                      {format(new Date().setHours(parseInt(time)), 'h:mm a')}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveShift(day.value, index)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          
+                          <Button
+                            variant="link"
+                            className="text-purple-600 p-0 h-auto font-normal"
+                            onClick={() => handleAddShift(day.value)}
+                          >
+                            Add a shift
+                          </Button>
+                        </div>
+                      )}
+
+                      {!dayConfig.enabled && (
+                        <p className="text-sm text-muted-foreground">No shifts</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 mt-6">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
