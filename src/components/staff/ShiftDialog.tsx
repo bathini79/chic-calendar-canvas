@@ -60,7 +60,7 @@ export function ShiftDialog({
     try {
       // Check if this is a recurring shift (has a pattern ID)
       if (shift.id.startsWith('pattern-')) {
-        // For recurring shifts, create an override
+        // For recurring shifts, create an override with declined status
         const shiftDate = new Date(selectedDate!);
         const startTime = new Date(shift.start_time);
         const endTime = new Date(shift.end_time);
@@ -71,8 +71,9 @@ export function ShiftDialog({
             employee_id: employee?.id,
             start_time: shiftDate.toISOString(),
             end_time: shiftDate.toISOString(),
-            status: 'cancelled',
-            is_override: true
+            status: 'declined',
+            is_override: true,
+            is_recurring: true
           }]);
 
         if (error) throw error;
@@ -112,7 +113,9 @@ export function ShiftDialog({
           employee_id: employee.id,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          status: 'pending'
+          status: 'pending',
+          is_override: false,
+          is_recurring: false
         };
       });
 
