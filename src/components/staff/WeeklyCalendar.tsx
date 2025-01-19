@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 interface WeeklyCalendarProps {
   employee: any;
   shifts: any[];
-  recurringShifts: any[];
   onDateClick: (date: Date) => void;
   onSetRegularShifts: (employee: any) => void;
   currentWeek: Date;
@@ -24,8 +23,7 @@ interface WeeklyCalendarProps {
 
 export function WeeklyCalendar({ 
   employee, 
-  shifts,
-  recurringShifts,
+  shifts = [],
   onDateClick,
   onSetRegularShifts,
   currentWeek
@@ -36,31 +34,9 @@ export function WeeklyCalendar({
 
   const getShiftsForDate = (date: Date) => {
     // Get regular shifts
-    const regularShifts = shifts.filter((shift) => 
+    return shifts.filter((shift) => 
       isSameDay(new Date(shift.start_time), date)
     );
-
-    // Get recurring shifts for the day
-    const dayOfWeek = date.getDay();
-    const recurringForDay = recurringShifts.filter(shift => {
-      // Convert date strings to Date objects once
-      const effectiveFrom = new Date(shift.effective_from);
-      const effectiveUntil = shift.effective_until ? new Date(shift.effective_until) : null;
-      const shiftDate = new Date(date);
-      
-      // Set hours to 0 for date comparison
-      effectiveFrom.setHours(0, 0, 0, 0);
-      if (effectiveUntil) effectiveUntil.setHours(23, 59, 59, 999);
-      shiftDate.setHours(0, 0, 0, 0);
-
-      return (
-        shift.day_of_week === dayOfWeek &&
-        shiftDate >= effectiveFrom &&
-        (!effectiveUntil || shiftDate <= effectiveUntil)
-      );
-    });
-
-    return [...regularShifts, ...recurringForDay];
   };
 
   const formatShiftTime = (start: string | Date, end: string | Date) => {

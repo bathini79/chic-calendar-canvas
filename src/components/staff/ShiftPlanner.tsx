@@ -6,7 +6,7 @@ import { ShiftDialog } from "./ShiftDialog";
 import { RegularShiftDialog } from "./RegularShiftDialog";
 import { Button } from "../ui/button";
 import { ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-react";
-import { format, addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
+import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, addDays } from "date-fns";
 import { toast } from "sonner";
 
 export function ShiftPlanner() {
@@ -88,7 +88,7 @@ export function ShiftPlanner() {
       }) || [];
 
       // Combine regular and generated shifts
-      return [...regularShifts, ...generatedShifts];
+      return [...(regularShifts || []), ...generatedShifts];
     },
   });
 
