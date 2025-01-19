@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { EmployeeRow } from "../EmployeeRow";
 import { Button } from "../ui/button";
@@ -13,7 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { ShiftDialog } from "./ShiftDialog";
-import { useState } from "react";
 
 interface WeeklyCalendarProps {
   employee: any;
@@ -67,22 +67,6 @@ export function WeeklyCalendar({
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-accent/10 text-accent-foreground';
-    }
-  };
-
-  const handleDeleteShift = async (shiftId: string) => {
-    try {
-      const { error } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('id', shiftId);
-
-      if (error) throw error;
-      
-      toast.success("Shift deleted successfully");
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-    } catch (error: any) {
-      toast.error(error.message);
     }
   };
 
@@ -156,19 +140,9 @@ export function WeeklyCalendar({
                     return (
                       <div
                         key={shift.id}
-                        className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status, isRecurring)} group/shift relative`}
+                        className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status, isRecurring)}`}
                       >
                         {shiftTime}
-                        {!isRecurring && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute -right-1 -top-1 h-4 w-4 opacity-0 group-hover/shift:opacity-100 transition-opacity"
-                            onClick={() => handleDeleteShift(shift.id)}
-                          >
-                            <span className="text-xs text-destructive">×</span>
-                          </Button>
-                        )}
                         {isRecurring && (
                           <Badge variant="secondary" className="ml-1 text-[10px]">
                             Recurring
@@ -193,6 +167,7 @@ export function WeeklyCalendar({
         onOpenChange={setShiftDialogOpen}
         employee={employee}
         selectedDate={selectedDate}
+        existingShifts={selectedDate ? getShiftsForDate(selectedDate) : []}
       />
     </div>
   );
