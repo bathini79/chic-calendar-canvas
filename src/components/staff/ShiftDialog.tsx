@@ -58,6 +58,11 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
+      if (!shift.id) {
+        toast.error("Cannot delete this shift. Invalid shift ID.");
+        return;
+      }
+
       const { error } = await supabase
         .from('shifts')
         .delete()
@@ -133,9 +138,6 @@ export function ShiftDialog({
                 <div key={shift.id} className="flex items-center gap-2 bg-accent/5 p-2 rounded-md">
                   <span className="flex-1 text-sm">
                     {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
-                    {shift.is_recurring && (
-                      <span className="ml-2 text-xs text-muted-foreground">(Recurring)</span>
-                    )}
                   </span>
                   <Button
                     variant="ghost"
