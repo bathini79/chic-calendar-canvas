@@ -18,13 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { startOfDay, format } from "date-fns";
 
 const formSchema = z.object({
   employee_id: z.string().min(1, "Employee is required"),
   start_time: z.string().min(1, "Start time is required"),
   end_time: z.string().min(1, "End time is required"),
   status: z.enum(['pending', 'approved', 'declined']).default('pending'),
-  duration_weeks: z.enum(['1', '2', '3', '4']).default('1'),
 });
 
 type ShiftFormData = z.infer<typeof formSchema>;
@@ -32,49 +32,43 @@ type ShiftFormData = z.infer<typeof formSchema>;
 interface ShiftFormProps {
   initialData?: any;
   employee?: any;
+  selectedDate?: Date | null;
   onSubmit: (data: ShiftFormData) => void;
   onCancel: () => void;
 }
 
-export function ShiftForm({ initialData, employee, onSubmit, onCancel }: ShiftFormProps) {
+export function ShiftForm({ 
+  initialData, 
+  employee, 
+  selectedDate,
+  onSubmit, 
+  onCancel 
+}: ShiftFormProps) {
+  const getDefaultDateTime = () => {
+    if (selectedDate) {
+      const date = startOfDay(selectedDate);
+      return format(date, "yyyy-MM-dd'T'HH:mm");
+    }
+    return '';
+  };
+
   const form = useForm<ShiftFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       employee_id: employee?.id || initialData?.employee_id || '',
-      start_time: initialData?.start_time ? new Date(initialData.start_time).toISOString().slice(0, 16) : '',
-      end_time: initialData?.end_time ? new Date(initialData.end_time).toISOString().slice(0, 16) : '',
+      start_time: initialData?.start_time 
+        ? new Date(initialData.start_time).toISOString().slice(0, 16) 
+        : getDefaultDateTime(),
+      end_time: initialData?.end_time 
+        ? new Date(initialData.end_time).toISOString().slice(0, 16)
+        : getDefaultDateTime(),
       status: initialData?.status || 'pending',
-      duration_weeks: '1',
     },
   });
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="duration_weeks"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Duration (Weeks)</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select duration" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="1">1 Week</SelectItem>
-                  <SelectItem value="2">2 Weeks</SelectItem>
-                  <SelectItem value="3">3 Weeks</SelectItem>
-                  <SelectItem value="4">4 Weeks</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
         <FormField
           control={form.control}
           name="start_time"

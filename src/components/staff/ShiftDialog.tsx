@@ -3,15 +3,23 @@ import { ShiftForm } from "./ShiftForm";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 interface ShiftDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: any;
   employee?: any;
+  selectedDate?: Date | null;
 }
 
-export function ShiftDialog({ open, onOpenChange, initialData, employee }: ShiftDialogProps) {
+export function ShiftDialog({ 
+  open, 
+  onOpenChange, 
+  initialData, 
+  employee,
+  selectedDate 
+}: ShiftDialogProps) {
   const queryClient = useQueryClient();
 
   const handleSubmit = async (data: any) => {
@@ -40,20 +48,27 @@ export function ShiftDialog({ open, onOpenChange, initialData, employee }: Shift
     }
   };
 
+  const dialogTitle = initialData 
+    ? 'Edit Shift'
+    : selectedDate
+    ? `Add Shift for ${format(selectedDate, 'EEEE, MMMM d')}`
+    : 'Create Shift';
+
+  const dialogDescription = employee?.name 
+    ? `Assign shifts for ${employee.name}`
+    : 'Assign shifts';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {initialData ? 'Edit Shift' : 'Create Shift'}
-          </DialogTitle>
-          <DialogDescription>
-            {employee?.name ? `Assign shifts for ${employee.name}` : 'Assign shifts'}
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
         <ShiftForm
           initialData={initialData}
           employee={employee}
+          selectedDate={selectedDate}
           onSubmit={handleSubmit}
           onCancel={() => onOpenChange(false)}
         />

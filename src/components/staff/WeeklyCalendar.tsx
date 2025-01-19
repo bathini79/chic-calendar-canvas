@@ -1,7 +1,7 @@
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { EmployeeRow } from "../EmployeeRow";
 import { Button } from "../ui/button";
-import { MoreHorizontal, Plus, Clock, CalendarCheck } from "lucide-react";
+import { MoreHorizontal, Plus, Clock, CalendarCheck, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { ShiftDialog } from "./ShiftDialog";
+import { useState } from "react";
 
 interface WeeklyCalendarProps {
   employee: any;
@@ -31,9 +33,10 @@ export function WeeklyCalendar({
   const queryClient = useQueryClient();
   const startDate = startOfWeek(currentWeek);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
 
   const getShiftsForDate = (date: Date) => {
-    // Get regular shifts
     return shifts.filter((shift) => 
       isSameDay(new Date(shift.start_time), date)
     );
@@ -83,6 +86,11 @@ export function WeeklyCalendar({
     }
   };
 
+  const handleDayClick = (date: Date) => {
+    setSelectedDate(date);
+    setShiftDialogOpen(true);
+  };
+
   return (
     <div className="grid grid-cols-[250px_1fr] gap-4">
       <div className="flex items-center justify-between pr-4">
@@ -120,15 +128,24 @@ export function WeeklyCalendar({
                   </Badge>
                 )}
               </div>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
-                onClick={() => onDateClick(date)}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
+                  >
+                    <MoreVertical className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleDayClick(date)}>
+                    <Clock className="h-4 w-4 mr-2" />
+                    Update shifts for this day
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               
               {dayShifts.length > 0 ? (
                 <div className="space-y-1 pt-2">
@@ -170,6 +187,13 @@ export function WeeklyCalendar({
           );
         })}
       </div>
+
+      <ShiftDialog
+        open={shiftDialogOpen}
+        onOpenChange={setShiftDialogOpen}
+        employee={employee}
+        selectedDate={selectedDate}
+      />
     </div>
   );
 }
