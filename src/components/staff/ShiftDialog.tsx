@@ -30,10 +30,12 @@ export function ShiftDialog({
 }: ShiftDialogProps) {
   const queryClient = useQueryClient();
   const [shifts, setShifts] = useState<ShiftTime[]>(
-    existingShifts.map(shift => ({
-      startTime: format(new Date(shift.start_time), 'HH:mm'),
-      endTime: format(new Date(shift.end_time), 'HH:mm')
-    })) || []
+    existingShifts
+      .filter(shift => !shift.is_recurring)
+      .map(shift => ({
+        startTime: format(new Date(shift.start_time), 'HH:mm'),
+        endTime: format(new Date(shift.end_time), 'HH:mm')
+      })) || []
   );
 
   const handleAddShift = () => {
@@ -56,12 +58,18 @@ export function ShiftDialog({
     setShifts(newShifts);
   };
 
-  const handleDeleteExistingShift = async (shiftId: string) => {
+  const handleDeleteExistingShift = async (shift: any) => {
     try {
+      // Skip deletion for recurring shifts as they're generated
+      if (shift.is_recurring) {
+        toast.error("Cannot delete recurring shifts here. Please modify the recurring pattern instead.");
+        return;
+      }
+
       const { error } = await supabase
         .from('shifts')
         .delete()
-        .eq('id', shiftId);
+        .eq('id', shift.id);
 
       if (error) throw error;
       
@@ -133,11 +141,16 @@ export function ShiftDialog({
                 <div key={shift.id} className="flex items-center gap-2 bg-accent/5 p-2 rounded-md">
                   <span className="flex-1 text-sm">
                     {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
+                    {shift.is_recurring && (
+                      <span className="ml-2 text-xs text-muted-foreground">(Recurring)</span>
+                    )}
                   </span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDeleteExistingShift(shift.id)}
+                    onClick={() => handleDeleteExistingShift(shift)}
+                    disabled={shift.is_recurring}
+                    title={shift.is_recurring ? "Cannot delete recurring shifts here" : "Delete shift"}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
