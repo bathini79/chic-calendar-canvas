@@ -30,12 +30,10 @@ export function ShiftDialog({
 }: ShiftDialogProps) {
   const queryClient = useQueryClient();
   const [shifts, setShifts] = useState<ShiftTime[]>(
-    existingShifts
-      .filter(shift => !shift.is_recurring)
-      .map(shift => ({
-        startTime: format(new Date(shift.start_time), 'HH:mm'),
-        endTime: format(new Date(shift.end_time), 'HH:mm')
-      })) || []
+    existingShifts.map(shift => ({
+      startTime: format(new Date(shift.start_time), 'HH:mm'),
+      endTime: format(new Date(shift.end_time), 'HH:mm')
+    })) || []
   );
 
   const handleAddShift = () => {
@@ -60,12 +58,6 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      // Skip deletion for recurring shifts as they're generated
-      if (shift.is_recurring) {
-        toast.error("Cannot delete recurring shifts here. Please modify the recurring pattern instead.");
-        return;
-      }
-
       const { error } = await supabase
         .from('shifts')
         .delete()
@@ -128,7 +120,7 @@ export function ShiftDialog({
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
-            You are editing this day's shifts only. To set regular shifts, go to scheduled shifts.
+            You can update or delete any shifts for this day, including recurring shifts.
           </DialogDescription>
         </DialogHeader>
 
@@ -149,8 +141,6 @@ export function ShiftDialog({
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeleteExistingShift(shift)}
-                    disabled={shift.is_recurring}
-                    title={shift.is_recurring ? "Cannot delete recurring shifts here" : "Delete shift"}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
