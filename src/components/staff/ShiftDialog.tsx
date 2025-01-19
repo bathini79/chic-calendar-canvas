@@ -58,20 +58,37 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      // Check if this is a regular shift with a valid UUID
-      if (shift.id && typeof shift.id === 'string' && shift.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      // Handle recurring shifts differently
+      if (shift.is_recurring) {
+        // For recurring shifts, we create an exception by adding a new shift
+        // that overrides the recurring pattern for this specific day
         const { error } = await supabase
           .from('shifts')
-          .delete()
-          .eq('id', shift.id);
+          .insert([{
+            employee_id: employee?.id,
+            start_time: null, // Null start/end time indicates this is blocking out a recurring shift
+            end_time: null,
+            status: 'declined' // This will prevent the recurring shift from showing
+          }]);
 
         if (error) throw error;
-        
-        toast.success("Shift deleted successfully");
-        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+        toast.success("Recurring shift overridden for this day");
       } else {
-        toast.error("Cannot delete this shift. Invalid shift ID.");
+        // For regular shifts, proceed with deletion if it has a valid UUID
+        if (shift.id && typeof shift.id === 'string' && shift.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          const { error } = await supabase
+            .from('shifts')
+            .delete()
+            .eq('id', shift.id);
+
+          if (error) throw error;
+          toast.success("Shift deleted successfully");
+        } else {
+          toast.error("Cannot delete this shift. Invalid shift ID.");
+        }
       }
+      
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -125,7 +142,7 @@ export function ShiftDialog({
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
-            Add new shifts or delete existing ones for this day.
+            Manage both regular and recurring shifts for this day. You can override recurring shifts or add exceptional shifts.
           </DialogDescription>
         </DialogHeader>
 
@@ -138,6 +155,9 @@ export function ShiftDialog({
                 <div key={shift.id} className="flex items-center gap-2 bg-accent/5 p-2 rounded-md">
                   <span className="flex-1 text-sm">
                     {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
+                    {shift.is_recurring && (
+                      <span className="ml-2 text-xs text-muted-foreground">(Recurring)</span>
+                    )}
                   </span>
                   <Button
                     variant="ghost"
