@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Edit2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -35,6 +35,7 @@ export function ShiftDialog({
       endTime: format(new Date(shift.end_time), 'HH:mm')
     })) || []
   );
+  const [editingShift, setEditingShift] = useState<any>(null);
 
   const handleAddShift = () => {
     setShifts([...shifts, { startTime: '09:00', endTime: '17:00' }]);
@@ -56,6 +57,41 @@ export function ShiftDialog({
     setShifts(newShifts);
   };
 
+  const handleEditRecurringShift = async (shift: any) => {
+    if (!selectedDate) return;
+
+    try {
+      // Create an override for the recurring shift on this specific date
+      const shiftDate = new Date(selectedDate);
+      const [startHour, startMinute] = shift.startTime.split(':');
+      const [endHour, endMinute] = shift.endTime.split(':');
+      
+      const startTime = new Date(shiftDate);
+      startTime.setHours(parseInt(startHour), parseInt(startMinute), 0);
+      
+      const endTime = new Date(shiftDate);
+      endTime.setHours(parseInt(endHour), parseInt(endMinute), 0);
+
+      const { error } = await supabase
+        .from('shifts')
+        .insert([{
+          employee_id: employee?.id,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          status: 'pending',
+          is_override: true // Mark this as an override of a recurring shift
+        }]);
+
+      if (error) throw error;
+
+      toast.success("Shift updated for this day");
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setEditingShift(null);
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
   const handleDeleteExistingShift = async (shift: any) => {
     try {
       // Handle recurring shifts differently
@@ -68,7 +104,8 @@ export function ShiftDialog({
             employee_id: employee?.id,
             start_time: null, // Null start/end time indicates this is blocking out a recurring shift
             end_time: null,
-            status: 'declined' // This will prevent the recurring shift from showing
+            status: 'declined', // This will prevent the recurring shift from showing
+            is_override: true
           }]);
 
         if (error) throw error;
@@ -142,7 +179,7 @@ export function ShiftDialog({
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
-            Manage both regular and recurring shifts for this day. You can override recurring shifts or add exceptional shifts.
+            Manage both regular and recurring shifts for this day. You can override, edit, or add exceptional shifts.
           </DialogDescription>
         </DialogHeader>
 
@@ -153,19 +190,46 @@ export function ShiftDialog({
               <h3 className="text-sm font-medium">Existing Shifts</h3>
               {existingShifts.map((shift: any) => (
                 <div key={shift.id} className="flex items-center gap-2 bg-accent/5 p-2 rounded-md">
-                  <span className="flex-1 text-sm">
-                    {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
-                    {shift.is_recurring && (
-                      <span className="ml-2 text-xs text-muted-foreground">(Recurring)</span>
-                    )}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteExistingShift(shift)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  {editingShift?.id === shift.id ? (
+                    <ShiftTimeSelector
+                      startTime={editingShift.startTime}
+                      endTime={editingShift.endTime}
+                      onStartTimeChange={(value) => setEditingShift({ ...editingShift, startTime: value })}
+                      onEndTimeChange={(value) => setEditingShift({ ...editingShift, endTime: value })}
+                      onRemove={() => setEditingShift(null)}
+                    />
+                  ) : (
+                    <>
+                      <span className="flex-1 text-sm">
+                        {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
+                        {shift.is_recurring && (
+                          <span className="ml-2 text-xs text-muted-foreground">(Recurring)</span>
+                        )}
+                      </span>
+                      <div className="flex gap-1">
+                        {shift.is_recurring && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingShift({
+                              id: shift.id,
+                              startTime: format(new Date(shift.start_time), 'HH:mm'),
+                              endTime: format(new Date(shift.end_time), 'HH:mm')
+                            })}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteExistingShift(shift)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -200,9 +264,15 @@ export function ShiftDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave}>
-              Save
-            </Button>
+            {editingShift ? (
+              <Button onClick={() => handleEditRecurringShift(editingShift)}>
+                Save Changes
+              </Button>
+            ) : (
+              <Button onClick={handleSave}>
+                Save
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
