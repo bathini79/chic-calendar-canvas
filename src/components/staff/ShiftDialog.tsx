@@ -58,20 +58,20 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      if (!shift.id) {
+      // Check if this is a regular shift with a valid UUID
+      if (shift.id && typeof shift.id === 'string' && shift.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const { error } = await supabase
+          .from('shifts')
+          .delete()
+          .eq('id', shift.id);
+
+        if (error) throw error;
+        
+        toast.success("Shift deleted successfully");
+        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      } else {
         toast.error("Cannot delete this shift. Invalid shift ID.");
-        return;
       }
-
-      const { error } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('id', shift.id);
-
-      if (error) throw error;
-      
-      toast.success("Shift deleted successfully");
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -125,7 +125,7 @@ export function ShiftDialog({
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
-            You can update or delete any shifts for this day, including recurring shifts.
+            Add new shifts or delete existing ones for this day.
           </DialogDescription>
         </DialogHeader>
 
