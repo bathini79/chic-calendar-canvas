@@ -58,15 +58,33 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      // Extract just the UUID part if it exists, otherwise use the full ID
-      const shiftId = shift.id;
-      
-      const { error } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('id', shiftId);
+      // Check if this is a recurring shift (has a pattern ID)
+      if (shift.id.startsWith('pattern-')) {
+        // For recurring shifts, create an override
+        const shiftDate = new Date(selectedDate!);
+        const startTime = new Date(shift.start_time);
+        const endTime = new Date(shift.end_time);
+        
+        const { error } = await supabase
+          .from('shifts')
+          .insert([{
+            employee_id: employee?.id,
+            start_time: shiftDate.toISOString(),
+            end_time: shiftDate.toISOString(),
+            status: 'cancelled',
+            is_override: true
+          }]);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // For regular shifts, delete normally
+        const { error } = await supabase
+          .from('shifts')
+          .delete()
+          .eq('id', shift.id);
+
+        if (error) throw error;
+      }
       
       toast.success("Shift deleted successfully");
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
