@@ -61,7 +61,6 @@ export function ShiftDialog({
     if (!selectedDate) return;
 
     try {
-      // Create an override for the recurring shift on this specific date
       const shiftDate = new Date(selectedDate);
       const [startHour, startMinute] = shift.startTime.split(':');
       const [endHour, endMinute] = shift.endTime.split(':');
@@ -79,7 +78,8 @@ export function ShiftDialog({
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           status: 'pending',
-          is_override: true // Mark this as an override of a recurring shift
+          is_override: true,
+          is_recurring: false
         }]);
 
       if (error) throw error;
@@ -94,24 +94,21 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      // Handle recurring shifts differently
       if (shift.is_recurring) {
-        // For recurring shifts, we create an exception by adding a new shift
-        // that overrides the recurring pattern for this specific day
         const { error } = await supabase
           .from('shifts')
           .insert([{
             employee_id: employee?.id,
-            start_time: null, // Null start/end time indicates this is blocking out a recurring shift
+            start_time: null,
             end_time: null,
-            status: 'declined', // This will prevent the recurring shift from showing
-            is_override: true
+            status: 'declined',
+            is_override: true,
+            is_recurring: false
           }]);
 
         if (error) throw error;
         toast.success("Recurring shift overridden for this day");
       } else {
-        // For regular shifts, proceed with deletion if it has a valid UUID
         if (shift.id && typeof shift.id === 'string' && shift.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
           const { error } = await supabase
             .from('shifts')
@@ -135,7 +132,6 @@ export function ShiftDialog({
     if (!selectedDate || !employee) return;
 
     try {
-      // Create new shifts
       const shiftsToCreate = shifts.map(shift => {
         const shiftDate = new Date(selectedDate);
         const [startHour, startMinute] = shift.startTime.split(':');
@@ -151,7 +147,9 @@ export function ShiftDialog({
           employee_id: employee.id,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          status: 'pending'
+          status: 'pending',
+          is_override: false,
+          is_recurring: false
         };
       });
 
@@ -184,7 +182,6 @@ export function ShiftDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Existing shifts */}
           {existingShifts && existingShifts.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium">Existing Shifts</h3>
@@ -235,7 +232,6 @@ export function ShiftDialog({
             </div>
           )}
 
-          {/* New shifts */}
           <div className="space-y-2">
             <h3 className="text-sm font-medium">New Shifts</h3>
             {shifts.map((shift, index) => (
