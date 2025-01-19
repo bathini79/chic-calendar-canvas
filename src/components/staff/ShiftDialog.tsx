@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Edit2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -35,7 +35,6 @@ export function ShiftDialog({
       endTime: format(new Date(shift.end_time), 'HH:mm')
     })) || []
   );
-  const [editingShift, setEditingShift] = useState<any>(null);
 
   const handleAddShift = () => {
     setShifts([...shifts, { startTime: '09:00', endTime: '17:00' }]);
@@ -57,48 +56,18 @@ export function ShiftDialog({
     setShifts(newShifts);
   };
 
-  const handleEditRecurringShift = async (shift: any) => {
-    if (!selectedDate) return;
-
-    try {
-      const shiftDate = new Date(selectedDate);
-      const [startHour, startMinute] = shift.startTime.split(':');
-      const [endHour, endMinute] = shift.endTime.split(':');
-      
-      const startTime = new Date(shiftDate);
-      startTime.setHours(parseInt(startHour), parseInt(startMinute), 0);
-      
-      const endTime = new Date(shiftDate);
-      endTime.setHours(parseInt(endHour), parseInt(endMinute), 0);
-
-      const { error } = await supabase
-        .from('shifts')
-        .insert([{
-          employee_id: employee?.id,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          status: 'pending'
-        }]);
-
-      if (error) throw error;
-
-      toast.success("Shift updated successfully");
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      setEditingShift(null);
-    } catch (error: any) {
-      toast.error(error.message);
-    }
-  };
-
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      // Simply delete the shift record, regardless of its type
+      // Extract just the UUID part if it exists, otherwise use the full ID
+      const shiftId = shift.id;
+      
       const { error } = await supabase
         .from('shifts')
         .delete()
-        .eq('id', shift.id);
+        .eq('id', shiftId);
 
       if (error) throw error;
+      
       toast.success("Shift deleted successfully");
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
     } catch (error: any) {
@@ -163,28 +132,16 @@ export function ShiftDialog({
               <h3 className="text-sm font-medium">Existing Shifts</h3>
               {existingShifts.map((shift: any) => (
                 <div key={shift.id} className="flex items-center gap-2 bg-accent/5 p-2 rounded-md">
-                  {editingShift?.id === shift.id ? (
-                    <ShiftTimeSelector
-                      startTime={editingShift.startTime}
-                      endTime={editingShift.endTime}
-                      onStartTimeChange={(value) => setEditingShift({ ...editingShift, startTime: value })}
-                      onEndTimeChange={(value) => setEditingShift({ ...editingShift, endTime: value })}
-                      onRemove={() => setEditingShift(null)}
-                    />
-                  ) : (
-                    <>
-                      <span className="flex-1 text-sm">
-                        {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteExistingShift(shift)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </>
-                  )}
+                  <span className="flex-1 text-sm">
+                    {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteExistingShift(shift)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
               ))}
             </div>
