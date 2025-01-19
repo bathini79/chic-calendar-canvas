@@ -77,14 +77,12 @@ export function ShiftDialog({
           employee_id: employee?.id,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          status: 'pending',
-          is_override: true,
-          is_recurring: false
+          status: 'pending'
         }]);
 
       if (error) throw error;
 
-      toast.success("Shift updated for this day");
+      toast.success("Shift updated successfully");
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setEditingShift(null);
     } catch (error: any) {
@@ -94,45 +92,14 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      // If it's an override record, we can delete it directly
-      if (shift.is_override) {
-        const { error } = await supabase
-          .from('shifts')
-          .delete()
-          .eq('id', shift.id);
+      // Simply delete the shift record, regardless of its type
+      const { error } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('id', shift.id);
 
-        if (error) throw error;
-        toast.success("Shift override removed successfully");
-      } else if (shift.is_recurring) {
-        // For recurring shifts, create an override record that blocks out this day
-        const { error } = await supabase
-          .from('shifts')
-          .insert([{
-            employee_id: employee?.id,
-            start_time: new Date(shift.start_time).toISOString(),
-            end_time: new Date(shift.end_time).toISOString(),
-            status: 'declined',
-            is_override: true,
-            is_recurring: false
-          }]);
-
-        if (error) throw error;
-        toast.success("Recurring shift blocked for this day");
-      } else {
-        // For regular non-recurring shifts, delete the record
-        if (shift.id && typeof shift.id === 'string' && shift.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-          const { error } = await supabase
-            .from('shifts')
-            .delete()
-            .eq('id', shift.id);
-
-          if (error) throw error;
-          toast.success("Shift deleted successfully");
-        } else {
-          toast.error("Cannot delete this shift. Invalid shift ID.");
-        }
-      }
-      
+      if (error) throw error;
+      toast.success("Shift deleted successfully");
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
     } catch (error: any) {
       toast.error(error.message);
@@ -158,9 +125,7 @@ export function ShiftDialog({
           employee_id: employee.id,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          status: 'pending',
-          is_override: false,
-          is_recurring: false
+          status: 'pending'
         };
       });
 
@@ -170,7 +135,7 @@ export function ShiftDialog({
 
       if (error) throw error;
 
-      toast.success("Shifts updated successfully");
+      toast.success("Shifts created successfully");
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       onOpenChange(false);
     } catch (error: any) {
@@ -188,7 +153,7 @@ export function ShiftDialog({
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
-            Manage both regular and recurring shifts for this day. You can override, edit, or add exceptional shifts.
+            Manage shifts for this day
           </DialogDescription>
         </DialogHeader>
 
@@ -210,32 +175,14 @@ export function ShiftDialog({
                     <>
                       <span className="flex-1 text-sm">
                         {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
-                        {shift.is_recurring && (
-                          <span className="ml-2 text-xs text-muted-foreground">(Recurring)</span>
-                        )}
                       </span>
-                      <div className="flex gap-1">
-                        {shift.is_recurring && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingShift({
-                              id: shift.id,
-                              startTime: format(new Date(shift.start_time), 'HH:mm'),
-                              endTime: format(new Date(shift.end_time), 'HH:mm')
-                            })}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteExistingShift(shift)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteExistingShift(shift)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </>
                   )}
                 </div>
@@ -271,15 +218,9 @@ export function ShiftDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            {editingShift ? (
-              <Button onClick={() => handleEditRecurringShift(editingShift)}>
-                Save Changes
-              </Button>
-            ) : (
-              <Button onClick={handleSave}>
-                Save
-              </Button>
-            )}
+            <Button onClick={handleSave}>
+              Save
+            </Button>
           </div>
         </div>
       </DialogContent>
