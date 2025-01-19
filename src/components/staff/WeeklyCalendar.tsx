@@ -77,7 +77,10 @@ export function WeeklyCalendar({
     }, 0);
   };
 
-  const getShiftStatusColor = (status: string) => {
+  const getShiftStatusColor = (status: string, isRecurring: boolean = false) => {
+    if (isRecurring) {
+      return 'bg-blue-100 text-blue-800';
+    }
     switch (status) {
       case 'approved':
         return 'bg-green-100 text-green-800';
@@ -154,15 +157,13 @@ export function WeeklyCalendar({
               {dayShifts.length > 0 ? (
                 <div className="space-y-1 pt-2">
                   {dayShifts.map((shift) => {
-                    const isRecurring = !shift.start_time;
-                    const shiftTime = isRecurring
-                      ? `${shift.start_time} - ${shift.end_time}`
-                      : formatShiftTime(shift.start_time, shift.end_time);
+                    const isRecurring = shift.is_recurring;
+                    const shiftTime = formatShiftTime(shift.start_time, shift.end_time);
 
                     return (
                       <div
                         key={shift.id}
-                        className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status)} group/shift relative`}
+                        className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status, isRecurring)} group/shift relative`}
                       >
                         {shiftTime}
                         {!isRecurring && (
@@ -174,6 +175,11 @@ export function WeeklyCalendar({
                           >
                             <span className="text-xs text-destructive">×</span>
                           </Button>
+                        )}
+                        {isRecurring && (
+                          <Badge variant="secondary" className="ml-1 text-[10px]">
+                            Recurring
+                          </Badge>
                         )}
                       </div>
                     );

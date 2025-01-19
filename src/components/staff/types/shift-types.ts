@@ -12,6 +12,14 @@ export interface WeekConfig {
   days: Record<string, DayConfig>;
 }
 
+export interface RecurringShiftPattern {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
+}
+
 export const DAYS = [
   { label: "Monday", value: "1", duration: "9h" },
   { label: "Tuesday", value: "2", duration: "9h" },

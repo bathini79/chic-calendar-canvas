@@ -41,35 +41,54 @@ export function ShiftPlanner() {
       const weekStart = startOfWeek(currentWeek);
       const weekEnd = endOfWeek(currentWeek);
       
-      const { data, error } = await supabase
+      // Get regular shifts
+      const { data: regularShifts, error: regularError } = await supabase
         .from('shifts')
         .select('*')
         .gte('start_time', weekStart.toISOString())
         .lte('end_time', weekEnd.toISOString());
       
-      if (error) {
-        toast.error("Failed to load shifts");
-        throw error;
-      }
-      return data;
-    },
-  });
+      if (regularError) throw regularError;
 
-  // Query for recurring shifts
-  const { data: recurringShifts } = useQuery({
-    queryKey: ['recurring_shifts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+      // Get recurring shift patterns
+      const { data: patterns, error: patternsError } = await supabase
         .from('recurring_shifts')
         .select('*')
-        .gte('effective_from', startOfWeek(currentWeek).toISOString())
-        .or(`effective_until.is.null,effective_until.gte.${endOfWeek(currentWeek).toISOString()}`);
-      
-      if (error) {
-        toast.error("Failed to load recurring shifts");
-        throw error;
-      }
-      return data;
+        .lte('effective_from', weekEnd.toISOString())
+        .or(`effective_until.is.null,effective_until.gte.${weekStart.toISOString()}`);
+
+      if (patternsError) throw patternsError;
+
+      // Generate shifts from patterns
+      const generatedShifts = patterns?.flatMap(pattern => {
+        const shiftsForWeek = [];
+        let currentDate = new Date(weekStart);
+
+        while (currentDate <= weekEnd) {
+          if (currentDate.getDay() === pattern.day_of_week) {
+            const shiftStart = new Date(currentDate);
+            const [startHour, startMinute] = pattern.start_time.split(':');
+            shiftStart.setHours(parseInt(startHour), parseInt(startMinute), 0);
+
+            const shiftEnd = new Date(currentDate);
+            const [endHour, endMinute] = pattern.end_time.split(':');
+            shiftEnd.setHours(parseInt(endHour), parseInt(endMinute), 0);
+
+            shiftsForWeek.push({
+              ...pattern,
+              id: `pattern-${pattern.id}-${format(currentDate, 'yyyy-MM-dd')}`,
+              start_time: shiftStart.toISOString(),
+              end_time: shiftEnd.toISOString(),
+              is_recurring: true
+            });
+          }
+          currentDate = addDays(currentDate, 1);
+        }
+        return shiftsForWeek;
+      }) || [];
+
+      // Combine regular and generated shifts
+      return [...regularShifts, ...generatedShifts];
     },
   });
 
@@ -142,7 +161,6 @@ export function ShiftPlanner() {
               <WeeklyCalendar
                 employee={employee}
                 shifts={shifts?.filter((s) => s.employee_id === employee.id) || []}
-                recurringShifts={recurringShifts?.filter((s) => s.employee_id === employee.id) || []}
                 onDateClick={(date) => handleDateClick(date, employee)}
                 onSetRegularShifts={handleSetRegularShifts}
                 currentWeek={currentWeek}
