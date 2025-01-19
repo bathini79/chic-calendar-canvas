@@ -95,20 +95,22 @@ export function ShiftDialog({
   const handleDeleteExistingShift = async (shift: any) => {
     try {
       if (shift.is_recurring) {
+        // For recurring shifts, create an override record that blocks out this day
         const { error } = await supabase
           .from('shifts')
           .insert([{
             employee_id: employee?.id,
-            start_time: null,
-            end_time: null,
+            start_time: new Date(shift.start_time).toISOString(),
+            end_time: new Date(shift.end_time).toISOString(),
             status: 'declined',
             is_override: true,
             is_recurring: false
           }]);
 
         if (error) throw error;
-        toast.success("Recurring shift overridden for this day");
+        toast.success("Recurring shift blocked for this day");
       } else {
+        // For non-recurring shifts, simply delete the record
         if (shift.id && typeof shift.id === 'string' && shift.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
           const { error } = await supabase
             .from('shifts')

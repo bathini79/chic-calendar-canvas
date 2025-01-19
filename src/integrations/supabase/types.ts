@@ -286,43 +286,187 @@ export type Database = {
           },
         ]
       }
+      services: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          description: string | null
+          duration: number
+          gender: string | null
+          id: string
+          image_urls: string[] | null
+          name: string
+          original_price: number
+          selling_price: number
+          status: Database["public"]["Enums"]["service_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          duration: number
+          gender?: string | null
+          id?: string
+          image_urls?: string[] | null
+          name: string
+          original_price: number
+          selling_price: number
+          status?: Database["public"]["Enums"]["service_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          duration?: number
+          gender?: string | null
+          id?: string
+          image_urls?: string[] | null
+          name?: string
+          original_price?: number
+          selling_price?: number
+          status?: Database["public"]["Enums"]["service_status"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      services_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          service_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          service_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_categories_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shifts: {
         Row: {
-          id: string;
-          employee_id: string | null;
-          start_time: string;
-          end_time: string;
-          status: 'pending' | 'approved' | 'declined';
-          created_at: string;
-          updated_at: string;
-          is_override: boolean;
-          is_recurring: boolean;
-        };
+          created_at: string
+          employee_id: string | null
+          end_time: string
+          id: string
+          is_override: boolean | null
+          is_recurring: boolean | null
+          start_time: string
+          status: Database["public"]["Enums"]["shift_status"] | null
+          updated_at: string
+        }
         Insert: {
-          id?: string;
-          employee_id?: string | null;
-          start_time: string;
-          end_time: string;
-          status?: 'pending' | 'approved' | 'declined';
-          created_at?: string;
-          updated_at?: string;
-          is_override?: boolean;
-          is_recurring?: boolean;
-        };
+          created_at?: string
+          employee_id?: string | null
+          end_time: string
+          id?: string
+          is_override?: boolean | null
+          is_recurring?: boolean | null
+          start_time: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string
+        }
         Update: {
-          id?: string;
-          employee_id?: string | null;
-          start_time?: string;
-          end_time?: string;
-          status?: 'pending' | 'approved' | 'declined';
-          created_at?: string;
-          updated_at?: string;
-          is_override?: boolean;
-          is_recurring?: boolean;
-        };
-      };
-    };
-  };
+          created_at?: string
+          employee_id?: string | null
+          end_time?: string
+          id?: string
+          is_override?: boolean | null
+          is_recurring?: boolean | null
+          start_time?: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_off_requests: {
+        Row: {
+          created_at: string
+          employee_id: string | null
+          end_date: string
+          id: string
+          reason: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["shift_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id?: string | null
+          end_date: string
+          id?: string
+          reason?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string | null
+          end_date?: string
+          id?: string
+          reason?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_off_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      employee_status: "active" | "inactive"
+      employee_type: "stylist" | "operations"
+      service_status: "active" | "inactive" | "archived"
+      shift_status: "pending" | "approved" | "declined"
+      user_role: "customer" | "employee" | "admin" | "superadmin"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
 }
 
 type PublicSchema = Database[Extract<keyof Database, "public">]
@@ -334,7 +478,7 @@ export type Tables<
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
     ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
         Database[PublicTableNameOrOptions["schema"]]["Views"])
-    : never,
+    : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
   ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
       Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
@@ -346,10 +490,10 @@ export type Tables<
         PublicSchema["Views"])
     ? (PublicSchema["Tables"] &
         PublicSchema["Views"])[PublicTableNameOrOptions] extends {
-      Row: infer R
-    }
-    ? R
-    : never
+        Row: infer R
+      }
+      ? R
+      : never
     : never
 
 export type TablesInsert<
