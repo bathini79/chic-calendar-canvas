@@ -34,14 +34,14 @@ export function ShiftPlanner() {
     },
   });
 
-  // Query for shifts within the current week
-  const { data: shifts, isLoading: shiftsLoading } = useQuery({
+  // Query for shifts and recurring patterns within the current week
+  const { data: allShifts, isLoading: shiftsLoading } = useQuery({
     queryKey: ['shifts', format(currentWeek, 'yyyy-MM-dd')],
     queryFn: async () => {
       const weekStart = startOfWeek(currentWeek);
       const weekEnd = endOfWeek(currentWeek);
       
-      // Get regular shifts
+      // Get regular shifts and overrides
       const { data: regularShifts, error: regularError } = await supabase
         .from('shifts')
         .select('*')
@@ -79,7 +79,8 @@ export function ShiftPlanner() {
               id: `pattern-${pattern.id}-${format(currentDate, 'yyyy-MM-dd')}`,
               start_time: shiftStart.toISOString(),
               end_time: shiftEnd.toISOString(),
-              is_recurring: true
+              is_recurring: true,
+              status: 'approved'
             });
           }
           currentDate = addDays(currentDate, 1);
@@ -160,7 +161,7 @@ export function ShiftPlanner() {
             <div key={employee.id} className="p-4">
               <WeeklyCalendar
                 employee={employee}
-                shifts={shifts?.filter((s) => s.employee_id === employee.id) || []}
+                shifts={allShifts?.filter((s) => s.employee_id === employee.id) || []}
                 onDateClick={(date) => handleDateClick(date, employee)}
                 onSetRegularShifts={handleSetRegularShifts}
                 currentWeek={currentWeek}
@@ -173,12 +174,14 @@ export function ShiftPlanner() {
       <ShiftDialog
         open={shiftDialogOpen}
         onOpenChange={setShiftDialogOpen}
-        initialData={selectedDate ? {
-          employee_id: selectedEmployee?.id,
-          start_time: selectedDate.toISOString(),
-          end_time: selectedDate.toISOString(),
-        } : undefined}
         employee={selectedEmployee}
+        selectedDate={selectedDate}
+        existingShifts={selectedDate && selectedEmployee ? 
+          allShifts?.filter(s => 
+            s.employee_id === selectedEmployee.id && 
+            isSameDay(new Date(s.start_time), selectedDate)
+          ) : []
+        }
       />
 
       <RegularShiftDialog

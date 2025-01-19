@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format, startOfWeek, addDays, isSameDay } from "date-fns";
+import { format, startOfWeek, addDays, isSameDay, parseISO } from "date-fns";
 import { EmployeeRow } from "../EmployeeRow";
 import { Button } from "../ui/button";
 import { MoreHorizontal, Plus, Clock, CalendarCheck, MoreVertical } from "lucide-react";
@@ -37,14 +37,32 @@ export function WeeklyCalendar({
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
 
   const getShiftsForDate = (date: Date) => {
-    return shifts.filter((shift) => 
-      isSameDay(new Date(shift.start_time), date)
+    // Get regular shifts for this date
+    const regularShifts = shifts.filter(shift => 
+      !shift.is_recurring && isSameDay(new Date(shift.start_time), date)
     );
+
+    // Get recurring shifts that are not overridden
+    const recurringShifts = shifts.filter(shift => 
+      shift.is_recurring && 
+      new Date(shift.start_time).getDay() === date.getDay() &&
+      !shifts.some(override => 
+        override.is_override && 
+        isSameDay(new Date(override.start_time), date)
+      )
+    );
+
+    // Get overrides for this date
+    const overrides = shifts.filter(shift => 
+      shift.is_override && isSameDay(new Date(shift.start_time), date)
+    );
+
+    return [...regularShifts, ...recurringShifts, ...overrides];
   };
 
   const formatShiftTime = (start: string | Date, end: string | Date) => {
-    const startDate = typeof start === 'string' ? new Date(start) : start;
-    const endDate = typeof end === 'string' ? new Date(end) : end;
+    const startDate = typeof start === 'string' ? parseISO(start) : start;
+    const endDate = typeof end === 'string' ? parseISO(end) : end;
     return `${format(startDate, 'h:mma')} - ${format(endDate, 'h:mma')}`.toLowerCase();
   };
 
@@ -56,7 +74,10 @@ export function WeeklyCalendar({
     }, 0);
   };
 
-  const getShiftStatusColor = (status: string, isRecurring: boolean = false) => {
+  const getShiftStatusColor = (status: string, isRecurring: boolean = false, isOverride: boolean = false) => {
+    if (isOverride) {
+      return 'bg-red-100 text-red-800';
+    }
     if (isRecurring) {
       return 'bg-blue-100 text-blue-800';
     }
@@ -135,17 +156,23 @@ export function WeeklyCalendar({
                 <div className="space-y-1 pt-2">
                   {dayShifts.map((shift) => {
                     const isRecurring = shift.is_recurring;
+                    const isOverride = shift.is_override;
                     const shiftTime = formatShiftTime(shift.start_time, shift.end_time);
 
                     return (
                       <div
                         key={shift.id}
-                        className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status, isRecurring)}`}
+                        className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status, isRecurring, isOverride)}`}
                       >
                         {shiftTime}
-                        {isRecurring && (
+                        {isRecurring && !isOverride && (
                           <Badge variant="secondary" className="ml-1 text-[10px]">
                             Recurring
+                          </Badge>
+                        )}
+                        {isOverride && (
+                          <Badge variant="destructive" className="ml-1 text-[10px]">
+                            Cancelled
                           </Badge>
                         )}
                       </div>
