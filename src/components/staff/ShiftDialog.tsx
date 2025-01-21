@@ -58,34 +58,12 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      // Check if this is a recurring shift (has a pattern ID)
-      if (shift.id.startsWith('pattern-')) {
-        // For recurring shifts, create an override with declined status
-        const shiftDate = new Date(selectedDate!);
-        const startTime = new Date(shift.start_time);
-        const endTime = new Date(shift.end_time);
-        
-        const { error } = await supabase
-          .from('shifts')
-          .insert([{
-            employee_id: employee?.id,
-            start_time: shiftDate.toISOString(),
-            end_time: shiftDate.toISOString(),
-            status: 'declined',
-            is_override: true,
-            is_recurring: true
-          }]);
+      const { error } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('id', shift.id);
 
-        if (error) throw error;
-      } else {
-        // For regular shifts, delete normally
-        const { error } = await supabase
-          .from('shifts')
-          .delete()
-          .eq('id', shift.id);
-
-        if (error) throw error;
-      }
+      if (error) throw error;
       
       toast.success("Shift deleted successfully");
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
@@ -113,7 +91,6 @@ export function ShiftDialog({
           employee_id: employee.id,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          status: 'pending',
           is_override: false,
           is_recurring: false
         };
