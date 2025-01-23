@@ -1,16 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash } from "lucide-react";
+import { Edit, Package, Trash, Clock, DollarSign } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 interface PackagesGridProps {
   searchQuery: string;
@@ -19,6 +14,7 @@ interface PackagesGridProps {
 
 export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: packages, isLoading } = useQuery({
     queryKey: ['packages'],
@@ -43,7 +39,6 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
 
   const handleDelete = async (id: string) => {
     try {
-      // First delete package_services entries
       const { error: servicesError } = await supabase
         .from('package_services')
         .delete()
@@ -51,7 +46,6 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
       
       if (servicesError) throw servicesError;
 
-      // Then delete the package
       const { error: packageError } = await supabase
         .from('packages')
         .delete()
@@ -76,14 +70,27 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {filteredPackages?.map((pkg) => (
         <Card key={pkg.id} className="relative group">
-          <CardHeader>
+          {pkg.image_urls && pkg.image_urls[0] ? (
+            <div className="relative aspect-video">
+              <img
+                src={pkg.image_urls[0]}
+                alt={pkg.name}
+                className="w-full h-full object-cover rounded-t-lg"
+              />
+            </div>
+          ) : (
+            <div className="bg-muted aspect-video rounded-t-lg flex items-center justify-center">
+              <Package className="h-12 w-12 text-muted-foreground" />
+            </div>
+          )}
+          <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
-              <div>
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
                 <CardTitle className="text-xl">{pkg.name}</CardTitle>
-                <CardDescription>₹{pkg.price}</CardDescription>
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button
@@ -103,20 +110,54 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {pkg.description && (
-                <p className="text-sm text-muted-foreground">{pkg.description}</p>
-              )}
-              <div className="flex flex-wrap gap-1">
-                {pkg.package_services.map(({ service }: any) => (
-                  <Badge key={service.id} variant="secondary">
-                    {service.name}
-                  </Badge>
-                ))}
+          <CardContent className="space-y-4">
+            {pkg.description && (
+              <p className="text-sm text-muted-foreground">{pkg.description}</p>
+            )}
+            <div className="flex flex-wrap gap-1">
+              {pkg.package_services.map(({ service }: any) => (
+                <Badge key={service.id} variant="secondary">
+                  {service.name}
+                </Badge>
+              ))}
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span>{pkg.duration} min</span>
+              </div>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <DollarSign className="h-4 w-4" />
+                <span>₹{pkg.price}</span>
               </div>
             </div>
           </CardContent>
+          <CardFooter className="flex gap-2">
+            {pkg.is_customizable ? (
+              <>
+                <Button 
+                  className="flex-[7]"
+                  onClick={() => navigate(`/book/package/${pkg.id}`)}
+                >
+                  Book Now
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex-[3]"
+                  onClick={() => navigate(`/book/package/${pkg.id}?customize=true`)}
+                >
+                  Customize
+                </Button>
+              </>
+            ) : (
+              <Button 
+                className="w-full"
+                onClick={() => navigate(`/book/package/${pkg.id}`)}
+              >
+                Book Now
+              </Button>
+            )}
+          </CardFooter>
         </Card>
       ))}
     </div>
