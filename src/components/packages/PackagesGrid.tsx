@@ -132,9 +132,9 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex gap-2">
+          <CardFooter>
             {pkg.is_customizable ? (
-              <>
+              <div className="flex w-full gap-2">
                 <Button 
                   className="flex-[7]"
                   onClick={() => navigate(`/book/package/${pkg.id}`)}
@@ -148,7 +148,7 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
                 >
                   Customize
                 </Button>
-              </>
+              </div>
             ) : (
               <Button 
                 className="w-full"
