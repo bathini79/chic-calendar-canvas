@@ -78,12 +78,12 @@ export default function Services() {
         </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 items-center">
-        <div className="relative flex-1 w-full">
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full max-w-xs">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search services..."
-            className="pl-9"
+            className="pl-9 h-9"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
