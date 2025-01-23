@@ -17,18 +17,18 @@ import {
 } from "@/components/ui/select";
 
 export default function BookingForm() {
-  const { id: bookingId, type = "service" } = useParams();
+  const { id: bookingId } = useParams();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>();
   const [selectedEmployee, setSelectedEmployee] = useState<string>();
 
-  // Fetch service/package details
+  // Fetch service details
   const { data: itemDetails } = useQuery({
-    queryKey: [type, bookingId],
+    queryKey: ["service", bookingId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from(type === "service" ? "services" : "packages")
+        .from("services")
         .select("*")
         .eq("id", bookingId)
         .single();
@@ -86,7 +86,7 @@ export default function BookingForm() {
     try {
       const { error } = await supabase.from("bookings").insert({
         customer_id: (await supabase.auth.getUser()).data.user?.id,
-        [type === "service" ? "service_id" : "package_id"]: bookingId,
+        service_id: bookingId,
         employee_id: selectedEmployee,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
