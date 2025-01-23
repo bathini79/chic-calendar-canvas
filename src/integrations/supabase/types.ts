@@ -370,6 +370,8 @@ export type Database = {
           employee_id: string | null
           end_time: string
           id: string
+          is_pattern_generated: boolean | null
+          pattern_id: string | null
           start_time: string
           updated_at: string
         }
@@ -378,6 +380,8 @@ export type Database = {
           employee_id?: string | null
           end_time: string
           id?: string
+          is_pattern_generated?: boolean | null
+          pattern_id?: string | null
           start_time: string
           updated_at?: string
         }
@@ -386,6 +390,8 @@ export type Database = {
           employee_id?: string | null
           end_time?: string
           id?: string
+          is_pattern_generated?: boolean | null
+          pattern_id?: string | null
           start_time?: string
           updated_at?: string
         }
@@ -395,6 +401,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_pattern_id_fkey"
+            columns: ["pattern_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_shifts"
             referencedColumns: ["id"]
           },
         ]

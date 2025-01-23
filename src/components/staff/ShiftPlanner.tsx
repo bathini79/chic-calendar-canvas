@@ -6,7 +6,7 @@ import { ShiftDialog } from "./ShiftDialog";
 import { RegularShiftDialog } from "./RegularShiftDialog";
 import { Button } from "../ui/button";
 import { ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-react";
-import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, addDays, isSameDay } from "date-fns";
 import { toast } from "sonner";
 
 export function ShiftPlanner() {
@@ -79,8 +79,8 @@ export function ShiftPlanner() {
               id: `pattern-${pattern.id}-${format(currentDate, 'yyyy-MM-dd')}`,
               start_time: shiftStart.toISOString(),
               end_time: shiftEnd.toISOString(),
-              is_recurring: true,
-              status: 'approved'
+              is_pattern_generated: true,
+              pattern_id: pattern.id
             });
           }
           currentDate = addDays(currentDate, 1);
