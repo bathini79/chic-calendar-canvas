@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { WeeklyCalendar } from "./WeeklyCalendar";
 import { ShiftDialog } from "./ShiftDialog";
 import { RegularShiftDialog } from "./RegularShiftDialog";
-import { Button } from "../ui/button";
-import { ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-react";
-import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, addDays, isSameDay } from "date-fns";
+import { addWeeks, subWeeks, startOfWeek, endOfWeek, addDays, isSameDay, format } from "date-fns";
 import { toast } from "sonner";
+import { ShiftPlannerHeader } from "./components/ShiftPlannerHeader";
+import { EmployeeShiftsList } from "./components/EmployeeShiftsList";
 
 export function ShiftPlanner() {
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
@@ -110,9 +109,6 @@ export function ShiftPlanner() {
     );
   };
 
-  const weekStart = startOfWeek(currentWeek);
-  const weekEnd = endOfWeek(currentWeek);
-
   if (employeesLoading || shiftsLoading) {
     return (
       <div className="w-full h-48 flex items-center justify-center">
@@ -123,52 +119,22 @@ export function ShiftPlanner() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between bg-card p-4 rounded-lg shadow-sm">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-primary" />
-          Shift Planner
-        </h2>
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => handleWeekChange('prev')}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
-          <div className="text-sm font-medium bg-accent/10 px-4 py-2 rounded-md flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            {format(weekStart, "d MMM")} - {format(weekEnd, "d MMM, yyyy")}
-          </div>
-          
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => handleWeekChange('next')}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <ShiftPlannerHeader
+        currentWeek={currentWeek}
+        onWeekChange={handleWeekChange}
+      />
 
       <div className="bg-card rounded-lg shadow-sm">
         <div className="p-4 border-b">
           <h3 className="text-sm font-medium text-muted-foreground">Staff Schedule</h3>
         </div>
-        <div className="divide-y">
-          {employees?.map((employee) => (
-            <div key={employee.id} className="p-4">
-              <WeeklyCalendar
-                employee={employee}
-                shifts={allShifts?.filter((s) => s.employee_id === employee.id) || []}
-                onDateClick={(date) => handleDateClick(date, employee)}
-                onSetRegularShifts={handleSetRegularShifts}
-                currentWeek={currentWeek}
-              />
-            </div>
-          ))}
-        </div>
+        <EmployeeShiftsList
+          employees={employees}
+          allShifts={allShifts}
+          onDateClick={handleDateClick}
+          onSetRegularShifts={handleSetRegularShifts}
+          currentWeek={currentWeek}
+        />
       </div>
 
       <ShiftDialog
