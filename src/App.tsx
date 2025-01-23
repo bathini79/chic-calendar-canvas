@@ -1,10 +1,18 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
-import { AppSidebar } from "@/components/AppSidebar";
-import Services from "@/pages/Services";
-import Staff from "@/pages/Staff";
-import Index from "@/pages/Index";
+import { AdminLayout } from "@/layouts/AdminLayout";
+import { CustomerLayout } from "@/layouts/CustomerLayout";
+
+// Admin Pages
+import AdminDashboard from "@/pages/admin/Dashboard";
+import AdminServices from "@/pages/admin/Services";
+import AdminStaff from "@/pages/admin/Staff";
+
+// Customer Pages
+import Home from "@/pages/customer/Home";
+import Services from "@/pages/customer/Services";
+import BookingForm from "@/pages/customer/BookingForm";
 
 const queryClient = new QueryClient();
 
@@ -12,16 +20,24 @@ function App() {
   return (
     <Router>
       <QueryClientProvider client={queryClient}>
-        <div className="flex min-h-screen">
-          <AppSidebar />
-          <main className="flex-1">
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/services" element={<Services />} />
-              <Route path="/staff" element={<Staff />} />
-            </Routes>
-          </main>
-        </div>
+        <Routes>
+          {/* Customer Routes */}
+          <Route element={<CustomerLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/book/service/:id" element={<BookingForm />} />
+          </Route>
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="services" element={<AdminServices />} />
+            <Route path="staff" element={<AdminStaff />} />
+          </Route>
+
+          {/* Catch all route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
         <Toaster />
       </QueryClientProvider>
     </Router>
