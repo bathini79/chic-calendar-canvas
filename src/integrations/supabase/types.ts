@@ -9,77 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      bookings: {
-        Row: {
-          created_at: string
-          customer_id: string
-          employee_id: string | null
-          end_time: string
-          id: string
-          notes: string | null
-          package_id: string | null
-          service_id: string | null
-          start_time: string
-          status: Database["public"]["Enums"]["booking_status"] | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          customer_id: string
-          employee_id?: string | null
-          end_time: string
-          id?: string
-          notes?: string | null
-          package_id?: string | null
-          service_id?: string | null
-          start_time: string
-          status?: Database["public"]["Enums"]["booking_status"] | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          customer_id?: string
-          employee_id?: string | null
-          end_time?: string
-          id?: string
-          notes?: string | null
-          package_id?: string | null
-          service_id?: string | null
-          start_time?: string
-          status?: Database["public"]["Enums"]["booking_status"] | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bookings_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bookings_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bookings_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "packages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bookings_service_id_fkey"
-            columns: ["service_id"]
-            isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       categories: {
         Row: {
           created_at: string
@@ -532,7 +461,6 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      booking_status: "pending" | "confirmed" | "canceled" | "completed"
       employee_status: "active" | "inactive"
       employee_type: "stylist" | "operations"
       service_status: "active" | "inactive" | "archived"

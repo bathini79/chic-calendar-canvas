@@ -29,11 +29,11 @@ export function BookingBlock({
         <TooltipTrigger>
           <div 
             className={cn(
-              "booking-block absolute left-0 right-0 px-2 py-1 m-1 rounded-md text-sm",
+              "booking-block",
               {
-                "bg-green-100 border-green-200 border": status === "confirmed",
-                "bg-yellow-100 border-yellow-200 border": status === "pending",
-                "bg-red-100 border-red-200 border": status === "canceled"
+                "booking-confirmed": status === "confirmed",
+                "booking-pending": status === "pending",
+                "booking-canceled": status === "canceled"
               }
             )}
             style={{

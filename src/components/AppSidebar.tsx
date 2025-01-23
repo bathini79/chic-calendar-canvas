@@ -1,38 +1,49 @@
-import { Link } from "react-router-dom";
-import { Home, Scissors, Users, Calendar } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { LayoutGrid, Users, Calendar } from "lucide-react";
 
 export function AppSidebar() {
   return (
-    <aside className="h-screen w-64 border-r bg-background px-4 py-6 hidden md:block">
+    <aside className="w-64 bg-background border-r min-h-screen p-4">
       <nav className="space-y-2">
-        <Link
+        <NavLink
           to="/"
-          className="flex items-center gap-2 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+          className={({ isActive }) =>
+            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            }`
+          }
         >
-          <Home className="h-4 w-4" />
-          Dashboard
-        </Link>
-        <Link
+          <Calendar className="w-5 h-5" />
+          <span>Bookings</span>
+        </NavLink>
+        <NavLink
           to="/services"
-          className="flex items-center gap-2 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+          className={({ isActive }) =>
+            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            }`
+          }
         >
-          <Scissors className="h-4 w-4" />
-          Services
-        </Link>
-        <Link
+          <LayoutGrid className="w-5 h-5" />
+          <span>Services</span>
+        </NavLink>
+        <NavLink
           to="/staff"
-          className="flex items-center gap-2 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+          className={({ isActive }) =>
+            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            }`
+          }
         >
-          <Users className="h-4 w-4" />
-          Staff
-        </Link>
-        <Link
-          to="/book"
-          className="flex items-center gap-2 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
-        >
-          <Calendar className="h-4 w-4" />
-          Book
-        </Link>
+          <Users className="w-5 h-5" />
+          <span>Staff</span>
+        </NavLink>
       </nav>
     </aside>
   );
