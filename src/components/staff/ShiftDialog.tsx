@@ -30,12 +30,10 @@ export function ShiftDialog({
 }: ShiftDialogProps) {
   const queryClient = useQueryClient();
   const [shifts, setShifts] = useState<ShiftTime[]>(
-    existingShifts
-      .filter(shift => !shift.id.startsWith('pattern-')) // Only include non-pattern shifts
-      .map(shift => ({
-        startTime: format(new Date(shift.start_time), 'HH:mm'),
-        endTime: format(new Date(shift.end_time), 'HH:mm')
-      })) || []
+    existingShifts.map(shift => ({
+      startTime: format(new Date(shift.start_time), 'HH:mm'),
+      endTime: format(new Date(shift.end_time), 'HH:mm')
+    })) || []
   );
 
   const handleAddShift = () => {
@@ -60,29 +58,12 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      // If it's a pattern-based shift, create an override
-      if (shift.id.startsWith('pattern-')) {
-        const [_, patternId, date] = shift.id.split('-');
-        const { error } = await supabase
-          .from('shifts')
-          .insert([{
-            employee_id: employee?.id,
-            start_time: shift.start_time,
-            end_time: shift.end_time,
-            is_override: true,
-            is_recurring: true
-          }]);
+      const { error } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('id', shift.id);
 
-        if (error) throw error;
-      } else {
-        // For regular shifts, delete normally
-        const { error } = await supabase
-          .from('shifts')
-          .delete()
-          .eq('id', shift.id);
-
-        if (error) throw error;
-      }
+      if (error) throw error;
       
       toast.success("Shift deleted successfully");
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
@@ -109,9 +90,7 @@ export function ShiftDialog({
         return {
           employee_id: employee.id,
           start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          is_override: false,
-          is_recurring: false
+          end_time: endTime.toISOString()
         };
       });
 

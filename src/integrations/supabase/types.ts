@@ -370,10 +370,7 @@ export type Database = {
           employee_id: string | null
           end_time: string
           id: string
-          is_override: boolean | null
-          is_recurring: boolean | null
           start_time: string
-          status: Database["public"]["Enums"]["shift_status"] | null
           updated_at: string
         }
         Insert: {
@@ -381,10 +378,7 @@ export type Database = {
           employee_id?: string | null
           end_time: string
           id?: string
-          is_override?: boolean | null
-          is_recurring?: boolean | null
           start_time: string
-          status?: Database["public"]["Enums"]["shift_status"] | null
           updated_at?: string
         }
         Update: {
@@ -392,10 +386,7 @@ export type Database = {
           employee_id?: string | null
           end_time?: string
           id?: string
-          is_override?: boolean | null
-          is_recurring?: boolean | null
           start_time?: string
-          status?: Database["public"]["Enums"]["shift_status"] | null
           updated_at?: string
         }
         Relationships: [

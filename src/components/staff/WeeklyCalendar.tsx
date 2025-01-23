@@ -2,8 +2,7 @@ import { useState } from "react";
 import { format, startOfWeek, addDays, isSameDay, parseISO } from "date-fns";
 import { EmployeeRow } from "../EmployeeRow";
 import { Button } from "../ui/button";
-import { MoreHorizontal, Plus, Clock, CalendarCheck, MoreVertical } from "lucide-react";
-import { toast } from "sonner";
+import { MoreHorizontal, Clock, CalendarCheck, MoreVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -37,27 +36,7 @@ export function WeeklyCalendar({
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
 
   const getShiftsForDate = (date: Date) => {
-    // Get regular shifts for this date
-    const regularShifts = shifts.filter(shift => 
-      !shift.is_recurring && isSameDay(new Date(shift.start_time), date)
-    );
-
-    // Get recurring shifts that are not overridden
-    const recurringShifts = shifts.filter(shift => 
-      shift.is_recurring && 
-      new Date(shift.start_time).getDay() === date.getDay() &&
-      !shifts.some(override => 
-        override.is_override && 
-        isSameDay(new Date(override.start_time), date)
-      )
-    );
-
-    // Get overrides for this date
-    const overrides = shifts.filter(shift => 
-      shift.is_override && isSameDay(new Date(shift.start_time), date)
-    );
-
-    return [...regularShifts, ...recurringShifts, ...overrides];
+    return shifts.filter(shift => isSameDay(new Date(shift.start_time), date));
   };
 
   const formatShiftTime = (start: string | Date, end: string | Date) => {
@@ -72,23 +51,6 @@ export function WeeklyCalendar({
       const end = new Date(shift.end_time);
       return acc + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
     }, 0);
-  };
-
-  const getShiftStatusColor = (status: string, isRecurring: boolean = false, isOverride: boolean = false) => {
-    if (isOverride) {
-      return 'bg-red-100 text-red-800';
-    }
-    if (isRecurring) {
-      return 'bg-blue-100 text-blue-800';
-    }
-    switch (status) {
-      case 'approved':
-        return 'bg-green-100 text-green-800';
-      case 'declined':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-accent/10 text-accent-foreground';
-    }
   };
 
   const handleDayClick = (date: Date) => {
@@ -154,30 +116,14 @@ export function WeeklyCalendar({
               
               {dayShifts.length > 0 ? (
                 <div className="space-y-1 pt-2">
-                  {dayShifts.map((shift) => {
-                    const isRecurring = shift.is_recurring;
-                    const isOverride = shift.is_override;
-                    const shiftTime = formatShiftTime(shift.start_time, shift.end_time);
-
-                    return (
-                      <div
-                        key={shift.id}
-                        className={`text-xs p-1.5 rounded ${getShiftStatusColor(shift.status, isRecurring, isOverride)}`}
-                      >
-                        {shiftTime}
-                        {isRecurring && !isOverride && (
-                          <Badge variant="secondary" className="ml-1 text-[10px]">
-                            Recurring
-                          </Badge>
-                        )}
-                        {isOverride && (
-                          <Badge variant="destructive" className="ml-1 text-[10px]">
-                            Cancelled
-                          </Badge>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {dayShifts.map((shift) => (
+                    <div
+                      key={shift.id}
+                      className="text-xs p-1.5 rounded bg-accent/10"
+                    >
+                      {formatShiftTime(shift.start_time, shift.end_time)}
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-xs text-muted-foreground pt-2">
