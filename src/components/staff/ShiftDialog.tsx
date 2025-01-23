@@ -58,12 +58,6 @@ export function ShiftDialog({
 
   const handleDeleteExistingShift = async (shift: any) => {
     try {
-      // Skip deletion for pattern-generated shifts
-      if (shift.id.toString().startsWith('pattern-')) {
-        toast.error("Cannot delete recurring shift patterns directly");
-        return;
-      }
-
       const { error } = await supabase
         .from('shifts')
         .delete()
@@ -144,7 +138,6 @@ export function ShiftDialog({
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeleteExistingShift(shift)}
-                    disabled={shift.id.toString().startsWith('pattern-')}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
