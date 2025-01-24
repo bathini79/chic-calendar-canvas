@@ -6,15 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Clock, DollarSign } from "lucide-react";
+import { Search, Clock, DollarSign, Package } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 export default function Services() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
-  const { data: services, isLoading } = useQuery({
+  const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -30,7 +31,34 @@ export default function Services() {
         `)
         .eq("status", "active");
       
-      if (error) throw error;
+      if (error) {
+        toast.error("Error loading services");
+        throw error;
+      }
+      return data;
+    },
+  });
+
+  const { data: packages, isLoading: packagesLoading } = useQuery({
+    queryKey: ["packages"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("packages")
+        .select(`
+          *,
+          package_services (
+            service:services (
+              id,
+              name
+            )
+          )
+        `)
+        .eq("status", "active");
+      
+      if (error) {
+        toast.error("Error loading packages");
+        throw error;
+      }
       return data;
     },
   });
@@ -43,7 +71,10 @@ export default function Services() {
         .select("*")
         .order("name");
       
-      if (error) throw error;
+      if (error) {
+        toast.error("Error loading categories");
+        throw error;
+      }
       return data;
     },
   });
@@ -60,20 +91,25 @@ export default function Services() {
     return matchesSearch && matchesCategory;
   });
 
-  if (isLoading) {
+  const filteredPackages = packages?.filter((pkg) => {
+    return pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pkg.description?.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  if (servicesLoading || packagesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-pulse text-lg">Loading services...</div>
+        <div className="animate-pulse text-lg">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="container mx-auto py-8 space-y-12">
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-bold">Our Services</h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Discover our range of professional services designed to meet your needs.
+          Discover our range of professional services and packages designed to meet your needs.
           Book your appointment today and experience excellence.
         </p>
       </div>
@@ -109,8 +145,95 @@ export default function Services() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredServices?.map((service, index) => (
+      {packages && packages.length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-semibold">Featured Packages</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPackages?.map((pkg, index) => (
+              <motion.div
+                key={pkg.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
+                  {pkg.image_urls && pkg.image_urls[0] ? (
+                    <div className="relative aspect-video">
+                      <img
+                        src={pkg.image_urls[0]}
+                        alt={pkg.name}
+                        className="w-full h-full object-cover rounded-t-lg"
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-muted aspect-video rounded-t-lg flex items-center justify-center">
+                      <Package className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                  )}
+                  <CardHeader>
+                    <CardTitle className="flex justify-between items-start">
+                      <span>{pkg.name}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1">
+                    <p className="text-muted-foreground line-clamp-2">
+                      {pkg.description || "No description available"}
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-4">
+                      {pkg.package_services.map((ps: any) => (
+                        <Badge key={ps.service.id} variant="secondary">
+                          {ps.service.name}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-4 mt-4">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{pkg.duration} min</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <DollarSign className="h-4 w-4" />
+                        <span>₹{pkg.price}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    {pkg.is_customizable ? (
+                      <div className="flex w-full gap-2">
+                        <Button 
+                          className="flex-[7]"
+                          onClick={() => navigate(`/book/package/${pkg.id}`)}
+                        >
+                          Book Now
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="flex-[3]"
+                          onClick={() => navigate(`/book/package/${pkg.id}?customize=true`)}
+                        >
+                          Customize
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        className="w-full"
+                        onClick={() => navigate(`/book/package/${pkg.id}`)}
+                      >
+                        Book Now
+                      </Button>
+                    )}
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        <h2 className="text-2xl font-semibold">Individual Services</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredServices?.map((service, index) => (
           <motion.div
             key={service.id}
             initial={{ opacity: 0, y: 20 }}
@@ -166,12 +289,14 @@ export default function Services() {
               </CardFooter>
             </Card>
           </motion.div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {filteredServices?.length === 0 && (
+      {(!filteredServices || filteredServices.length === 0) && 
+       (!filteredPackages || filteredPackages.length === 0) && (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">No services found matching your criteria.</p>
+          <p className="text-muted-foreground">No services or packages found matching your criteria.</p>
         </div>
       )}
     </div>

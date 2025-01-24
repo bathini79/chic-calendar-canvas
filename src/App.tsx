@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { CustomerLayout } from "@/layouts/CustomerLayout";
+import { AdminRoute } from "@/components/auth/AdminRoute";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -26,13 +27,16 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/services" element={<Services />} />
             <Route path="/book/service/:id" element={<BookingForm />} />
+            <Route path="/book/package/:id" element={<BookingForm />} />
           </Route>
 
           {/* Admin Routes */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="services" element={<AdminServices />} />
-            <Route path="staff" element={<AdminStaff />} />
+          <Route path="/admin" element={<AdminRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="services" element={<AdminServices />} />
+              <Route path="staff" element={<AdminStaff />} />
+            </Route>
           </Route>
 
           {/* Catch all route */}
