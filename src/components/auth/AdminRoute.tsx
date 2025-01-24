@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export function AdminRoute() {
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading, error } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log("Current user:", user);
       if (!user) return null;
 
       const { data, error } = await supabase
@@ -15,7 +16,11 @@ export function AdminRoute() {
         .eq("id", user.id)
         .single();
 
-      if (error) throw error;
+      console.log("Profile data:", data);
+      if (error) {
+        console.error("Profile fetch error:", error);
+        throw error;
+      }
       return data;
     },
   });
@@ -28,7 +33,13 @@ export function AdminRoute() {
     );
   }
 
+  if (error) {
+    console.error("Admin route error:", error);
+    return <Navigate to="/" replace />;
+  }
+
   if (!profile || profile.role !== "admin") {
+    console.log("Access denied. Profile:", profile);
     return <Navigate to="/" replace />;
   }
 
