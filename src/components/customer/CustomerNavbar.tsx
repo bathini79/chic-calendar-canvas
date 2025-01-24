@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { UserStatus } from "@/components/auth/UserStatus";
 
 export function CustomerNavbar() {
   return (
@@ -22,6 +23,7 @@ export function CustomerNavbar() {
             </NavLink>
           </div>
           <div className="flex items-center space-x-4">
+            <UserStatus />
             <Button variant="outline" asChild>
               <NavLink to="/admin">Admin Panel</NavLink>
             </Button>
