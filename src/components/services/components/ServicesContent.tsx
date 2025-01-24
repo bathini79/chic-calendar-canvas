@@ -1,5 +1,5 @@
-import { ServicesList } from "../ServicesList";
 import { ServicesGrid } from "../ServicesGrid";
+import { ServicesList } from "../ServicesList";
 
 interface ServicesContentProps {
   view: 'grid' | 'list';
@@ -7,7 +7,11 @@ interface ServicesContentProps {
   onEdit: (service: any) => void;
 }
 
-export function ServicesContent({ view, searchQuery, onEdit }: ServicesContentProps) {
+export function ServicesContent({ 
+  view, 
+  searchQuery, 
+  onEdit 
+}: ServicesContentProps) {
   return view === 'grid' ? (
     <ServicesGrid searchQuery={searchQuery} onEdit={onEdit} />
   ) : (

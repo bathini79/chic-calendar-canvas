@@ -1,13 +1,7 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { ServiceForm } from "./ServiceForm";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ServiceForm } from "./ServiceForm";
 import { toast } from "sonner";
 
 interface ServiceDialogProps {
@@ -16,106 +10,66 @@ interface ServiceDialogProps {
   initialData?: any;
 }
 
-export function ServiceDialog({ open, onOpenChange, initialData }: ServiceDialogProps) {
-  const queryClient = useQueryClient();
-
-  const handleSubmit = async (data: any) => {
-    try {
-      if (initialData) {
-        // Update service
-        const { error: serviceError } = await supabase
-          .from('services')
-          .update({
-            name: data.name,
-            description: data.description,
-            original_price: data.original_price,
-            selling_price: data.selling_price,
-            duration: data.duration,
-            image_urls: data.image_urls,
-          })
-          .eq('id', initialData.id);
-        
-        if (serviceError) throw serviceError;
-
-        // Delete existing categories
-        const { error: deleteError } = await supabase
-          .from('services_categories')
-          .delete()
-          .eq('service_id', initialData.id);
-        
-        if (deleteError) throw deleteError;
-
-        // Insert new categories if any are selected
-        if (data.categories && data.categories.length > 0) {
-          const serviceCategoriesData = data.categories.map((categoryId: string) => ({
-            service_id: initialData.id,
-            category_id: categoryId,
-          }));
-
-          const { error: categoriesError } = await supabase
-            .from('services_categories')
-            .insert(serviceCategoriesData);
-          
-          if (categoriesError) throw categoriesError;
-        }
-        
-        toast.success('Service updated successfully');
-      } else {
-        // Create new service
-        const { data: newService, error: serviceError } = await supabase
-          .from('services')
-          .insert({
-            name: data.name,
-            description: data.description,
-            original_price: data.original_price,
-            selling_price: data.selling_price,
-            duration: data.duration,
-            image_urls: data.image_urls,
-          })
-          .select()
-          .single();
-        
-        if (serviceError) throw serviceError;
-
-        // Insert categories if any are selected
-        if (data.categories && data.categories.length > 0) {
-          const serviceCategoriesData = data.categories.map((categoryId: string) => ({
-            service_id: newService.id,
-            category_id: categoryId,
-          }));
-
-          const { error: categoriesError } = await supabase
-            .from('services_categories')
-            .insert(serviceCategoriesData);
-          
-          if (categoriesError) throw categoriesError;
-        }
-        
-        toast.success('Service created successfully');
+export function ServiceDialog({ 
+  open, 
+  onOpenChange,
+  initialData 
+}: ServiceDialogProps) {
+  const { data: service, isLoading } = useQuery({
+    queryKey: ['service', initialData?.id],
+    queryFn: async () => {
+      if (!initialData?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('services')
+        .select(`
+          *,
+          services_categories (
+            category_id
+          )
+        `)
+        .eq('id', initialData.id)
+        .maybeSingle();
+      
+      if (error) {
+        toast.error("Error loading service");
+        throw error;
       }
       
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message);
-    }
-  };
+      if (!data) {
+        toast.error("Service not found");
+        return null;
+      }
+
+      return {
+        ...data,
+        categories: data.services_categories?.map(sc => sc.category_id) || []
+      };
+    },
+    enabled: !!initialData?.id,
+  });
+
+  const serviceData = service || initialData;
+
+  if (initialData?.id && isLoading) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <div className="flex items-center justify-center p-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] p-0">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle>{initialData ? 'Edit Service' : 'Create Service'}</DialogTitle>
-        </DialogHeader>
-        <ScrollArea className="max-h-[calc(90vh-80px)]">
-          <div className="p-6 pt-0">
-            <ServiceForm
-              initialData={initialData}
-              onSubmit={handleSubmit}
-              onCancel={() => onOpenChange(false)}
-            />
-          </div>
-        </ScrollArea>
+      <DialogContent>
+        <ServiceForm 
+          initialData={serviceData} 
+          onSuccess={() => onOpenChange(false)} 
+        />
       </DialogContent>
     </Dialog>
   );

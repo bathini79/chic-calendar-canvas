@@ -14,36 +14,27 @@ interface ServicesGridProps {
 export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
   const queryClient = useQueryClient();
 
-  const { data: services, isLoading } = useQuery({
+  const { data: services, isLoading, error } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
-      // First fetch services
-      const { data: servicesData, error: servicesError } = await supabase
+      const { data, error } = await supabase
         .from('services')
-        .select('*');
-      
-      if (servicesError) throw servicesError;
-
-      // Then fetch categories for these services
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('services_categories')
         .select(`
-          service_id,
-          categories (
-            id,
-            name
+          *,
+          services_categories (
+            categories (
+              id,
+              name
+            )
           )
         `);
       
-      if (categoriesError) throw categoriesError;
+      if (error) {
+        toast.error("Error loading services");
+        throw error;
+      }
 
-      // Map categories to services
-      return servicesData.map(service => ({
-        ...service,
-        categories: categoriesData
-          .filter(sc => sc.service_id === service.id)
-          .map(sc => sc.categories) || [],
-      }));
+      return data || [];
     },
   });
 
@@ -70,8 +61,28 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
     )
   );
 
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-500">Error loading services. Please try again.</p>
+      </div>
+    );
+  }
+
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!filteredServices?.length) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">No services found.</p>
+      </div>
+    );
   }
 
   return (
