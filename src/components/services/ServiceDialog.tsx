@@ -38,6 +38,7 @@ export function ServiceDialog({
       
       if (!data) {
         toast.error("Service not found");
+        onOpenChange(false); // Close dialog if service not found
         return null;
       }
 
