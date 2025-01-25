@@ -18,6 +18,7 @@ import Staff from "@/pages/admin/Staff";
 import Home from "@/pages/customer/Home";
 import Services from "@/pages/customer/Services";
 import BookingForm from "@/pages/customer/BookingForm";
+import Index from "./pages/admin/Index";
 
 function App() {
   return (
@@ -38,7 +39,7 @@ function App() {
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute />}>
             <Route element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
+              <Route index element={<Index />} />
               <Route path="services" element={<AdminServices />} />
               <Route path="staff" element={<Staff />} />
             </Route>

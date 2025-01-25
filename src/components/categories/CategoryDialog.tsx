@@ -40,9 +40,9 @@ export function CategoryDialog({
 
   const onSubmit = async (values: CategoryFormValues) => {
     const result = category
-      ? await update(category.id, values)
-      : await create(values);
-
+    ? await update(category.id, values)
+    : await create(values);
+    
     if (result) {
       onSuccess();
       onOpenChange(false);

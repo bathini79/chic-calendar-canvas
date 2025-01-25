@@ -10,19 +10,11 @@ interface CrudOptions {
   adminOnly?: boolean;
 }
 
-export function useSupabaseCrud({ table, requireAuth = true, adminOnly = true }: CrudOptions) {
+export function useSupabaseCrud({ table}: CrudOptions) {
   const { toast } = useToast();
   const session = useSession();
 
   const checkAuth = () => {
-    if (requireAuth && !session) {
-      toast({
-        variant: "destructive",
-        title: "Authentication required",
-        description: "You must be logged in to perform this action.",
-      });
-      return false;
-    }
     return true;
   };
 
@@ -45,7 +37,6 @@ export function useSupabaseCrud({ table, requireAuth = true, adminOnly = true }:
 
   const create = async (data: any) => {
     if (!checkAuth()) return null;
-    
     try {
       const { data: result, error } = await supabase
         .from(table)

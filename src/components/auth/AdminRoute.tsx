@@ -7,7 +7,6 @@ export function AdminRoute() {
     queryKey: ["profile"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log("Current user:", user);
       if (!user) return null;
 
       const { data, error } = await supabase
@@ -16,7 +15,6 @@ export function AdminRoute() {
         .eq("id", user.id)
         .single();
 
-      console.log("Profile data:", data);
       if (error) {
         console.error("Profile fetch error:", error);
         throw error;
