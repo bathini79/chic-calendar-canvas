@@ -25,7 +25,7 @@ export function CustomerNavbar() {
           <div className="flex items-center space-x-4">
             <UserStatus />
             <Button variant="outline" asChild>
-              <NavLink to="/admin">Admin Panel</NavLink>
+              <NavLink to="/auth">Sign In</NavLink>
             </Button>
           </div>
         </div>

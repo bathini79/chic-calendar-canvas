@@ -5,16 +5,18 @@ import { AdminLayout } from "@/layouts/AdminLayout";
 import { CustomerLayout } from "@/layouts/CustomerLayout";
 import { AdminRoute } from "@/components/auth/AdminRoute";
 
+// Auth Page
+import Auth from "@/pages/Auth";
+
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminServices from "@/pages/admin/AdminServices";
-import AdminStaff from "@/pages/admin/Staff";
+import Staff from "@/pages/admin/Staff";
 
 // Customer Pages
 import Home from "@/pages/customer/Home";
 import Services from "@/pages/customer/Services";
 import BookingForm from "@/pages/customer/BookingForm";
-import Staff from "./pages/admin/Staff";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +25,9 @@ function App() {
     <Router>
       <QueryClientProvider client={queryClient}>
         <Routes>
+          {/* Auth Route */}
+          <Route path="/auth" element={<Auth />} />
+
           {/* Customer Routes */}
           <Route element={<CustomerLayout />}>
             <Route path="/" element={<Home />} />
