@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Edit, Package, Trash, Clock, DollarSign } from "lucide-react";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
 
 interface PackagesGridProps {
   searchQuery: string;
@@ -14,7 +13,6 @@ interface PackagesGridProps {
 
 export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
 
   const { data: packages, isLoading } = useQuery({
     queryKey: ['packages'],
@@ -132,32 +130,6 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
               </div>
             </div>
           </CardContent>
-          <CardFooter>
-            {pkg.is_customizable ? (
-              <div className="flex w-full gap-2">
-                <Button 
-                  className="flex-[7]"
-                  onClick={() => navigate(`/book/package/${pkg.id}`)}
-                >
-                  Book Now
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex-[3]"
-                  onClick={() => navigate(`/book/package/${pkg.id}?customize=true`)}
-                >
-                  Customize
-                </Button>
-              </div>
-            ) : (
-              <Button 
-                className="w-full"
-                onClick={() => navigate(`/book/package/${pkg.id}`)}
-              >
-                Book Now
-              </Button>
-            )}
-          </CardFooter>
         </Card>
       ))}
     </div>
