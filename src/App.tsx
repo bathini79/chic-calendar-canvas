@@ -13,12 +13,12 @@ import Auth from "@/pages/Auth";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminServices from "@/pages/admin/AdminServices";
 import Staff from "@/pages/admin/Staff";
+import Index from "@/pages/admin/Index";
 
 // Customer Pages
 import Home from "@/pages/customer/Home";
 import Services from "@/pages/customer/Services";
 import BookingForm from "@/pages/customer/BookingForm";
-import Index from "./pages/admin/Index";
 
 function App() {
   return (
@@ -40,6 +40,7 @@ function App() {
           <Route path="/admin" element={<AdminRoute />}>
             <Route element={<AdminLayout />}>
               <Route index element={<Index />} />
+              <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="services" element={<AdminServices />} />
               <Route path="staff" element={<Staff />} />
             </Route>

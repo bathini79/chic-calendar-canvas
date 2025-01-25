@@ -7,6 +7,7 @@ export function AppSidebar() {
       <nav className="space-y-2">
         <NavLink
           to="/admin"
+          end
           className={({ isActive }) =>
             `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
               isActive
