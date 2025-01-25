@@ -7,13 +7,14 @@ import { AdminRoute } from "@/components/auth/AdminRoute";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
-import AdminServices from "@/pages/admin/Services";
+import AdminServices from "@/pages/admin/AdminServices";
 import AdminStaff from "@/pages/admin/Staff";
 
 // Customer Pages
 import Home from "@/pages/customer/Home";
 import Services from "@/pages/customer/Services";
 import BookingForm from "@/pages/customer/BookingForm";
+import Staff from "./pages/admin/Staff";
 
 const queryClient = new QueryClient();
 
@@ -35,7 +36,7 @@ function App() {
             <Route element={<AdminLayout />}>
               <Route index element={<AdminDashboard />} />
               <Route path="services" element={<AdminServices />} />
-              <Route path="staff" element={<AdminStaff />} />
+              <Route path="staff" element={<Staff />} />
             </Route>
           </Route>
 
