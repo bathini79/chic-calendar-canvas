@@ -4,8 +4,13 @@ import { UserStatus } from "@/components/auth/UserStatus";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { CartIcon } from "@/components/cart/CartIcon";
+import { CartDrawer } from "@/components/cart/CartDrawer";
+import { useState } from "react";
 
 export function CustomerNavbar() {
+  const [cartOpen, setCartOpen] = useState(false);
+  
   const { data: session } = useQuery({
     queryKey: ["session"],
     queryFn: async () => {
@@ -24,38 +29,45 @@ export function CustomerNavbar() {
   };
 
   return (
-    <nav className="border-b">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center space-x-8">
-            <NavLink to="/" className="text-xl font-bold">
-              Salon
-            </NavLink>
-            <NavLink
-              to="/services"
-              className={({ isActive }) =>
-                `transition-colors hover:text-primary ${
-                  isActive ? "text-primary" : "text-muted-foreground"
-                }`
-              }
-            >
-              Services
-            </NavLink>
-          </div>
-          <div className="flex items-center space-x-4">
-            <UserStatus />
-            {session ? (
-              <Button variant="outline" onClick={handleLogout}>
-                Sign Out
-              </Button>
-            ) : (
-              <Button variant="outline" asChild>
-                <NavLink to="/auth">Sign In</NavLink>
-              </Button>
-            )}
+    <>
+      <nav className="border-b">
+        <div className="container mx-auto px-4">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center space-x-8">
+              <NavLink to="/" className="text-xl font-bold">
+                Salon
+              </NavLink>
+              <NavLink
+                to="/services"
+                className={({ isActive }) =>
+                  `transition-colors hover:text-primary ${
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  }`
+                }
+              >
+                Services
+              </NavLink>
+            </div>
+            <div className="flex items-center space-x-4">
+              <UserStatus />
+              {session ? (
+                <>
+                  <CartIcon onClick={() => setCartOpen(true)} />
+                  <Button variant="outline" onClick={handleLogout}>
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" asChild>
+                  <NavLink to="/auth">Sign In</NavLink>
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      <CartDrawer open={cartOpen} onOpenChange={setCartOpen} />
+    </>
   );
 }

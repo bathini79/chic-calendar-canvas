@@ -80,6 +80,58 @@ export type Database = {
           },
         ]
       }
+      cart_items: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          package_id: string | null
+          service_id: string | null
+          status: Database["public"]["Enums"]["cart_item_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          package_id?: string | null
+          service_id?: string | null
+          status?: Database["public"]["Enums"]["cart_item_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          package_id?: string | null
+          service_id?: string | null
+          status?: Database["public"]["Enums"]["cart_item_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cart_items_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -533,6 +585,7 @@ export type Database = {
     }
     Enums: {
       booking_status: "pending" | "confirmed" | "canceled" | "completed"
+      cart_item_status: "pending" | "scheduled" | "removed"
       employee_status: "active" | "inactive"
       employee_type: "stylist" | "operations"
       service_status: "active" | "inactive" | "archived"
