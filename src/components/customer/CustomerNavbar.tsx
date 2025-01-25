@@ -1,8 +1,28 @@
 import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { UserStatus } from "@/components/auth/UserStatus";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export function CustomerNavbar() {
+  const { data: session } = useQuery({
+    queryKey: ["session"],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      return session;
+    },
+  });
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error("Error signing out");
+    } else {
+      toast.success("Signed out successfully");
+    }
+  };
+
   return (
     <nav className="border-b">
       <div className="container mx-auto px-4">
@@ -24,9 +44,15 @@ export function CustomerNavbar() {
           </div>
           <div className="flex items-center space-x-4">
             <UserStatus />
-            <Button variant="outline" asChild>
-              <NavLink to="/auth">Sign In</NavLink>
-            </Button>
+            {session ? (
+              <Button variant="outline" onClick={handleLogout}>
+                Sign Out
+              </Button>
+            ) : (
+              <Button variant="outline" asChild>
+                <NavLink to="/auth">Sign In</NavLink>
+              </Button>
+            )}
           </div>
         </div>
       </div>
