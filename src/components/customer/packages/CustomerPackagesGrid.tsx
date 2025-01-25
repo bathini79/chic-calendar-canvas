@@ -8,7 +8,8 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 
 interface ServicesByCategory {
   [category: string]: {
@@ -23,6 +24,9 @@ export function CustomerPackagesGrid() {
   const navigate = useNavigate();
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [totalPrice, setTotalPrice] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
 
   const { data: packages, isLoading } = useQuery({
     queryKey: ['packages'],
@@ -101,22 +105,51 @@ export function CustomerPackagesGrid() {
     return grouped;
   };
 
-  const getIncludedServices = () => {
-    if (!selectedPackage) return {};
-    return groupServicesByCategory(selectedPackage.package_services.map((ps: any) => ps.service));
+  const handleCustomizeOpen = (pkg: any) => {
+    setSelectedPackage(pkg);
+    // Initialize with included services
+    const includedServiceIds = pkg.package_services.map((ps: any) => ps.service.id);
+    setSelectedServices(includedServiceIds);
+    setCustomizeDialogOpen(true);
+    calculateTotals(includedServiceIds, pkg);
   };
 
-  const getCustomizableServices = () => {
-    if (!selectedPackage || !allServices) return {};
-    
-    // Filter out services that are already included in the package
-    const includedServiceIds = selectedPackage.package_services.map((ps: any) => ps.service.id);
-    const customizableServices = allServices.filter(
-      service => !includedServiceIds.includes(service.id) &&
-                 selectedPackage.customizable_services?.includes(service.id)
-    );
-    
-    return groupServicesByCategory(customizableServices);
+  const handleServiceToggle = (serviceId: string, checked: boolean) => {
+    let newSelectedServices;
+    if (checked) {
+      newSelectedServices = [...selectedServices, serviceId];
+    } else {
+      // Don't allow removing included services
+      const includedServiceIds = selectedPackage.package_services.map((ps: any) => ps.service.id);
+      if (includedServiceIds.includes(serviceId)) return;
+      newSelectedServices = selectedServices.filter(id => id !== serviceId);
+    }
+    setSelectedServices(newSelectedServices);
+    calculateTotals(newSelectedServices, selectedPackage);
+  };
+
+  const calculateTotals = (serviceIds: string[], pkg: any) => {
+    const includedServiceIds = pkg.package_services.map((ps: any) => ps.service.id);
+    let price = pkg.price; // Start with base package price
+    let duration = pkg.duration;
+
+    // Add prices and durations for additional selected services
+    serviceIds.forEach(serviceId => {
+      if (!includedServiceIds.includes(serviceId)) {
+        const service = allServices?.find(s => s.id === serviceId);
+        if (service) {
+          price += service.selling_price;
+          duration += service.duration;
+        }
+      }
+    });
+
+    setTotalPrice(price);
+    setTotalDuration(duration);
+  };
+
+  const isServiceIncluded = (serviceId: string) => {
+    return selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId);
   };
 
   if (isLoading) {
@@ -178,10 +211,7 @@ export function CustomerPackagesGrid() {
                   <Button 
                     variant="outline" 
                     className="flex-[3]"
-                    onClick={() => {
-                      setSelectedPackage(pkg);
-                      setCustomizeDialogOpen(true);
-                    }}
+                    onClick={() => handleCustomizeOpen(pkg)}
                   >
                     Customize
                   </Button>
@@ -206,83 +236,84 @@ export function CustomerPackagesGrid() {
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-6 p-1">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Included Services</h3>
-                <Accordion type="single" collapsible className="w-full">
-                  {Object.entries(getIncludedServices()).map(([category, services]) => (
-                    <AccordionItem key={category} value={category}>
-                      <AccordionTrigger className="text-base">
-                        {category}
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-2">
-                          {services.map((service) => (
-                            <div
-                              key={service.id}
-                              className="flex items-center justify-between p-2 rounded-lg bg-muted"
-                            >
-                              <div>
-                                <p className="font-medium">{service.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {service.duration} min
-                                </p>
-                              </div>
-                              <Badge>Included</Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
+              <div className="space-y-4">
+                <h3 className="font-semibold">Included Services</h3>
+                {selectedPackage?.package_services.map(({ service }: any) => (
+                  <div
+                    key={service.id}
+                    className="flex items-center space-x-2 p-2 rounded-lg bg-muted"
+                  >
+                    <Checkbox
+                      checked={true}
+                      disabled
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium">{service.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {service.duration} min • ₹{service.selling_price}
+                      </p>
+                    </div>
+                    <Badge>Included</Badge>
+                  </div>
+                ))}
               </div>
 
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Optional Services</h3>
-                <Accordion type="single" collapsible className="w-full">
-                  {Object.entries(getCustomizableServices()).map(([category, services]) => (
-                    <AccordionItem key={category} value={category}>
-                      <AccordionTrigger className="text-base">
-                        {category}
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-2">
-                          {services.map((service) => (
-                            <div
-                              key={service.id}
-                              className="flex items-center justify-between p-2 rounded-lg bg-muted"
-                            >
-                              <div>
-                                <p className="font-medium">{service.name}</p>
-                                <div className="text-sm text-muted-foreground">
-                                  <span>{service.duration} min</span>
-                                  <span className="mx-2">•</span>
-                                  <span>₹{service.price}</span>
-                                </div>
-                              </div>
-                              <Button variant="outline" size="sm">
-                                Add Service
-                              </Button>
-                            </div>
-                          ))}
+              {selectedPackage?.is_customizable && (
+                <div className="space-y-4">
+                  <Separator />
+                  <h3 className="font-semibold">Optional Services</h3>
+                  {allServices
+                    ?.filter(service => 
+                      !isServiceIncluded(service.id) &&
+                      selectedPackage.customizable_services?.includes(service.id)
+                    )
+                    .map((service) => (
+                      <div
+                        key={service.id}
+                        className="flex items-center space-x-2 p-2 rounded-lg bg-muted"
+                      >
+                        <Checkbox
+                          checked={selectedServices.includes(service.id)}
+                          onCheckedChange={(checked) => 
+                            handleServiceToggle(service.id, checked as boolean)
+                          }
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{service.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {service.duration} min • ₹{service.selling_price}
+                          </p>
                         </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           </ScrollArea>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setCustomizeDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => {
-              navigate(`/book/package/${selectedPackage?.id}?customize=true`);
-              setCustomizeDialogOpen(false);
-            }}>
-              Continue Booking
-            </Button>
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex justify-between items-center">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span>Total Duration: {totalDuration} min</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  <span>Total Price: ₹{totalPrice}</span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setCustomizeDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => {
+                  navigate(`/book/package/${selectedPackage?.id}?customize=true&services=${selectedServices.join(',')}`);
+                  setCustomizeDialogOpen(false);
+                }}>
+                  Continue Booking
+                </Button>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
