@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { CustomerLayout } from "@/layouts/CustomerLayout";
 import { AdminRoute } from "@/components/auth/AdminRoute";
+import { queryClient } from "@/lib/react-query";
 
 // Auth Page
 import Auth from "@/pages/Auth";
@@ -17,8 +18,6 @@ import Staff from "@/pages/admin/Staff";
 import Home from "@/pages/customer/Home";
 import Services from "@/pages/customer/Services";
 import BookingForm from "@/pages/customer/BookingForm";
-
-const queryClient = new QueryClient();
 
 function App() {
   return (
