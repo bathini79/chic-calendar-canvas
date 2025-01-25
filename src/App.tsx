@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { CustomerLayout } from "@/layouts/CustomerLayout";
@@ -22,8 +22,8 @@ import BookingForm from "@/pages/customer/BookingForm";
 
 function App() {
   return (
-    <Router>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <Router>
         <Routes>
           {/* Auth Route */}
           <Route path="/auth" element={<Auth />} />
@@ -50,8 +50,8 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster />
-      </QueryClientProvider>
-    </Router>
+      </Router>
+    </QueryClientProvider>
   );
 }
 
