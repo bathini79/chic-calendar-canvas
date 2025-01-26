@@ -58,12 +58,15 @@ export default function Services() {
     },
   });
 
-  const handleBookNow = async (serviceId: string) => {
-    await addToCart(serviceId);
+  const handleBookNow = async (serviceId?: string, packageId?: string) => {
+    await addToCart(serviceId, packageId);
   };
 
-  const isItemInCart = (serviceId: string) => {
-    return items.some(item => item.service_id === serviceId);
+  const isItemInCart = (serviceId?: string, packageId?: string) => {
+    return items.some(item => 
+      (serviceId && item.service_id === serviceId) || 
+      (packageId && item.package_id === packageId)
+    );
   };
 
   const filteredServices = services?.filter((service) => {
@@ -129,7 +132,60 @@ export default function Services() {
 
       <div className="space-y-6">
         <h2 className="text-2xl font-semibold">Featured Packages</h2>
-        <CustomerPackagesGrid />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {packages?.map((pkg) => (
+            <motion.div
+              key={pkg.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
+                {pkg.image_urls && pkg.image_urls[0] ? (
+                  <div className="relative aspect-video">
+                    <img
+                      src={pkg.image_urls[0]}
+                      alt={pkg.name}
+                      className="w-full h-full object-cover rounded-t-lg"
+                    />
+                  </div>
+                ) : (
+                  <div className="bg-muted aspect-video rounded-t-lg flex items-center justify-center">
+                    <Package className="h-12 w-12 text-muted-foreground" />
+                  </div>
+                )}
+                <CardHeader>
+                  <CardTitle>{pkg.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <p className="text-muted-foreground line-clamp-2">
+                    {pkg.description || "No description available"}
+                  </p>
+                  <div className="flex items-center gap-4 mt-4">
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>{pkg.duration} min</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <DollarSign className="h-4 w-4" />
+                      <span>₹{pkg.price}</span>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    className="w-full"
+                    onClick={() => handleBookNow(undefined, pkg.id)}
+                    variant={isItemInCart(undefined, pkg.id) ? "secondary" : "default"}
+                    disabled={isItemInCart(undefined, pkg.id)}
+                  >
+                    {isItemInCart(undefined, pkg.id) ? "Added" : "Book Now"}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-6">

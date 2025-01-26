@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
-import { format, isSameDay, parseISO, addMinutes, isWithinInterval } from "date-fns";
+import { format, isSameDay, addMinutes, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
 
 interface BookingDialogProps {
@@ -34,41 +34,6 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
     },
   });
 
-  const { data: shifts } = useQuery({
-    queryKey: ['shifts', selectedStylist],
-    enabled: !!selectedStylist,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('shifts')
-        .select('*')
-        .eq('employee_id', selectedStylist);
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: existingBookings } = useQuery({
-    queryKey: ['bookings', selectedStylist, selectedDate],
-    enabled: !!selectedStylist && !!selectedDate,
-    queryFn: async () => {
-      const startOfDay = new Date(selectedDate!);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate!);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('employee_id', selectedStylist)
-        .gte('start_time', startOfDay.toISOString())
-        .lte('end_time', endOfDay.toISOString());
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const getAvailableDates = () => {
     if (!shifts) return [];
     return shifts.map(shift => new Date(shift.start_time));
@@ -90,7 +55,6 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
       let currentSlot = startTime;
 
       while (addMinutes(currentSlot, duration) <= endTime) {
-        // Check if this slot overlaps with any existing booking
         const slotEnd = addMinutes(currentSlot, duration);
         const isSlotAvailable = !existingBookings?.some(booking => {
           const bookingStart = new Date(booking.start_time);
@@ -107,7 +71,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
             label: format(currentSlot, 'h:mm a'),
           });
         }
-        currentSlot = addMinutes(currentSlot, duration); // Increment by service duration
+        currentSlot = addMinutes(currentSlot, duration);
       }
     });
 
@@ -115,8 +79,8 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
   };
 
   const handleBook = async () => {
-    if (!selectedStylist || !selectedDate || !selectedTime) {
-      toast.error("Please select all booking details");
+    if (!selectedDate || !selectedTime) {
+      toast.error("Please select booking details");
       return;
     }
 
@@ -129,7 +93,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
         {
           service_id: item.service_id,
           package_id: item.package_id,
-          employee_id: selectedStylist,
+          employee_id: selectedStylist || null,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
         },
@@ -140,7 +104,6 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
       return;
     }
 
-    // Update cart item status
     await supabase
       .from('cart_items')
       .update({ status: 'scheduled' })
@@ -158,7 +121,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Select Stylist</label>
+            <label className="text-sm font-medium">Select Stylist (Optional)</label>
             <Select
               value={selectedStylist}
               onValueChange={(value) => {
@@ -168,9 +131,10 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Choose a stylist" />
+                <SelectValue placeholder="Choose a stylist or select any" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="">Any Available Stylist</SelectItem>
                 {stylists?.map((stylist) => (
                   <SelectItem key={stylist.id} value={stylist.id}>
                     {stylist.name}
@@ -180,26 +144,24 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
             </Select>
           </div>
 
-          {selectedStylist && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Select Date</label>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => {
-                  setSelectedDate(date);
-                  setSelectedTime(undefined);
-                }}
-                disabled={(date) => {
-                  const availableDates = getAvailableDates();
-                  return !availableDates.some(availableDate => 
-                    isSameDay(date, availableDate)
-                  );
-                }}
-                className="rounded-md border"
-              />
-            </div>
-          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Select Date</label>
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={(date) => {
+                setSelectedDate(date);
+                setSelectedTime(undefined);
+              }}
+              disabled={(date) => {
+                const availableDates = getAvailableDates();
+                return !availableDates.some(availableDate => 
+                  isSameDay(date, availableDate)
+                );
+              }}
+              className="rounded-md border"
+            />
+          </div>
 
           {selectedDate && (
             <div className="space-y-2">
@@ -225,7 +187,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
           <Button
             className="w-full"
             onClick={handleBook}
-            disabled={!selectedStylist || !selectedDate || !selectedTime}
+            disabled={!selectedDate || !selectedTime}
           >
             Book Appointment
           </Button>
