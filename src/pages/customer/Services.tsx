@@ -10,12 +10,15 @@ import { Search, Clock, DollarSign, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useCart } from "@/components/cart/CartContext";
+import { CustomizeDialog } from "@/components/customer/packages/CustomizeDialog";
 
 export default function Services() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { addToCart, items } = useCart();
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
   
   const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
@@ -51,7 +54,9 @@ export default function Services() {
           package_services (
             service:services (
               id,
-              name
+              name,
+              selling_price,
+              duration
             )
           )
         `)
@@ -83,6 +88,11 @@ export default function Services() {
 
   const handleBookNow = async (serviceId?: string, packageId?: string) => {
     await addToCart(serviceId, packageId);
+  };
+
+  const handleCustomize = (pkg: any) => {
+    setSelectedPackage(pkg);
+    setCustomizeDialogOpen(true);
   };
 
   const isItemInCart = (serviceId?: string, packageId?: string) => {
@@ -196,14 +206,34 @@ export default function Services() {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button 
-                    className="w-full"
-                    onClick={() => handleBookNow(undefined, pkg.id)}
-                    variant={isItemInCart(undefined, pkg.id) ? "secondary" : "default"}
-                    disabled={isItemInCart(undefined, pkg.id)}
-                  >
-                    {isItemInCart(undefined, pkg.id) ? "Added" : "Book Now"}
-                  </Button>
+                  {pkg.is_customizable ? (
+                    <div className="flex w-full gap-2">
+                      <Button 
+                        className="flex-[7]"
+                        onClick={() => handleBookNow(undefined, pkg.id)}
+                        variant={isItemInCart(undefined, pkg.id) ? "secondary" : "default"}
+                        disabled={isItemInCart(undefined, pkg.id)}
+                      >
+                        {isItemInCart(undefined, pkg.id) ? "Added" : "Book Now"}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex-[3]"
+                        onClick={() => handleCustomize(pkg)}
+                      >
+                        Customize
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      className="w-full"
+                      onClick={() => handleBookNow(undefined, pkg.id)}
+                      variant={isItemInCart(undefined, pkg.id) ? "secondary" : "default"}
+                      disabled={isItemInCart(undefined, pkg.id)}
+                    >
+                      {isItemInCart(undefined, pkg.id) ? "Added" : "Book Now"}
+                    </Button>
+                  )}
                 </CardFooter>
               </Card>
             </motion.div>
@@ -281,6 +311,12 @@ export default function Services() {
           <p className="text-muted-foreground">No services found matching your criteria.</p>
         </div>
       )}
+
+      <CustomizeDialog
+        open={customizeDialogOpen}
+        onOpenChange={setCustomizeDialogOpen}
+        selectedPackage={selectedPackage}
+      />
     </div>
   );
 }

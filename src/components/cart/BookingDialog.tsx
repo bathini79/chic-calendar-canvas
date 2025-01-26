@@ -34,6 +34,44 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
     },
   });
 
+  const { data: shifts } = useQuery({
+    queryKey: ['shifts', selectedStylist],
+    enabled: open,
+    queryFn: async () => {
+      let query = supabase
+        .from('shifts')
+        .select('*')
+        .gte('start_time', new Date().toISOString());
+
+      if (selectedStylist) {
+        query = query.eq('employee_id', selectedStylist);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: existingBookings } = useQuery({
+    queryKey: ['existing-bookings', selectedDate, selectedStylist],
+    enabled: open && !!selectedDate,
+    queryFn: async () => {
+      let query = supabase
+        .from('bookings')
+        .select('*')
+        .gte('start_time', format(selectedDate!, 'yyyy-MM-dd'));
+
+      if (selectedStylist) {
+        query = query.eq('employee_id', selectedStylist);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const getAvailableDates = () => {
     if (!shifts) return [];
     return shifts.map(shift => new Date(shift.start_time));
