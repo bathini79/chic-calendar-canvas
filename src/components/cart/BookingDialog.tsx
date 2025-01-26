@@ -19,6 +19,15 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
   const [selectedStylist, setSelectedStylist] = useState<string>();
   const [selectedTime, setSelectedTime] = useState<string>();
 
+  // Query for current user session
+  const { data: session } = useQuery({
+    queryKey: ['session'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      return session;
+    },
+  });
+
   // Query for location data
   const { data: location } = useQuery({
     queryKey: ['location'],
@@ -90,6 +99,43 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
       return data;
     },
   });
+
+  const handleBook = async () => {
+    if (!selectedDate || !selectedTime || !session?.user?.id) {
+      toast.error("Please select booking details and ensure you're logged in");
+      return;
+    }
+
+    const startTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTime}`);
+    const endTime = addMinutes(startTime, item.service?.duration || item.package?.duration || 30);
+
+    const { error } = await supabase
+      .from('bookings')
+      .insert([
+        {
+          service_id: item.service_id,
+          package_id: item.package_id,
+          employee_id: selectedStylist === 'any_stylist' ? null : selectedStylist,
+          customer_id: session.user.id,  // Add the customer_id
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+        },
+      ]);
+
+    if (error) {
+      toast.error("Error creating booking");
+      console.error("Booking error:", error);
+      return;
+    }
+
+    await supabase
+      .from('cart_items')
+      .update({ status: 'scheduled' })
+      .eq('id', item.id);
+
+    toast.success("Appointment scheduled successfully");
+    onOpenChange(false);
+  };
 
   const getAvailableDates = () => {
     if (!location) return [];
@@ -183,41 +229,6 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
     return slots;
   };
 
-  const handleBook = async () => {
-    if (!selectedDate || !selectedTime) {
-      toast.error("Please select booking details");
-      return;
-    }
-
-    const startTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTime}`);
-    const endTime = addMinutes(startTime, item.service?.duration || item.package?.duration || 30);
-
-    const { error } = await supabase
-      .from('bookings')
-      .insert([
-        {
-          service_id: item.service_id,
-          package_id: item.package_id,
-          employee_id: selectedStylist === 'any_stylist' ? null : selectedStylist,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-        },
-      ]);
-
-    if (error) {
-      toast.error("Error creating booking");
-      return;
-    }
-
-    await supabase
-      .from('cart_items')
-      .update({ status: 'scheduled' })
-      .eq('id', item.id);
-
-    toast.success("Appointment scheduled successfully");
-    onOpenChange(false);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -225,6 +236,11 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
           <DialogTitle>Schedule Appointment</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          {!session?.user ? (
+            <div className="text-center py-4">
+              <p className="text-red-500">Please log in to book an appointment</p>
+            </div>
+          ) : (
           <div className="space-y-2">
             <label className="text-sm font-medium">Select Stylist (Optional)</label>
             <Select
@@ -296,6 +312,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
           >
             Book Appointment
           </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
