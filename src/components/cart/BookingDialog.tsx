@@ -116,7 +116,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
           service_id: item.service_id,
           package_id: item.package_id,
           employee_id: selectedStylist === 'any_stylist' ? null : selectedStylist,
-          customer_id: session.user.id,  // Add the customer_id
+          customer_id: session.user.id,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
         },
@@ -241,77 +241,79 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
               <p className="text-red-500">Please log in to book an appointment</p>
             </div>
           ) : (
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Select Stylist (Optional)</label>
-            <Select
-              value={selectedStylist}
-              onValueChange={(value) => {
-                setSelectedStylist(value);
-                setSelectedDate(undefined);
-                setSelectedTime(undefined);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a stylist or select any" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any_stylist">Any Available Stylist</SelectItem>
-                {stylists?.map((stylist) => (
-                  <SelectItem key={stylist.id} value={stylist.id}>
-                    {stylist.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Stylist (Optional)</label>
+                <Select
+                  value={selectedStylist}
+                  onValueChange={(value) => {
+                    setSelectedStylist(value);
+                    setSelectedDate(undefined);
+                    setSelectedTime(undefined);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a stylist or select any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any_stylist">Any Available Stylist</SelectItem>
+                    {stylists?.map((stylist) => (
+                      <SelectItem key={stylist.id} value={stylist.id}>
+                        {stylist.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Select Date</label>
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => {
-                setSelectedDate(date);
-                setSelectedTime(undefined);
-              }}
-              disabled={(date) => {
-                const availableDates = getAvailableDates();
-                return !availableDates.some(availableDate => 
-                  isSameDay(date, availableDate)
-                );
-              }}
-              className="rounded-md border"
-            />
-          </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Date</label>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    setSelectedTime(undefined);
+                  }}
+                  disabled={(date) => {
+                    const availableDates = getAvailableDates();
+                    return !availableDates.some(availableDate => 
+                      isSameDay(date, availableDate)
+                    );
+                  }}
+                  className="rounded-md border"
+                />
+              </div>
 
-          {selectedDate && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Select Time</label>
-              <Select
-                value={selectedTime}
-                onValueChange={setSelectedTime}
+              {selectedDate && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Select Time</label>
+                  <Select
+                    value={selectedTime}
+                    onValueChange={setSelectedTime}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableTimeSlots().map((slot) => (
+                        <SelectItem key={slot.value} value={slot.value}>
+                          {slot.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <Button
+                className="w-full"
+                onClick={handleBook}
+                disabled={!selectedDate || !selectedTime}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAvailableTimeSlots().map((slot) => (
-                    <SelectItem key={slot.value} value={slot.value}>
-                      {slot.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <Button
-            className="w-full"
-            onClick={handleBook}
-            disabled={!selectedDate || !selectedTime}
-          >
-            Book Appointment
-          </Button>
+                Book Appointment
+              </Button>
+            </>
           )}
         </div>
       </DialogContent>
