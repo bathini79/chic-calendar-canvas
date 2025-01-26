@@ -23,7 +23,7 @@ export function CartIcon({ onClick }: CartIconProps) {
     <div className="flex items-center gap-2">
       {items.length > 0 && (
         <Button variant="default" onClick={handleContinue}>
-          Continue to Schedule
+          Continue
         </Button>
       )}
       <Button

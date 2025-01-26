@@ -20,6 +20,7 @@ import Index from "@/pages/admin/Index";
 import Home from "@/pages/customer/Home";
 import Services from "@/pages/customer/Services";
 import BookingForm from "@/pages/customer/BookingForm";
+import UnifiedScheduling from "@/pages/customer/UnifiedScheduling";
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
             <Route element={<CustomerLayout />}>
               <Route path="/" element={<Home />} />
               <Route path="/services" element={<Services />} />
+              <Route path="/schedule" element={<UnifiedScheduling />} />
               <Route path="/book/service/:id" element={<BookingForm />} />
               <Route path="/book/package/:id" element={<BookingForm />} />
             </Route>
