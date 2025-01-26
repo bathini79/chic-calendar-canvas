@@ -172,7 +172,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
                 <SelectValue placeholder="Choose a stylist or select any" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Any Available Stylist</SelectItem>
+                <SelectItem value="any_stylist">Any Available Stylist</SelectItem>
                 {stylists?.map((stylist) => (
                   <SelectItem key={stylist.id} value={stylist.id}>
                     {stylist.name}
