@@ -37,6 +37,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetchCartItems();
 
+    // Subscribe to real-time updates
     const channel = supabase
       .channel('cart-changes')
       .on(
@@ -107,7 +108,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     toast.success("Added to cart");
-    setCartOpen(true); // Open cart drawer after adding item
+    setCartOpen(true);
+    await fetchCartItems(); // Immediately fetch updated cart items
   };
 
   const removeFromCart = async (itemId: string) => {
@@ -122,6 +124,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     toast.success("Removed from cart");
+    await fetchCartItems(); // Immediately fetch updated cart items
   };
 
   return (

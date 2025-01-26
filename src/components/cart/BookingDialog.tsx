@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
-import { format, isSameDay, parseISO, addMinutes } from "date-fns";
+import { format, isSameDay, parseISO, addMinutes, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
 
 interface BookingDialogProps {
@@ -48,6 +48,27 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
     },
   });
 
+  const { data: existingBookings } = useQuery({
+    queryKey: ['bookings', selectedStylist, selectedDate],
+    enabled: !!selectedStylist && !!selectedDate,
+    queryFn: async () => {
+      const startOfDay = new Date(selectedDate!);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDate!);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('employee_id', selectedStylist)
+        .gte('start_time', startOfDay.toISOString())
+        .lte('end_time', endOfDay.toISOString());
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const getAvailableDates = () => {
     if (!shifts) return [];
     return shifts.map(shift => new Date(shift.start_time));
@@ -61,19 +82,32 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
     );
 
     const slots: { value: string; label: string; }[] = [];
+    const duration = item.service?.duration || item.package?.duration || 30;
     
     dayShifts.forEach(shift => {
       const startTime = new Date(shift.start_time);
       const endTime = new Date(shift.end_time);
-      const duration = item.service?.duration || item.package?.duration || 0;
-      
       let currentSlot = startTime;
+
       while (addMinutes(currentSlot, duration) <= endTime) {
-        slots.push({
-          value: format(currentSlot, 'HH:mm'),
-          label: format(currentSlot, 'h:mm a'),
+        // Check if this slot overlaps with any existing booking
+        const slotEnd = addMinutes(currentSlot, duration);
+        const isSlotAvailable = !existingBookings?.some(booking => {
+          const bookingStart = new Date(booking.start_time);
+          const bookingEnd = new Date(booking.end_time);
+          return (
+            isWithinInterval(currentSlot, { start: bookingStart, end: bookingEnd }) ||
+            isWithinInterval(slotEnd, { start: bookingStart, end: bookingEnd })
+          );
         });
-        currentSlot = addMinutes(currentSlot, 30); // 30-minute intervals
+
+        if (isSlotAvailable) {
+          slots.push({
+            value: format(currentSlot, 'HH:mm'),
+            label: format(currentSlot, 'h:mm a'),
+          });
+        }
+        currentSlot = addMinutes(currentSlot, duration); // Increment by service duration
       }
     });
 
@@ -87,7 +121,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
     }
 
     const startTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTime}`);
-    const endTime = new Date(startTime.getTime() + (item.service?.duration || item.package?.duration) * 60000);
+    const endTime = addMinutes(startTime, item.service?.duration || item.package?.duration || 30);
 
     const { error } = await supabase
       .from('bookings')
