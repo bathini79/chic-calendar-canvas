@@ -17,10 +17,11 @@ import { supabase } from "@/integrations/supabase/client";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
   name: z.string().min(1, "Service name is required"),
-  category: z.string().min(1, "Category is required"),
+  categories: z.array(z.string()).min(1, "At least one category is required"),
   original_price: z.number().min(0, "Price must be greater than or equal to 0"),
   selling_price: z.number().min(0, "Price must be greater than or equal to 0"),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
@@ -33,13 +34,14 @@ type ServiceFormData = z.infer<typeof formSchema>;
 
 interface ServiceFormProps {
   initialData?: any;
-  onSubmit: (data: ServiceFormData) => void;
+  onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>(
-    initialData?.categories?.[0]?.id || ''
+export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormProps) {
+  const queryClient = useQueryClient();
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    initialData?.categories?.map((cat: any) => cat.id) || []
   );
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
@@ -48,7 +50,7 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: initialData?.name || '',
-      category: selectedCategory,
+      categories: selectedCategories,
       original_price: initialData?.original_price || 0,
       selling_price: initialData?.selling_price || 0,
       duration: initialData?.duration || 0,
@@ -59,8 +61,15 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
   });
 
   const handleCategorySelect = (categoryId: string) => {
-    setSelectedCategory(categoryId);
-    form.setValue('category', categoryId);
+    const newCategories = [...selectedCategories, categoryId];
+    setSelectedCategories(newCategories);
+    form.setValue('categories', newCategories);
+  };
+
+  const handleCategoryRemove = (categoryId: string) => {
+    const newCategories = selectedCategories.filter(id => id !== categoryId);
+    setSelectedCategories(newCategories);
+    form.setValue('categories', newCategories);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,6 +113,84 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
     form.setValue('image_urls', newImages);
   };
 
+  const onSubmit = async (data: ServiceFormData) => {
+    try {
+      if (initialData?.id) {
+        // Update existing service
+        const { error: serviceError } = await supabase
+          .from('services')
+          .update({
+            name: data.name,
+            original_price: data.original_price,
+            selling_price: data.selling_price,
+            duration: data.duration,
+            description: data.description,
+            image_urls: data.image_urls,
+            gender: data.gender,
+          })
+          .eq('id', initialData.id);
+
+        if (serviceError) throw serviceError;
+
+        // Delete existing category relationships
+        const { error: deleteError } = await supabase
+          .from('services_categories')
+          .delete()
+          .eq('service_id', initialData.id);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new category relationships
+        const { error: categoriesError } = await supabase
+          .from('services_categories')
+          .insert(
+            data.categories.map(categoryId => ({
+              service_id: initialData.id,
+              category_id: categoryId,
+            }))
+          );
+
+        if (categoriesError) throw categoriesError;
+
+      } else {
+        // Create new service
+        const { data: newService, error: serviceError } = await supabase
+          .from('services')
+          .insert({
+            name: data.name,
+            original_price: data.original_price,
+            selling_price: data.selling_price,
+            duration: data.duration,
+            description: data.description,
+            image_urls: data.image_urls,
+            gender: data.gender,
+          })
+          .select()
+          .single();
+
+        if (serviceError) throw serviceError;
+
+        // Insert category relationships
+        const { error: categoriesError } = await supabase
+          .from('services_categories')
+          .insert(
+            data.categories.map(categoryId => ({
+              service_id: newService.id,
+              category_id: categoryId,
+            }))
+          );
+
+        if (categoriesError) throw categoriesError;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      toast.success(`Service ${initialData ? 'updated' : 'created'} successfully`);
+      onSuccess();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -123,19 +210,15 @@ export function ServiceForm({ initialData, onSubmit, onCancel }: ServiceFormProp
 
         <FormField
           control={form.control}
-          name="category"
-          render={({ field }) => (
+          name="categories"
+          render={() => (
             <FormItem>
-              <FormLabel>Category *</FormLabel>
+              <FormLabel>Categories *</FormLabel>
               <FormControl>
                 <CategoryMultiSelect
-                  selectedCategories={[field.value]}
+                  selectedCategories={selectedCategories}
                   onCategorySelect={handleCategorySelect}
-                  onCategoryRemove={() => {
-                    setSelectedCategory('');
-                    field.onChange('');
-                  }}
-                  maxSelections={1}
+                  onCategoryRemove={handleCategoryRemove}
                 />
               </FormControl>
               <FormMessage />

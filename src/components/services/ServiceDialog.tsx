@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ServiceForm } from "./ServiceForm";
 import { toast } from "sonner";
 
@@ -25,7 +25,10 @@ export function ServiceDialog({
         .select(`
           *,
           services_categories (
-            category_id
+            categories (
+              id,
+              name
+            )
           )
         `)
         .eq('id', initialData.id)
@@ -38,13 +41,13 @@ export function ServiceDialog({
       
       if (!data) {
         toast.error("Service not found");
-        onOpenChange(false); // Close dialog if service not found
+        onOpenChange(false);
         return null;
       }
 
       return {
         ...data,
-        categories: data.services_categories?.map(sc => sc.category_id) || []
+        categories: data.services_categories?.map(sc => sc.categories) || []
       };
     },
     enabled: !!initialData?.id,
@@ -67,9 +70,13 @@ export function ServiceDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
+        <DialogTitle>
+          {initialData ? 'Edit Service' : 'Create New Service'}
+        </DialogTitle>
         <ServiceForm 
           initialData={serviceData} 
           onSuccess={() => onOpenChange(false)} 
+          onCancel={() => onOpenChange(false)}
         />
       </DialogContent>
     </Dialog>
