@@ -16,7 +16,7 @@ interface BookingDialogProps {
 
 export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) {
   const [selectedDate, setSelectedDate] = useState<Date>();
-  const [selectedStylist, setSelectedStylist] = useState<string>();
+  const [selectedStylist, setSelectedStylist] = useState<string>('any_stylist'); // Set default value
   const [selectedTime, setSelectedTime] = useState<string>();
 
   // Query for current user session
