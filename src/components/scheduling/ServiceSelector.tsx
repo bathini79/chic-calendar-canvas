@@ -1,12 +1,15 @@
-import { useCart } from "@/components/cart/CartContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function ServiceSelector() {
-  const { items, setCartOpen } = useCart();
+interface ServiceSelectorProps {
+  items: any[];
+  selectedStylists: Record<string, string>;
+  onStylistSelect: (itemId: string, stylistId: string) => void;
+}
 
+export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
   const { data: employees } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
@@ -21,15 +24,10 @@ export function ServiceSelector() {
     },
   });
 
-  const handleStylistChange = async (serviceId: string, employeeId: string) => {
-    // This will be implemented in the cart context update
-    console.log('Stylist selected:', employeeId, 'for service:', serviceId);
-  };
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Selected Services</CardTitle>
+        <CardTitle>Select Stylists</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {items.map((item) => (
@@ -40,12 +38,15 @@ export function ServiceSelector() {
                 {item.service?.duration || item.package?.duration} minutes
               </p>
             </div>
-            <Select onValueChange={(value) => handleStylistChange(item.id, value)}>
+            <Select 
+              value={selectedStylists[item.id] || ''} 
+              onValueChange={(value) => onStylistSelect(item.id, value)}
+            >
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Select stylist" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="any_stylist">Any Available Stylist</SelectItem>
+                <SelectItem value="any">Any Available Stylist</SelectItem>
                 {employees?.map((employee) => (
                   <SelectItem key={employee.id} value={employee.id}>
                     {employee.name}
