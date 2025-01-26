@@ -1,20 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format } from "date-fns";
+import { format, addMinutes, isSameDay, parseISO } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { CalendarClock, Clock, User2 } from "lucide-react";
+import { CalendarClock, Clock } from "lucide-react";
 
 interface TimeSlot {
   time: string;
   isAvailable: boolean;
   isSelected: boolean;
-  stylistId?: string;
   conflicts?: boolean;
 }
 
@@ -35,6 +34,13 @@ export function UnifiedCalendar({
 }: UnifiedCalendarProps) {
   const { items } = useCart();
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+
+  // Calculate total duration of all services
+  const totalDuration = useMemo(() => {
+    return items.reduce((total, item) => {
+      return total + (item.service?.duration || item.package?.duration || 30);
+    }, 0);
+  }, [items]);
 
   // Fetch existing bookings for the selected date
   const { data: existingBookings } = useQuery({
@@ -60,6 +66,36 @@ export function UnifiedCalendar({
     enabled: !!selectedDate
   });
 
+  // Fetch employee shifts
+  const { data: shifts } = useQuery({
+    queryKey: ['shifts', selectedDate, Object.values(selectedStylists)],
+    queryFn: async () => {
+      if (!selectedDate) return [];
+
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      let query = supabase
+        .from('shifts')
+        .select('*')
+        .gte('start_time', startOfDay.toISOString())
+        .lte('end_time', endOfDay.toISOString());
+
+      const specificStylists = Object.values(selectedStylists).filter(id => id !== 'any');
+      if (specificStylists.length > 0) {
+        query = query.in('employee_id', specificStylists);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedDate
+  });
+
   // Generate available time slots
   useEffect(() => {
     if (!selectedDate) return;
@@ -71,30 +107,43 @@ export function UnifiedCalendar({
       while (hour < 17) { // End at 5 PM
         for (let minute = 0; minute < 60; minute += 30) {
           const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          const slotStart = new Date(selectedDate);
+          slotStart.setHours(hour, minute, 0, 0);
+          const slotEnd = addMinutes(slotStart, totalDuration);
           
-          // Check conflicts with existing bookings and selected stylists
-          const conflicts = existingBookings?.some(booking => {
-            const bookingTime = new Date(booking.start_time);
-            const isTimeMatch = bookingTime.getHours() === hour && bookingTime.getMinutes() === minute;
-            
-            if (!isTimeMatch) return false;
+          // Check if slot fits within any stylist's shift
+          const hasAvailableShift = shifts?.some(shift => {
+            const shiftStart = new Date(shift.start_time);
+            const shiftEnd = new Date(shift.end_time);
+            return slotStart >= shiftStart && slotEnd <= shiftEnd;
+          }) ?? true;
 
-            // Check if this booking conflicts with any of our selected services
-            return Object.entries(selectedStylists).some(([itemId, stylistId]) => {
-              if (stylistId === 'any') {
-                return true; // Any stylist booking blocks the slot
-              }
+          // Check conflicts with existing bookings
+          const hasConflict = existingBookings?.some(booking => {
+            const bookingStart = new Date(booking.start_time);
+            const bookingEnd = new Date(booking.end_time);
+            
+            // Check if this booking conflicts with selected stylists
+            const stylistConflict = Object.entries(selectedStylists).some(([itemId, stylistId]) => {
+              if (stylistId === 'any') return false;
               return booking.employee_id === stylistId;
             });
+
+            if (!stylistConflict) return false;
+
+            return (
+              (slotStart >= bookingStart && slotStart < bookingEnd) ||
+              (slotEnd > bookingStart && slotEnd <= bookingEnd)
+            );
           });
 
           const isSelected = Object.values(selectedTimeSlots).includes(timeString);
 
           slots.push({
             time: timeString,
-            isAvailable: !conflicts,
+            isAvailable: hasAvailableShift && !hasConflict,
             isSelected,
-            conflicts
+            conflicts: !hasAvailableShift || hasConflict
           });
         }
         hour++;
@@ -103,14 +152,23 @@ export function UnifiedCalendar({
     };
 
     setTimeSlots(generateTimeSlots());
-  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists]);
+  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, totalDuration]);
 
   const handleTimeSlotSelect = (time: string) => {
-    // Find the first unscheduled item
-    const unscheduledItem = items.find(item => !selectedTimeSlots[item.id]);
-    if (unscheduledItem) {
-      onTimeSlotSelect(unscheduledItem.id, time);
-    }
+    // When a time slot is selected, assign it to all services
+    const startTime = time;
+    let currentTime = startTime;
+    
+    items.forEach((item, index) => {
+      onTimeSlotSelect(item.id, currentTime);
+      // Calculate next start time based on service duration
+      const duration = item.service?.duration || item.package?.duration || 30;
+      const nextTime = new Date(selectedDate!);
+      const [hours, minutes] = currentTime.split(':').map(Number);
+      nextTime.setHours(hours, minutes);
+      const newTime = addMinutes(nextTime, duration);
+      currentTime = format(newTime, 'HH:mm');
+    });
   };
 
   return (
@@ -175,25 +233,6 @@ export function UnifiedCalendar({
             </Card>
           )}
         </div>
-
-        {selectedDate && items.length > 0 && (
-          <div className="mt-6 space-y-3 border-t pt-6">
-            <h3 className="font-medium flex items-center gap-2">
-              <User2 className="h-4 w-4" />
-              Selected Times
-            </h3>
-            <div className="space-y-2">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between text-sm rounded-lg bg-muted/50 p-3">
-                  <span className="font-medium">{item.service?.name || item.package?.name}</span>
-                  <span className="text-muted-foreground">
-                    {selectedTimeSlots[item.id] || "Not scheduled"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
