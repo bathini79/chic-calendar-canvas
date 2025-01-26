@@ -6,10 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Clock, DollarSign } from "lucide-react";
+import { Search, Clock, DollarSign, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { CustomerPackagesGrid } from "@/components/customer/packages/CustomerPackagesGrid";
 import { useCart } from "@/components/cart/CartContext";
 
 export default function Services() {
@@ -36,6 +35,30 @@ export default function Services() {
       
       if (error) {
         toast.error("Error loading services");
+        throw error;
+      }
+      return data;
+    },
+  });
+
+  const { data: packages, isLoading: packagesLoading } = useQuery({
+    queryKey: ["packages"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("packages")
+        .select(`
+          *,
+          package_services (
+            service:services (
+              id,
+              name
+            )
+          )
+        `)
+        .eq("status", "active");
+      
+      if (error) {
+        toast.error("Error loading packages");
         throw error;
       }
       return data;
@@ -81,7 +104,7 @@ export default function Services() {
     return matchesSearch && matchesCategory;
   });
 
-  if (servicesLoading) {
+  if (servicesLoading || packagesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-pulse text-lg">Loading...</div>
