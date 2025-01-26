@@ -10,11 +10,13 @@ import { Search, Clock, DollarSign } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { CustomerPackagesGrid } from "@/components/customer/packages/CustomerPackagesGrid";
+import { useCart } from "@/components/cart/CartContext";
 
 export default function Services() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { addToCart } = useCart();
   
   const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
@@ -55,6 +57,10 @@ export default function Services() {
       return data;
     },
   });
+
+  const handleBookNow = async (serviceId: string) => {
+    await addToCart(serviceId);
+  };
 
   const filteredServices = services?.filter((service) => {
     const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -174,7 +180,7 @@ export default function Services() {
                 <CardFooter>
                   <Button 
                     className="w-full"
-                    onClick={() => navigate(`/book/service/${service.id}`)}
+                    onClick={() => handleBookNow(service.id)}
                   >
                     Book Now
                   </Button>
