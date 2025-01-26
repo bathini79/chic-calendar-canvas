@@ -35,7 +35,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetchCartItems();
 
-    // Subscribe to real-time updates
     const channel = supabase
       .channel('cart-changes')
       .on(
@@ -57,6 +56,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchCartItems = async () => {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session) {
+      setIsLoading(false);
+      return;
+    }
+
     const { data: cartItems, error } = await supabase
       .from('cart_items')
       .select(`
@@ -64,7 +69,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         service:services(*),
         package:packages(*)
       `)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .eq('customer_id', session.session.user.id);
 
     if (error) {
       toast.error("Error fetching cart items");
@@ -76,6 +82,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addToCart = async (serviceId?: string, packageId?: string) => {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session) {
+      toast.error("Please sign in to add items to cart");
+      return;
+    }
+
     const { error } = await supabase
       .from('cart_items')
       .insert([
@@ -83,6 +95,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           service_id: serviceId,
           package_id: packageId,
           status: 'pending',
+          customer_id: session.session.user.id,
         },
       ]);
 
