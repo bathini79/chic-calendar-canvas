@@ -24,6 +24,7 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
+      console.log("Fetching services...");
       const { data: servicesData, error } = await supabase
         .from('services')
         .select(`
@@ -43,10 +44,15 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
         throw error;
       }
 
-      return servicesData?.map(service => ({
+      console.log("Raw services data:", servicesData);
+
+      const transformedServices = servicesData?.map(service => ({
         ...service,
         categories: service.services_categories?.map((sc: any) => sc.categories) || []
       }));
+
+      console.log("Transformed services:", transformedServices);
+      return transformedServices;
     },
   });
 
