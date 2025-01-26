@@ -78,18 +78,12 @@ export function UnifiedCalendar({
       const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('shifts')
         .select('*')
         .gte('start_time', startOfDay.toISOString())
         .lte('end_time', endOfDay.toISOString());
 
-      const specificStylists = Object.values(selectedStylists).filter(id => id !== 'any');
-      if (specificStylists.length > 0) {
-        query = query.in('employee_id', specificStylists);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -110,12 +104,19 @@ export function UnifiedCalendar({
           const slotStart = new Date(selectedDate);
           slotStart.setHours(hour, minute, 0, 0);
           const slotEnd = addMinutes(slotStart, totalDuration);
-          
-          // Check if slot fits within any stylist's shift
+
+          // Check if any stylist is available for this slot
           const hasAvailableShift = shifts?.some(shift => {
+            // For "any" stylist, check all shifts
             const shiftStart = new Date(shift.start_time);
             const shiftEnd = new Date(shift.end_time);
-            return slotStart >= shiftStart && slotEnd <= shiftEnd;
+            
+            // Check if this shift belongs to a selected stylist
+            const isSelectedStylist = Object.entries(selectedStylists).some(([_, stylistId]) => {
+              return stylistId === 'any' || stylistId === shift.employee_id;
+            });
+
+            return isSelectedStylist && slotStart >= shiftStart && slotEnd <= shiftEnd;
           }) ?? true;
 
           // Check conflicts with existing bookings
@@ -124,14 +125,12 @@ export function UnifiedCalendar({
             const bookingEnd = new Date(booking.end_time);
             
             // Check if this booking conflicts with selected stylists
-            const stylistConflict = Object.entries(selectedStylists).some(([itemId, stylistId]) => {
+            const stylistConflict = Object.entries(selectedStylists).some(([_, stylistId]) => {
               if (stylistId === 'any') return false;
               return booking.employee_id === stylistId;
             });
 
-            if (!stylistConflict) return false;
-
-            return (
+            return stylistConflict && (
               (slotStart >= bookingStart && slotStart < bookingEnd) ||
               (slotEnd > bookingStart && slotEnd <= bookingEnd)
             );
@@ -159,7 +158,7 @@ export function UnifiedCalendar({
     const startTime = time;
     let currentTime = startTime;
     
-    items.forEach((item, index) => {
+    items.forEach((item) => {
       onTimeSlotSelect(item.id, currentTime);
       // Calculate next start time based on service duration
       const duration = item.service?.duration || item.package?.duration || 30;
@@ -214,9 +213,9 @@ export function UnifiedCalendar({
                         variant={slot.isSelected ? "default" : slot.isAvailable ? "secondary" : "outline"}
                         className={cn(
                           "py-2 cursor-pointer transition-colors justify-center",
-                          !slot.isAvailable && "opacity-50 cursor-not-allowed bg-muted",
+                          !slot.isAvailable && "opacity-50 cursor-not-allowed",
                           slot.isSelected && "bg-primary hover:bg-primary/90",
-                          slot.conflicts && "bg-red-100 text-red-700 hover:bg-red-200"
+                          !slot.isAvailable && !slot.isSelected && "bg-muted text-muted-foreground"
                         )}
                         onClick={() => {
                           if (slot.isAvailable && !slot.isSelected) {
