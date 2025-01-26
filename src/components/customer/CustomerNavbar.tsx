@@ -7,9 +7,11 @@ import { toast } from "sonner";
 import { CartIcon } from "@/components/cart/CartIcon";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { useState } from "react";
+import { useCart } from "@/components/cart/CartContext";
 
 export function CustomerNavbar() {
   const [cartOpen, setCartOpen] = useState(false);
+  const { setCartOpen: setContextCartOpen } = useCart();
   
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -18,6 +20,12 @@ export function CustomerNavbar() {
       return session;
     },
   });
+
+  // Sync local state with context
+  const handleCartOpenChange = (open: boolean) => {
+    setCartOpen(open);
+    setContextCartOpen(open);
+  };
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -52,7 +60,7 @@ export function CustomerNavbar() {
               <UserStatus />
               {session ? (
                 <>
-                  <CartIcon onClick={() => setCartOpen(true)} />
+                  <CartIcon onClick={() => handleCartOpenChange(true)} />
                   <Button variant="outline" onClick={handleLogout}>
                     Sign Out
                   </Button>
@@ -67,7 +75,7 @@ export function CustomerNavbar() {
         </div>
       </nav>
 
-      <CartDrawer open={cartOpen} onOpenChange={setCartOpen} />
+      <CartDrawer open={cartOpen} onOpenChange={handleCartOpenChange} />
     </>
   );
 }

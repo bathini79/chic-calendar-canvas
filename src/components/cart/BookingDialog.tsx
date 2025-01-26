@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, isSameDay, parseISO, addMinutes } from "date-fns";
 import { toast } from "sonner";
 
 interface BookingDialogProps {
@@ -35,20 +35,50 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
   });
 
   const { data: shifts } = useQuery({
-    queryKey: ['shifts', selectedStylist, selectedDate],
-    enabled: !!(selectedStylist && selectedDate),
+    queryKey: ['shifts', selectedStylist],
+    enabled: !!selectedStylist,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('shifts')
         .select('*')
-        .eq('employee_id', selectedStylist)
-        .gte('start_time', format(selectedDate!, 'yyyy-MM-dd'))
-        .lte('start_time', format(selectedDate!, 'yyyy-MM-dd 23:59:59'));
+        .eq('employee_id', selectedStylist);
       
       if (error) throw error;
       return data;
     },
   });
+
+  const getAvailableDates = () => {
+    if (!shifts) return [];
+    return shifts.map(shift => new Date(shift.start_time));
+  };
+
+  const getAvailableTimeSlots = () => {
+    if (!shifts || !selectedDate) return [];
+    
+    const dayShifts = shifts.filter(shift => 
+      isSameDay(new Date(shift.start_time), selectedDate)
+    );
+
+    const slots: { value: string; label: string; }[] = [];
+    
+    dayShifts.forEach(shift => {
+      const startTime = new Date(shift.start_time);
+      const endTime = new Date(shift.end_time);
+      const duration = item.service?.duration || item.package?.duration || 0;
+      
+      let currentSlot = startTime;
+      while (addMinutes(currentSlot, duration) <= endTime) {
+        slots.push({
+          value: format(currentSlot, 'HH:mm'),
+          label: format(currentSlot, 'h:mm a'),
+        });
+        currentSlot = addMinutes(currentSlot, 30); // 30-minute intervals
+      }
+    });
+
+    return slots;
+  };
 
   const handleBook = async () => {
     if (!selectedStylist || !selectedDate || !selectedTime) {
@@ -86,14 +116,6 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
     onOpenChange(false);
   };
 
-  const getAvailableTimeSlots = () => {
-    if (!shifts) return [];
-    return shifts.map(shift => ({
-      value: format(new Date(shift.start_time), 'HH:mm'),
-      label: format(new Date(shift.start_time), 'h:mm a'),
-    }));
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -105,7 +127,11 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
             <label className="text-sm font-medium">Select Stylist</label>
             <Select
               value={selectedStylist}
-              onValueChange={setSelectedStylist}
+              onValueChange={(value) => {
+                setSelectedStylist(value);
+                setSelectedDate(undefined);
+                setSelectedTime(undefined);
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Choose a stylist" />
@@ -120,17 +146,28 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Select Date</label>
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              className="rounded-md border"
-            />
-          </div>
+          {selectedStylist && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Date</label>
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  setSelectedDate(date);
+                  setSelectedTime(undefined);
+                }}
+                disabled={(date) => {
+                  const availableDates = getAvailableDates();
+                  return !availableDates.some(availableDate => 
+                    isSameDay(date, availableDate)
+                  );
+                }}
+                className="rounded-md border"
+              />
+            </div>
+          )}
 
-          {selectedDate && selectedStylist && (
+          {selectedDate && (
             <div className="space-y-2">
               <label className="text-sm font-medium">Select Time</label>
               <Select

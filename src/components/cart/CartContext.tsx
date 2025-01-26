@@ -24,6 +24,7 @@ type CartContextType = {
   addToCart: (serviceId?: string, packageId?: string) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   isLoading: boolean;
+  setCartOpen: (open: boolean) => void;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -31,6 +32,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
     fetchCartItems();
@@ -105,6 +107,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     toast.success("Added to cart");
+    setCartOpen(true); // Open cart drawer after adding item
   };
 
   const removeFromCart = async (itemId: string) => {
@@ -122,7 +125,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <CartContext.Provider value={{ items, addToCart, removeFromCart, isLoading }}>
+    <CartContext.Provider value={{ items, addToCart, removeFromCart, isLoading, setCartOpen }}>
       {children}
     </CartContext.Provider>
   );
