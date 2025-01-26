@@ -24,29 +24,26 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
-      const { data: servicesData, error: servicesError } = await supabase
+      const { data: servicesData, error } = await supabase
         .from('services')
-        .select('*');
-      
-      if (servicesError) throw servicesError;
-
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('services_categories')
         .select(`
-          service_id,
-          categories (
-            id,
-            name
+          *,
+          services_categories (
+            categories (
+              id,
+              name
+            )
           )
         `);
       
-      if (categoriesError) throw categoriesError;
+      if (error) {
+        toast.error("Error loading services");
+        throw error;
+      }
 
-      return servicesData.map(service => ({
+      return servicesData?.map(service => ({
         ...service,
-        categories: categoriesData
-          .filter(sc => sc.service_id === service.id)
-          .map(sc => sc.categories),
+        categories: service.services_categories?.map((sc: any) => sc.categories) || []
       }));
     },
   });
