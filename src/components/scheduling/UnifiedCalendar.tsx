@@ -14,7 +14,6 @@ interface TimeSlot {
   time: string;
   isAvailable: boolean;
   isSelected: boolean;
-  conflicts?: boolean;
 }
 
 interface UnifiedCalendarProps {
@@ -92,6 +91,7 @@ export function UnifiedCalendar({
 
       const { data, error } = await query;
       if (error) throw error;
+      console.log('Fetched shifts:', data); // Debug log
       return data;
     },
     enabled: !!selectedDate
@@ -100,6 +100,8 @@ export function UnifiedCalendar({
   // Generate available time slots
   useEffect(() => {
     if (!selectedDate || !shifts) return;
+    console.log('Generating time slots with shifts:', shifts); // Debug log
+    console.log('Selected stylists:', selectedStylists); // Debug log
 
     const generateTimeSlots = () => {
       const slots: TimeSlot[] = [];
@@ -122,9 +124,18 @@ export function UnifiedCalendar({
             const isRelevantStylist = relevantStylistIds.includes('any') || 
                                     relevantStylistIds.includes(shift.employee_id);
 
-            return isRelevantStylist && 
-                   slotStart >= shiftStart && 
-                   slotEnd <= shiftEnd;
+            const isAvailable = isRelevantStylist && 
+                              slotStart >= shiftStart && 
+                              slotEnd <= shiftEnd;
+            
+            console.log('Checking shift:', {
+              shiftStart,
+              shiftEnd,
+              isRelevantStylist,
+              isAvailable
+            }); // Debug log
+
+            return isAvailable;
           });
 
           // Check conflicts with existing bookings
@@ -156,7 +167,9 @@ export function UnifiedCalendar({
       return slots;
     };
 
-    setTimeSlots(generateTimeSlots());
+    const generatedSlots = generateTimeSlots();
+    console.log('Generated slots:', generatedSlots); // Debug log
+    setTimeSlots(generatedSlots);
   }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, totalDuration]);
 
   const handleTimeSlotSelect = (time: string) => {
