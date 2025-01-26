@@ -8,12 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { CalendarClock, Clock, User2 } from "lucide-react";
 
 interface TimeSlot {
   time: string;
   isAvailable: boolean;
   isSelected: boolean;
   stylistId?: string;
+  conflicts?: boolean;
 }
 
 interface UnifiedCalendarProps {
@@ -48,7 +50,7 @@ export function UnifiedCalendar({
 
       const { data, error } = await supabase
         .from('bookings')
-        .select('*')
+        .select('*, employee:employees(*)')
         .gte('start_time', startOfDay.toISOString())
         .lte('start_time', endOfDay.toISOString());
 
@@ -70,16 +72,29 @@ export function UnifiedCalendar({
         for (let minute = 0; minute < 60; minute += 30) {
           const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
           
-          // Check if this slot conflicts with any existing bookings
-          const isBooked = existingBookings?.some(booking => {
+          // Check conflicts with existing bookings and selected stylists
+          const conflicts = existingBookings?.some(booking => {
             const bookingTime = new Date(booking.start_time);
-            return bookingTime.getHours() === hour && bookingTime.getMinutes() === minute;
+            const isTimeMatch = bookingTime.getHours() === hour && bookingTime.getMinutes() === minute;
+            
+            if (!isTimeMatch) return false;
+
+            // Check if this booking conflicts with any of our selected services
+            return Object.entries(selectedStylists).some(([itemId, stylistId]) => {
+              if (stylistId === 'any') {
+                return true; // Any stylist booking blocks the slot
+              }
+              return booking.employee_id === stylistId;
+            });
           });
+
+          const isSelected = Object.values(selectedTimeSlots).includes(timeString);
 
           slots.push({
             time: timeString,
-            isAvailable: !isBooked,
-            isSelected: Object.values(selectedTimeSlots).includes(timeString)
+            isAvailable: !conflicts,
+            isSelected,
+            conflicts
           });
         }
         hour++;
@@ -88,7 +103,7 @@ export function UnifiedCalendar({
     };
 
     setTimeSlots(generateTimeSlots());
-  }, [selectedDate, existingBookings, selectedTimeSlots]);
+  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists]);
 
   const handleTimeSlotSelect = (time: string) => {
     // Find the first unscheduled item
@@ -99,19 +114,21 @@ export function UnifiedCalendar({
   };
 
   return (
-    <Card>
+    <Card className="border-0 shadow-none">
       <CardHeader>
-        <CardTitle>Select Date & Time</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <CalendarClock className="h-5 w-5" />
+          Select Date & Time
+        </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent>
         <div className="grid md:grid-cols-[1fr_300px] gap-6">
           <Calendar
             mode="single"
             selected={selectedDate}
             onSelect={onDateSelect}
-            className="rounded-md border"
+            className="rounded-md border bg-card p-4"
             disabled={(date) => {
-              // Disable past dates and weekends
               const now = new Date();
               now.setHours(0, 0, 0, 0);
               return (
@@ -124,22 +141,24 @@ export function UnifiedCalendar({
 
           {selectedDate && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
                   {format(selectedDate, "MMMM d, yyyy")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-[300px]">
+                <ScrollArea className="h-[300px] pr-4">
                   <div className="grid grid-cols-2 gap-2">
                     {timeSlots.map((slot) => (
                       <Badge
                         key={slot.time}
                         variant={slot.isSelected ? "default" : slot.isAvailable ? "secondary" : "outline"}
                         className={cn(
-                          "py-2 cursor-pointer transition-colors",
-                          !slot.isAvailable && "opacity-50 cursor-not-allowed",
-                          slot.isSelected && "bg-primary"
+                          "py-2 cursor-pointer transition-colors justify-center",
+                          !slot.isAvailable && "opacity-50 cursor-not-allowed bg-muted",
+                          slot.isSelected && "bg-primary hover:bg-primary/90",
+                          slot.conflicts && "bg-red-100 text-red-700 hover:bg-red-200"
                         )}
                         onClick={() => {
                           if (slot.isAvailable && !slot.isSelected) {
@@ -157,13 +176,16 @@ export function UnifiedCalendar({
           )}
         </div>
 
-        {selectedDate && (
-          <div className="space-y-2">
-            <h3 className="font-medium">Selected Times</h3>
-            <div className="space-y-1">
+        {selectedDate && items.length > 0 && (
+          <div className="mt-6 space-y-3 border-t pt-6">
+            <h3 className="font-medium flex items-center gap-2">
+              <User2 className="h-4 w-4" />
+              Selected Times
+            </h3>
+            <div className="space-y-2">
               {items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between text-sm">
-                  <span>{item.service?.name || item.package?.name}</span>
+                <div key={item.id} className="flex items-center justify-between text-sm rounded-lg bg-muted/50 p-3">
+                  <span className="font-medium">{item.service?.name || item.package?.name}</span>
                   <span className="text-muted-foreground">
                     {selectedTimeSlots[item.id] || "Not scheduled"}
                   </span>
