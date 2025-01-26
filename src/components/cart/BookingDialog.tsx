@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
-import { format, isSameDay, addMinutes, isWithinInterval } from "date-fns";
+import { format, isSameDay, addMinutes, isWithinInterval, parse } from "date-fns";
 import { toast } from "sonner";
 
 interface BookingDialogProps {
@@ -18,6 +18,25 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedStylist, setSelectedStylist] = useState<string>();
   const [selectedTime, setSelectedTime] = useState<string>();
+
+  // Query for location data
+  const { data: location } = useQuery({
+    queryKey: ['location'],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select(`
+          *,
+          location_hours (*)
+        `)
+        .eq('status', 'active')
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: stylists } = useQuery({
     queryKey: ['stylists'],
@@ -36,7 +55,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
 
   const { data: shifts } = useQuery({
     queryKey: ['shifts', selectedStylist],
-    enabled: open,
+    enabled: open && selectedStylist && selectedStylist !== 'any_stylist',
     queryFn: async () => {
       let query = supabase
         .from('shifts')
@@ -62,7 +81,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
         .select('*')
         .gte('start_time', format(selectedDate!, 'yyyy-MM-dd'));
 
-      if (selectedStylist) {
+      if (selectedStylist && selectedStylist !== 'any_stylist') {
         query = query.eq('employee_id', selectedStylist);
       }
 
@@ -73,45 +92,93 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
   });
 
   const getAvailableDates = () => {
+    if (!location) return [];
+    if (selectedStylist === 'any_stylist') {
+      // Return all dates that have location hours and aren't closed
+      const today = new Date();
+      const dates: Date[] = [];
+      for (let i = 0; i < 30; i++) {
+        const date = addMinutes(today, i * 24 * 60);
+        const dayOfWeek = date.getDay();
+        const locationHours = location.location_hours.find(h => h.day_of_week === dayOfWeek);
+        if (locationHours && !locationHours.is_closed) {
+          dates.push(date);
+        }
+      }
+      return dates;
+    }
     if (!shifts) return [];
     return shifts.map(shift => new Date(shift.start_time));
   };
 
   const getAvailableTimeSlots = () => {
-    if (!shifts || !selectedDate) return [];
+    if (!selectedDate) return [];
     
-    const dayShifts = shifts.filter(shift => 
-      isSameDay(new Date(shift.start_time), selectedDate)
-    );
-
     const slots: { value: string; label: string; }[] = [];
     const duration = item.service?.duration || item.package?.duration || 30;
     
-    dayShifts.forEach(shift => {
-      const startTime = new Date(shift.start_time);
-      const endTime = new Date(shift.end_time);
-      let currentSlot = startTime;
+    if (selectedStylist === 'any_stylist' && location) {
+      // Use location hours
+      const dayOfWeek = selectedDate.getDay();
+      const locationHours = location.location_hours.find(h => h.day_of_week === dayOfWeek);
+      
+      if (locationHours && !locationHours.is_closed) {
+        const startTime = parse(locationHours.start_time, 'HH:mm:ss', selectedDate);
+        const endTime = parse(locationHours.end_time, 'HH:mm:ss', selectedDate);
+        let currentSlot = startTime;
 
-      while (addMinutes(currentSlot, duration) <= endTime) {
-        const slotEnd = addMinutes(currentSlot, duration);
-        const isSlotAvailable = !existingBookings?.some(booking => {
-          const bookingStart = new Date(booking.start_time);
-          const bookingEnd = new Date(booking.end_time);
-          return (
-            isWithinInterval(currentSlot, { start: bookingStart, end: bookingEnd }) ||
-            isWithinInterval(slotEnd, { start: bookingStart, end: bookingEnd })
-          );
-        });
-
-        if (isSlotAvailable) {
-          slots.push({
-            value: format(currentSlot, 'HH:mm'),
-            label: format(currentSlot, 'h:mm a'),
+        while (addMinutes(currentSlot, duration) <= endTime) {
+          const slotEnd = addMinutes(currentSlot, duration);
+          const isSlotAvailable = !existingBookings?.some(booking => {
+            const bookingStart = new Date(booking.start_time);
+            const bookingEnd = new Date(booking.end_time);
+            return (
+              isWithinInterval(currentSlot, { start: bookingStart, end: bookingEnd }) ||
+              isWithinInterval(slotEnd, { start: bookingStart, end: bookingEnd })
+            );
           });
+
+          if (isSlotAvailable) {
+            slots.push({
+              value: format(currentSlot, 'HH:mm'),
+              label: format(currentSlot, 'h:mm a'),
+            });
+          }
+          currentSlot = addMinutes(currentSlot, duration);
         }
-        currentSlot = addMinutes(currentSlot, duration);
       }
-    });
+    } else if (shifts) {
+      // Use stylist shifts
+      const dayShifts = shifts.filter(shift => 
+        isSameDay(new Date(shift.start_time), selectedDate)
+      );
+
+      dayShifts.forEach(shift => {
+        const startTime = new Date(shift.start_time);
+        const endTime = new Date(shift.end_time);
+        let currentSlot = startTime;
+
+        while (addMinutes(currentSlot, duration) <= endTime) {
+          const slotEnd = addMinutes(currentSlot, duration);
+          const isSlotAvailable = !existingBookings?.some(booking => {
+            const bookingStart = new Date(booking.start_time);
+            const bookingEnd = new Date(booking.end_time);
+            return (
+              isWithinInterval(currentSlot, { start: bookingStart, end: bookingEnd }) ||
+              isWithinInterval(slotEnd, { start: bookingStart, end: bookingEnd })
+            );
+          });
+
+          if (isSlotAvailable) {
+            slots.push({
+              value: format(currentSlot, 'HH:mm'),
+              label: format(currentSlot, 'h:mm a'),
+            });
+          }
+          currentSlot = addMinutes(currentSlot, duration);
+        }
+      });
+    }
 
     return slots;
   };
@@ -131,7 +198,7 @@ export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) 
         {
           service_id: item.service_id,
           package_id: item.package_id,
-          employee_id: selectedStylist || null,
+          employee_id: selectedStylist === 'any_stylist' ? null : selectedStylist,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
         },

@@ -260,6 +260,80 @@ export type Database = {
         }
         Relationships: []
       }
+      location_hours: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_closed: boolean | null
+          location_id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_closed?: boolean | null
+          location_id: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_closed?: boolean | null
+          location_id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_hours_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locations: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          status: Database["public"]["Enums"]["location_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["location_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["location_status"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       package_services: {
         Row: {
           package_id: string
@@ -588,6 +662,7 @@ export type Database = {
       cart_item_status: "pending" | "scheduled" | "removed"
       employee_status: "active" | "inactive"
       employee_type: "stylist" | "operations"
+      location_status: "active" | "inactive"
       service_status: "active" | "inactive" | "archived"
       shift_status: "pending" | "approved" | "declined"
       user_role: "customer" | "employee" | "admin" | "superadmin"
