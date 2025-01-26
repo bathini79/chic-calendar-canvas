@@ -16,7 +16,7 @@ export default function Services() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const { addToCart } = useCart();
+  const { addToCart, items } = useCart();
   
   const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
@@ -60,6 +60,10 @@ export default function Services() {
 
   const handleBookNow = async (serviceId: string) => {
     await addToCart(serviceId);
+  };
+
+  const isItemInCart = (serviceId: string) => {
+    return items.some(item => item.service_id === serviceId);
   };
 
   const filteredServices = services?.filter((service) => {
@@ -181,8 +185,10 @@ export default function Services() {
                   <Button 
                     className="w-full"
                     onClick={() => handleBookNow(service.id)}
+                    variant={isItemInCart(service.id) ? "secondary" : "default"}
+                    disabled={isItemInCart(service.id)}
                   >
-                    Book Now
+                    {isItemInCart(service.id) ? "Added" : "Book Now"}
                   </Button>
                 </CardFooter>
               </Card>
