@@ -28,15 +28,17 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
         .from('services')
         .select(`
           *,
-          services_categories (
+          services_categories!inner (
             categories (
               id,
               name
             )
           )
-        `);
+        `)
+        .eq('status', 'active');
       
       if (error) {
+        console.error("Error loading services:", error);
         toast.error("Error loading services");
         throw error;
       }
@@ -60,6 +62,7 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       toast.success('Service deleted successfully');
     } catch (error: any) {
+      console.error("Error deleting service:", error);
       toast.error(error.message);
     }
   };
@@ -73,6 +76,10 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
 
   if (isLoading) {
     return <div>Loading...</div>;
+  }
+
+  if (!services || services.length === 0) {
+    return <div>No services found</div>;
   }
 
   return (
