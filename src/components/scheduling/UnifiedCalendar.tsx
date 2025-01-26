@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addMinutes, isSameDay, parseISO } from "date-fns";
+import { format, addMinutes, parseISO } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +66,7 @@ export function UnifiedCalendar({
     enabled: !!selectedDate
   });
 
-  // Fetch employee shifts
+  // Fetch employee shifts with proper filtering
   const { data: shifts } = useQuery({
     queryKey: ['shifts', selectedDate, Object.values(selectedStylists)],
     queryFn: async () => {
@@ -78,12 +78,19 @@ export function UnifiedCalendar({
       const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('shifts')
         .select('*')
         .gte('start_time', startOfDay.toISOString())
         .lte('end_time', endOfDay.toISOString());
 
+      // Filter for specific stylists if any are selected
+      const specificStylists = Object.values(selectedStylists).filter(id => id !== 'any');
+      if (specificStylists.length > 0) {
+        query = query.in('employee_id', specificStylists);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -92,7 +99,7 @@ export function UnifiedCalendar({
 
   // Generate available time slots
   useEffect(() => {
-    if (!selectedDate) return;
+    if (!selectedDate || !shifts) return;
 
     const generateTimeSlots = () => {
       const slots: TimeSlot[] = [];
@@ -105,19 +112,20 @@ export function UnifiedCalendar({
           slotStart.setHours(hour, minute, 0, 0);
           const slotEnd = addMinutes(slotStart, totalDuration);
 
-          // Check if any stylist is available for this slot
-          const hasAvailableShift = shifts?.some(shift => {
-            // For "any" stylist, check all shifts
+          // Check if any selected stylist has an available shift
+          const hasAvailableShift = shifts.some(shift => {
             const shiftStart = new Date(shift.start_time);
             const shiftEnd = new Date(shift.end_time);
             
-            // Check if this shift belongs to a selected stylist
-            const isSelectedStylist = Object.entries(selectedStylists).some(([_, stylistId]) => {
-              return stylistId === 'any' || stylistId === shift.employee_id;
-            });
+            // For "any" stylist, all shifts are valid
+            const relevantStylistIds = Object.values(selectedStylists);
+            const isRelevantStylist = relevantStylistIds.includes('any') || 
+                                    relevantStylistIds.includes(shift.employee_id);
 
-            return isSelectedStylist && slotStart >= shiftStart && slotEnd <= shiftEnd;
-          }) ?? true;
+            return isRelevantStylist && 
+                   slotStart >= shiftStart && 
+                   slotEnd <= shiftEnd;
+          });
 
           // Check conflicts with existing bookings
           const hasConflict = existingBookings?.some(booking => {
@@ -125,9 +133,8 @@ export function UnifiedCalendar({
             const bookingEnd = new Date(booking.end_time);
             
             // Check if this booking conflicts with selected stylists
-            const stylistConflict = Object.entries(selectedStylists).some(([_, stylistId]) => {
-              if (stylistId === 'any') return false;
-              return booking.employee_id === stylistId;
+            const stylistConflict = Object.values(selectedStylists).some(stylistId => {
+              return stylistId === booking.employee_id || stylistId === 'any';
             });
 
             return stylistConflict && (
@@ -142,7 +149,6 @@ export function UnifiedCalendar({
             time: timeString,
             isAvailable: hasAvailableShift && !hasConflict,
             isSelected,
-            conflicts: !hasAvailableShift || hasConflict
           });
         }
         hour++;
