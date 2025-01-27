@@ -18,6 +18,12 @@ export default function UnifiedScheduling() {
     }
   }, [items, navigate]);
 
+  // Reset date and time slots when stylists change
+  useEffect(() => {
+    setSelectedDate(null);
+    setSelectedTimeSlots({});
+  }, [selectedStylists]);
+
   return (
     <div className="container mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold mb-6">Schedule Your Services</h1>
