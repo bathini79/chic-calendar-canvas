@@ -41,6 +41,28 @@ export function UnifiedCalendar({
     }, 0);
   }, [items]);
 
+  // Fetch all shifts for the selected stylists
+  const { data: allShifts } = useQuery({
+    queryKey: ['all-shifts', Object.values(selectedStylists)],
+    queryFn: async () => {
+      const specificStylists = Object.values(selectedStylists).filter(id => id !== 'any');
+      
+      let query = supabase
+        .from('shifts')
+        .select('*');
+
+      if (specificStylists.length > 0) {
+        query = query.in('employee_id', specificStylists);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      console.log('Fetched all shifts:', data);
+      return data;
+    },
+    enabled: Object.values(selectedStylists).length > 0
+  });
+
   // Fetch existing bookings for the selected date
   const { data: existingBookings } = useQuery({
     queryKey: ['bookings', selectedDate],
@@ -65,43 +87,9 @@ export function UnifiedCalendar({
     enabled: !!selectedDate
   });
 
-  // Fetch employee shifts with proper filtering
-  const { data: shifts } = useQuery({
-    queryKey: ['shifts', selectedDate, Object.values(selectedStylists)],
-    queryFn: async () => {
-      if (!selectedDate) return [];
-
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      let query = supabase
-        .from('shifts')
-        .select('*')
-        .gte('start_time', startOfDay.toISOString())
-        .lte('end_time', endOfDay.toISOString());
-
-      // Filter for specific stylists if any are selected
-      const specificStylists = Object.values(selectedStylists).filter(id => id !== 'any');
-      if (specificStylists.length > 0) {
-        query = query.in('employee_id', specificStylists);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      console.log('Fetched shifts:', data); // Debug log
-      return data;
-    },
-    enabled: !!selectedDate
-  });
-
   // Generate available time slots
   useEffect(() => {
-    if (!selectedDate || !shifts) return;
-    console.log('Generating time slots with shifts:', shifts); // Debug log
-    console.log('Selected stylists:', selectedStylists); // Debug log
+    if (!selectedDate || !allShifts) return;
 
     const generateTimeSlots = () => {
       const slots: TimeSlot[] = [];
@@ -115,27 +103,26 @@ export function UnifiedCalendar({
           const slotEnd = addMinutes(slotStart, totalDuration);
 
           // Check if any selected stylist has an available shift
-          const hasAvailableShift = shifts.some(shift => {
+          const hasAvailableShift = allShifts.some(shift => {
             const shiftStart = new Date(shift.start_time);
             const shiftEnd = new Date(shift.end_time);
+            const shiftDate = new Date(shift.start_time);
             
+            // Check if shift is on the selected date
+            if (shiftDate.getDate() !== selectedDate.getDate() ||
+                shiftDate.getMonth() !== selectedDate.getMonth() ||
+                shiftDate.getFullYear() !== selectedDate.getFullYear()) {
+              return false;
+            }
+
             // For "any" stylist, all shifts are valid
             const relevantStylistIds = Object.values(selectedStylists);
             const isRelevantStylist = relevantStylistIds.includes('any') || 
                                     relevantStylistIds.includes(shift.employee_id);
 
-            const isAvailable = isRelevantStylist && 
-                              slotStart >= shiftStart && 
-                              slotEnd <= shiftEnd;
-            
-            console.log('Checking shift:', {
-              shiftStart,
-              shiftEnd,
-              isRelevantStylist,
-              isAvailable
-            }); // Debug log
-
-            return isAvailable;
+            return isRelevantStylist && 
+                   slotStart >= shiftStart && 
+                   slotEnd <= shiftEnd;
           });
 
           // Check conflicts with existing bookings
@@ -168,9 +155,9 @@ export function UnifiedCalendar({
     };
 
     const generatedSlots = generateTimeSlots();
-    console.log('Generated slots:', generatedSlots); // Debug log
+    console.log('Generated slots:', generatedSlots);
     setTimeSlots(generatedSlots);
-  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, totalDuration]);
+  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, allShifts, totalDuration]);
 
   const handleTimeSlotSelect = (time: string) => {
     // When a time slot is selected, assign it to all services
@@ -205,9 +192,23 @@ export function UnifiedCalendar({
             onSelect={onDateSelect}
             className="rounded-md border bg-card p-4"
             disabled={(date) => {
+              // Check if there are any shifts available for this date
+              if (!allShifts) return true;
+
+              const hasShiftOnDate = allShifts.some(shift => {
+                const shiftDate = new Date(shift.start_time);
+                return (
+                  shiftDate.getDate() === date.getDate() &&
+                  shiftDate.getMonth() === date.getMonth() &&
+                  shiftDate.getFullYear() === date.getFullYear()
+                );
+              });
+
               const now = new Date();
               now.setHours(0, 0, 0, 0);
+              
               return (
+                !hasShiftOnDate ||
                 date < now ||
                 date.getDay() === 0 ||
                 date.getDay() === 6
