@@ -42,17 +42,21 @@ export function UnifiedCalendar({
     }, 0);
   }, [items]);
 
-  // Fetch location hours
-  const { data: locationHours } = useQuery({
-    queryKey: ['locationHours'],
+  // Fetch location data
+  const { data: location } = useQuery({
+    queryKey: ['location'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('location_hours')
-        .select('*')
-        .eq('location_id', process.env.VITE_LOCATION_ID || '');
+        .from('locations')
+        .select(`
+          *,
+          location_hours (*)
+        `)
+        .eq('id', process.env.VITE_LOCATION_ID || '')
+        .single();
       
       if (error) throw error;
-      console.log('Location hours:', data);
+      console.log('Location data:', data);
       return data;
     },
     enabled: !hasSelectedStylists,
@@ -120,9 +124,9 @@ export function UnifiedCalendar({
 
     const generateTimeSlots = () => {
       const slots: TimeSlot[] = [];
-      let hour = 9; // Start at 9 AM
+      let hour = 9; // Default start time if no location hours found
       
-      while (hour < 17) { // End at 5 PM
+      while (hour < 17) { // Default end time if no location hours found
         for (let minute = 0; minute < 60; minute += 30) {
           const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
           const slotStart = new Date(selectedDate);
@@ -146,10 +150,10 @@ export function UnifiedCalendar({
                      slotEnd <= shiftEnd;
             });
             isAvailable = !!hasAvailableShift;
-          } else {
+          } else if (location?.location_hours) {
             // Check location hours
             const dayOfWeek = selectedDate.getDay();
-            const locationHour = locationHours?.find(h => h.day_of_week === dayOfWeek);
+            const locationHour = location.location_hours.find(h => h.day_of_week === dayOfWeek);
             
             if (locationHour && !locationHour.is_closed) {
               const [locationStartHour, locationStartMinute] = locationHour.start_time.split(':').map(Number);
@@ -197,7 +201,7 @@ export function UnifiedCalendar({
     const generatedSlots = generateTimeSlots();
     console.log('Generated slots:', generatedSlots);
     setTimeSlots(generatedSlots);
-  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, locationHours, totalDuration]);
+  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, location, totalDuration]);
 
   const handleTimeSlotSelect = (time: string) => {
     // When a time slot is selected, assign it to all services
@@ -250,11 +254,12 @@ export function UnifiedCalendar({
                   const shiftDate = new Date(shift.start_time);
                   return shiftDate >= dayStart && shiftDate <= dayEnd;
                 });
-              } else {
+              } else if (location?.location_hours) {
                 // For location hours, check if the location is closed
-                const locationHour = locationHours?.find(h => h.day_of_week === dayOfWeek);
+                const locationHour = location.location_hours.find(h => h.day_of_week === dayOfWeek);
                 return !locationHour || locationHour.is_closed;
               }
+              return true;
             }}
           />
 
