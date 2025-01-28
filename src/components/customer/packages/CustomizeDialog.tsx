@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, DollarSign } from "lucide-react";
 import { ServicesList } from "./ServicesList";
 import { useNavigate } from "react-router-dom";
+import { useMediaQuery } from "@/hooks/use-mobile";
 
 interface CustomizeDialogProps {
   open: boolean;
@@ -27,16 +28,19 @@ export function CustomizeDialog({
   onServiceToggle,
 }: CustomizeDialogProps) {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   if (!selectedPackage) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent 
+        className={`${isMobile ? 'max-w-full h-[90vh] mt-auto translate-y-0 rounded-b-none' : 'max-w-2xl'}`}
+      >
         <DialogHeader>
           <DialogTitle>Customize {selectedPackage?.name}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="max-h-[60vh]">
+        <ScrollArea className={`${isMobile ? 'flex-1' : 'max-h-[60vh]'}`}>
           <ServicesList
             selectedPackage={selectedPackage}
             selectedServices={selectedServices}
@@ -45,28 +49,26 @@ export function CustomizeDialog({
           />
         </ScrollArea>
         <div className="space-y-4 pt-4 border-t">
-          <div className="flex justify-between items-center">
-            <div className="space-y-1">
+          <div className={`${isMobile ? 'flex flex-col gap-4' : 'flex justify-between items-center'}`}>
+            <div className={`${isMobile ? 'grid grid-cols-2 gap-4 bg-muted p-4 rounded-lg' : 'space-y-1'}`}>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                <span>Total Duration: {totalDuration} min</span>
+                <span>{totalDuration} min</span>
               </div>
               <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
-                <span>Total Price: ₹{totalPrice}</span>
+                <span>₹{totalPrice}</span>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button onClick={() => {
+            <Button 
+              className="w-full" 
+              onClick={() => {
                 navigate(`/book/package/${selectedPackage?.id}?customize=true&services=${selectedServices.join(',')}`);
                 onOpenChange(false);
-              }}>
-                Continue Booking
-              </Button>
-            </div>
+              }}
+            >
+              Continue Booking
+            </Button>
           </div>
         </div>
       </DialogContent>
