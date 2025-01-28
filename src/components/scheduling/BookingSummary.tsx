@@ -65,11 +65,6 @@ export function BookingSummary({
               <span>{item.service?.name || item.package?.name}</span>
               <span>${item.service?.selling_price || item.package?.price}</span>
             </div>
-            {selectedTimeSlots[item.id] && (
-              <p className="text-sm text-muted-foreground">
-                Time: {selectedTimeSlots[item.id]}
-              </p>
-            )}
           </div>
         ))}
         <div className="border-t pt-4">
