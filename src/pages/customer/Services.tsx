@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,9 +10,10 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useCart } from "@/components/cart/CartContext";
 import { CustomizeDialog } from "@/components/customer/packages/CustomizeDialog";
+import { CartSummary } from "@/components/cart/CartSummary";
+import { MobileCartBar } from "@/components/cart/MobileCartBar";
 
 export default function Services() {
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { addToCart, items } = useCart();
@@ -123,200 +123,206 @@ export default function Services() {
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-12">
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold">Our Services</h1>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
-          Discover our range of professional services and packages designed to meet your needs.
-          Book your appointment today and experience excellence.
-        </p>
-      </div>
+    <div className="container mx-auto py-8">
+      <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-8">
+        <div className="space-y-12">
+          <div className="text-center space-y-4">
+            <h1 className="text-4xl font-bold">Our Services</h1>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Discover our range of professional services and packages designed to meet your needs.
+              Book your appointment today and experience excellence.
+            </p>
+          </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full max-w-xs">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search services..."
-            className="pl-9 h-9"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge
-            variant={selectedCategory === null ? "default" : "outline"}
-            className="cursor-pointer"
-            onClick={() => setSelectedCategory(null)}
-          >
-            All
-          </Badge>
-          {categories?.map((category) => (
-            <Badge
-              key={category.id}
-              variant={selectedCategory === category.id ? "default" : "outline"}
-              className="cursor-pointer"
-              onClick={() => setSelectedCategory(category.id)}
-            >
-              {category.name}
-            </Badge>
-          ))}
-        </div>
-      </div>
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search services..."
+                className="pl-9 h-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge
+                variant={selectedCategory === null ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setSelectedCategory(null)}
+              >
+                All
+              </Badge>
+              {categories?.map((category) => (
+                <Badge
+                  key={category.id}
+                  variant={selectedCategory === category.id ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setSelectedCategory(category.id)}
+                >
+                  {category.name}
+                </Badge>
+              ))}
+            </div>
+          </div>
 
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold">Featured Packages</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {packages?.map((pkg) => (
-            <motion.div
-              key={pkg.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
-                {pkg.image_urls && pkg.image_urls[0] ? (
-                  <div className="relative aspect-video">
-                    <img
-                      src={pkg.image_urls[0]}
-                      alt={pkg.name}
-                      className="w-full h-full object-cover rounded-t-lg"
-                    />
-                  </div>
-                ) : (
-                  <div className="bg-muted aspect-video rounded-t-lg flex items-center justify-center">
-                    <Package className="h-12 w-12 text-muted-foreground" />
-                  </div>
-                )}
-                <CardHeader>
-                  <CardTitle>{pkg.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <p className="text-muted-foreground line-clamp-2">
-                    {pkg.description || "No description available"}
-                  </p>
-                  <div className="flex items-center gap-4 mt-4">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{pkg.duration} min</span>
+          <h2 className="text-2xl font-semibold">Featured Packages</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {packages?.map((pkg) => (
+              <motion.div
+                key={pkg.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
+                  {pkg.image_urls && pkg.image_urls[0] ? (
+                    <div className="relative aspect-video">
+                      <img
+                        src={pkg.image_urls[0]}
+                        alt={pkg.name}
+                        className="w-full h-full object-cover rounded-t-lg"
+                      />
                     </div>
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <DollarSign className="h-4 w-4" />
-                      <span>₹{pkg.price}</span>
+                  ) : (
+                    <div className="bg-muted aspect-video rounded-t-lg flex items-center justify-center">
+                      <Package className="h-12 w-12 text-muted-foreground" />
                     </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  {pkg.is_customizable ? (
-                    <div className="flex w-full gap-2">
+                  )}
+                  <CardHeader>
+                    <CardTitle>{pkg.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1">
+                    <p className="text-muted-foreground line-clamp-2">
+                      {pkg.description || "No description available"}
+                    </p>
+                    <div className="flex items-center gap-4 mt-4">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{pkg.duration} min</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <DollarSign className="h-4 w-4" />
+                        <span>₹{pkg.price}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    {pkg.is_customizable ? (
+                      <div className="flex w-full gap-2">
+                        <Button 
+                          className="flex-[7]"
+                          onClick={() => handleBookNow(undefined, pkg.id)}
+                          variant={isItemInCart(undefined, pkg.id) ? "secondary" : "default"}
+                          disabled={isItemInCart(undefined, pkg.id)}
+                        >
+                          {isItemInCart(undefined, pkg.id) ? "Added" : "Book Now"}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="flex-[3]"
+                          onClick={() => handleCustomize(pkg)}
+                        >
+                          Customize
+                        </Button>
+                      </div>
+                    ) : (
                       <Button 
-                        className="flex-[7]"
+                        className="w-full"
                         onClick={() => handleBookNow(undefined, pkg.id)}
                         variant={isItemInCart(undefined, pkg.id) ? "secondary" : "default"}
                         disabled={isItemInCart(undefined, pkg.id)}
                       >
                         {isItemInCart(undefined, pkg.id) ? "Added" : "Book Now"}
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        className="flex-[3]"
-                        onClick={() => handleCustomize(pkg)}
-                      >
-                        Customize
-                      </Button>
+                    )}
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+
+          <h2 className="text-2xl font-semibold">Individual Services</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredServices?.map((service, index) => (
+              <motion.div
+                key={service.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
+                  {service.image_urls && service.image_urls[0] ? (
+                    <div className="relative aspect-video">
+                      <img
+                        src={service.image_urls[0]}
+                        alt={service.name}
+                        className="w-full h-full object-cover rounded-t-lg"
+                      />
                     </div>
                   ) : (
+                    <div className="bg-muted aspect-video rounded-t-lg" />
+                  )}
+                  <CardHeader>
+                    <CardTitle className="flex justify-between items-start">
+                      <span>{service.name}</span>
+                      <div className="flex gap-2">
+                        {service.services_categories.map((sc: any) => (
+                          <Badge key={sc.categories.id} variant="secondary">
+                            {sc.categories.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1">
+                    <p className="text-muted-foreground line-clamp-2">
+                      {service.description || "No description available"}
+                    </p>
+                    <div className="flex items-center gap-4 mt-4">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{service.duration} min</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <DollarSign className="h-4 w-4" />
+                        <span>₹{service.selling_price}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
                     <Button 
                       className="w-full"
-                      onClick={() => handleBookNow(undefined, pkg.id)}
-                      variant={isItemInCart(undefined, pkg.id) ? "secondary" : "default"}
-                      disabled={isItemInCart(undefined, pkg.id)}
+                      onClick={() => handleBookNow(service.id)}
+                      variant={isItemInCart(service.id) ? "secondary" : "default"}
+                      disabled={isItemInCart(service.id)}
                     >
-                      {isItemInCart(undefined, pkg.id) ? "Added" : "Book Now"}
+                      {isItemInCart(service.id) ? "Added" : "Book Now"}
                     </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            </motion.div>
-          ))}
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+
+          {(!filteredServices || filteredServices.length === 0) && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No services found matching your criteria.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden lg:block sticky top-24 h-[calc(100vh-6rem)]">
+          <CartSummary />
         </div>
       </div>
-
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold">Individual Services</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredServices?.map((service, index) => (
-            <motion.div
-              key={service.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.1 }}
-            >
-              <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
-                {service.image_urls && service.image_urls[0] ? (
-                  <div className="relative aspect-video">
-                    <img
-                      src={service.image_urls[0]}
-                      alt={service.name}
-                      className="w-full h-full object-cover rounded-t-lg"
-                    />
-                  </div>
-                ) : (
-                  <div className="bg-muted aspect-video rounded-t-lg" />
-                )}
-                <CardHeader>
-                  <CardTitle className="flex justify-between items-start">
-                    <span>{service.name}</span>
-                    <div className="flex gap-2">
-                      {service.services_categories.map((sc: any) => (
-                        <Badge key={sc.categories.id} variant="secondary">
-                          {sc.categories.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <p className="text-muted-foreground line-clamp-2">
-                    {service.description || "No description available"}
-                  </p>
-                  <div className="flex items-center gap-4 mt-4">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{service.duration} min</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <DollarSign className="h-4 w-4" />
-                      <span>₹{service.selling_price}</span>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button 
-                    className="w-full"
-                    onClick={() => handleBookNow(service.id)}
-                    variant={isItemInCart(service.id) ? "secondary" : "default"}
-                    disabled={isItemInCart(service.id)}
-                  >
-                    {isItemInCart(service.id) ? "Added" : "Book Now"}
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {(!filteredServices || filteredServices.length === 0) && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">No services found matching your criteria.</p>
-        </div>
-      )}
 
       <CustomizeDialog
         open={customizeDialogOpen}
         onOpenChange={setCustomizeDialogOpen}
         selectedPackage={selectedPackage}
       />
+
+      <MobileCartBar />
     </div>
   );
 }
