@@ -1,10 +1,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Clock, DollarSign } from "lucide-react";
 import { ServicesList } from "./ServicesList";
-import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useCart } from "@/components/cart/CartContext";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface CustomizeDialogProps {
   open: boolean;
@@ -27,8 +28,25 @@ export function CustomizeDialog({
   totalDuration,
   onServiceToggle,
 }: CustomizeDialogProps) {
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+  const { addToCart, items } = useCart();
+
+  const handleBookNow = async () => {
+    // Check if this package is already in cart
+    const existingPackageInCart = items.find(item => 
+      item.package_id === selectedPackage?.id
+    );
+
+    if (existingPackageInCart) {
+      // Remove the existing package from cart (it will be handled by the CartContext)
+      toast.success("Package updated in cart");
+    }
+
+    // Add the customized package to cart
+    await addToCart(undefined, selectedPackage?.id);
+    onOpenChange(false);
+  };
 
   if (!selectedPackage) return null;
 
@@ -40,17 +58,6 @@ export function CustomizeDialog({
         <DialogHeader className="p-6 pb-0">
           <DialogTitle>Customize {selectedPackage?.name}</DialogTitle>
         </DialogHeader>
-        
-        <div className="flex items-center gap-4 p-4 border-b">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>{totalDuration} min</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <DollarSign className="h-4 w-4" />
-            <span>₹{totalPrice}</span>
-          </div>
-        </div>
 
         <ScrollArea className="flex-1">
           <div className="p-6">
@@ -69,19 +76,21 @@ export function CustomizeDialog({
               <div className="text-sm text-muted-foreground">
                 {selectedServices.length} services selected
               </div>
-              <div className="text-2xl font-bold">
-                ₹{totalPrice}
+              <div className="flex items-center gap-4">
+                <div className="text-sm text-muted-foreground">
+                  {totalDuration} min
+                </div>
+                <div className="text-2xl font-bold">
+                  ₹{totalPrice}
+                </div>
               </div>
             </div>
             <Button 
               className="w-full" 
               size="lg"
-              onClick={() => {
-                navigate(`/book/package/${selectedPackage?.id}?customize=true&services=${selectedServices.join(',')}`);
-                onOpenChange(false);
-              }}
+              onClick={handleBookNow}
             >
-              Continue
+              Book Now
             </Button>
           </div>
         </div>
