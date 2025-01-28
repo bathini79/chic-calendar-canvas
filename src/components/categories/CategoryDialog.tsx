@@ -1,17 +1,35 @@
-import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { FormDialog } from "@/components/ui/form-dialog";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
-import { categoryFormSchema, type CategoryFormValues } from "@/lib/validations/form-schemas";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEffect } from "react";
+
+const categoryFormSchema = z.object({
+  name: z.string().min(1, "Category name is required"),
+});
+
+type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 
 interface CategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  category?: any;
+  category?: { id: string; name: string };
   onSuccess: () => void;
 }
 
@@ -26,68 +44,60 @@ export function CategoryDialog({
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
-      name: category?.name || "",
+      name: "",
     },
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (category) {
-      form.reset({ name: category.name });
-    } else {
-      form.reset({ name: "" });
+      form.reset({
+        name: category.name,
+      });
     }
   }, [category, form]);
 
   const onSubmit = async (values: CategoryFormValues) => {
-    if (category) {
-      const success = await update(category.id, values);
-      if (success) {
-        onSuccess();
-        onOpenChange(false);
-        form.reset();
+    try {
+      if (category) {
+        await update(category.id, values);
+      } else {
+        await create(values);
       }
-    } else {
-      const success = await create(values);
-      if (success) {
-        onSuccess();
-        onOpenChange(false);
-        form.reset();
-      }
+      onSuccess();
+      onOpenChange(false);
+      form.reset();
+    } catch (error) {
+      console.error('Error saving category:', error);
     }
   };
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={category ? "Edit Category" : "Create Category"}
-      description={category 
-        ? "Update the details of an existing category."
-        : "Create a new category for organizing services."
-      }
-      form={form}
-      onSubmit={onSubmit}
-      submitLabel={category ? "Update" : "Create"}
-      className="max-h-[90vh]"
-      contentClassName="p-0"
-    >
-      <ScrollArea className="max-h-[calc(90vh-200px)]">
-        <div className="p-6">
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-      </ScrollArea>
-    </FormDialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{category ? "Edit" : "Add"} Category</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end">
+              <Button type="submit">Save</Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }
