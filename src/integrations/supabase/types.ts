@@ -84,6 +84,7 @@ export type Database = {
         Row: {
           created_at: string
           customer_id: string
+          customized_services: string[] | null
           id: string
           package_id: string | null
           service_id: string | null
@@ -93,6 +94,7 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_id: string
+          customized_services?: string[] | null
           id?: string
           package_id?: string | null
           service_id?: string | null
@@ -102,6 +104,7 @@ export type Database = {
         Update: {
           created_at?: string
           customer_id?: string
+          customized_services?: string[] | null
           id?: string
           package_id?: string | null
           service_id?: string | null

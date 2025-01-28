@@ -38,7 +38,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetchCartItems();
 
-    // Subscribe to real-time updates
     const channel = supabase
       .channel('cart-changes')
       .on(
@@ -92,14 +91,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // First check if the item already exists in cart
     const existingItem = items.find(item => 
       (serviceId && item.service_id === serviceId) || 
       (packageId && item.package_id === packageId)
     );
 
     if (existingItem) {
-      // If it exists, update its status back to pending if it was removed
       const { error } = await supabase
         .from('cart_items')
         .update({ 
@@ -113,7 +110,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return;
       }
     } else {
-      // If it doesn't exist, insert a new item
       const { error } = await supabase
         .from('cart_items')
         .insert([

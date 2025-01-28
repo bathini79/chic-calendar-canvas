@@ -10,7 +10,7 @@ export default function CustomerLayout() {
   return (
     <CartProvider>
       <div className="min-h-screen bg-background">
-        <CustomerNavbar onCartClick={() => setCartOpen(true)} />
+        <CustomerNavbar onOpenCart={() => setCartOpen(true)} />
         <main>
           <Outlet />
         </main>
