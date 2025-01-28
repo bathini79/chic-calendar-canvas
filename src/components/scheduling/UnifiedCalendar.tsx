@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addMinutes, parseISO, isSameDay } from "date-fns";
+import { format, addMinutes, parseISO } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -41,33 +41,67 @@ export function UnifiedCalendar({
     }, 0);
   }, [items]);
 
-  // Fetch all shifts for selected stylists
-  const { data: shifts } = useQuery({
-    queryKey: ['shifts', Object.values(selectedStylists)],
+  // Fetch existing bookings for the selected date
+  const { data: existingBookings } = useQuery({
+    queryKey: ['bookings', selectedDate],
     queryFn: async () => {
-      const specificStylists = Object.values(selectedStylists).filter(id => id !== 'any');
+      if (!selectedDate) return [];
       
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*, employee:employees(*)')
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString());
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedDate
+  });
+
+  // Fetch employee shifts with proper filtering
+  const { data: shifts } = useQuery({
+    queryKey: ['shifts', selectedDate, Object.values(selectedStylists)],
+    queryFn: async () => {
+      if (!selectedDate) return [];
+
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
       let query = supabase
         .from('shifts')
         .select('*')
-        .gte('start_time', new Date().toISOString());
+        .gte('start_time', startOfDay.toISOString())
+        .lte('end_time', endOfDay.toISOString());
 
+      // Filter for specific stylists if any are selected
+      const specificStylists = Object.values(selectedStylists).filter(id => id !== 'any');
       if (specificStylists.length > 0) {
         query = query.in('employee_id', specificStylists);
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      console.log('Fetched shifts:', data);
+      console.log('Fetched shifts:', data); // Debug log
       return data;
     },
-    enabled: Object.values(selectedStylists).length > 0
+    enabled: !!selectedDate
   });
 
   // Generate available time slots
   useEffect(() => {
     if (!selectedDate || !shifts) return;
-    console.log('Generating time slots for date:', selectedDate);
+    console.log('Generating time slots with shifts:', shifts); // Debug log
+    console.log('Selected stylists:', selectedStylists); // Debug log
 
     const generateTimeSlots = () => {
       const slots: TimeSlot[] = [];
@@ -94,14 +128,37 @@ export function UnifiedCalendar({
                               slotStart >= shiftStart && 
                               slotEnd <= shiftEnd;
             
+            console.log('Checking shift:', {
+              shiftStart,
+              shiftEnd,
+              isRelevantStylist,
+              isAvailable
+            }); // Debug log
+
             return isAvailable;
+          });
+
+          // Check conflicts with existing bookings
+          const hasConflict = existingBookings?.some(booking => {
+            const bookingStart = new Date(booking.start_time);
+            const bookingEnd = new Date(booking.end_time);
+            
+            // Check if this booking conflicts with selected stylists
+            const stylistConflict = Object.values(selectedStylists).some(stylistId => {
+              return stylistId === booking.employee_id || stylistId === 'any';
+            });
+
+            return stylistConflict && (
+              (slotStart >= bookingStart && slotStart < bookingEnd) ||
+              (slotEnd > bookingStart && slotEnd <= bookingEnd)
+            );
           });
 
           const isSelected = Object.values(selectedTimeSlots).includes(timeString);
 
           slots.push({
             time: timeString,
-            isAvailable: hasAvailableShift,
+            isAvailable: hasAvailableShift && !hasConflict,
             isSelected,
           });
         }
@@ -111,25 +168,24 @@ export function UnifiedCalendar({
     };
 
     const generatedSlots = generateTimeSlots();
-    console.log('Generated slots:', generatedSlots);
+    console.log('Generated slots:', generatedSlots); // Debug log
     setTimeSlots(generatedSlots);
-  }, [selectedDate, selectedTimeSlots, selectedStylists, shifts, totalDuration]);
+  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, totalDuration]);
 
-  // Function to check if a date has any available shifts
-  const hasShiftsOnDate = (date: Date) => {
-    if (!shifts) return false;
+  const handleTimeSlotSelect = (time: string) => {
+    // When a time slot is selected, assign it to all services
+    const startTime = time;
+    let currentTime = startTime;
     
-    return shifts.some(shift => {
-      const shiftStart = new Date(shift.start_time);
-      const shiftEnd = new Date(shift.end_time);
-      const isDateInShift = isSameDay(date, shiftStart) || isSameDay(date, shiftEnd);
-      
-      // Check if this shift belongs to a selected stylist
-      const relevantStylistIds = Object.values(selectedStylists);
-      const isRelevantStylist = relevantStylistIds.includes('any') || 
-                               relevantStylistIds.includes(shift.employee_id);
-      
-      return isDateInShift && isRelevantStylist;
+    items.forEach((item) => {
+      onTimeSlotSelect(item.id, currentTime);
+      // Calculate next start time based on service duration
+      const duration = item.service?.duration || item.package?.duration || 30;
+      const nextTime = new Date(selectedDate!);
+      const [hours, minutes] = currentTime.split(':').map(Number);
+      nextTime.setHours(hours, minutes);
+      const newTime = addMinutes(nextTime, duration);
+      currentTime = format(newTime, 'HH:mm');
     });
   };
 
@@ -154,8 +210,7 @@ export function UnifiedCalendar({
               return (
                 date < now ||
                 date.getDay() === 0 ||
-                date.getDay() === 6 ||
-                !hasShiftsOnDate(date)
+                date.getDay() === 6
               );
             }}
           />
