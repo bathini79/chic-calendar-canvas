@@ -141,10 +141,14 @@ export function UnifiedCalendar({
             const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
             const slotStart = new Date(selectedDate);
             slotStart.setHours(hour, minute, 0, 0);
+            
+            // Calculate end time based on total duration
             const slotEnd = addMinutes(slotStart, totalDuration);
-
-            // Check if slot end time is within location hours
-            if (slotEnd.getHours() > endHour) continue;
+            
+            // Skip if the slot would end after location closing time
+            const closingTime = new Date(selectedDate);
+            closingTime.setHours(endHour, 0, 0, 0);
+            if (slotEnd > closingTime) continue;
 
             // Check conflicts with existing bookings
             const hasConflict = existingBookings?.some(booking => {
@@ -178,9 +182,11 @@ export function UnifiedCalendar({
               const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
               const slotStart = new Date(selectedDate);
               slotStart.setHours(hour, minute, 0, 0);
+              
+              // Calculate end time based on total duration
               const slotEnd = addMinutes(slotStart, totalDuration);
-
-              // Check if slot end time is within shift
+              
+              // Skip if the slot would end after shift end time
               if (slotEnd > shiftEnd) continue;
 
               // Check conflicts with existing bookings
@@ -213,13 +219,6 @@ export function UnifiedCalendar({
     console.log('Generated slots:', generatedSlots);
     setTimeSlots(generatedSlots);
   }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, locationData, totalDuration]);
-
-  const handleTimeSlotSelect = (time: string, endTime: string) => {
-    // When a time slot is selected, assign it to all services
-    items.forEach((item) => {
-      onTimeSlotSelect(item.id, time);
-    });
-  };
 
   return (
     <Card className="border-0 shadow-none">
@@ -280,7 +279,10 @@ export function UnifiedCalendar({
                         )}
                         onClick={() => {
                           if (slot.isAvailable && !slot.isSelected) {
-                            handleTimeSlotSelect(slot.time, slot.endTime);
+                            // When a time slot is selected, assign it to all services
+                            items.forEach((item) => {
+                              onTimeSlotSelect(item.id, slot.time);
+                            });
                           }
                         }}
                       >
