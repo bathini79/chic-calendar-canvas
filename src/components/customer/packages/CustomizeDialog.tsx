@@ -35,7 +35,7 @@ export function CustomizeDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`${isMobile ? 'max-w-full h-[100vh] mt-0 rounded-none' : 'max-w-2xl h-[90vh]'} flex flex-col p-0`}
+        className={`${isMobile ? 'max-w-full h-[90vh] mt-[5vh] rounded-t-lg' : 'max-w-2xl h-[90vh]'} flex flex-col p-0`}
       >
         <DialogHeader className="p-6 pb-0">
           <DialogTitle>Customize {selectedPackage?.name}</DialogTitle>
