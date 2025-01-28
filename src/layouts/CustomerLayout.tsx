@@ -1,13 +1,20 @@
-import { Outlet } from "react-router-dom";
 import { CustomerNavbar } from "@/components/customer/CustomerNavbar";
+import { CartProvider } from "@/components/cart/CartContext";
+import { CartDrawer } from "@/components/cart/CartDrawer";
+import { Toaster } from "@/components/ui/sonner";
+import { Outlet } from "react-router-dom";
 
-export function CustomerLayout() {
+export default function CustomerLayout() {
   return (
-    <div className="min-h-screen">
-      <CustomerNavbar />
-      <main className="container mx-auto px-4 py-8">
-        <Outlet />
-      </main>
-    </div>
+    <CartProvider>
+      <div className="min-h-screen bg-background">
+        <CustomerNavbar />
+        <main>
+          <Outlet />
+        </main>
+        <CartDrawer />
+        <Toaster />
+      </div>
+    </CartProvider>
   );
 }
