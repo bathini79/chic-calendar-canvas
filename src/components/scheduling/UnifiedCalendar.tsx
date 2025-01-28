@@ -1,14 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addMinutes, parseISO } from "date-fns";
+import { format, addMinutes } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { CalendarClock, Clock } from "lucide-react";
+import { ModernScheduler } from "./ModernScheduler";
 
 interface TimeSlot {
   time: string;
@@ -35,7 +31,6 @@ export function UnifiedCalendar({
   const { items } = useCart();
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
 
-  // Calculate total duration of all services
   const totalDuration = useMemo(() => {
     return items.reduce((total, item) => {
       return total + (item.service?.duration || item.package?.duration || 30);
@@ -221,81 +216,13 @@ export function UnifiedCalendar({
   }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, locationData, totalDuration]);
 
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarClock className="h-5 w-5" />
-          Select Date & Time
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid md:grid-cols-[1fr_300px] gap-6">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={onDateSelect}
-            className="rounded-md border bg-card p-4"
-            disabled={(date) => {
-              const now = new Date();
-              now.setHours(0, 0, 0, 0);
-              
-              // Get day of week (0-6, where 0 is Sunday)
-              const dayOfWeek = date.getDay();
-              
-              // Check location hours if no stylist is selected
-              const useLocationHours = Object.values(selectedStylists).every(id => !id || id === 'any');
-              if (useLocationHours && locationData?.location_hours) {
-                const hasHours = locationData.location_hours.some(
-                  (h: any) => h.day_of_week === dayOfWeek && !h.is_closed
-                );
-                return date < now || !hasHours;
-              }
-              
-              // Default to weekends disabled if no location hours
-              return date < now || dayOfWeek === 0 || dayOfWeek === 6;
-            }}
-          />
-
-          {selectedDate && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  {format(selectedDate, "MMMM d, yyyy")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[300px] pr-4">
-                  <div className="grid grid-cols-2 gap-2">
-                    {timeSlots.map((slot) => (
-                      <Badge
-                        key={slot.time}
-                        variant={slot.isSelected ? "default" : slot.isAvailable ? "secondary" : "outline"}
-                        className={cn(
-                          "py-2 cursor-pointer transition-colors justify-center",
-                          !slot.isAvailable && "opacity-50 cursor-not-allowed",
-                          slot.isSelected && "bg-primary hover:bg-primary/90",
-                          !slot.isAvailable && !slot.isSelected && "bg-muted text-muted-foreground"
-                        )}
-                        onClick={() => {
-                          if (slot.isAvailable && !slot.isSelected) {
-                            // When a time slot is selected, assign it to all services
-                            items.forEach((item) => {
-                              onTimeSlotSelect(item.id, slot.time);
-                            });
-                          }
-                        }}
-                      >
-                        {slot.time} - {slot.endTime}
-                      </Badge>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <ModernScheduler
+      selectedDate={selectedDate}
+      onDateSelect={onDateSelect}
+      selectedTimeSlots={selectedTimeSlots}
+      onTimeSlotSelect={onTimeSlotSelect}
+      timeSlots={timeSlots}
+      items={items}
+    />
   );
 }
