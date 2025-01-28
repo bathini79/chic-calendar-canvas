@@ -216,7 +216,7 @@ export default function Services() {
                       <div className="flex w-full gap-2">
                         {isItemInCart(undefined, pkg.id) ? (
                           <Button 
-                            className="flex-[7]"
+                            className="flex-[7] bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700"
                             onClick={() => handleRemove(undefined, pkg.id)}
                             variant="destructive"
                           >
@@ -241,7 +241,7 @@ export default function Services() {
                     ) : (
                       isItemInCart(undefined, pkg.id) ? (
                         <Button 
-                          className="w-full"
+                          className="w-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700"
                           onClick={() => handleRemove(undefined, pkg.id)}
                           variant="destructive"
                         >
@@ -313,7 +313,7 @@ export default function Services() {
                   <CardFooter>
                     {isItemInCart(service.id) ? (
                       <Button 
-                        className="w-full"
+                        className="w-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700"
                         onClick={() => handleRemove(service.id)}
                         variant="destructive"
                       >
