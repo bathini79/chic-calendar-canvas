@@ -35,9 +35,9 @@ export function CustomizeDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`${isMobile ? 'max-w-full h-[90vh] mt-auto translate-y-0 rounded-b-none' : 'max-w-2xl'} flex flex-col`}
+        className={`${isMobile ? 'max-w-full h-[100vh] mt-0 rounded-none' : 'max-w-2xl h-[90vh]'} flex flex-col p-0`}
       >
-        <DialogHeader>
+        <DialogHeader className="p-6 pb-0">
           <DialogTitle>Customize {selectedPackage?.name}</DialogTitle>
         </DialogHeader>
         
@@ -52,16 +52,18 @@ export function CustomizeDialog({
           </div>
         </div>
 
-        <ScrollArea className="flex-1 px-4">
-          <ServicesList
-            selectedPackage={selectedPackage}
-            selectedServices={selectedServices}
-            allServices={allServices}
-            onServiceToggle={onServiceToggle}
-          />
+        <ScrollArea className="flex-1">
+          <div className="p-6">
+            <ServicesList
+              selectedPackage={selectedPackage}
+              selectedServices={selectedServices}
+              allServices={allServices}
+              onServiceToggle={onServiceToggle}
+            />
+          </div>
         </ScrollArea>
 
-        <div className="sticky bottom-0 border-t bg-background p-4">
+        <div className="border-t bg-background p-4 mt-auto">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
