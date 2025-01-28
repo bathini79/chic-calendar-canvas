@@ -6,17 +6,27 @@ import CustomerLayout from "@/layouts/CustomerLayout";
 import { AdminRoute } from "@/components/auth/AdminRoute";
 import { queryClient } from "@/lib/react-query";
 import Services from "@/pages/customer/Services";
+import UnifiedScheduling from "@/pages/customer/UnifiedScheduling";
+import AdminServices from "@/pages/admin/AdminServices";
+import AdminDashboard from "@/pages/admin/Dashboard";
+import Staff from "@/pages/admin/Staff";
 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          {/* Customer Routes */}
           <Route path="/" element={<CustomerLayout />}>
             <Route index element={<Services />} />
+            <Route path="schedule" element={<UnifiedScheduling />} />
           </Route>
+
+          {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-            <Route index element={<div>Dashboard</div>} />
+            <Route index element={<AdminDashboard />} />
+            <Route path="services" element={<AdminServices />} />
+            <Route path="staff" element={<Staff />} />
           </Route>
         </Routes>
       </BrowserRouter>
