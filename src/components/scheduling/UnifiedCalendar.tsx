@@ -33,7 +33,6 @@ export function UnifiedCalendar({
 }: UnifiedCalendarProps) {
   const { items } = useCart();
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const hasSelectedStylists = Object.values(selectedStylists).length > 0;
 
   // Calculate total duration of all services
   const totalDuration = useMemo(() => {
@@ -41,26 +40,6 @@ export function UnifiedCalendar({
       return total + (item.service?.duration || item.package?.duration || 30);
     }, 0);
   }, [items]);
-
-  // Fetch location data
-  const { data: location } = useQuery({
-    queryKey: ['location'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select(`
-          *,
-          location_hours (*)
-        `)
-        .eq('id', process.env.VITE_LOCATION_ID || '')
-        .single();
-      
-      if (error) throw error;
-      console.log('Location data:', data);
-      return data;
-    },
-    enabled: !hasSelectedStylists,
-  });
 
   // Fetch existing bookings for the selected date
   const { data: existingBookings } = useQuery({
@@ -112,62 +91,52 @@ export function UnifiedCalendar({
 
       const { data, error } = await query;
       if (error) throw error;
-      console.log('Fetched shifts:', data);
+      console.log('Fetched shifts:', data); // Debug log
       return data;
     },
-    enabled: !!selectedDate && hasSelectedStylists
+    enabled: !!selectedDate
   });
 
   // Generate available time slots
   useEffect(() => {
-    if (!selectedDate) return;
+    if (!selectedDate || !shifts) return;
+    console.log('Generating time slots with shifts:', shifts); // Debug log
+    console.log('Selected stylists:', selectedStylists); // Debug log
 
     const generateTimeSlots = () => {
       const slots: TimeSlot[] = [];
-      let hour = 9; // Default start time if no location hours found
+      let hour = 9; // Start at 9 AM
       
-      while (hour < 17) { // Default end time if no location hours found
+      while (hour < 17) { // End at 5 PM
         for (let minute = 0; minute < 60; minute += 30) {
           const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
           const slotStart = new Date(selectedDate);
           slotStart.setHours(hour, minute, 0, 0);
           const slotEnd = addMinutes(slotStart, totalDuration);
 
-          let isAvailable = false;
-
-          if (hasSelectedStylists) {
-            // Check stylist availability
-            const hasAvailableShift = shifts?.some(shift => {
-              const shiftStart = new Date(shift.start_time);
-              const shiftEnd = new Date(shift.end_time);
-              
-              const relevantStylistIds = Object.values(selectedStylists);
-              const isRelevantStylist = relevantStylistIds.includes('any') || 
-                                      relevantStylistIds.includes(shift.employee_id);
-
-              return isRelevantStylist && 
-                     slotStart >= shiftStart && 
-                     slotEnd <= shiftEnd;
-            });
-            isAvailable = !!hasAvailableShift;
-          } else if (location?.location_hours) {
-            // Check location hours
-            const dayOfWeek = selectedDate.getDay();
-            const locationHour = location.location_hours.find(h => h.day_of_week === dayOfWeek);
+          // Check if any selected stylist has an available shift
+          const hasAvailableShift = shifts.some(shift => {
+            const shiftStart = new Date(shift.start_time);
+            const shiftEnd = new Date(shift.end_time);
             
-            if (locationHour && !locationHour.is_closed) {
-              const [locationStartHour, locationStartMinute] = locationHour.start_time.split(':').map(Number);
-              const [locationEndHour, locationEndMinute] = locationHour.end_time.split(':').map(Number);
-              
-              const locationStart = new Date(selectedDate);
-              locationStart.setHours(locationStartHour, locationStartMinute, 0, 0);
-              
-              const locationEnd = new Date(selectedDate);
-              locationEnd.setHours(locationEndHour, locationEndMinute, 0, 0);
-              
-              isAvailable = slotStart >= locationStart && slotEnd <= locationEnd;
-            }
-          }
+            // For "any" stylist, all shifts are valid
+            const relevantStylistIds = Object.values(selectedStylists);
+            const isRelevantStylist = relevantStylistIds.includes('any') || 
+                                    relevantStylistIds.includes(shift.employee_id);
+
+            const isAvailable = isRelevantStylist && 
+                              slotStart >= shiftStart && 
+                              slotEnd <= shiftEnd;
+            
+            console.log('Checking shift:', {
+              shiftStart,
+              shiftEnd,
+              isRelevantStylist,
+              isAvailable
+            }); // Debug log
+
+            return isAvailable;
+          });
 
           // Check conflicts with existing bookings
           const hasConflict = existingBookings?.some(booking => {
@@ -189,7 +158,7 @@ export function UnifiedCalendar({
 
           slots.push({
             time: timeString,
-            isAvailable: isAvailable && !hasConflict,
+            isAvailable: hasAvailableShift && !hasConflict,
             isSelected,
           });
         }
@@ -199,9 +168,9 @@ export function UnifiedCalendar({
     };
 
     const generatedSlots = generateTimeSlots();
-    console.log('Generated slots:', generatedSlots);
+    console.log('Generated slots:', generatedSlots); // Debug log
     setTimeSlots(generatedSlots);
-  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, location, totalDuration]);
+  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, totalDuration]);
 
   const handleTimeSlotSelect = (time: string) => {
     // When a time slot is selected, assign it to all services
@@ -238,28 +207,11 @@ export function UnifiedCalendar({
             disabled={(date) => {
               const now = new Date();
               now.setHours(0, 0, 0, 0);
-
-              if (date < now) return true;
-
-              const dayOfWeek = date.getDay();
-              
-              if (hasSelectedStylists) {
-                // For stylists, check if there are any shifts on this day
-                const dayStart = new Date(date);
-                dayStart.setHours(0, 0, 0, 0);
-                const dayEnd = new Date(date);
-                dayEnd.setHours(23, 59, 59, 999);
-                
-                return !shifts?.some(shift => {
-                  const shiftDate = new Date(shift.start_time);
-                  return shiftDate >= dayStart && shiftDate <= dayEnd;
-                });
-              } else if (location?.location_hours) {
-                // For location hours, check if the location is closed
-                const locationHour = location.location_hours.find(h => h.day_of_week === dayOfWeek);
-                return !locationHour || locationHour.is_closed;
-              }
-              return true;
+              return (
+                date < now ||
+                date.getDay() === 0 ||
+                date.getDay() === 6
+              );
             }}
           />
 
