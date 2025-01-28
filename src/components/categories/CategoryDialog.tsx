@@ -21,7 +21,7 @@ export function CategoryDialog({
   category,
   onSuccess,
 }: CategoryDialogProps) {
-  const { create, update } = useSupabaseCrud({ table: 'categories' });
+  const { create, update } = useSupabaseCrud('categories');
   
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
@@ -39,14 +39,20 @@ export function CategoryDialog({
   }, [category, form]);
 
   const onSubmit = async (values: CategoryFormValues) => {
-    const result = category
-    ? await update(category.id, values)
-    : await create(values);
-    
-    if (result) {
-      onSuccess();
-      onOpenChange(false);
-      form.reset();
+    if (category) {
+      const success = await update(category.id, values);
+      if (success) {
+        onSuccess();
+        onOpenChange(false);
+        form.reset();
+      }
+    } else {
+      const success = await create(values);
+      if (success) {
+        onSuccess();
+        onOpenChange(false);
+        form.reset();
+      }
     }
   };
 

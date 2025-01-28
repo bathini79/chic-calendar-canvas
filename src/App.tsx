@@ -12,7 +12,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route element={<CustomerLayout />}>
+          <Route path="/" element={<CustomerLayout />}>
             <Route index element={<Services />} />
           </Route>
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
