@@ -27,6 +27,9 @@ vi.mock('@tanstack/react-query', () => ({
     ],
     isLoading: false,
   }),
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+  }),
 }));
 
 describe('PackagesList', () => {

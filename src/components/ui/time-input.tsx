@@ -1,20 +1,21 @@
-import { Input } from "./input";
 import { forwardRef } from "react";
+import { cn } from "@/lib/utils";
 
-interface TimeInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  value?: string;
-  onChange?: (value: string) => void;
+interface TimeInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
+  onChange: (value: string) => void;
 }
 
-export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
-  ({ value, onChange, ...props }, ref) => {
+const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
+  ({ className, onChange, ...props }, ref) => {
     return (
-      <Input
+      <input
         type="time"
+        className={cn(
+          "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+          className
+        )}
+        onChange={(e) => onChange(e.target.value)}
         ref={ref}
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
-        className="w-32"
         {...props}
       />
     );
@@ -22,3 +23,5 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
 );
 
 TimeInput.displayName = "TimeInput";
+
+export { TimeInput };

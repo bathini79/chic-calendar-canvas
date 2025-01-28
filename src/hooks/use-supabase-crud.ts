@@ -10,13 +10,9 @@ interface CrudOptions {
   adminOnly?: boolean;
 }
 
-export function useSupabaseCrud({ table}: CrudOptions) {
+export function useSupabaseCrud({ table }: CrudOptions) {
   const { toast } = useToast();
   const session = useSession();
-
-  const checkAuth = () => {
-    return true;
-  };
 
   const handleError = (error: any) => {
     if (error.code === "42501") {
@@ -35,8 +31,7 @@ export function useSupabaseCrud({ table}: CrudOptions) {
     return null;
   };
 
-  const create = async (data: any) => {
-    if (!checkAuth()) return null;
+  const create = async <T extends Record<string, any>>(data: T) => {
     try {
       const { data: result, error } = await supabase
         .from(table)
@@ -56,9 +51,7 @@ export function useSupabaseCrud({ table}: CrudOptions) {
     }
   };
 
-  const update = async (id: string, data: any) => {
-    if (!checkAuth()) return null;
-
+  const update = async <T extends Record<string, any>>(id: string, data: T) => {
     try {
       const { data: result, error } = await supabase
         .from(table)
@@ -80,8 +73,6 @@ export function useSupabaseCrud({ table}: CrudOptions) {
   };
 
   const remove = async (id: string) => {
-    if (!checkAuth()) return null;
-
     try {
       const { error } = await supabase
         .from(table)

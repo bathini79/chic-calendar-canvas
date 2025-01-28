@@ -56,8 +56,8 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
 
   const filteredServices = services?.filter(service =>
     service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    service.categories?.some((cat: any) => 
-      cat?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    service.services_categories?.some((sc: any) => 
+      sc.categories?.name?.toLowerCase().includes(searchQuery.toLowerCase())
     )
   );
 
@@ -89,7 +89,7 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
       {filteredServices?.map((service) => (
         <Card key={service.id} className="relative group">
-          {service.image_urls && service.image_urls.length > 0 ? (
+          {service.image_urls && service.image_urls[0] ? (
             <div className="relative aspect-video">
               <img
                 src={service.image_urls[0]}
@@ -102,31 +102,20 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
               <ImageIcon className="h-8 w-8 text-muted-foreground" />
             </div>
           )}
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg flex justify-between items-start">
-              <span className="line-clamp-1">{service.name}</span>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(service)}>
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(service.id)}>
-                  <Trash className="h-4 w-4" />
-                </Button>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-start">
+              <span>{service.name}</span>
+              <div className="flex gap-2">
+                {service.services_categories?.map((sc: any) => (
+                  <Badge key={sc.categories.id} variant="secondary">
+                    {sc.categories.name}
+                  </Badge>
+                ))}
               </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <span className="text-sm text-muted-foreground">Categories</span>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {service.categories?.map((category: any) => (
-                  <Badge key={category.id} variant="secondary" className="text-xs">
-                    {category.name}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Original Price</span>
               <span>₹{service.original_price}</span>
             </div>
@@ -139,6 +128,14 @@ export function ServicesGrid({ searchQuery, onEdit }: ServicesGridProps) {
               <span>{service.duration} min</span>
             </div>
           </CardContent>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="icon" onClick={() => onEdit(service)}>
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => handleDelete(service.id)}>
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
         </Card>
       ))}
     </div>

@@ -78,17 +78,6 @@ export function ShiftList() {
               <h3 className="font-medium">{shift.employee?.name}</h3>
               <p className="text-sm text-muted-foreground">{shift.employee?.email}</p>
             </div>
-            <div>
-              <span className={`text-sm px-2 py-1 rounded-full ${
-                shift.status === 'approved' 
-                  ? 'bg-green-100 text-green-700' 
-                  : shift.status === 'declined'
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-yellow-100 text-yellow-700'
-              }`}>
-                {shift.status}
-              </span>
-            </div>
           </div>
         ))}
       </div>
@@ -96,7 +85,7 @@ export function ShiftList() {
       <ShiftDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        initialData={selectedShift}
+        shift={selectedShift}
       />
     </div>
   );
