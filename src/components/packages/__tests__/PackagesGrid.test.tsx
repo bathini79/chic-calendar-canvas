@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import { PackagesGrid } from '../PackagesGrid';
 import { vi } from 'vitest';
 
-// Mock the components and hooks
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({
     data: [

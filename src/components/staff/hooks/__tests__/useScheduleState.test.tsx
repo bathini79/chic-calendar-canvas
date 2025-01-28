@@ -56,7 +56,7 @@ describe('useScheduleState', () => {
 
   it('should generate correct rotating shifts for a 2-week schedule', async () => {
     const { result } = renderHook(() => useScheduleState(mockEmployee));
-    const insertMock = vi.fn(() => Promise.resolve({ error: null }));
+    const insertMock = vi.fn(() => Promise.resolve({ data: [{ id: '1' }], error: null }));
     
     // Mock Supabase for this specific test
     (supabase.from as any).mockImplementation(() => ({
@@ -112,17 +112,17 @@ describe('useScheduleState', () => {
       await result.current.handleSubmit();
     });
 
-    // Get all shifts that were generated
+    // Verify shifts were generated
+    expect(insertMock).toHaveBeenCalled();
     const generatedShifts = insertMock.mock.calls[0][0];
-
-    // Verify shifts were generated for 8 weeks (4 cycles of 2-week rotation)
     expect(generatedShifts).toBeDefined();
+    expect(Array.isArray(generatedShifts)).toBe(true);
     
     // Helper function to get day of week from date string
     const getDayOfWeek = (dateString: string) => new Date(dateString).getDay();
     
     // Group shifts by week
-    const shiftsByWeek = generatedShifts.reduce((acc: any[], shift: any) => {
+    const shiftsByWeek = generatedShifts.reduce((acc: any, shift: any) => {
       const weekStart = new Date(shift.start_time);
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       const weekKey = weekStart.toISOString();

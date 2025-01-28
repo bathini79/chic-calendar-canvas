@@ -35,7 +35,7 @@ export function useSupabaseCrud({ table }: CrudOptions) {
     try {
       const { data: result, error } = await supabase
         .from(table)
-        .insert([data])
+        .insert(data)
         .select()
         .single();
 

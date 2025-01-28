@@ -8,7 +8,8 @@ import { ShiftDialog } from "./ShiftDialog";
 
 export function ShiftList() {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedShift, setSelectedShift] = useState<any>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const { data: shifts, isLoading } = useQuery({
     queryKey: ['shifts'],
@@ -31,12 +32,14 @@ export function ShiftList() {
   });
 
   const handleCreate = () => {
-    setSelectedShift(null);
+    setSelectedEmployee(null);
+    setSelectedDate(null);
     setDialogOpen(true);
   };
 
   const handleEdit = (shift: any) => {
-    setSelectedShift(shift);
+    setSelectedEmployee(shift.employee);
+    setSelectedDate(new Date(shift.start_time));
     setDialogOpen(true);
   };
 
@@ -61,7 +64,7 @@ export function ShiftList() {
         {shifts?.map((shift) => (
           <div
             key={shift.id}
-            className="border rounded-lg p-4 space-y-3 hover:border-primary transition-colors"
+            className="border rounded-lg p-4 space-y-3 hover:border-primary transition-colors cursor-pointer"
             onClick={() => handleEdit(shift)}
           >
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -85,7 +88,8 @@ export function ShiftList() {
       <ShiftDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        shift={selectedShift}
+        employee={selectedEmployee}
+        selectedDate={selectedDate}
       />
     </div>
   );

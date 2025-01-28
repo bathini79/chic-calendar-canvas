@@ -5,6 +5,12 @@ import { StaffList } from "@/components/staff/StaffList";
 
 export default function Staff() {
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleEdit = (staff: any) => {
+    // Handle edit functionality
+    console.log("Edit staff:", staff);
+  };
 
   return (
     <div className="container mx-auto py-8">
@@ -19,7 +25,10 @@ export default function Staff() {
           </Button>
         </div>
       </div>
-      {view === "grid" ? <StaffGrid /> : <StaffList />}
+      {view === "grid" ? 
+        <StaffGrid searchQuery={searchQuery} onEdit={handleEdit} /> : 
+        <StaffList searchQuery={searchQuery} onEdit={handleEdit} />
+      }
     </div>
   );
 }
