@@ -35,12 +35,24 @@ export function CustomizeDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`${isMobile ? 'max-w-full h-[90vh] mt-auto translate-y-0 rounded-b-none' : 'max-w-2xl'}`}
+        className={`${isMobile ? 'max-w-full h-[90vh] mt-auto translate-y-0 rounded-b-none' : 'max-w-2xl'} flex flex-col`}
       >
         <DialogHeader>
           <DialogTitle>Customize {selectedPackage?.name}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className={`${isMobile ? 'flex-1' : 'max-h-[60vh]'}`}>
+        
+        <div className="flex items-center gap-4 p-4 border-b">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>{totalDuration} min</span>
+          </div>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <DollarSign className="h-4 w-4" />
+            <span>₹{totalPrice}</span>
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1 px-4">
           <ServicesList
             selectedPackage={selectedPackage}
             selectedServices={selectedServices}
@@ -48,28 +60,22 @@ export function CustomizeDialog({
             onServiceToggle={onServiceToggle}
           />
         </ScrollArea>
-        <div className="space-y-4 pt-4 border-t">
-          <div className={`${isMobile ? 'flex flex-col gap-4' : 'flex justify-between items-center'}`}>
-            <div className={`${isMobile ? 'grid grid-cols-2 gap-4 bg-muted p-4 rounded-lg' : 'space-y-1'}`}>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span>{totalDuration} min</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                <span>₹{totalPrice}</span>
-              </div>
-            </div>
-            <Button 
-              className="w-full" 
-              onClick={() => {
-                navigate(`/book/package/${selectedPackage?.id}?customize=true&services=${selectedServices.join(',')}`);
-                onOpenChange(false);
-              }}
-            >
-              Continue Booking
-            </Button>
+
+        <div className="border-t p-4 mt-auto">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-lg font-medium">Total</span>
+            <span className="text-2xl font-bold">₹{totalPrice}</span>
           </div>
+          <Button 
+            className="w-full" 
+            size="lg"
+            onClick={() => {
+              navigate(`/book/package/${selectedPackage?.id}?customize=true&services=${selectedServices.join(',')}`);
+              onOpenChange(false);
+            }}
+          >
+            Book Now
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
