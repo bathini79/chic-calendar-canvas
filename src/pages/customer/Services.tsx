@@ -19,6 +19,9 @@ export default function Services() {
   const { addToCart, removeFromCart, items } = useCart();
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [totalPrice, setTotalPrice] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
   
   const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
@@ -118,6 +121,44 @@ export default function Services() {
 
     return matchesSearch && matchesCategory;
   });
+
+  const handleCustomize = (pkg: any) => {
+    setSelectedPackage(pkg);
+    const includedServiceIds = pkg.package_services.map((ps: any) => ps.service.id);
+    setSelectedServices(includedServiceIds);
+    setCustomizeDialogOpen(true);
+    
+    // Calculate initial totals
+    let price = pkg.price;
+    let duration = pkg.duration;
+    setTotalPrice(price);
+    setTotalDuration(duration);
+  };
+
+  const handleServiceToggle = (serviceId: string, checked: boolean) => {
+    let newSelectedServices;
+    if (checked) {
+      newSelectedServices = [...selectedServices, serviceId];
+    } else {
+      const includedServiceIds = selectedPackage.package_services.map((ps: any) => ps.service.id);
+      if (includedServiceIds.includes(serviceId)) return;
+      newSelectedServices = selectedServices.filter(id => id !== serviceId);
+    }
+    setSelectedServices(newSelectedServices);
+
+    // Recalculate totals
+    let price = selectedPackage.price;
+    let duration = selectedPackage.duration;
+    newSelectedServices.forEach(id => {
+      const service = services?.find(s => s.id === id);
+      if (service && !selectedPackage.package_services.some((ps: any) => ps.service.id === id)) {
+        price += service.selling_price;
+        duration += service.duration;
+      }
+    });
+    setTotalPrice(price);
+    setTotalDuration(duration);
+  };
 
   if (servicesLoading || packagesLoading) {
     return (
@@ -349,6 +390,11 @@ export default function Services() {
         open={customizeDialogOpen}
         onOpenChange={setCustomizeDialogOpen}
         selectedPackage={selectedPackage}
+        selectedServices={selectedServices}
+        allServices={services}
+        totalPrice={totalPrice}
+        totalDuration={totalDuration}
+        onServiceToggle={handleServiceToggle}
       />
 
       <MobileCartBar />
