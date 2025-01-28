@@ -47,15 +47,15 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                           Duration: {item.service?.duration || item.package?.duration} min
                         </p>
                         <p className="text-sm font-medium">
-                          ${item.service?.selling_price || item.package?.price}
+                          ₹{item.service?.selling_price || item.package?.price}
                         </p>
                       </div>
                       <Button
-                        variant="ghost"
-                        size="icon"
+                        variant="destructive"
+                        size="sm"
                         onClick={() => removeFromCart(item.id)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        Remove
                       </Button>
                     </div>
                   </div>

@@ -16,7 +16,7 @@ import { MobileCartBar } from "@/components/cart/MobileCartBar";
 export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const { addToCart, items } = useCart();
+  const { addToCart, removeFromCart, items } = useCart();
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
   
@@ -90,9 +90,14 @@ export default function Services() {
     await addToCart(serviceId, packageId);
   };
 
-  const handleCustomize = (pkg: any) => {
-    setSelectedPackage(pkg);
-    setCustomizeDialogOpen(true);
+  const handleRemove = async (serviceId?: string, packageId?: string) => {
+    const itemToRemove = items.find(item => 
+      (serviceId && item.service_id === serviceId) || 
+      (packageId && item.package_id === packageId)
+    );
+    if (itemToRemove) {
+      await removeFromCart(itemToRemove.id);
+    }
   };
 
   const isItemInCart = (serviceId?: string, packageId?: string) => {
@@ -209,14 +214,22 @@ export default function Services() {
                   <CardFooter>
                     {pkg.is_customizable ? (
                       <div className="flex w-full gap-2">
-                        <Button 
-                          className="flex-[7]"
-                          onClick={() => handleBookNow(undefined, pkg.id)}
-                          variant={isItemInCart(undefined, pkg.id) ? "secondary" : "default"}
-                          disabled={isItemInCart(undefined, pkg.id)}
-                        >
-                          {isItemInCart(undefined, pkg.id) ? "Added" : "Book Now"}
-                        </Button>
+                        {isItemInCart(undefined, pkg.id) ? (
+                          <Button 
+                            className="flex-[7]"
+                            onClick={() => handleRemove(undefined, pkg.id)}
+                            variant="destructive"
+                          >
+                            Remove
+                          </Button>
+                        ) : (
+                          <Button 
+                            className="flex-[7]"
+                            onClick={() => handleBookNow(undefined, pkg.id)}
+                          >
+                            Book Now
+                          </Button>
+                        )}
                         <Button 
                           variant="outline" 
                           className="flex-[3]"
@@ -226,14 +239,22 @@ export default function Services() {
                         </Button>
                       </div>
                     ) : (
-                      <Button 
-                        className="w-full"
-                        onClick={() => handleBookNow(undefined, pkg.id)}
-                        variant={isItemInCart(undefined, pkg.id) ? "secondary" : "default"}
-                        disabled={isItemInCart(undefined, pkg.id)}
-                      >
-                        {isItemInCart(undefined, pkg.id) ? "Added" : "Book Now"}
-                      </Button>
+                      isItemInCart(undefined, pkg.id) ? (
+                        <Button 
+                          className="w-full"
+                          onClick={() => handleRemove(undefined, pkg.id)}
+                          variant="destructive"
+                        >
+                          Remove
+                        </Button>
+                      ) : (
+                        <Button 
+                          className="w-full"
+                          onClick={() => handleBookNow(undefined, pkg.id)}
+                        >
+                          Book Now
+                        </Button>
+                      )
                     )}
                   </CardFooter>
                 </Card>
@@ -290,14 +311,22 @@ export default function Services() {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button 
-                      className="w-full"
-                      onClick={() => handleBookNow(service.id)}
-                      variant={isItemInCart(service.id) ? "secondary" : "default"}
-                      disabled={isItemInCart(service.id)}
-                    >
-                      {isItemInCart(service.id) ? "Added" : "Book Now"}
-                    </Button>
+                    {isItemInCart(service.id) ? (
+                      <Button 
+                        className="w-full"
+                        onClick={() => handleRemove(service.id)}
+                        variant="destructive"
+                      >
+                        Remove
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="w-full"
+                        onClick={() => handleBookNow(service.id)}
+                      >
+                        Book Now
+                      </Button>
+                    )}
                   </CardFooter>
                 </Card>
               </motion.div>

@@ -1,9 +1,8 @@
 import { useCart } from "./CartContext";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 
 export function CartSummary() {
   const { items, removeFromCart } = useCart();
@@ -48,11 +47,11 @@ export function CartSummary() {
                     </p>
                   </div>
                   <Button
-                    variant="ghost"
-                    size="icon"
+                    variant="destructive"
+                    size="sm"
                     onClick={() => removeFromCart(item.id)}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    Remove
                   </Button>
                 </div>
               </div>
