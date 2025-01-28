@@ -14,6 +14,7 @@ interface TimeSlot {
   time: string;
   isAvailable: boolean;
   isSelected: boolean;
+  endTime: string;
 }
 
 interface UnifiedCalendarProps {
@@ -127,7 +128,7 @@ export function UnifiedCalendar({
         (h: any) => h.day_of_week === dayOfWeek
       );
 
-      // If no stylists are selected, use location hours
+      // If no stylists are selected or all stylists are 'any', use location hours
       const useLocationHours = Object.values(selectedStylists).every(id => !id || id === 'any');
       
       if (useLocationHours && locationHours) {
@@ -141,6 +142,9 @@ export function UnifiedCalendar({
             const slotStart = new Date(selectedDate);
             slotStart.setHours(hour, minute, 0, 0);
             const slotEnd = addMinutes(slotStart, totalDuration);
+
+            // Check if slot end time is within location hours
+            if (slotEnd.getHours() > endHour) continue;
 
             // Check conflicts with existing bookings
             const hasConflict = existingBookings?.some(booking => {
@@ -156,6 +160,7 @@ export function UnifiedCalendar({
 
             slots.push({
               time: timeString,
+              endTime: format(slotEnd, 'HH:mm'),
               isAvailable: !hasConflict,
               isSelected,
             });
@@ -164,51 +169,44 @@ export function UnifiedCalendar({
       } else if (shifts) {
         // Use stylist shifts
         console.log('Using stylist shifts:', shifts);
-        for (let hour = 9; hour < 17; hour++) {
-          for (let minute = 0; minute < 60; minute += 30) {
-            const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-            const slotStart = new Date(selectedDate);
-            slotStart.setHours(hour, minute, 0, 0);
-            const slotEnd = addMinutes(slotStart, totalDuration);
+        shifts.forEach(shift => {
+          const shiftStart = new Date(shift.start_time);
+          const shiftEnd = new Date(shift.end_time);
+          
+          for (let hour = shiftStart.getHours(); hour < shiftEnd.getHours(); hour++) {
+            for (let minute = 0; minute < 60; minute += 30) {
+              const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+              const slotStart = new Date(selectedDate);
+              slotStart.setHours(hour, minute, 0, 0);
+              const slotEnd = addMinutes(slotStart, totalDuration);
 
-            const hasAvailableShift = shifts.some(shift => {
-              const shiftStart = new Date(shift.start_time);
-              const shiftEnd = new Date(shift.end_time);
-              
-              const relevantStylistIds = Object.values(selectedStylists);
-              const isRelevantStylist = relevantStylistIds.includes('any') || 
-                                      relevantStylistIds.includes(shift.employee_id);
+              // Check if slot end time is within shift
+              if (slotEnd > shiftEnd) continue;
 
-              return isRelevantStylist && 
-                     slotStart >= shiftStart && 
-                     slotEnd <= shiftEnd;
-            });
-
-            const hasConflict = existingBookings?.some(booking => {
-              const bookingStart = new Date(booking.start_time);
-              const bookingEnd = new Date(booking.end_time);
-              
-              const stylistConflict = Object.values(selectedStylists).some(stylistId => {
-                return stylistId === booking.employee_id || stylistId === 'any';
+              // Check conflicts with existing bookings
+              const hasConflict = existingBookings?.some(booking => {
+                const bookingStart = new Date(booking.start_time);
+                const bookingEnd = new Date(booking.end_time);
+                return (
+                  (slotStart >= bookingStart && slotStart < bookingEnd) ||
+                  (slotEnd > bookingStart && slotEnd <= bookingEnd)
+                );
               });
 
-              return stylistConflict && (
-                (slotStart >= bookingStart && slotStart < bookingEnd) ||
-                (slotEnd > bookingStart && slotEnd <= bookingEnd)
-              );
-            });
+              const isSelected = Object.values(selectedTimeSlots).includes(timeString);
 
-            const isSelected = Object.values(selectedTimeSlots).includes(timeString);
-
-            slots.push({
-              time: timeString,
-              isAvailable: hasAvailableShift && !hasConflict,
-              isSelected,
-            });
+              slots.push({
+                time: timeString,
+                endTime: format(slotEnd, 'HH:mm'),
+                isAvailable: !hasConflict,
+                isSelected,
+              });
+            }
           }
-        }
+        });
       }
-      return slots;
+      
+      return slots.sort((a, b) => a.time.localeCompare(b.time));
     };
 
     const generatedSlots = generateTimeSlots();
@@ -216,20 +214,10 @@ export function UnifiedCalendar({
     setTimeSlots(generatedSlots);
   }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, shifts, locationData, totalDuration]);
 
-  const handleTimeSlotSelect = (time: string) => {
+  const handleTimeSlotSelect = (time: string, endTime: string) => {
     // When a time slot is selected, assign it to all services
-    const startTime = time;
-    let currentTime = startTime;
-    
     items.forEach((item) => {
-      onTimeSlotSelect(item.id, currentTime);
-      // Calculate next start time based on service duration
-      const duration = item.service?.duration || item.package?.duration || 30;
-      const nextTime = new Date(selectedDate!);
-      const [hours, minutes] = currentTime.split(':').map(Number);
-      nextTime.setHours(hours, minutes);
-      const newTime = addMinutes(nextTime, duration);
-      currentTime = format(newTime, 'HH:mm');
+      onTimeSlotSelect(item.id, time);
     });
   };
 
@@ -292,11 +280,11 @@ export function UnifiedCalendar({
                         )}
                         onClick={() => {
                           if (slot.isAvailable && !slot.isSelected) {
-                            handleTimeSlotSelect(slot.time);
+                            handleTimeSlotSelect(slot.time, slot.endTime);
                           }
                         }}
                       >
-                        {slot.time}
+                        {slot.time} - {slot.endTime}
                       </Badge>
                     ))}
                   </div>
