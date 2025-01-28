@@ -17,3 +17,6 @@ export function useIsMobile() {
 
   return !!isMobile
 }
+
+// Add the useMediaQuery function as an alias for consistency
+export const useMediaQuery = useIsMobile

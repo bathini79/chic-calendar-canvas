@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, DollarSign } from "lucide-react";
 import { ServicesList } from "./ServicesList";
 import { useNavigate } from "react-router-dom";
-import { useMediaQuery } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CustomizeDialogProps {
   open: boolean;
@@ -28,7 +28,7 @@ export function CustomizeDialog({
   onServiceToggle,
 }: CustomizeDialogProps) {
   const navigate = useNavigate();
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useIsMobile();
 
   if (!selectedPackage) return null;
 
