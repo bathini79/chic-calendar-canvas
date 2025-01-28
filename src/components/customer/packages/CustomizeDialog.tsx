@@ -61,21 +61,27 @@ export function CustomizeDialog({
           />
         </ScrollArea>
 
-        <div className="border-t p-4 mt-auto">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-lg font-medium">Total</span>
-            <span className="text-2xl font-bold">₹{totalPrice}</span>
+        <div className="sticky bottom-0 border-t bg-background p-4">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                {selectedServices.length} services selected
+              </div>
+              <div className="text-2xl font-bold">
+                ₹{totalPrice}
+              </div>
+            </div>
+            <Button 
+              className="w-full" 
+              size="lg"
+              onClick={() => {
+                navigate(`/book/package/${selectedPackage?.id}?customize=true&services=${selectedServices.join(',')}`);
+                onOpenChange(false);
+              }}
+            >
+              Continue
+            </Button>
           </div>
-          <Button 
-            className="w-full" 
-            size="lg"
-            onClick={() => {
-              navigate(`/book/package/${selectedPackage?.id}?customize=true&services=${selectedServices.join(',')}`);
-              onOpenChange(false);
-            }}
-          >
-            Book Now
-          </Button>
         </div>
       </DialogContent>
     </Dialog>
