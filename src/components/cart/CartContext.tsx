@@ -91,25 +91,43 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const { error } = await supabase
-      .from('cart_items')
-      .insert([
-        {
-          service_id: serviceId,
-          package_id: packageId,
-          status: 'pending',
-          customer_id: session.session.user.id,
-        },
-      ]);
+    // First check if the item already exists in cart
+    const existingItem = items.find(item => 
+      (serviceId && item.service_id === serviceId) || 
+      (packageId && item.package_id === packageId)
+    );
 
-    if (error) {
-      toast.error("Error adding item to cart");
-      return;
+    if (existingItem) {
+      // If it exists, update its status back to pending if it was removed
+      const { error } = await supabase
+        .from('cart_items')
+        .update({ status: 'pending' })
+        .eq('id', existingItem.id);
+
+      if (error) {
+        toast.error("Error updating cart item");
+        return;
+      }
+    } else {
+      // If it doesn't exist, insert a new item
+      const { error } = await supabase
+        .from('cart_items')
+        .insert([
+          {
+            service_id: serviceId,
+            package_id: packageId,
+            status: 'pending',
+            customer_id: session.session.user.id,
+          },
+        ]);
+
+      if (error) {
+        toast.error("Error adding item to cart");
+        return;
+      }
     }
 
-    toast.success("Added to cart");
-    setCartOpen(true);
-    await fetchCartItems(); // Immediately fetch updated cart items
+    await fetchCartItems();
   };
 
   const removeFromCart = async (itemId: string) => {
@@ -123,8 +141,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    toast.success("Removed from cart");
-    await fetchCartItems(); // Immediately fetch updated cart items
+    await fetchCartItems();
   };
 
   return (

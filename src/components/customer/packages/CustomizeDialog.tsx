@@ -6,6 +6,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useCart } from "@/components/cart/CartContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useEffect } from "react";
 
 interface CustomizeDialogProps {
   open: boolean;
@@ -30,7 +31,24 @@ export function CustomizeDialog({
 }: CustomizeDialogProps) {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const { addToCart, items } = useCart();
+  const { addToCart, removeFromCart, items } = useCart();
+
+  // Initialize selected services when dialog opens
+  useEffect(() => {
+    if (open && selectedPackage) {
+      // Find if this package is already in cart
+      const existingPackageInCart = items.find(item => 
+        item.package_id === selectedPackage?.id
+      );
+
+      if (existingPackageInCart) {
+        // Reset selected services to match what's in the cart
+        const includedServiceIds = selectedPackage.package_services.map((ps: any) => ps.service.id);
+        onServiceToggle('reset', false); // Reset all selections
+        includedServiceIds.forEach(id => onServiceToggle(id, true));
+      }
+    }
+  }, [open, selectedPackage, items]);
 
   const handleBookNow = async () => {
     // Check if this package is already in cart
@@ -39,12 +57,17 @@ export function CustomizeDialog({
     );
 
     if (existingPackageInCart) {
-      // Remove the existing package from cart (it will be handled by the CartContext)
+      // First remove the existing package from cart
+      await removeFromCart(existingPackageInCart.id);
+      // Then add the updated package
+      await addToCart(undefined, selectedPackage?.id);
       toast.success("Package updated in cart");
+    } else {
+      // Add the new customized package to cart
+      await addToCart(undefined, selectedPackage?.id);
+      toast.success("Added to cart");
     }
-
-    // Add the customized package to cart
-    await addToCart(undefined, selectedPackage?.id);
+    
     onOpenChange(false);
   };
 
