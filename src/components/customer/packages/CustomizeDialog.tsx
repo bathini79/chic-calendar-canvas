@@ -2,7 +2,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ServicesList } from "./ServicesList";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useCart } from "@/components/cart/CartContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -29,46 +28,54 @@ export function CustomizeDialog({
   totalDuration,
   onServiceToggle,
 }: CustomizeDialogProps) {
-  const isMobile = useIsMobile();
-  const navigate = useNavigate();
   const { addToCart, removeFromCart, items } = useCart();
+  const navigate = useNavigate();
 
-  // Initialize selected services when dialog opens
+  // Find if this package is already in cart
+  const existingPackageInCart = items.find(item => 
+    item.package_id === selectedPackage?.id
+  );
+
+  // When dialog opens, initialize selected services from cart if package exists
   useEffect(() => {
-    if (open && selectedPackage) {
-      // Find if this package is already in cart
-      const existingPackageInCart = items.find(item => 
-        item.package_id === selectedPackage?.id
-      );
+    if (open && selectedPackage && existingPackageInCart) {
+      // Reset all selections first
+      selectedServices.forEach(id => onServiceToggle(id, false));
+      
+      // Add back the included services
+      selectedPackage.package_services.forEach((ps: any) => {
+        onServiceToggle(ps.service.id, true);
+      });
 
-      if (existingPackageInCart) {
-        // Reset selected services to match what's in the cart
-        const includedServiceIds = selectedPackage.package_services.map((ps: any) => ps.service.id);
-        onServiceToggle('reset', false); // Reset all selections
-        includedServiceIds.forEach(id => onServiceToggle(id, true));
+      // Add any additional services that were previously selected
+      if (existingPackageInCart.customized_services) {
+        existingPackageInCart.customized_services.forEach((serviceId: string) => {
+          onServiceToggle(serviceId, true);
+        });
       }
     }
-  }, [open, selectedPackage, items]);
+  }, [open, selectedPackage, existingPackageInCart]);
 
   const handleBookNow = async () => {
-    // Check if this package is already in cart
-    const existingPackageInCart = items.find(item => 
-      item.package_id === selectedPackage?.id
-    );
-
-    if (existingPackageInCart) {
-      // First remove the existing package from cart
-      await removeFromCart(existingPackageInCart.id);
-      // Then add the updated package
-      await addToCart(undefined, selectedPackage?.id);
-      toast.success("Package updated in cart");
-    } else {
-      // Add the new customized package to cart
-      await addToCart(undefined, selectedPackage?.id);
-      toast.success("Added to cart");
+    try {
+      if (existingPackageInCart) {
+        // First remove the existing package from cart
+        await removeFromCart(existingPackageInCart.id);
+      }
+      
+      // Add the package with updated customizations
+      await addToCart(undefined, selectedPackage?.id, {
+        customized_services: selectedServices.filter(
+          serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
+        )
+      });
+      
+      toast.success(existingPackageInCart ? "Package updated in cart" : "Added to cart");
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error handling package:', error);
+      toast.error("Failed to update cart");
     }
-    
-    onOpenChange(false);
   };
 
   if (!selectedPackage) return null;
@@ -76,7 +83,7 @@ export function CustomizeDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`${isMobile ? 'max-w-full h-[90vh] mt-[5vh] rounded-t-lg' : 'max-w-2xl h-[90vh]'} flex flex-col p-0`}
+        className="max-w-2xl h-[90vh] flex flex-col p-0"
       >
         <DialogHeader className="p-6 pb-0">
           <DialogTitle>Customize {selectedPackage?.name}</DialogTitle>
@@ -97,15 +104,10 @@ export function CustomizeDialog({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                {selectedServices.length} services selected
+                {selectedServices.length} services selected • {totalDuration} min
               </div>
-              <div className="flex items-center gap-4">
-                <div className="text-sm text-muted-foreground">
-                  {totalDuration} min
-                </div>
-                <div className="text-2xl font-bold">
-                  ₹{totalPrice}
-                </div>
+              <div className="text-2xl font-bold">
+                ₹{totalPrice}
               </div>
             </div>
             <Button 

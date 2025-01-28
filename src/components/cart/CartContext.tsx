@@ -7,6 +7,7 @@ type CartItem = {
   service_id?: string;
   package_id?: string;
   status: 'pending' | 'scheduled' | 'removed';
+  customized_services?: string[];
   service?: {
     name: string;
     selling_price: number;
@@ -21,7 +22,7 @@ type CartItem = {
 
 type CartContextType = {
   items: CartItem[];
-  addToCart: (serviceId?: string, packageId?: string) => Promise<void>;
+  addToCart: (serviceId?: string, packageId?: string, options?: { customized_services?: string[] }) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   isLoading: boolean;
   setCartOpen: (open: boolean) => void;
@@ -84,7 +85,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   };
 
-  const addToCart = async (serviceId?: string, packageId?: string) => {
+  const addToCart = async (serviceId?: string, packageId?: string, options?: { customized_services?: string[] }) => {
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) {
       toast.error("Please sign in to add items to cart");
@@ -101,7 +102,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       // If it exists, update its status back to pending if it was removed
       const { error } = await supabase
         .from('cart_items')
-        .update({ status: 'pending' })
+        .update({ 
+          status: 'pending',
+          customized_services: options?.customized_services 
+        })
         .eq('id', existingItem.id);
 
       if (error) {
@@ -118,6 +122,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             package_id: packageId,
             status: 'pending',
             customer_id: session.session.user.id,
+            customized_services: options?.customized_services
           },
         ]);
 
