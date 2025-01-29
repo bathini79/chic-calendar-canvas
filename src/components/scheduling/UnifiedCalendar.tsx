@@ -46,15 +46,14 @@ export function UnifiedCalendar({
 
   // Generate week dates
   useEffect(() => {
-    if (selectedDate) {
-      const dates = Array.from({ length: 7 }, (_, i) => {
-        return addDays(selectedDate, i - 3);
-      });
-      setWeekDates(dates);
+    const today = new Date();
+    const dates = Array.from({ length: 7 }, (_, i) => addDays(today, i));
+    setWeekDates(dates);
+    if (!selectedDate) {
+      onDateSelect(today);
     }
-  }, [selectedDate]);
+  }, [selectedDate, onDateSelect]);
 
-  // Fetch location hours and existing bookings logic
   const { data: locationData } = useQuery({
     queryKey: ['location'],
     queryFn: async () => {
