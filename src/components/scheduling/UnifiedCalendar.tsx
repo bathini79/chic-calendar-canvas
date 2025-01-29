@@ -197,14 +197,14 @@ export function UnifiedCalendar({
                 key={date.toISOString()}
                 variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
                 className={cn(
-                  "flex-col h-auto py-2 px-4",
+                  "flex-col h-[4.5rem] w-[4.5rem] rounded-full p-0",
                   selectedDate?.toDateString() === date.toDateString() 
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : ""
+                    : "hover:bg-accent"
                 )}
                 onClick={() => onDateSelect(date)}
               >
-                <span className="text-lg font-semibold">{format(date, "d")}</span>
+                <span className="text-2xl font-semibold">{format(date, "d")}</span>
                 <span className="text-sm">{format(date, "EEE")}</span>
               </Button>
             ))}
