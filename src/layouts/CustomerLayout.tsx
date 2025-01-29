@@ -4,10 +4,6 @@ import { CartProvider } from "@/components/cart/CartContext";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { useState } from "react";
 
-interface CustomerNavbarProps {
-  onCartClick: () => void;
-}
-
 export default function CustomerLayout() {
   const [cartOpen, setCartOpen] = useState(false);
 

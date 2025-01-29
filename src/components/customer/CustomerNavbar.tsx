@@ -5,7 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export function CustomerNavbar() {
+interface CustomerNavbarProps {
+  onCartClick: () => void;
+}
+
+export function CustomerNavbar({ onCartClick }: CustomerNavbarProps) {
   const { data: session } = useQuery({
     queryKey: ["session"],
     queryFn: async () => {
