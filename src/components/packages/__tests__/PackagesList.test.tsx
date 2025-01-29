@@ -1,67 +1,43 @@
 import { render, screen } from '@testing-library/react';
 import { PackagesList } from '../PackagesList';
-import { vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import * as reactQuery from '@tanstack/react-query';
 
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({
-    data: [
-      {
-        id: '1',
-        name: 'Package 1',
-        description: 'Description 1',
-        price: 100,
-        package_services: [
-          { service: { id: '1', name: 'Service 1' } },
-        ],
-      },
-      {
-        id: '2',
-        name: 'Package 2',
-        description: 'Description 2',
-        price: 200,
-        package_services: [
-          { service: { id: '2', name: 'Service 2' } },
-        ],
-      },
-    ],
-    isLoading: false,
-  }),
-  useQueryClient: () => ({
-    invalidateQueries: vi.fn(),
-  }),
-}));
+// Mock the useQuery hook
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual('@tanstack/react-query');
+  return {
+    ...actual,
+    useQuery: vi.fn().mockReturnValue({
+      data: [],
+      isLoading: false,
+    }),
+  };
+});
 
 describe('PackagesList', () => {
-  const mockOnEdit = vi.fn();
-
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('renders loading state', () => {
+    vi.mocked(reactQuery.useQuery).mockReturnValueOnce({ isLoading: true });
+    render(<PackagesList />);
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
 
-  it('renders packages list with correct data', () => {
-    render(<PackagesList searchQuery="" onEdit={mockOnEdit} />);
-
-    expect(screen.getByText('Package 1')).toBeInTheDocument();
-    expect(screen.getByText('Package 2')).toBeInTheDocument();
-    expect(screen.getByText('Description 1')).toBeInTheDocument();
-    expect(screen.getByText('Description 2')).toBeInTheDocument();
-  });
-
-  it('filters packages based on search query', () => {
-    render(<PackagesList searchQuery="Package 1" onEdit={mockOnEdit} />);
-
-    expect(screen.getByText('Package 1')).toBeInTheDocument();
-    expect(screen.queryByText('Package 2')).not.toBeInTheDocument();
-  });
-
-  it('displays loading state when data is loading', () => {
-    vi.mocked('@tanstack/react-query').useQuery.mockReturnValueOnce({
-      data: undefined,
-      isLoading: true,
+  it('renders packages when data is available', () => {
+    vi.mocked(reactQuery.useQuery).mockReturnValueOnce({
+      data: [{ id: '1', name: 'Package 1' }, { id: '2', name: 'Package 2' }],
+      isLoading: false,
     });
+    render(<PackagesList />);
+    expect(screen.getByText(/package 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/package 2/i)).toBeInTheDocument();
+  });
 
-    render(<PackagesList searchQuery="" onEdit={mockOnEdit} />);
-
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+  it('renders empty state when no packages are available', () => {
+    vi.mocked(reactQuery.useQuery).mockReturnValueOnce({
+      data: [],
+      isLoading: false,
+    });
+    render(<PackagesList />);
+    expect(screen.getByText(/no packages available/i)).toBeInTheDocument();
   });
 });

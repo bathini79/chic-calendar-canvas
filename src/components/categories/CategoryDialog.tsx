@@ -1,102 +1,82 @@
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
-import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-const categoryFormSchema = z.object({
-  name: z.string().min(1, "Category name is required"),
-});
-
-type CategoryFormValues = z.infer<typeof categoryFormSchema>;
+interface CategoryFormValues {
+  name: string;
+}
 
 interface CategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  category?: { id: string; name: string };
-  onSuccess: () => void;
+  initialData?: { id: string; name: string };
 }
 
-export function CategoryDialog({
-  open,
-  onOpenChange,
-  category,
-  onSuccess,
-}: CategoryDialogProps) {
-  const { create, update } = useSupabaseCrud('categories');
-  
-  const form = useForm<CategoryFormValues>({
-    resolver: zodResolver(categoryFormSchema),
-    defaultValues: {
-      name: "",
-    },
-  });
+export function CategoryDialog({ open, onOpenChange, initialData }: CategoryDialogProps) {
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (category) {
-      form.reset({
-        name: category.name,
-      });
-    }
-  }, [category, form]);
-
-  const onSubmit = async (values: CategoryFormValues) => {
+  const handleSubmit = async (values: CategoryFormValues) => {
     try {
-      if (category) {
-        await update(category.id, values);
+      if (initialData) {
+        const { error } = await supabase
+          .from('categories')
+          .update({
+            name: values.name,
+          })
+          .eq('id', initialData.id)
+          .select()
+          .single();
+
+        if (error) throw error;
       } else {
-        await create(values);
+        const { error } = await supabase
+          .from('categories')
+          .insert({
+            name: values.name,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
       }
-      onSuccess();
+
+      toast.success(initialData ? "Category updated" : "Category created");
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
       onOpenChange(false);
-      form.reset();
-    } catch (error) {
-      console.error('Error saving category:', error);
+    } catch (error: any) {
+      toast.error(error.message);
     }
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
-          <DialogTitle>{category ? "Edit" : "Add"} Category</DialogTitle>
+          <DialogTitle>{initialData ? "Edit Category" : "Create Category"}</DialogTitle>
+          <DialogDescription>
+            {initialData ? "Update the category details." : "Fill in the details to create a new category."}
+          </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="flex justify-end">
-              <Button type="submit">Save</Button>
-            </div>
-          </form>
-        </Form>
+        {/* Form fields for category name */}
+        <div className="space-y-4">
+          <input
+            type="text"
+            placeholder="Category Name"
+            defaultValue={initialData?.name}
+            className="input"
+            required
+          />
+        </div>
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit}>
+            {initialData ? "Update" : "Create"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

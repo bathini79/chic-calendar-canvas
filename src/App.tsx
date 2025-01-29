@@ -17,7 +17,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* Customer Routes */}
-          <Route path="/" element={<CustomerLayout />}>
+          <Route element={<CustomerLayout />}>
             <Route index element={<Services />} />
             <Route path="schedule" element={<UnifiedScheduling />} />
           </Route>
