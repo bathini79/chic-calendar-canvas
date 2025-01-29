@@ -43,7 +43,7 @@ export function UnifiedCalendar({
     }, 0);
   }, [items]);
 
-  // Generate week dates
+  // Generate week dates and set default selected date
   useEffect(() => {
     const today = new Date();
     const dates = Array.from({ length: 7 }, (_, i) => addDays(today, i));
@@ -51,7 +51,7 @@ export function UnifiedCalendar({
     if (!selectedDate) {
       onDateSelect(today);
     }
-  }, [selectedDate, onDateSelect]);
+  }, [onDateSelect]);
 
   const { data: locationData } = useQuery({
     queryKey: ['location'],
@@ -156,6 +156,32 @@ export function UnifiedCalendar({
     setTimeSlots(generatedSlots);
   }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, locationData, totalDuration]);
 
+  const handlePrevDay = () => {
+    if (selectedDate) {
+      const newDate = subDays(selectedDate, 1);
+      onDateSelect(newDate);
+      
+      // Update week dates if necessary
+      if (newDate < weekDates[0]) {
+        const newWeekDates = Array.from({ length: 7 }, (_, i) => addDays(newDate, i));
+        setWeekDates(newWeekDates);
+      }
+    }
+  };
+
+  const handleNextDay = () => {
+    if (selectedDate) {
+      const newDate = addDays(selectedDate, 1);
+      onDateSelect(newDate);
+      
+      // Update week dates if necessary
+      if (newDate > weekDates[6]) {
+        const newWeekDates = Array.from({ length: 7 }, (_, i) => subDays(newDate, 6-i));
+        setWeekDates(newWeekDates);
+      }
+    }
+  };
+
   return (
     <Card className="border-0 shadow-none bg-transparent">
       <CardHeader className="pb-4">
@@ -175,14 +201,14 @@ export function UnifiedCalendar({
             <Button 
               variant="outline" 
               size="icon"
-              onClick={() => selectedDate && onDateSelect(subDays(selectedDate, 1))}
+              onClick={handlePrevDay}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button 
               variant="outline" 
               size="icon"
-              onClick={() => selectedDate && onDateSelect(addDays(selectedDate, 1))}
+              onClick={handleNextDay}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
