@@ -37,7 +37,6 @@ export function UnifiedCalendar({
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [weekDates, setWeekDates] = useState<Date[]>([]);
 
-  // Calculate total duration of all services
   const totalDuration = useMemo(() => {
     return items.reduce((total, item) => {
       return total + (item.service?.duration || item.package?.duration || 30);
@@ -158,7 +157,7 @@ export function UnifiedCalendar({
   }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, locationData, totalDuration]);
 
   return (
-    <Card className="border-0 shadow-none">
+    <Card className="border-0 shadow-none bg-transparent">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-2xl">
@@ -169,23 +168,25 @@ export function UnifiedCalendar({
         
         {/* Month Navigation */}
         <div className="flex items-center justify-between mt-4">
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => selectedDate && onDateSelect(subDays(selectedDate, 1))}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
           <span className="text-lg font-medium">
             {selectedDate ? format(selectedDate, "MMMM yyyy") : "Select a date"}
           </span>
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => selectedDate && onDateSelect(addDays(selectedDate, 1))}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => selectedDate && onDateSelect(subDays(selectedDate, 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => selectedDate && onDateSelect(addDays(selectedDate, 1))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Date Picker Strip */}
@@ -204,7 +205,7 @@ export function UnifiedCalendar({
                 onClick={() => onDateSelect(date)}
               >
                 <span className="text-2xl font-semibold">{format(date, "d")}</span>
-                <span className="text-sm">{format(date, "EEE")}</span>
+                <span className="text-xs mt-1">{format(date, "EEE")}</span>
               </Button>
             ))}
           </div>
@@ -234,9 +235,6 @@ export function UnifiedCalendar({
                   }}
                 >
                   <span className="font-medium">{slot.time} - {slot.endTime}</span>
-                  <span className="text-sm">
-                    {slot.isAvailable ? "Available" : "Booked"}
-                  </span>
                 </Badge>
               ))}
             </div>
