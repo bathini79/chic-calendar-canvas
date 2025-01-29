@@ -8,17 +8,24 @@ vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual('@tanstack/react-query');
   return {
     ...actual,
-    useQuery: vi.fn().mockReturnValue({
-      data: [],
-      isLoading: false,
-    }),
+    useQuery: vi.fn(),
   };
 });
 
 describe('PackagesList', () => {
   it('renders loading state', () => {
-    vi.mocked(reactQuery.useQuery).mockReturnValueOnce({ isLoading: true });
-    render(<PackagesList />);
+    vi.mocked(reactQuery.useQuery).mockReturnValueOnce({
+      isLoading: true,
+      data: undefined,
+      error: null,
+      isError: false,
+      isPending: true,
+      isSuccess: false,
+      status: 'loading',
+      refetch: vi.fn(),
+    } as any);
+    
+    render(<PackagesList searchQuery="" onEdit={() => {}} />);
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
 
@@ -26,8 +33,15 @@ describe('PackagesList', () => {
     vi.mocked(reactQuery.useQuery).mockReturnValueOnce({
       data: [{ id: '1', name: 'Package 1' }, { id: '2', name: 'Package 2' }],
       isLoading: false,
-    });
-    render(<PackagesList />);
+      error: null,
+      isError: false,
+      isPending: false,
+      isSuccess: true,
+      status: 'success',
+      refetch: vi.fn(),
+    } as any);
+    
+    render(<PackagesList searchQuery="" onEdit={() => {}} />);
     expect(screen.getByText(/package 1/i)).toBeInTheDocument();
     expect(screen.getByText(/package 2/i)).toBeInTheDocument();
   });
@@ -36,8 +50,15 @@ describe('PackagesList', () => {
     vi.mocked(reactQuery.useQuery).mockReturnValueOnce({
       data: [],
       isLoading: false,
-    });
-    render(<PackagesList />);
+      error: null,
+      isError: false,
+      isPending: false,
+      isSuccess: true,
+      status: 'success',
+      refetch: vi.fn(),
+    } as any);
+    
+    render(<PackagesList searchQuery="" onEdit={() => {}} />);
     expect(screen.getByText(/no packages available/i)).toBeInTheDocument();
   });
 });

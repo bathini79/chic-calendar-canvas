@@ -1,82 +1,74 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-interface CategoryFormValues {
-  name: string;
-}
+const categorySchema = z.object({
+  name: z.string().min(1, "Name is required"),
+});
+
+type CategoryFormValues = z.infer<typeof categorySchema>;
 
 interface CategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialData?: { id: string; name: string };
+  onSuccess: () => void;
 }
 
-export function CategoryDialog({ open, onOpenChange, initialData }: CategoryDialogProps) {
-  const queryClient = useQueryClient();
+export function CategoryDialog({ open, onOpenChange, onSuccess }: CategoryDialogProps) {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<CategoryFormValues>({
+    resolver: zodResolver(categorySchema),
+  });
 
-  const handleSubmit = async (values: CategoryFormValues) => {
+  const onSubmit = async (values: CategoryFormValues) => {
     try {
-      if (initialData) {
-        const { error } = await supabase
-          .from('categories')
-          .update({
-            name: values.name,
-          })
-          .eq('id', initialData.id)
-          .select()
-          .single();
+      const { error } = await supabase
+        .from("categories")
+        .insert([{ name: values.name }]);
 
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('categories')
-          .insert({
-            name: values.name,
-          })
-          .select()
-          .single();
+      if (error) throw error;
 
-        if (error) throw error;
-      }
-
-      toast.success(initialData ? "Category updated" : "Category created");
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      toast.success("Category created successfully");
+      onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message);
+      reset();
+    } catch (error) {
+      toast.error("Failed to create category");
+      console.error("Error creating category:", error);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px]">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>{initialData ? "Edit Category" : "Create Category"}</DialogTitle>
-          <DialogDescription>
-            {initialData ? "Update the category details." : "Fill in the details to create a new category."}
-          </DialogDescription>
+          <DialogTitle>Create Category</DialogTitle>
         </DialogHeader>
-        {/* Form fields for category name */}
-        <div className="space-y-4">
-          <input
-            type="text"
-            placeholder="Category Name"
-            defaultValue={initialData?.name}
-            className="input"
-            required
-          />
-        </div>
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit}>
-            {initialData ? "Update" : "Create"}
-          </Button>
-        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div>
+            <Label htmlFor="name">Name</Label>
+            <Input id="name" {...register("name")} />
+            {errors.name && (
+              <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
+            )}
+          </div>
+          <Button type="submit">Create Category</Button>
+        </form>
       </DialogContent>
     </Dialog>
   );
