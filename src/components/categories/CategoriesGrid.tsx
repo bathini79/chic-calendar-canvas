@@ -76,15 +76,11 @@ const CategoriesGrid = ({ categories, onEdit, onDelete }: CategoriesGridProps) =
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
       {categories.map((category) => (
         <Card key={category.id} className="group relative">
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold">{category.name}</h3>
-            <div className="text-sm text-muted-foreground mt-2">
-              <p>Created: {new Date(category.created_at).toLocaleDateString()}</p>
-              <p>Updated: {new Date(category.updated_at).toLocaleDateString()}</p>
-            </div>
           </CardContent>
           <CardFooter className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <div className="flex gap-2">
