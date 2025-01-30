@@ -191,12 +191,12 @@ export default function Services() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="w-full sm:w-[400px]">
-              <ScrollArea className="w-full">
-                <div className="flex gap-2 p-2">
+            <div className="w-full sm:w-[400px] relative">
+              <ScrollArea className="w-full h-16 rounded-md border">
+                <div className="flex items-center px-4 py-3 gap-3">
                   <Badge
                     variant={selectedCategory === null ? "default" : "outline"}
-                    className="cursor-pointer flex-shrink-0"
+                    className="cursor-pointer flex-none hover:bg-accent"
                     onClick={() => setSelectedCategory(null)}
                   >
                     All
@@ -205,7 +205,7 @@ export default function Services() {
                     <Badge
                       key={category.id}
                       variant={selectedCategory === category.id ? "default" : "outline"}
-                      className="cursor-pointer flex-shrink-0"
+                      className="cursor-pointer flex-none hover:bg-accent"
                       onClick={() => setSelectedCategory(category.id)}
                     >
                       {category.name}
