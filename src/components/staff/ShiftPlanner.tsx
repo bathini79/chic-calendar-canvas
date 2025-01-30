@@ -125,9 +125,6 @@ export function ShiftPlanner() {
       />
 
       <div className="bg-card rounded-lg shadow-sm">
-        <div className="p-4 border-b">
-          <h3 className="text-sm font-medium text-muted-foreground">Staff Schedule</h3>
-        </div>
         <EmployeeShiftsList
           employees={employees}
           allShifts={allShifts}

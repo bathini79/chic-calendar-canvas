@@ -48,7 +48,7 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
       {staff?.map((member) => (
         <Card key={member.id} className="relative">
           <CardContent className="pt-6">

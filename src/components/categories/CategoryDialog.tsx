@@ -1,75 +1,87 @@
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import React from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-
-const categorySchema = z.object({
-  name: z.string().min(1, "Name is required"),
-});
-
-type CategoryFormValues = z.infer<typeof categorySchema>;
+import { Input } from "@/components/ui/input";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
+import { categoryFormSchema, type CategoryFormValues } from "@/lib/validations/form-schemas";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  category?: any;
   onSuccess: () => void;
 }
 
-export function CategoryDialog({ open, onOpenChange, onSuccess }: CategoryDialogProps) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<CategoryFormValues>({
-    resolver: zodResolver(categorySchema),
+export function CategoryDialog({
+  open,
+  onOpenChange,
+  category,
+  onSuccess,
+}: CategoryDialogProps) {
+  const { create, update } = useSupabaseCrud({ table: 'categories' });
+  
+  const form = useForm<CategoryFormValues>({
+    resolver: zodResolver(categoryFormSchema),
+    defaultValues: {
+      name: category?.name || "",
+    },
   });
 
+  React.useEffect(() => {
+    if (category) {
+      form.reset({ name: category.name });
+    } else {
+      form.reset({ name: "" });
+    }
+  }, [category, form]);
+
   const onSubmit = async (values: CategoryFormValues) => {
-    try {
-      const { error } = await supabase
-        .from("categories")
-        .insert([{ name: values.name }]);
+    const result = category
+      ? await update(category.id, values)
+      : await create(values);
 
-      if (error) throw error;
-
-      toast.success("Category created successfully");
+    if (result) {
       onSuccess();
       onOpenChange(false);
-      reset();
-    } catch (error) {
-      toast.error("Failed to create category");
-      console.error("Error creating category:", error);
+      form.reset();
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create Category</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" {...register("name")} />
-            {errors.name && (
-              <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={category ? "Edit Category" : "Create Category"}
+      description={category 
+        ? "Update the details of an existing category."
+        : "Create a new category for organizing services."
+      }
+      form={form}
+      onSubmit={onSubmit}
+      submitLabel={category ? "Update" : "Create"}
+      className="max-h-[90vh]"
+      contentClassName="p-0"
+    >
+      <ScrollArea className="max-h-[calc(90vh-200px)]">
+        <div className="p-6">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
-          <Button type="submit">Create Category</Button>
-        </form>
-      </DialogContent>
-    </Dialog>
+          />
+        </div>
+      </ScrollArea>
+    </FormDialog>
   );
 }

@@ -1,4 +1,4 @@
-import { Package, Clock, DollarSign } from "lucide-react";
+import { Package, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,6 @@ export function PackageCard({ pkg, onCustomize }: PackageCardProps) {
             <span>{pkg.duration} min</span>
           </div>
           <div className="flex items-center gap-1 text-muted-foreground">
-            <DollarSign className="h-4 w-4" />
             <span>₹{pkg.price}</span>
           </div>
         </div>

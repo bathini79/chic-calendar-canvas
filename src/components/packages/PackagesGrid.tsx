@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Package, Trash, Clock, DollarSign } from "lucide-react";
+import { Edit, Package, Trash, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 interface PackagesGridProps {
@@ -68,7 +68,7 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
       {filteredPackages?.map((pkg) => (
         <Card key={pkg.id} className="relative group">
           {pkg.image_urls && pkg.image_urls[0] ? (
@@ -125,7 +125,6 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
                 <span>{pkg.duration} min</span>
               </div>
               <div className="flex items-center gap-1 text-muted-foreground">
-                <DollarSign className="h-4 w-4" />
                 <span>₹{pkg.price}</span>
               </div>
             </div>

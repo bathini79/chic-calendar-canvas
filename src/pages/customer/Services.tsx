@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Clock, DollarSign, Package } from "lucide-react";
+import { Search, Clock, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useCart } from "@/components/cart/CartContext";
@@ -247,7 +247,6 @@ export default function Services() {
                         <span>{pkg.duration} min</span>
                       </div>
                       <div className="flex items-center gap-1 text-muted-foreground">
-                        <DollarSign className="h-4 w-4" />
                         <span>₹{pkg.price}</span>
                       </div>
                     </div>
@@ -346,7 +345,6 @@ export default function Services() {
                         <span>{service.duration} min</span>
                       </div>
                       <div className="flex items-center gap-1 text-muted-foreground">
-                        <DollarSign className="h-4 w-4" />
                         <span>₹{service.selling_price}</span>
                       </div>
                     </div>

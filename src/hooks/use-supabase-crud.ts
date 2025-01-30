@@ -1,95 +1,117 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { useSession } from "@supabase/auth-helpers-react";
 
-type TableNames = 'services' | 'categories' | 'packages' | 'employees' | 'bookings' | 'cart_items';
+type TableNames = 'categories' | 'package_services' | 'packages' | 'services' | 'profiles' | 'services_categories';
 
-export function useSupabaseCrud<T extends Record<string, any>>(tableName: TableNames) {
-  const queryClient = useQueryClient();
+interface CrudOptions {
+  table: TableNames;
+  requireAuth?: boolean;
+  adminOnly?: boolean;
+}
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: [tableName],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from(tableName)
-        .select('*');
+export function useSupabaseCrud({ table, requireAuth = true, adminOnly = true }: CrudOptions) {
+  const { toast } = useToast();
+  const session = useSession();
 
-      if (error) {
-        toast.error(`Error fetching ${tableName}`);
-        throw error;
-      }
+  const checkAuth = () => {
+    if (requireAuth && !session) {
+      toast({
+        variant: "destructive",
+        title: "Authentication required",
+        description: "You must be logged in to perform this action.",
+      });
+      return false;
+    }
+    return true;
+  };
 
-      return data;
-    },
-  });
+  const handleError = (error: any) => {
+    if (error.code === "42501") {
+      toast({
+        variant: "destructive",
+        title: "Permission denied",
+        description: `You don't have permission to modify ${table}. Only admin users can perform this action.`,
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: `Error with ${table}`,
+        description: error.message,
+      });
+    }
+    return null;
+  };
 
-  const createMutation = useMutation({
-    mutationFn: async (newItem: Partial<T>) => {
-      const { data, error } = await supabase
-        .from(tableName)
-        .insert([newItem as any])
+  const create = async (data: any) => {
+    if (!checkAuth()) return null;
+    
+    try {
+      const { data: result, error } = await supabase
+        .from(table)
+        .insert([data])
         .select()
         .single();
 
-      if (error) {
-        toast.error(`Error creating ${tableName}`);
-        throw error;
-      }
+      if (error) return handleError(error);
 
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [tableName] });
-      toast.success(`${tableName} created successfully`);
-    },
-  });
+      toast({
+        title: "Success",
+        description: `${table} created successfully`,
+      });
+      return result;
+    } catch (error: any) {
+      return handleError(error);
+    }
+  };
 
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<T> & { id: string }) => {
-      const { data, error } = await supabase
-        .from(tableName)
-        .update(updates as any)
+  const update = async (id: string, data: any) => {
+    if (!checkAuth()) return null;
+
+    try {
+      const { data: result, error } = await supabase
+        .from(table)
+        .update(data)
         .eq('id', id)
         .select()
         .single();
 
-      if (error) {
-        toast.error(`Error updating ${tableName}`);
-        throw error;
-      }
+      if (error) return handleError(error);
 
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [tableName] });
-      toast.success(`${tableName} updated successfully`);
-    },
-  });
+      toast({
+        title: "Success",
+        description: `${table} updated successfully`,
+      });
+      return result;
+    } catch (error: any) {
+      return handleError(error);
+    }
+  };
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+  const remove = async (id: string) => {
+    if (!checkAuth()) return null;
+
+    try {
       const { error } = await supabase
-        .from(tableName)
+        .from(table)
         .delete()
         .eq('id', id);
 
-      if (error) {
-        toast.error(`Error deleting ${tableName}`);
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [tableName] });
-      toast.success(`${tableName} deleted successfully`);
-    },
-  });
+      if (error) return handleError(error);
+
+      toast({
+        title: "Success",
+        description: `${table} deleted successfully`,
+      });
+      return true;
+    } catch (error: any) {
+      return handleError(error);
+    }
+  };
 
   return {
-    data,
-    isLoading,
-    error,
-    create: createMutation.mutate,
-    update: updateMutation.mutate,
-    delete: deleteMutation.mutate,
+    create,
+    update,
+    remove,
   };
 }
