@@ -191,11 +191,11 @@ export default function Services() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <ScrollArea className="w-[calc(100vw-2rem)] sm:w-auto">
-              <div className="flex gap-2 p-1">
+            <ScrollArea className="w-full sm:w-[400px] whitespace-nowrap">
+              <div className="flex gap-2 px-1 py-2 min-w-full">
                 <Badge
                   variant={selectedCategory === null ? "default" : "outline"}
-                  className="cursor-pointer whitespace-nowrap"
+                  className="cursor-pointer shrink-0"
                   onClick={() => setSelectedCategory(null)}
                 >
                   All
@@ -204,7 +204,7 @@ export default function Services() {
                   <Badge
                     key={category.id}
                     variant={selectedCategory === category.id ? "default" : "outline"}
-                    className="cursor-pointer whitespace-nowrap"
+                    className="cursor-pointer shrink-0"
                     onClick={() => setSelectedCategory(category.id)}
                   >
                     {category.name}
