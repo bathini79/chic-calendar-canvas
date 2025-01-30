@@ -191,27 +191,29 @@ export default function Services() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <ScrollArea className="w-full sm:w-[400px] whitespace-nowrap">
-              <div className="flex gap-2 px-1 py-2 min-w-full">
-                <Badge
-                  variant={selectedCategory === null ? "default" : "outline"}
-                  className="cursor-pointer shrink-0"
-                  onClick={() => setSelectedCategory(null)}
-                >
-                  All
-                </Badge>
-                {categories?.map((category) => (
+            <div className="w-full sm:w-[400px]">
+              <ScrollArea className="w-full">
+                <div className="flex gap-2 p-2">
                   <Badge
-                    key={category.id}
-                    variant={selectedCategory === category.id ? "default" : "outline"}
-                    className="cursor-pointer shrink-0"
-                    onClick={() => setSelectedCategory(category.id)}
+                    variant={selectedCategory === null ? "default" : "outline"}
+                    className="cursor-pointer flex-shrink-0"
+                    onClick={() => setSelectedCategory(null)}
                   >
-                    {category.name}
+                    All
                   </Badge>
-                ))}
-              </div>
-            </ScrollArea>
+                  {categories?.map((category) => (
+                    <Badge
+                      key={category.id}
+                      variant={selectedCategory === category.id ? "default" : "outline"}
+                      className="cursor-pointer flex-shrink-0"
+                      onClick={() => setSelectedCategory(category.id)}
+                    >
+                      {category.name}
+                    </Badge>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
           </div>
 
           <h2 className="text-2xl font-semibold">Featured Packages</h2>
