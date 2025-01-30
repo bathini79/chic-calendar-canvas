@@ -10,6 +10,7 @@ import UnifiedScheduling from "@/pages/customer/UnifiedScheduling";
 import AdminServices from "@/pages/admin/AdminServices";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import Staff from "@/pages/admin/Staff";
+import Index from "./pages/admin/Index";
 
 export default function App() {
   return (
@@ -24,7 +25,7 @@ export default function App() {
 
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-            <Route index element={<AdminDashboard />} />
+            <Route index element={<Index />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="staff" element={<Staff />} />
           </Route>
