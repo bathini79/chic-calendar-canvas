@@ -12,6 +12,7 @@ import { useCart } from "@/components/cart/CartContext";
 import { CustomizeDialog } from "@/components/customer/packages/CustomizeDialog";
 import { CartSummary } from "@/components/cart/CartSummary";
 import { MobileCartBar } from "@/components/cart/MobileCartBar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -190,25 +191,27 @@ export default function Services() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge
-                variant={selectedCategory === null ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => setSelectedCategory(null)}
-              >
-                All
-              </Badge>
-              {categories?.map((category) => (
+            <ScrollArea className="w-[calc(100vw-2rem)] sm:w-auto">
+              <div className="flex gap-2 p-1">
                 <Badge
-                  key={category.id}
-                  variant={selectedCategory === category.id ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedCategory(category.id)}
+                  variant={selectedCategory === null ? "default" : "outline"}
+                  className="cursor-pointer whitespace-nowrap"
+                  onClick={() => setSelectedCategory(null)}
                 >
-                  {category.name}
+                  All
                 </Badge>
-              ))}
-            </div>
+                {categories?.map((category) => (
+                  <Badge
+                    key={category.id}
+                    variant={selectedCategory === category.id ? "default" : "outline"}
+                    className="cursor-pointer whitespace-nowrap"
+                    onClick={() => setSelectedCategory(category.id)}
+                  >
+                    {category.name}
+                  </Badge>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
 
           <h2 className="text-2xl font-semibold">Featured Packages</h2>
