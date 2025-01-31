@@ -13,7 +13,6 @@ import { CustomizeDialog } from "@/components/customer/packages/CustomizeDialog"
 import { CartSummary } from "@/components/cart/CartSummary";
 import { MobileCartBar } from "@/components/cart/MobileCartBar";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Scrollbar } from "@radix-ui/react-scroll-area";
 
 export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -184,11 +183,11 @@ export default function Services() {
 
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div className="w-full sm:w-[400px]">
-              <ScrollArea className="w-full">
-                <div className="flex gap-2 p-2">
+              <ScrollArea className="w-full border rounded-lg p-2">
+                <div className="flex gap-2">
                   <Badge
                     variant={selectedCategory === null ? "default" : "outline"}
-                    className="cursor-pointer flex-shrink-0"
+                    className="cursor-pointer flex-none"
                     onClick={() => setSelectedCategory(null)}
                   >
                     All
@@ -197,19 +196,18 @@ export default function Services() {
                     <Badge
                       key={category.id}
                       variant={selectedCategory === category.id ? "default" : "outline"}
-                      className="cursor-pointer flex-shrink-0"
+                      className="cursor-pointer flex-none"
                       onClick={() => setSelectedCategory(category.id)}
                     >
                       {category.name}
                     </Badge>
                   ))}
-                        <Scrollbar orientation="horizontal" />
                 </div>
+                <ScrollBar orientation="horizontal" />
               </ScrollArea>
             </div>
           </div>
 
-          <h2 className="text-2xl font-semibold">Featured Packages</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {packages?.map((pkg) => (
               <motion.div
@@ -233,7 +231,11 @@ export default function Services() {
                     </div>
                   )}
                   <CardHeader>
-                    <CardTitle>{pkg.name}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-primary" />
+                      <Badge variant="outline" className="text-xs">Package</Badge>
+                      <CardTitle>{pkg.name}</CardTitle>
+                    </div>
                   </CardHeader>
                   <CardContent className="flex-1">
                     <p className="text-muted-foreground line-clamp-2">
@@ -298,10 +300,7 @@ export default function Services() {
                 </Card>
               </motion.div>
             ))}
-          </div>
 
-          <h2 className="text-2xl font-semibold">Individual Services</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredServices?.map((service, index) => (
               <motion.div
                 key={service.id}

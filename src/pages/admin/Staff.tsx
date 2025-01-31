@@ -1,79 +1,57 @@
 import { useState } from "react";
-import { SearchInput } from "@/components/services/components/SearchInput";
-import { HeaderActions } from "@/components/services/components/HeaderActions";
-import { StaffGrid } from "@/components/staff/StaffGrid";
+import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { StaffList } from "@/components/staff/StaffList";
+import { StaffGrid } from "@/components/staff/StaffGrid";
 import { StaffDialog } from "@/components/staff/StaffDialog";
-import { ShiftPlanner } from "@/components/staff/ShiftPlanner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HeaderActions } from "@/components/services/components/HeaderActions";
+import { ViewToggle } from "@/components/services/components/ViewToggle";
+import { SearchInput } from "@/components/services/components/SearchInput";
 
 export default function Staff() {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
 
-  const handleEdit = (staff: any) => {
-    setSelectedStaff(staff);
+  const { data: employees, isLoading } = useSupabaseCrud("employees");
+
+  const handleEdit = (employee: any) => {
+    setSelectedEmployee(employee);
     setDialogOpen(true);
   };
 
-  const handleCreate = () => {
-    setSelectedStaff(null);
-    setDialogOpen(true);
+  const handleClose = () => {
+    setSelectedEmployee(null);
+    setDialogOpen(false);
   };
 
   return (
-    <div className="w-full min-h-screen bg-background p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container space-y-4 py-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="text-3xl font-bold">Staff Management</h1>
+        <HeaderActions
+          onAdd={() => setDialogOpen(true)}
+          view={view}
+          onViewChange={setView}
+        />
       </div>
 
-      <Tabs defaultValue="staff" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="staff">Staff Members</TabsTrigger>
-          <TabsTrigger value="planner">Shift Planner</TabsTrigger>
-        </TabsList>
+      <div className="flex items-center justify-between">
+        <SearchInput value={searchQuery} onChange={setSearchQuery} />
+        <ViewToggle view={view} onViewChange={setView} />
+      </div>
 
-        <TabsContent value="staff" className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <SearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search staff..."
-              />
-            </div>
-            <HeaderActions
-              view={viewMode}
-              onViewChange={setViewMode}
-              onCreateClick={handleCreate}
-              type="staff"
-            />
-          </div>
-
-          {viewMode === 'grid' ? (
-            <StaffGrid
-              searchQuery={searchQuery}
-              onEdit={handleEdit}
-            />
-          ) : (
-            <StaffList
-              searchQuery={searchQuery}
-              onEdit={handleEdit}
-            />
-          )}
-        </TabsContent>
-
-        <TabsContent value="planner">
-          <ShiftPlanner />
-        </TabsContent>
-      </Tabs>
+      {view === "grid" ? (
+        <StaffGrid searchQuery={searchQuery} onEdit={handleEdit} />
+      ) : (
+        <StaffList searchQuery={searchQuery} onEdit={handleEdit} />
+      )}
 
       <StaffDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        initialData={selectedStaff}
+        employee={selectedEmployee}
+        onClose={handleClose}
       />
     </div>
   );
