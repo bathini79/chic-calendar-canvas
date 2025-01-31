@@ -25,15 +25,15 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Select Stylists</CardTitle>
+    <Card className="w-full">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg">Select Stylists</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         {items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium">{item.service?.name || item.package?.name}</p>
+          <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium truncate">{item.service?.name || item.package?.name}</p>
               <p className="text-sm text-muted-foreground">
                 {item.service?.duration || item.package?.duration} minutes
               </p>
@@ -42,7 +42,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
               value={selectedStylists[item.id] || ''} 
               onValueChange={(value) => onStylistSelect(item.id, value)}
             >
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Select stylist" />
               </SelectTrigger>
               <SelectContent>
