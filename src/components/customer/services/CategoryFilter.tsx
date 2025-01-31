@@ -14,10 +14,10 @@ export function CategoryFilter({
 }: CategoryFilterProps) {
   return (
     <ScrollArea className="w-full border rounded-lg p-2">
-      <div className="flex gap-2">
+      <div className="flex gap-2 pb-4">
         <Badge
           variant={selectedCategory === null ? "default" : "outline"}
-          className="cursor-pointer flex-none"
+          className="cursor-pointer flex-none hover:bg-accent"
           onClick={() => onCategorySelect(null)}
         >
           All
@@ -26,14 +26,14 @@ export function CategoryFilter({
           <Badge
             key={category.id}
             variant={selectedCategory === category.id ? "default" : "outline"}
-            className="cursor-pointer flex-none"
+            className="cursor-pointer flex-none hover:bg-accent"
             onClick={() => onCategorySelect(category.id)}
           >
             {category.name}
           </Badge>
         ))}
       </div>
-      <ScrollBar orientation="horizontal" />
+      <ScrollBar orientation="horizontal" className="opacity-0" />
     </ScrollArea>
   );
 }
