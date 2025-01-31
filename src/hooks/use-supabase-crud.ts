@@ -5,14 +5,11 @@ import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 
 type TableName = keyof Database['public']['Tables'];
+type Row<T extends TableName> = Database['public']['Tables'][T]['Row'];
+type Insert<T extends TableName> = Database['public']['Tables'][T]['Insert'];
+type Update<T extends TableName> = Database['public']['Tables'][T]['Update'];
 
-interface BaseRecord {
-  id: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
+export function useSupabaseCrud<T extends TableName>(tableName: T) {
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
@@ -24,12 +21,12 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as T[];
+      return data as Row<T>[];
     },
   });
 
   const { mutateAsync: create } = useMutation({
-    mutationFn: async (newItem: Omit<T, 'id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (newItem: Insert<T>) => {
       const { data, error } = await supabase
         .from(tableName)
         .insert([newItem])
@@ -37,7 +34,7 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
         .single();
 
       if (error) throw error;
-      return data as T;
+      return data as Row<T>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [tableName] });
@@ -49,7 +46,7 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
   });
 
   const { mutateAsync: update } = useMutation({
-    mutationFn: async ({ id, ...updateData }: Partial<T> & { id: string }) => {
+    mutationFn: async ({ id, ...updateData }: Update<T> & { id: string }) => {
       const { data, error } = await supabase
         .from(tableName)
         .update(updateData)
@@ -58,7 +55,7 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
         .single();
 
       if (error) throw error;
-      return data as T;
+      return data as Row<T>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [tableName] });

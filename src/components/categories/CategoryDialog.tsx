@@ -24,7 +24,7 @@ export function CategoryDialog({
   category,
   onSuccess,
 }: CategoryDialogProps) {
-  const { create, update } = useSupabaseCrud<Category>('categories');
+  const { create, update } = useSupabaseCrud('categories');
   
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
@@ -44,9 +44,9 @@ export function CategoryDialog({
   const onSubmit = async (values: CategoryFormValues) => {
     try {
       if (category) {
-        await update({ id: category.id, ...values });
+        await update({ id: category.id, name: values.name });
       } else {
-        await create(values);
+        await create({ name: values.name });
       }
       onSuccess();
       onOpenChange(false);
