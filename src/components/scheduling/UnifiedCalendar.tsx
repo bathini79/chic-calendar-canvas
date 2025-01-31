@@ -38,17 +38,18 @@ export function UnifiedCalendar({
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const isMobile = useIsMobile();
 
-  // Generate dates for the next 2 months
+  // Generate dates for the next 2 months and set default date
   useEffect(() => {
     const today = startOfToday();
     const dates = Array.from({ length: 60 }, (_, i) => addDays(today, i));
     setWeekDates(dates);
     
-    // Auto-select today's date if no date is selected
+    // Only set the date if it hasn't been set yet
     if (!selectedDate) {
+      console.log('Setting default date to today:', today);
       onDateSelect(today);
     }
-  }, [onDateSelect, selectedDate]);
+  }, []); // Empty dependency array to run only once on mount
 
   const totalDuration = useMemo(() => {
     return items.reduce((total, item) => {
@@ -172,10 +173,10 @@ export function UnifiedCalendar({
                   className="flex flex-col items-center min-w-[3.5rem]"
                 >
                   <Button
-                    variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
+                    variant={selectedDate && isSameDay(selectedDate, date) ? "default" : "outline"}
                     className={cn(
                       "h-[3.5rem] w-[3.5rem] rounded-full p-0",
-                      selectedDate?.toDateString() === date.toDateString() 
+                      selectedDate && isSameDay(selectedDate, date)
                         ? "bg-primary text-primary-foreground hover:bg-primary/90"
                         : "hover:bg-accent"
                     )}
