@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addDays, startOfToday, addMonths, isSameDay, parseISO, addMinutes } from "date-fns";
+import { format, addDays, startOfToday, isSameDay, addMinutes } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +49,7 @@ export function UnifiedCalendar({
       console.log('Setting default date to today:', today);
       onDateSelect(today);
     }
-  }, []); // Empty dependency array to run only once on mount
+  }, [selectedDate, onDateSelect]); // Add dependencies to ensure proper updates
 
   const totalDuration = useMemo(() => {
     return items.reduce((total, item) => {

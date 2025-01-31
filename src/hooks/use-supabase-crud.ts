@@ -27,7 +27,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert([newData])
+        .insert([newData as any])
         .select()
         .single();
 
@@ -45,7 +45,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();
