@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addMinutes, parseISO, addDays, subDays } from "date-fns";
+import { format, addMinutes, parseISO, addDays, startOfToday } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { CalendarClock, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarClock, Clock } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TimeSlot {
   time: string;
@@ -35,6 +36,7 @@ export function UnifiedCalendar({
   const { items } = useCart();
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [weekDates, setWeekDates] = useState<Date[]>([]);
+  const isMobile = useIsMobile();
 
   const totalDuration = useMemo(() => {
     return items.reduce((total, item) => {
@@ -44,7 +46,7 @@ export function UnifiedCalendar({
 
   // Generate week dates and set default selected date
   useEffect(() => {
-    const today = new Date();
+    const today = startOfToday();
     const dates = Array.from({ length: 7 }, (_, i) => addDays(today, i));
     setWeekDates(dates);
     if (!selectedDate) {
@@ -100,12 +102,10 @@ export function UnifiedCalendar({
       const slots: TimeSlot[] = [];
       const dayOfWeek = selectedDate.getDay();
       
-      // Get location hours for the selected day
       const locationHours = locationData?.location_hours?.find(
         (h: any) => h.day_of_week === dayOfWeek
       );
 
-      // If no stylists are selected or all stylists are 'any', use location hours
       const useLocationHours = Object.values(selectedStylists).every(id => !id || id === 'any');
       
       if (useLocationHours && locationHours) {
@@ -118,15 +118,12 @@ export function UnifiedCalendar({
             const slotStart = new Date(selectedDate);
             slotStart.setHours(hour, minute, 0, 0);
             
-            // Calculate end time based on total duration
             const slotEnd = addMinutes(slotStart, totalDuration);
             
-            // Skip if the slot would end after location closing time
             const closingTime = new Date(selectedDate);
             closingTime.setHours(endHour, 0, 0, 0);
             if (slotEnd > closingTime) continue;
 
-            // Check conflicts with existing bookings
             const hasConflict = existingBookings?.some(booking => {
               const bookingStart = new Date(booking.start_time);
               const bookingEnd = new Date(booking.end_time);
@@ -165,44 +162,12 @@ export function UnifiedCalendar({
           </CardTitle>
         </div>
         
-        <div className="flex items-center justify-between mt-4">
-          <span className="text-base sm:text-lg font-medium">
-            {selectedDate ? format(selectedDate, "MMMM yyyy") : "Select a date"}
-          </span>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="icon"
-              onClick={() => {
-                if (selectedDate) {
-                  const newDate = subDays(selectedDate, 1);
-                  onDateSelect(newDate);
-                }
-              }}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="icon"
-              onClick={() => {
-                if (selectedDate) {
-                  const newDate = addDays(selectedDate, 1);
-                  onDateSelect(newDate);
-                }
-              }}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
         <div className="mt-4 -mx-4 px-4">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
             {weekDates.map((date) => (
               <div
                 key={date.toISOString()}
-                className="flex flex-col items-center"
+                className="flex flex-col items-center min-w-[3.5rem]"
               >
                 <Button
                   variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
@@ -216,7 +181,7 @@ export function UnifiedCalendar({
                 >
                   <span className="text-2xl font-semibold">{format(date, "d")}</span>
                 </Button>
-                <span className="text-xs mt-1 text-muted-foreground">
+                <span className="text-xs mt-2 text-muted-foreground">
                   {format(date, "EEE")}
                 </span>
               </div>
@@ -260,14 +225,6 @@ export function UnifiedCalendar({
               <p className="text-muted-foreground mb-4">
                 Available from {format(addDays(selectedDate, 1), "EEE, d MMM")}
               </p>
-              <Button
-                onClick={() => {
-                  const nextDay = addDays(selectedDate, 1);
-                  onDateSelect(nextDay);
-                }}
-              >
-                Go to next available date
-              </Button>
             </div>
           )
         )}
