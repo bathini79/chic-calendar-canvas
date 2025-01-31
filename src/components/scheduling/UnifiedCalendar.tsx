@@ -194,7 +194,7 @@ export function UnifiedCalendar({
                 </div>
               ))}
             </div>
-            <ScrollBar orientation="horizontal" />
+            <ScrollBar orientation="horizontal" className="opacity-0" />
           </ScrollArea>
         </div>
       </CardHeader>
