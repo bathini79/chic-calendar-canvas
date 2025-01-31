@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, addMinutes, parseISO, addDays, subDays } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -51,7 +50,7 @@ export function UnifiedCalendar({
     if (!selectedDate) {
       onDateSelect(today);
     }
-  }, [onDateSelect]);
+  }, [onDateSelect, selectedDate]);
 
   const { data: locationData } = useQuery({
     queryKey: ['location'],
@@ -156,99 +155,86 @@ export function UnifiedCalendar({
     setTimeSlots(generatedSlots);
   }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, locationData, totalDuration]);
 
-  const handlePrevDay = () => {
-    if (selectedDate) {
-      const newDate = subDays(selectedDate, 1);
-      onDateSelect(newDate);
-      
-      // Update week dates if necessary
-      if (newDate < weekDates[0]) {
-        const newWeekDates = Array.from({ length: 7 }, (_, i) => addDays(newDate, i));
-        setWeekDates(newWeekDates);
-      }
-    }
-  };
-
-  const handleNextDay = () => {
-    if (selectedDate) {
-      const newDate = addDays(selectedDate, 1);
-      onDateSelect(newDate);
-      
-      // Update week dates if necessary
-      if (newDate > weekDates[6]) {
-        const newWeekDates = Array.from({ length: 7 }, (_, i) => subDays(newDate, 6-i));
-        setWeekDates(newWeekDates);
-      }
-    }
-  };
-
   return (
-    <Card className="border-0 shadow-none bg-transparent">
+    <Card className="border-0 shadow-none bg-transparent w-full">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-2xl">
+          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
             <CalendarClock className="h-6 w-6" />
             Select Time
           </CardTitle>
         </div>
         
-        {/* Month Navigation */}
         <div className="flex items-center justify-between mt-4">
-          <span className="text-lg font-medium">
+          <span className="text-base sm:text-lg font-medium">
             {selectedDate ? format(selectedDate, "MMMM yyyy") : "Select a date"}
           </span>
           <div className="flex gap-2">
             <Button 
               variant="outline" 
               size="icon"
-              onClick={handlePrevDay}
+              onClick={() => {
+                if (selectedDate) {
+                  const newDate = subDays(selectedDate, 1);
+                  onDateSelect(newDate);
+                }
+              }}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button 
               variant="outline" 
               size="icon"
-              onClick={handleNextDay}
+              onClick={() => {
+                if (selectedDate) {
+                  const newDate = addDays(selectedDate, 1);
+                  onDateSelect(newDate);
+                }
+              }}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Date Picker Strip */}
-        <ScrollArea className="w-full mt-4">
-          <div className="flex gap-2 pb-4">
+        <div className="mt-4 -mx-4 px-4">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
             {weekDates.map((date) => (
-              <Button
+              <div
                 key={date.toISOString()}
-                variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
-                className={cn(
-                  "flex-col h-[4.5rem] w-[4.5rem] rounded-full p-0",
-                  selectedDate?.toDateString() === date.toDateString() 
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "hover:bg-accent"
-                )}
-                onClick={() => onDateSelect(date)}
+                className="flex flex-col items-center"
               >
-                <span className="text-2xl font-semibold">{format(date, "d")}</span>
-                <span className="text-xs mt-1">{format(date, "EEE")}</span>
-              </Button>
+                <Button
+                  variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
+                  className={cn(
+                    "h-[3.5rem] w-[3.5rem] rounded-full p-0",
+                    selectedDate?.toDateString() === date.toDateString() 
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "hover:bg-accent"
+                  )}
+                  onClick={() => onDateSelect(date)}
+                >
+                  <span className="text-2xl font-semibold">{format(date, "d")}</span>
+                </Button>
+                <span className="text-xs mt-1 text-muted-foreground">
+                  {format(date, "EEE")}
+                </span>
+              </div>
             ))}
           </div>
-          <ScrollBar orientation="horizontal"/>
-        </ScrollArea>
+        </div>
       </CardHeader>
 
       <CardContent>
         {selectedDate && (
           timeSlots.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {timeSlots.map((slot) => (
                 <Badge
                   key={slot.time}
                   variant={slot.isSelected ? "default" : slot.isAvailable ? "secondary" : "outline"}
                   className={cn(
-                    "py-4 cursor-pointer transition-colors justify-center flex-col h-auto",
+                    "py-3 cursor-pointer transition-colors justify-center flex-col h-auto",
                     !slot.isAvailable && "opacity-50 cursor-not-allowed",
                     slot.isSelected && "bg-primary hover:bg-primary/90",
                     !slot.isAvailable && !slot.isSelected && "bg-muted text-muted-foreground"
@@ -261,7 +247,7 @@ export function UnifiedCalendar({
                     }
                   }}
                 >
-                  <span className="font-medium">{slot.time} - {slot.endTime}</span>
+                  <span className="font-medium text-sm">{slot.time} - {slot.endTime}</span>
                 </Badge>
               ))}
             </div>
