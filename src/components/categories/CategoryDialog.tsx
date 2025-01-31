@@ -7,11 +7,12 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { categoryFormSchema, type CategoryFormValues } from "@/lib/validations/form-schemas";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tables } from "@/integrations/supabase/types";
 
 interface CategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  category?: any;
+  category?: Tables['categories']['Row'];
   onSuccess: () => void;
 }
 
@@ -21,7 +22,7 @@ export function CategoryDialog({
   category,
   onSuccess,
 }: CategoryDialogProps) {
-  const { create, update } = useSupabaseCrud({ table: 'categories' });
+  const { create, update } = useSupabaseCrud<Tables['categories']['Row']>('categories');
   
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
@@ -39,14 +40,17 @@ export function CategoryDialog({
   }, [category, form]);
 
   const onSubmit = async (values: CategoryFormValues) => {
-    const result = category
-      ? await update(category.id, values)
-      : await create(values);
-
-    if (result) {
+    try {
+      if (category) {
+        await update({ id: category.id, ...values });
+      } else {
+        await create(values);
+      }
       onSuccess();
       onOpenChange(false);
       form.reset();
+    } catch (error) {
+      console.error('Error:', error);
     }
   };
 

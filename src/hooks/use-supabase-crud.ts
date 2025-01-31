@@ -2,8 +2,9 @@ import { PostgrestError } from '@supabase/supabase-js';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Tables } from '@/integrations/supabase/types';
 
-type TableName = 'services' | 'packages' | 'categories' | 'employees';
+type TableName = keyof Tables;
 
 interface BaseRecord {
   id: string;
@@ -11,14 +12,14 @@ interface BaseRecord {
   updated_at?: string;
 }
 
-export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
+export function useSupabaseCrud<T extends BaseRecord>(table: TableName) {
   const queryClient = useQueryClient();
 
-  const getAll = useQuery({
-    queryKey: [tableName],
+  const { data, isLoading, error } = useQuery({
+    queryKey: [table],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from(tableName)
+        .from(table)
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -27,10 +28,10 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
     },
   });
 
-  const create = useMutation({
+  const { mutateAsync: create } = useMutation({
     mutationFn: async (newItem: Partial<T>) => {
       const { data, error } = await supabase
-        .from(tableName)
+        .from(table)
         .insert([newItem])
         .select()
         .single();
@@ -39,7 +40,7 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [tableName] });
+      queryClient.invalidateQueries({ queryKey: [table] });
       toast.success('Created successfully');
     },
     onError: (error: PostgrestError) => {
@@ -47,10 +48,10 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
     },
   });
 
-  const update = useMutation({
+  const { mutateAsync: update } = useMutation({
     mutationFn: async ({ id, ...updateData }: Partial<T> & { id: string }) => {
       const { data, error } = await supabase
-        .from(tableName)
+        .from(table)
         .update(updateData)
         .eq('id', id)
         .select()
@@ -60,7 +61,7 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [tableName] });
+      queryClient.invalidateQueries({ queryKey: [table] });
       toast.success('Updated successfully');
     },
     onError: (error: PostgrestError) => {
@@ -68,17 +69,17 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
     },
   });
 
-  const remove = useMutation({
+  const { mutateAsync: remove } = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from(tableName)
+        .from(table)
         .delete()
         .eq('id', id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [tableName] });
+      queryClient.invalidateQueries({ queryKey: [table] });
       toast.success('Deleted successfully');
     },
     onError: (error: PostgrestError) => {
@@ -87,9 +88,9 @@ export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
   });
 
   return {
-    data: getAll.data,
-    isLoading: getAll.isLoading,
-    error: getAll.error,
+    data,
+    isLoading,
+    error,
     create,
     update,
     remove,

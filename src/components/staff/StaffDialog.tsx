@@ -8,11 +8,12 @@ import { StaffForm } from "./StaffForm";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Tables } from "@/integrations/supabase/types";
 
 interface StaffDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialData?: any;
+  initialData?: Tables['employees']['Row'];
 }
 
 export function StaffDialog({ open, onOpenChange, initialData }: StaffDialogProps) {
