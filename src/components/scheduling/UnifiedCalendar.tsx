@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, addDays, startOfToday, isSameDay, addMinutes } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -190,6 +190,7 @@ export function UnifiedCalendar({
                 </div>
               ))}
             </div>
+            <ScrollBar orientation="horizontal" className="opacity-0" />
           </ScrollArea>
         </div>
       </CardHeader>
