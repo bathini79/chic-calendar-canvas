@@ -7,6 +7,7 @@ import { AdminRoute } from "@/components/auth/AdminRoute";
 import { queryClient } from "@/lib/react-query";
 import Services from "@/pages/customer/Services";
 import UnifiedScheduling from "@/pages/customer/UnifiedScheduling";
+import BookingConfirmation from "@/pages/customer/BookingConfirmation";
 import AdminServices from "@/pages/admin/AdminServices";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import Staff from "@/pages/admin/Staff";
@@ -21,6 +22,7 @@ export default function App() {
           <Route element={<CustomerLayout />}>
             <Route index element={<Services />} />
             <Route path="schedule" element={<UnifiedScheduling />} />
+            <Route path="booking-confirmation" element={<BookingConfirmation />} />
           </Route>
 
           {/* Admin Routes */}
