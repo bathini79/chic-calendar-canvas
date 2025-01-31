@@ -1,21 +1,26 @@
-import React from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Input } from "@/components/ui/input";
-import { FormDialog } from "@/components/ui/form-dialog";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
-import { categoryFormSchema, type CategoryFormValues } from "@/lib/validations/form-schemas";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Database } from "@/integrations/supabase/types";
+import { z } from "zod";
 
 type Category = Database['public']['Tables']['categories']['Row'];
+
+const categoryFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+});
+
+type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 
 interface CategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   category?: Category;
-  onSuccess: () => void;
+  onSuccess?: () => void;
 }
 
 export function CategoryDialog({
@@ -33,14 +38,6 @@ export function CategoryDialog({
     },
   });
 
-  React.useEffect(() => {
-    if (category) {
-      form.reset({ name: category.name });
-    } else {
-      form.reset({ name: "" });
-    }
-  }, [category, form]);
-
   const onSubmit = async (values: CategoryFormValues) => {
     try {
       if (category) {
@@ -48,46 +45,45 @@ export function CategoryDialog({
       } else {
         await create({ name: values.name });
       }
-      onSuccess();
+      onSuccess?.();
       onOpenChange(false);
       form.reset();
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error saving category:", error);
     }
   };
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={category ? "Edit Category" : "Create Category"}
-      description={category 
-        ? "Update the details of an existing category."
-        : "Create a new category for organizing services."
-      }
-      form={form}
-      onSubmit={onSubmit}
-      submitLabel={category ? "Update" : "Create"}
-      className="max-h-[90vh]"
-      contentClassName="p-0"
-    >
-      <ScrollArea className="max-h-[calc(90vh-200px)]">
-        <div className="p-6">
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-      </ScrollArea>
-    </FormDialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{category ? "Edit Category" : "New Category"}</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {category ? "Update" : "Create"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }

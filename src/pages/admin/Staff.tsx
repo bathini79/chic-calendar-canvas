@@ -1,62 +1,40 @@
 import { useState } from "react";
-import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
-import { StaffList } from "@/components/staff/StaffList";
-import { StaffGrid } from "@/components/staff/StaffGrid";
 import { StaffDialog } from "@/components/staff/StaffDialog";
-import { HeaderActions } from "@/components/services/components/HeaderActions";
-import { ViewToggle } from "@/components/services/components/ViewToggle";
-import { SearchInput } from "@/components/services/components/SearchInput";
+import { StaffGrid } from "@/components/staff/StaffGrid";
+import { StaffList } from "@/components/staff/StaffList";
+import { HeaderActions } from "@/components/staff/components/HeaderActions";
+import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { Database } from "@/integrations/supabase/types";
 
-type Employee = Database['public']['Tables']['employees']['Row'];
+type ViewMode = "grid" | "list";
 
 export default function Staff() {
-  const [view, setView] = useState<"grid" | "list">("grid");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | undefined>(undefined);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [view, setView] = useState<ViewMode>("grid");
+  const { data: employees, isLoading } = useSupabaseCrud('employees');
 
-  const { data: employees, isLoading } = useSupabaseCrud<Employee>("employees");
-
-  const handleEdit = (employee: Employee) => {
-    setSelectedEmployee(employee);
-    setDialogOpen(true);
-  };
-
-  const handleClose = () => {
-    setSelectedEmployee(undefined);
-    setDialogOpen(false);
-  };
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
-    <div className="container space-y-4 py-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-3xl font-bold">Staff Management</h1>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setDialogOpen(true)}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded"
-          >
-            Add Staff
-          </button>
-          <ViewToggle view={view} onViewChange={setView} />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <SearchInput value={searchQuery} onChange={setSearchQuery} />
-      </div>
+    <div className="container py-6 space-y-4">
+      <HeaderActions 
+        onAdd={() => setIsDialogOpen(true)} 
+        view={view} 
+        onViewChange={setView}
+      />
 
       {view === "grid" ? (
-        <StaffGrid searchQuery={searchQuery} onEdit={handleEdit} />
+        <StaffGrid employees={employees || []} />
       ) : (
-        <StaffList searchQuery={searchQuery} onEdit={handleEdit} />
+        <StaffList employees={employees || []} />
       )}
 
-      <StaffDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        initialData={selectedEmployee}
+      <StaffDialog 
+        open={isDialogOpen} 
+        onOpenChange={setIsDialogOpen} 
+        onClose={() => setIsDialogOpen(false)}
       />
     </div>
   );

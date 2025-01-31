@@ -1,13 +1,10 @@
 import { PostgrestError } from '@supabase/supabase-js';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 
-type TableName = keyof Database['public']['Tables'];
-type Row<T extends TableName> = Database['public']['Tables'][T]['Row'];
-type Insert<T extends TableName> = Database['public']['Tables'][T]['Insert'];
-type Update<T extends TableName> = Database['public']['Tables'][T]['Update'];
+type Tables = Database['public']['Tables'];
+type TableName = keyof Tables;
 
 export function useSupabaseCrud<T extends TableName>(tableName: T) {
   const queryClient = useQueryClient();
@@ -21,12 +18,12 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Row<T>[];
+      return data as Tables[T]['Row'][];
     },
   });
 
   const { mutateAsync: create } = useMutation({
-    mutationFn: async (newItem: Insert<T>) => {
+    mutationFn: async (newItem: Tables[T]['Insert']) => {
       const { data, error } = await supabase
         .from(tableName)
         .insert([newItem])
@@ -34,7 +31,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .single();
 
       if (error) throw error;
-      return data as Row<T>;
+      return data as Tables[T]['Row'];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [tableName] });
@@ -46,7 +43,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
   });
 
   const { mutateAsync: update } = useMutation({
-    mutationFn: async ({ id, ...updateData }: Update<T> & { id: string }) => {
+    mutationFn: async ({ id, ...updateData }: Tables[T]['Update'] & { id: string }) => {
       const { data, error } = await supabase
         .from(tableName)
         .update(updateData)
@@ -55,7 +52,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .single();
 
       if (error) throw error;
-      return data as Row<T>;
+      return data as Tables[T]['Row'];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [tableName] });
