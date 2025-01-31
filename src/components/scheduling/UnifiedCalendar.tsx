@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addMinutes, parseISO, addDays, startOfToday } from "date-fns";
+import { format, addDays, startOfToday, addMonths, isSameDay, parseISO } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -38,21 +38,23 @@ export function UnifiedCalendar({
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const isMobile = useIsMobile();
 
+  // Generate dates for the next 2 months
+  useEffect(() => {
+    const today = startOfToday();
+    const dates = Array.from({ length: 60 }, (_, i) => addDays(today, i));
+    setWeekDates(dates);
+    
+    // Auto-select today's date if no date is selected
+    if (!selectedDate) {
+      onDateSelect(today);
+    }
+  }, [onDateSelect, selectedDate]);
+
   const totalDuration = useMemo(() => {
     return items.reduce((total, item) => {
       return total + (item.service?.duration || item.package?.duration || 30);
     }, 0);
   }, [items]);
-
-  // Generate week dates and set default selected date
-  useEffect(() => {
-    const today = startOfToday();
-    const dates = Array.from({ length: 7 }, (_, i) => addDays(today, i));
-    setWeekDates(dates);
-    if (!selectedDate) {
-      onDateSelect(today);
-    }
-  }, [onDateSelect, selectedDate]);
 
   const { data: locationData } = useQuery({
     queryKey: ['location'],
@@ -94,7 +96,6 @@ export function UnifiedCalendar({
     enabled: !!selectedDate
   });
 
-  // Generate time slots logic
   useEffect(() => {
     if (!selectedDate || (!existingBookings && !locationData)) return;
 
@@ -163,30 +164,32 @@ export function UnifiedCalendar({
         </div>
         
         <div className="mt-4 -mx-4 px-4">
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-            {weekDates.map((date) => (
-              <div
-                key={date.toISOString()}
-                className="flex flex-col items-center min-w-[3.5rem]"
-              >
-                <Button
-                  variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
-                  className={cn(
-                    "h-[3.5rem] w-[3.5rem] rounded-full p-0",
-                    selectedDate?.toDateString() === date.toDateString() 
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "hover:bg-accent"
-                  )}
-                  onClick={() => onDateSelect(date)}
+          <ScrollArea className="w-full">
+            <div className="flex gap-2 pb-2">
+              {weekDates.map((date) => (
+                <div
+                  key={date.toISOString()}
+                  className="flex flex-col items-center min-w-[3.5rem]"
                 >
-                  <span className="text-2xl font-semibold">{format(date, "d")}</span>
-                </Button>
-                <span className="text-xs mt-2 text-muted-foreground">
-                  {format(date, "EEE")}
-                </span>
-              </div>
-            ))}
-          </div>
+                  <Button
+                    variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
+                    className={cn(
+                      "h-[3.5rem] w-[3.5rem] rounded-full p-0",
+                      selectedDate?.toDateString() === date.toDateString() 
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "hover:bg-accent"
+                    )}
+                    onClick={() => onDateSelect(date)}
+                  >
+                    <span className="text-2xl font-semibold">{format(date, "d")}</span>
+                  </Button>
+                  <span className="text-xs mt-2 text-muted-foreground">
+                    {format(date, "EEE")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
       </CardHeader>
 
@@ -221,9 +224,9 @@ export function UnifiedCalendar({
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4">
                 <Clock className="h-6 w-6" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Fully booked on this date</h3>
+              <h3 className="text-lg font-semibold mb-2">No available slots</h3>
               <p className="text-muted-foreground mb-4">
-                Available from {format(addDays(selectedDate, 1), "EEE, d MMM")}
+                Please select a different date
               </p>
             </div>
           )
