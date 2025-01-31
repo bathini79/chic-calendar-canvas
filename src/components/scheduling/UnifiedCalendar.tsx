@@ -162,6 +162,12 @@ export function UnifiedCalendar({
           </CardTitle>
         </div>
         
+        {selectedDate && (
+          <div className="mt-2 text-muted-foreground">
+            {format(selectedDate, "MMMM yyyy")}
+          </div>
+        )}
+        
         <div className="mt-4 -mx-4 px-4">
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-2 pb-4">
