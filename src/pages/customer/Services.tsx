@@ -1,21 +1,16 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Clock, Package } from "lucide-react";
-import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useCart } from "@/components/cart/CartContext";
 import { CustomizeDialog } from "@/components/customer/packages/CustomizeDialog";
 import { CartSummary } from "@/components/cart/CartSummary";
 import { MobileCartBar } from "@/components/cart/MobileCartBar";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
+import { ServiceCard } from "@/components/customer/services/ServiceCard";
+import { PackageCard } from "@/components/customer/services/PackageCard";
 
 export default function Services() {
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { addToCart, removeFromCart, items } = useCart();
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
@@ -111,18 +106,6 @@ export default function Services() {
     );
   };
 
-  const filteredServices = services?.filter((service) => {
-    const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      service.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesCategory = !selectedCategory || 
-      service.services_categories.some(
-        (sc: any) => sc.categories.id === selectedCategory
-      );
-
-    return matchesSearch && matchesCategory;
-  });
-
   const handleCustomize = (pkg: any) => {
     setSelectedPackage(pkg);
     const includedServiceIds = pkg.package_services.map((ps: any) => ps.service.id);
@@ -161,6 +144,14 @@ export default function Services() {
     setTotalDuration(duration);
   };
 
+  const filteredServices = services?.filter((service) => {
+    const matchesCategory = !selectedCategory || 
+      service.services_categories.some(
+        (sc: any) => sc.categories.id === selectedCategory
+      );
+    return matchesCategory;
+  });
+
   if (servicesLoading || packagesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -183,191 +174,34 @@ export default function Services() {
 
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div className="w-full sm:w-[400px]">
-              <ScrollArea className="w-full border rounded-lg p-2">
-                <div className="flex gap-2">
-                  <Badge
-                    variant={selectedCategory === null ? "default" : "outline"}
-                    className="cursor-pointer flex-none"
-                    onClick={() => setSelectedCategory(null)}
-                  >
-                    All
-                  </Badge>
-                  {categories?.map((category) => (
-                    <Badge
-                      key={category.id}
-                      variant={selectedCategory === category.id ? "default" : "outline"}
-                      className="cursor-pointer flex-none"
-                      onClick={() => setSelectedCategory(category.id)}
-                    >
-                      {category.name}
-                    </Badge>
-                  ))}
-                </div>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
+              <CategoryFilter
+                categories={categories || []}
+                selectedCategory={selectedCategory}
+                onCategorySelect={setSelectedCategory}
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {packages?.map((pkg) => (
-              <motion.div
+              <PackageCard
                 key={pkg.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
-                  {pkg.image_urls && pkg.image_urls[0] ? (
-                    <div className="relative aspect-video">
-                      <img
-                        src={pkg.image_urls[0]}
-                        alt={pkg.name}
-                        className="w-full h-full object-cover rounded-t-lg"
-                      />
-                    </div>
-                  ) : (
-                    <div className="bg-muted aspect-video rounded-t-lg flex items-center justify-center">
-                      <Package className="h-12 w-12 text-muted-foreground" />
-                    </div>
-                  )}
-                  <CardHeader>
-                      <div className="flex gap-2"> 
-                      <Package className="h-5 w-5 text-primary" /> 
-                      
-                      <Badge variant="outline" className="text-xs">Package</Badge>
-                      </div>
-                      <CardTitle>{pkg.name}</CardTitle>
-                   
-                  </CardHeader>
-                  <CardContent className="flex-1">
-                    <p className="text-muted-foreground line-clamp-2">
-                      {pkg.description || "No description available"}
-                    </p>
-                    <div className="flex items-center gap-4 mt-4">
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>{pkg.duration} min</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <span>₹{pkg.price}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    {pkg.is_customizable ? (
-                      <div className="flex w-full gap-2">
-                        {isItemInCart(undefined, pkg.id) ? (
-                          <Button 
-                            className="flex-[7] bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700"
-                            onClick={() => handleRemove(undefined, pkg.id)}
-                            variant="destructive"
-                          >
-                            Remove
-                          </Button>
-                        ) : (
-                          <Button 
-                            className="flex-[7]"
-                            onClick={() => handleBookNow(undefined, pkg.id)}
-                          >
-                            Book Now
-                          </Button>
-                        )}
-                        <Button 
-                          variant="outline" 
-                          className="flex-[3]"
-                          onClick={() => handleCustomize(pkg)}
-                        >
-                          Customize
-                        </Button>
-                      </div>
-                    ) : (
-                      isItemInCart(undefined, pkg.id) ? (
-                        <Button 
-                          className="w-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700"
-                          onClick={() => handleRemove(undefined, pkg.id)}
-                          variant="destructive"
-                        >
-                          Remove
-                        </Button>
-                      ) : (
-                        <Button 
-                          className="w-full"
-                          onClick={() => handleBookNow(undefined, pkg.id)}
-                        >
-                          Book Now
-                        </Button>
-                      )
-                    )}
-                  </CardFooter>
-                </Card>
-              </motion.div>
+                pkg={pkg}
+                isInCart={isItemInCart(undefined, pkg.id)}
+                onBookNow={(packageId) => handleBookNow(undefined, packageId)}
+                onRemove={(packageId) => handleRemove(undefined, packageId)}
+                onCustomize={handleCustomize}
+              />
             ))}
 
-            {filteredServices?.map((service, index) => (
-              <motion.div
+            {filteredServices?.map((service) => (
+              <ServiceCard
                 key={service.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-              >
-                <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
-                  {service.image_urls && service.image_urls[0] ? (
-                    <div className="relative aspect-video">
-                      <img
-                        src={service.image_urls[0]}
-                        alt={service.name}
-                        className="w-full h-full object-cover rounded-t-lg"
-                      />
-                    </div>
-                  ) : (
-                    <div className="bg-muted aspect-video rounded-t-lg" />
-                  )}
-                  <CardHeader>
-                    <CardTitle className="flex justify-between items-start">
-                      <span>{service.name}</span>
-                      <div className="flex gap-2">
-                        {service.services_categories.map((sc: any) => (
-                          <Badge key={sc.categories.id} variant="secondary">
-                            {sc.categories.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-1">
-                    <p className="text-muted-foreground line-clamp-2">
-                      {service.description || "No description available"}
-                    </p>
-                    <div className="flex items-center gap-4 mt-4">
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>{service.duration} min</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <span>₹{service.selling_price}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    {isItemInCart(service.id) ? (
-                      <Button 
-                        className="w-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700"
-                        onClick={() => handleRemove(service.id)}
-                        variant="destructive"
-                      >
-                        Remove
-                      </Button>
-                    ) : (
-                      <Button 
-                        className="w-full"
-                        onClick={() => handleBookNow(service.id)}
-                      >
-                        Book Now
-                      </Button>
-                    )}
-                  </CardFooter>
-                </Card>
-              </motion.div>
+                service={service}
+                isInCart={isItemInCart(service.id)}
+                onBookNow={(serviceId) => handleBookNow(serviceId)}
+                onRemove={(serviceId) => handleRemove(serviceId)}
+              />
             ))}
           </div>
 
