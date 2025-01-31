@@ -6,6 +6,10 @@ import { toast } from "sonner";
 type Tables = Database['public']['Tables'];
 type TableName = keyof Tables;
 
+type Row<T extends TableName> = Tables[T]['Row'];
+type Insert<T extends TableName> = Tables[T]['Insert'];
+type Update<T extends TableName> = Tables[T]['Update'];
+
 export function useSupabaseCrud<T extends TableName>(tableName: T) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [tableName],
@@ -15,33 +19,33 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return data as Tables[T]['Row'][];
+      return data as Row<T>[];
     },
   });
 
-  const create = async (newData: Tables[T]['Insert']) => {
+  const create = async (newData: Insert<T>) => {
     try {
       const { data, error } = await supabase
         .from(tableName)
-        .insert(newData)
+        .insert([newData as any])
         .select()
         .single();
 
       if (error) throw error;
       toast.success("Created successfully");
       refetch();
-      return data as Tables[T]['Row'];
+      return data as Row<T>;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
     }
   };
 
-  const update = async (id: string, updateData: Partial<Tables[T]['Update']>) => {
+  const update = async (id: string, updateData: Partial<Update<T>>) => {
     try {
       const { data, error } = await supabase
         .from(tableName)
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();
@@ -49,7 +53,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
       if (error) throw error;
       toast.success("Updated successfully");
       refetch();
-      return data as Tables[T]['Row'];
+      return data as Row<T>;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
