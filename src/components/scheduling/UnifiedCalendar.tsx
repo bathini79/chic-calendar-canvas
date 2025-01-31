@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addDays, startOfToday, addMonths, isSameDay, parseISO } from "date-fns";
+import { format, addDays, startOfToday, addMonths, isSameDay, parseISO, addMinutes } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
