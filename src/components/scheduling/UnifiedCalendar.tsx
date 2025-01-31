@@ -38,18 +38,17 @@ export function UnifiedCalendar({
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const isMobile = useIsMobile();
 
-  // Generate dates for the next 2 months and set default date
+  // Initialize dates and set default date only once on mount
   useEffect(() => {
     const today = startOfToday();
     const dates = Array.from({ length: 60 }, (_, i) => addDays(today, i));
     setWeekDates(dates);
     
-    // Only set the date if it hasn't been set yet
+    // Only set default date once on mount if not already set
     if (!selectedDate) {
-      console.log('Setting default date to today:', today);
       onDateSelect(today);
     }
-  }, [selectedDate, onDateSelect]); // Add dependencies to ensure proper updates
+  }, []); // Empty dependency array ensures this only runs once on mount
 
   const totalDuration = useMemo(() => {
     return items.reduce((total, item) => {
