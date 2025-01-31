@@ -6,17 +6,19 @@ import { StaffDialog } from "@/components/staff/StaffDialog";
 import { HeaderActions } from "@/components/services/components/HeaderActions";
 import { ViewToggle } from "@/components/services/components/ViewToggle";
 import { SearchInput } from "@/components/services/components/SearchInput";
-import { Tables } from "@/integrations/supabase/types";
+import { Database } from "@/integrations/supabase/types";
+
+type Employee = Database['public']['Tables']['employees']['Row'];
 
 export default function Staff() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Tables['employees']['Row'] | undefined>(undefined);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | undefined>(undefined);
 
-  const { data: employees, isLoading } = useSupabaseCrud<Tables['employees']['Row']>("employees");
+  const { data: employees, isLoading } = useSupabaseCrud<Employee>("employees");
 
-  const handleEdit = (employee: Tables['employees']['Row']) => {
+  const handleEdit = (employee: Employee) => {
     setSelectedEmployee(employee);
     setDialogOpen(true);
   };

@@ -2,9 +2,9 @@ import { PostgrestError } from '@supabase/supabase-js';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Tables } from '@/integrations/supabase/types';
+import { Database } from '@/integrations/supabase/types';
 
-type TableName = keyof Tables;
+type TableName = keyof Database['public']['Tables'];
 
 interface BaseRecord {
   id: string;
@@ -12,14 +12,14 @@ interface BaseRecord {
   updated_at?: string;
 }
 
-export function useSupabaseCrud<T extends BaseRecord>(table: TableName) {
+export function useSupabaseCrud<T extends BaseRecord>(tableName: TableName) {
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: [table],
+    queryKey: [tableName],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from(table)
+        .from(tableName)
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -29,18 +29,18 @@ export function useSupabaseCrud<T extends BaseRecord>(table: TableName) {
   });
 
   const { mutateAsync: create } = useMutation({
-    mutationFn: async (newItem: Partial<T>) => {
+    mutationFn: async (newItem: Omit<T, 'id' | 'created_at' | 'updated_at'>) => {
       const { data, error } = await supabase
-        .from(table)
+        .from(tableName)
         .insert([newItem])
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+      return data as T;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [table] });
+      queryClient.invalidateQueries({ queryKey: [tableName] });
       toast.success('Created successfully');
     },
     onError: (error: PostgrestError) => {
@@ -51,17 +51,17 @@ export function useSupabaseCrud<T extends BaseRecord>(table: TableName) {
   const { mutateAsync: update } = useMutation({
     mutationFn: async ({ id, ...updateData }: Partial<T> & { id: string }) => {
       const { data, error } = await supabase
-        .from(table)
+        .from(tableName)
         .update(updateData)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+      return data as T;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [table] });
+      queryClient.invalidateQueries({ queryKey: [tableName] });
       toast.success('Updated successfully');
     },
     onError: (error: PostgrestError) => {
@@ -72,14 +72,14 @@ export function useSupabaseCrud<T extends BaseRecord>(table: TableName) {
   const { mutateAsync: remove } = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from(table)
+        .from(tableName)
         .delete()
         .eq('id', id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [table] });
+      queryClient.invalidateQueries({ queryKey: [tableName] });
       toast.success('Deleted successfully');
     },
     onError: (error: PostgrestError) => {
