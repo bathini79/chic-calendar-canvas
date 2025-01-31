@@ -48,7 +48,7 @@ export function UnifiedCalendar({
     if (!selectedDate) {
       onDateSelect(today);
     }
-  }, [onDateSelect]); // Add onDateSelect as dependency to ensure proper initialization
+  }, [selectedDate, onDateSelect]); // Add both selectedDate and onDateSelect as dependencies
 
   const totalDuration = useMemo(() => {
     return items.reduce((total, item) => {
