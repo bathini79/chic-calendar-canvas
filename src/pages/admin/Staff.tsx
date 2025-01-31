@@ -7,11 +7,13 @@ import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { Database } from "@/integrations/supabase/types";
 
 type ViewMode = "grid" | "list";
+type Employee = Database['public']['Tables']['employees']['Row'];
 
 export default function Staff() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("grid");
-  const { data: employees, isLoading } = useSupabaseCrud('employees');
+  const [searchQuery, setSearchQuery] = useState("");
+  const { data: employees, isLoading } = useSupabaseCrud<'employees'>('employees');
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -26,15 +28,20 @@ export default function Staff() {
       />
 
       {view === "grid" ? (
-        <StaffGrid employees={employees || []} />
+        <StaffGrid 
+          searchQuery={searchQuery}
+          onEdit={() => setIsDialogOpen(true)}
+        />
       ) : (
-        <StaffList employees={employees || []} />
+        <StaffList 
+          searchQuery={searchQuery}
+          onEdit={() => setIsDialogOpen(true)}
+        />
       )}
 
       <StaffDialog 
         open={isDialogOpen} 
-        onOpenChange={setIsDialogOpen} 
-        onClose={() => setIsDialogOpen(false)}
+        onOpenChange={setIsDialogOpen}
       />
     </div>
   );

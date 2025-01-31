@@ -1,49 +1,44 @@
-import { PostgrestError } from '@supabase/supabase-js';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 
 type Tables = Database['public']['Tables'];
 type TableName = keyof Tables;
 
 export function useSupabaseCrud<T extends TableName>(tableName: T) {
-  const queryClient = useQueryClient();
-
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: [tableName],
     queryFn: async () => {
       const { data, error } = await supabase
         .from(tableName)
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
 
       if (error) throw error;
       return data as Tables[T]['Row'][];
     },
   });
 
-  const { mutateAsync: create } = useMutation({
-    mutationFn: async (newItem: Tables[T]['Insert']) => {
+  const create = async (newData: Tables[T]['Insert']) => {
+    try {
       const { data, error } = await supabase
         .from(tableName)
-        .insert([newItem])
+        .insert(newData)
         .select()
         .single();
 
       if (error) throw error;
+      toast.success("Created successfully");
+      refetch();
       return data as Tables[T]['Row'];
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [tableName] });
-      toast.success('Created successfully');
-    },
-    onError: (error: PostgrestError) => {
+    } catch (error: any) {
       toast.error(error.message);
-    },
-  });
+      throw error;
+    }
+  };
 
-  const { mutateAsync: update } = useMutation({
-    mutationFn: async ({ id, ...updateData }: Tables[T]['Update'] & { id: string }) => {
+  const update = async (id: string, updateData: Partial<Tables[T]['Update']>) => {
+    try {
       const { data, error } = await supabase
         .from(tableName)
         .update(updateData)
@@ -52,34 +47,30 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .single();
 
       if (error) throw error;
+      toast.success("Updated successfully");
+      refetch();
       return data as Tables[T]['Row'];
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [tableName] });
-      toast.success('Updated successfully');
-    },
-    onError: (error: PostgrestError) => {
+    } catch (error: any) {
       toast.error(error.message);
-    },
-  });
+      throw error;
+    }
+  };
 
-  const { mutateAsync: remove } = useMutation({
-    mutationFn: async (id: string) => {
+  const remove = async (id: string) => {
+    try {
       const { error } = await supabase
         .from(tableName)
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [tableName] });
-      toast.success('Deleted successfully');
-    },
-    onError: (error: PostgrestError) => {
+      toast.success("Deleted successfully");
+      refetch();
+    } catch (error: any) {
       toast.error(error.message);
-    },
-  });
+      throw error;
+    }
+  };
 
   return {
     data,
@@ -88,5 +79,6 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     create,
     update,
     remove,
+    refetch,
   };
 }
