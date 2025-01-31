@@ -12,7 +12,8 @@ import { useCart } from "@/components/cart/CartContext";
 import { CustomizeDialog } from "@/components/customer/packages/CustomizeDialog";
 import { CartSummary } from "@/components/cart/CartSummary";
 import { MobileCartBar } from "@/components/cart/MobileCartBar";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Scrollbar } from "@radix-ui/react-scroll-area";
 
 export default function Services() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -182,15 +183,6 @@ export default function Services() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="relative w-full max-w-xs">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search services..."
-                className="pl-9 h-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
             <div className="w-full sm:w-[400px]">
               <ScrollArea className="w-full">
                 <div className="flex gap-2 p-2">
@@ -211,6 +203,7 @@ export default function Services() {
                       {category.name}
                     </Badge>
                   ))}
+                        <Scrollbar orientation="horizontal" />
                 </div>
               </ScrollArea>
             </div>
