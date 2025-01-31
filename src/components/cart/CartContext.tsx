@@ -26,6 +26,14 @@ type CartContextType = {
   removeFromCart: (itemId: string) => Promise<void>;
   isLoading: boolean;
   setCartOpen: (open: boolean) => void;
+  selectedDate: Date | null;
+  setSelectedDate: (date: Date | null) => void;
+  selectedTimeSlots: Record<string, string>;
+  setSelectedTimeSlots: (slots: Record<string, string>) => void;
+  selectedStylists: Record<string, string>;
+  setSelectedStylists: (stylists: Record<string, string>) => void;
+  getTotalPrice: () => number;
+  getTotalDuration: () => number;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -34,6 +42,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<Record<string, string>>({});
+  const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchCartItems();
@@ -145,8 +156,34 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     await fetchCartItems();
   };
 
+  const getTotalPrice = () => {
+    return items.reduce((total, item) => {
+      return total + (item.service?.selling_price || item.package?.price || 0);
+    }, 0);
+  };
+
+  const getTotalDuration = () => {
+    return items.reduce((total, item) => {
+      return total + (item.service?.duration || item.package?.duration || 0);
+    }, 0);
+  };
+
   return (
-    <CartContext.Provider value={{ items, addToCart, removeFromCart, isLoading, setCartOpen }}>
+    <CartContext.Provider value={{ 
+      items, 
+      addToCart, 
+      removeFromCart, 
+      isLoading, 
+      setCartOpen,
+      selectedDate,
+      setSelectedDate,
+      selectedTimeSlots,
+      setSelectedTimeSlots,
+      selectedStylists,
+      setSelectedStylists,
+      getTotalPrice,
+      getTotalDuration
+    }}>
       {children}
     </CartContext.Provider>
   );

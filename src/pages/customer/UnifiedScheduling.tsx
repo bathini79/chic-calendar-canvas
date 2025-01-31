@@ -6,9 +6,17 @@ import { UnifiedCalendar } from "@/components/scheduling/UnifiedCalendar";
 import { Button } from "@/components/ui/button";
 
 export default function UnifiedScheduling() {
-  const { items, setSelectedDate, setSelectedTimeSlots, setSelectedStylists, selectedDate, selectedTimeSlots } = useCart();
+  const { 
+    items, 
+    selectedDate, 
+    setSelectedDate, 
+    selectedTimeSlots, 
+    setSelectedTimeSlots, 
+    selectedStylists, 
+    setSelectedStylists 
+  } = useCart();
   const navigate = useNavigate();
-  const [selectedStylists, setLocalSelectedStylists] = useState<Record<string, string>>({});
+  const [localSelectedStylists, setLocalSelectedStylists] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (items.length === 0) {
@@ -33,7 +41,7 @@ export default function UnifiedScheduling() {
       <div className="space-y-4 sm:space-y-6 min-w-0">
         <ServiceSelector 
           items={items}
-          selectedStylists={selectedStylists}
+          selectedStylists={localSelectedStylists}
           onStylistSelect={handleStylistSelect}
         />
         <UnifiedCalendar
