@@ -231,11 +231,13 @@ export default function Services() {
                     </div>
                   )}
                   <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Package className="h-5 w-5 text-primary" />
+                      <div className="flex gap-2"> 
+                      <Package className="h-5 w-5 text-primary" /> 
+                      
                       <Badge variant="outline" className="text-xs">Package</Badge>
+                      </div>
                       <CardTitle>{pkg.name}</CardTitle>
-                    </div>
+                   
                   </CardHeader>
                   <CardContent className="flex-1">
                     <p className="text-muted-foreground line-clamp-2">

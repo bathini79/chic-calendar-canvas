@@ -3,7 +3,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, addMinutes, parseISO, addDays, subDays } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -235,6 +235,7 @@ export function UnifiedCalendar({
               </Button>
             ))}
           </div>
+          <ScrollBar orientation="horizontal"/>
         </ScrollArea>
       </CardHeader>
 
