@@ -44,11 +44,10 @@ export function UnifiedCalendar({
     const dates = Array.from({ length: 60 }, (_, i) => addDays(today, i));
     setWeekDates(dates);
     
-    // Set default date to today if no date is selected
     if (!selectedDate) {
       onDateSelect(today);
     }
-  }, [selectedDate, onDateSelect]); // Add both selectedDate and onDateSelect as dependencies
+  }, [selectedDate, onDateSelect]);
 
   const totalDuration = useMemo(() => {
     return items.reduce((total, item) => {
@@ -164,8 +163,8 @@ export function UnifiedCalendar({
         </div>
         
         <div className="mt-4 -mx-4 px-4">
-          <ScrollArea className="w-full">
-            <div className="flex gap-2 pb-2">
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-2 pb-4">
               {weekDates.map((date) => (
                 <div
                   key={date.toISOString()}
@@ -189,7 +188,7 @@ export function UnifiedCalendar({
                 </div>
               ))}
             </div>
-            <ScrollBar orientation="horizontal" className="opacity-0" />
+            <ScrollBar orientation="horizontal" />
           </ScrollArea>
         </div>
       </CardHeader>
