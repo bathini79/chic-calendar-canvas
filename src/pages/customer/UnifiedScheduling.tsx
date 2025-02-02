@@ -31,6 +31,13 @@ export default function UnifiedScheduling() {
     }));
   };
 
+  const handleTimeSlotSelect = (itemId: string, timeSlot: string) => {
+    setSelectedTimeSlots((prev) => ({
+      ...prev,
+      [itemId]: timeSlot,
+    }));
+  };
+
   const handleContinue = () => {
     setSelectedStylists(localSelectedStylists);
     navigate('/booking-confirmation');
@@ -45,11 +52,11 @@ export default function UnifiedScheduling() {
           onStylistSelect={handleStylistSelect}
         />
         <UnifiedCalendar
-          items={items}
           selectedDate={selectedDate}
           onDateSelect={setSelectedDate}
           selectedTimeSlots={selectedTimeSlots}
-          onTimeSlotSelect={setSelectedTimeSlots}
+          onTimeSlotSelect={handleTimeSlotSelect}
+          selectedStylists={selectedStylists}
         />
         {selectedDate && Object.keys(selectedTimeSlots).length === items.length && (
           <div className="flex justify-end">

@@ -38,7 +38,6 @@ export function UnifiedCalendar({
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const isMobile = useIsMobile();
 
-  // Initialize dates and set default date
   useEffect(() => {
     const today = startOfToday();
     const dates = Array.from({ length: 60 }, (_, i) => addDays(today, i));
@@ -96,13 +95,13 @@ export function UnifiedCalendar({
   });
 
   useEffect(() => {
-    if (!selectedDate || (!existingBookings && !locationData)) return;
+    if (!selectedDate || !locationData) return;
 
     const generateTimeSlots = () => {
       const slots: TimeSlot[] = [];
       const dayOfWeek = selectedDate.getDay();
       
-      const locationHours = locationData?.location_hours?.find(
+      const locationHours = locationData.location_hours?.find(
         (h: any) => h.day_of_week === dayOfWeek
       );
 
