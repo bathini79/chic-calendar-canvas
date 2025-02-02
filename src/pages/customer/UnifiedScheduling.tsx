@@ -1,8 +1,8 @@
 import { useCart } from "@/components/cart/CartContext";
-import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
 import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
 import { UnifiedCalendar } from "@/components/scheduling/UnifiedCalendar";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 export default function UnifiedScheduling() {
@@ -25,19 +25,19 @@ export default function UnifiedScheduling() {
   }, [items, navigate]);
 
   const handleStylistSelect = (itemId: string, stylistId: string) => {
-    setLocalSelectedStylists(prev => ({ ...prev, [itemId]: stylistId }));
-    setSelectedStylists(prev => ({ ...prev, [itemId]: stylistId }));
+    setLocalSelectedStylists((prev) => ({
+      ...prev,
+      [itemId]: stylistId,
+    }));
   };
 
   const handleContinue = () => {
-    if (selectedDate && Object.keys(selectedTimeSlots).length === items.length) {
-      navigate('/booking-confirmation');
-    }
+    setSelectedStylists(localSelectedStylists);
+    navigate('/booking-confirmation');
   };
 
   return (
-    <div className="container max-w-7xl mx-auto py-4 sm:py-8 px-4 overflow-hidden">
-      <h1 className="text-2xl font-bold mb-4 sm:mb-6">Schedule Your Services</h1>
+    <div className="container max-w-7xl mx-auto py-6 px-4">
       <div className="space-y-4 sm:space-y-6 min-w-0">
         <ServiceSelector 
           items={items}
@@ -45,23 +45,19 @@ export default function UnifiedScheduling() {
           onStylistSelect={handleStylistSelect}
         />
         <UnifiedCalendar
+          items={items}
           selectedDate={selectedDate}
           onDateSelect={setSelectedDate}
           selectedTimeSlots={selectedTimeSlots}
-          onTimeSlotSelect={(itemId, timeSlot) =>
-            setSelectedTimeSlots(prev => ({ ...prev, [itemId]: timeSlot }))
-          }
-          selectedStylists={selectedStylists}
+          onTimeSlotSelect={setSelectedTimeSlots}
         />
-        <div className="flex justify-end">
-          <Button 
-            size="lg"
-            onClick={handleContinue}
-            disabled={!selectedDate || Object.keys(selectedTimeSlots).length !== items.length}
-          >
-            Continue
-          </Button>
-        </div>
+        {selectedDate && Object.keys(selectedTimeSlots).length === items.length && (
+          <div className="flex justify-end">
+            <Button size="lg" onClick={handleContinue}>
+              Continue
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
