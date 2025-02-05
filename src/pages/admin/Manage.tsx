@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { 
   LayoutGrid, 
   Package, 
@@ -6,10 +5,8 @@ import {
   Package2, 
   Tags, 
   ClipboardList,
-  Users2,
-  Settings2,
-  FileText
 } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 
 interface ManageCardProps {
@@ -41,42 +38,42 @@ export default function Manage() {
   const catalogueItems = [
     {
       title: "Services",
-      description: "Add, edit, and update the services you offer, which will display in your online menu and reflect in billing, ensuring easy management and organization.",
+      description: "Add, edit, and update the services you offer, which will display in your online menu and reflect in billing.",
       icon: <LayoutGrid className="w-6 h-6" />,
-      to: "/services"
+      to: "/admin/services"
     },
     {
       title: "Packages",
       description: "Create and manage service bundles to provide clients with great value and options.",
       icon: <Package className="w-6 h-6" />,
-      to: "/packages"
+      to: "/admin/packages"
     },
     {
       title: "Import and Export",
       description: "Quickly import and export customer, service, product, and booking data for efficient management.",
       icon: <Import className="w-6 h-6" />,
-      to: "/import-export"
+      to: "/admin/import-export"
     }
   ];
 
   const inventoryItems = [
     {
       title: "Products",
-      description: "Keep track of your products and stock, ensuring everything is well-stocked and organized. You can also add, edit, and update products available for sale both online and in-store.",
+      description: "Keep track of your products and stock, ensuring everything is well-stocked and organized.",
       icon: <Package2 className="w-6 h-6" />,
-      to: "/products"
+      to: "/admin/products"
     },
     {
       title: "Product Category",
       description: "Helps you monitor and manage all stock details, ensuring proper organization and availability.",
       icon: <Tags className="w-6 h-6" />,
-      to: "/product-categories"
+      to: "/admin/product-categories"
     },
     {
       title: "Inventory Receipts",
-      description: "Track incoming stock with product details, quantities, suppliers, and dates to keep your inventory updated and organized.",
+      description: "Track incoming stock with product details, quantities, suppliers, and dates.",
       icon: <ClipboardList className="w-6 h-6" />,
-      to: "/inventory-receipts"
+      to: "/admin/inventory-receipts"
     }
   ];
 
