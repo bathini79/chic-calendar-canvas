@@ -1,72 +1,39 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/sonner";
 import { AdminLayout } from "@/layouts/AdminLayout";
-import { AdminRoute } from "@/components/auth/AdminRoute";
-import AdminInventory from "@/pages/admin/inventory/AdminInventory";
 import CustomerLayout from "@/layouts/CustomerLayout";
-import Dashboard from "@/pages/admin/Dashboard";
-import AdminServices from "@/pages/admin/services/AdminServices";
-import Staff from "@/pages/admin/Staff";
-import Home from "@/pages/customer/Home";
+import { AdminRoute } from "@/components/auth/AdminRoute";
+import { queryClient } from "@/lib/react-query";
 import Services from "@/pages/customer/Services";
-import Packages from "@/pages/customer/Packages";
-import Cart from "@/pages/customer/Cart";
-import Profile from "@/pages/customer/Profile";
+import UnifiedScheduling from "@/pages/customer/UnifiedScheduling";
+import BookingConfirmation from "@/pages/customer/BookingConfirmation";
+import AdminServices from "@/pages/admin/AdminServices";
+import AdminDashboard from "@/pages/admin/Dashboard";
+import Staff from "@/pages/admin/Staff";
+import Index from "./pages/admin/Index";
 
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <CustomerLayout />,
-    children: [
-      {
-        index: true,
-        element: <Home />,
-      },
-      {
-        path: "services",
-        element: <Services />,
-      },
-      {
-        path: "packages",
-        element: <Packages />,
-      },
-      {
-        path: "cart",
-        element: <Cart />,
-      },
-      {
-        path: "profile",
-        element: <Profile />,
-      },
-    ],
-  },
-  {
-    path: "/admin",
-    element: (
-      <AdminRoute>
-        <AdminLayout />
-      </AdminRoute>
-    ),
-    children: [
-      {
-        index: true,
-        element: <Dashboard />,
-      },
-      {
-        path: "services",
-        element: <AdminServices />,
-      },
-      {
-        path: "staff",
-        element: <Staff />,
-      },
-      {
-        path: "inventory",
-        element: <AdminInventory />,
-      },
-    ],
-  },
-]);
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          {/* Customer Routes */}
+          <Route element={<CustomerLayout />}>
+            <Route index element={<Services />} />
+            <Route path="schedule" element={<UnifiedScheduling />} />
+            <Route path="booking-confirmation" element={<BookingConfirmation />} />
+          </Route>
 
-export function App() {
-  return <RouterProvider router={router} />;
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+            <Route index element={<Index />} />
+            <Route path="services" element={<AdminServices />} />
+            <Route path="staff" element={<Staff />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+      <Toaster />
+    </QueryClientProvider>
+  );
 }
