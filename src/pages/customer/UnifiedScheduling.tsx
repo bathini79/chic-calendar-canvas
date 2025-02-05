@@ -1,71 +1,39 @@
-import { useCart } from "@/components/cart/CartContext";
-import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
-import { UnifiedCalendar } from "@/components/scheduling/UnifiedCalendar";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { useCart } from "@/components/cart/CartContext";
+import { UnifiedCalendar } from "@/components/scheduling/UnifiedCalendar";
+import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
+import { BookingSummary } from "@/components/scheduling/BookingSummary";
 
 export default function UnifiedScheduling() {
-  const { 
-    items, 
-    selectedDate, 
-    setSelectedDate, 
-    selectedTimeSlots, 
-    setSelectedTimeSlots, 
-    selectedStylists, 
-    setSelectedStylists 
-  } = useCart();
   const navigate = useNavigate();
-  const [localSelectedStylists, setLocalSelectedStylists] = useState<Record<string, string>>({});
+  const { selectedServices, selectedPackages } = useCart();
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    if (items.length === 0) {
-      navigate('/services');
-    }
-  }, [items, navigate]);
-
-  const handleStylistSelect = (itemId: string, stylistId: string) => {
-    setLocalSelectedStylists((prev) => ({
+  const handleTimeSlotSelect = (serviceId: string, timeSlot: string) => {
+    setSelectedTimeSlot((prev) => ({
       ...prev,
-      [itemId]: stylistId,
+      [serviceId]: timeSlot,
     }));
   };
 
-  const handleTimeSlotSelect = (itemId: string, timeSlot: string) => {
-    setSelectedTimeSlots((prev) => ({
-      ...prev,
-      [itemId]: timeSlot,
-    }));
-  };
-
-  const handleContinue = () => {
-    setSelectedStylists(localSelectedStylists);
-    navigate('/booking-confirmation');
+  const handleConfirm = () => {
+    navigate("/booking-confirmation");
   };
 
   return (
-    <div className="container max-w-7xl mx-auto py-6 px-4">
-      <div className="space-y-4 sm:space-y-6 min-w-0">
-        <ServiceSelector 
-          items={items}
-          selectedStylists={localSelectedStylists}
-          onStylistSelect={handleStylistSelect}
-        />
-        <UnifiedCalendar
-          selectedDate={selectedDate}
-          onDateSelect={setSelectedDate}
-          selectedTimeSlots={selectedTimeSlots}
-          onTimeSlotSelect={handleTimeSlotSelect}
-          selectedStylists={selectedStylists}
-        />
-        {selectedDate && Object.keys(selectedTimeSlots).length === items.length && (
-          <div className="flex justify-end">
-            <Button size="lg" onClick={handleContinue}>
-              Continue
-            </Button>
-          </div>
-        )}
-      </div>
+    <div className="container mx-auto p-4 space-y-8">
+      <ServiceSelector />
+      <UnifiedCalendar
+        selectedServices={selectedServices}
+        selectedPackages={selectedPackages}
+        onTimeSlotSelect={handleTimeSlotSelect}
+        selectedTimeSlot={selectedTimeSlot}
+      />
+      <BookingSummary
+        selectedTimeSlot={selectedTimeSlot}
+        onConfirm={handleConfirm}
+      />
     </div>
   );
 }

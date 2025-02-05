@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { 
   LayoutGrid, 
   Package, 
-  FileImport, 
+  Import, 
   Package2, 
   Tags, 
   ClipboardList,
@@ -54,7 +54,7 @@ export default function Manage() {
     {
       title: "Import and Export",
       description: "Quickly import and export customer, service, product, and booking data for efficient management.",
-      icon: <FileImport className="w-6 h-6" />,
+      icon: <Import className="w-6 h-6" />,
       to: "/import-export"
     }
   ];
