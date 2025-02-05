@@ -11,7 +11,6 @@ import BookingConfirmation from "@/pages/customer/BookingConfirmation";
 import AdminServices from "@/pages/admin/AdminServices";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import Staff from "@/pages/admin/Staff";
-import Manage from "@/pages/admin/Manage";
 import Index from "./pages/admin/Index";
 
 export default function App() {
@@ -31,7 +30,6 @@ export default function App() {
             <Route index element={<Index />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="staff" element={<Staff />} />
-            <Route path="manage" element={<Manage />} />
           </Route>
         </Routes>
       </BrowserRouter>
