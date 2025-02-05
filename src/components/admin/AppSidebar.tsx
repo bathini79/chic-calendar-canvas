@@ -52,6 +52,20 @@ export function AppSidebar() {
             <span className="text-sm font-medium text-muted-foreground">Inventory</span>
           </div>
           <NavLink
+            to="/admin/inventory"
+            end
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              }`
+            }
+          >
+            <Package2 className="w-5 h-5" />
+            <span>Overview</span>
+          </NavLink>
+          <NavLink
             to="/admin/inventory/products"
             className={({ isActive }) =>
               `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
