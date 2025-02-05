@@ -14,12 +14,12 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [tableName],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: result, error } = await supabase
         .from(tableName)
         .select('*');
 
       if (error) throw error;
-      return data as Row<T>[];
+      return result as Row<T>[];
     },
   });
 
@@ -27,7 +27,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert([newData])
+        .insert(newData)
         .select()
         .single();
 
@@ -41,7 +41,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     }
   };
 
-  const update = async (id: string | number, updateData: Partial<Update<T>>) => {
+  const update = async (id: string, updateData: Update<T>) => {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
@@ -60,7 +60,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     }
   };
 
-  const remove = async (id: string | number) => {
+  const remove = async (id: string) => {
     try {
       const { error } = await supabase
         .from(tableName)

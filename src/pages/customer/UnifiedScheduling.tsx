@@ -7,13 +7,21 @@ import { BookingSummary } from "@/components/scheduling/BookingSummary";
 
 export default function UnifiedScheduling() {
   const navigate = useNavigate();
-  const { selectedServices, selectedPackages } = useCart();
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<Record<string, string>>({});
+  const { items: cartItems } = useCart();
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<Record<string, string>>({});
+  const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
 
   const handleTimeSlotSelect = (serviceId: string, timeSlot: string) => {
-    setSelectedTimeSlot((prev) => ({
+    setSelectedTimeSlots((prev) => ({
       ...prev,
       [serviceId]: timeSlot,
+    }));
+  };
+
+  const handleStylistSelect = (serviceId: string, stylistId: string) => {
+    setSelectedStylists((prev) => ({
+      ...prev,
+      [serviceId]: stylistId,
     }));
   };
 
@@ -23,15 +31,21 @@ export default function UnifiedScheduling() {
 
   return (
     <div className="container mx-auto p-4 space-y-8">
-      <ServiceSelector />
+      <ServiceSelector 
+        items={cartItems}
+        selectedStylists={selectedStylists}
+        onStylistSelect={handleStylistSelect}
+      />
       <UnifiedCalendar
-        selectedServices={selectedServices}
-        selectedPackages={selectedPackages}
+        items={cartItems}
         onTimeSlotSelect={handleTimeSlotSelect}
-        selectedTimeSlot={selectedTimeSlot}
+        selectedTimeSlots={selectedTimeSlots}
+        selectedStylists={selectedStylists}
       />
       <BookingSummary
-        selectedTimeSlot={selectedTimeSlot}
+        selectedTimeSlots={selectedTimeSlots}
+        selectedStylists={selectedStylists}
+        items={cartItems}
         onConfirm={handleConfirm}
       />
     </div>
