@@ -19,7 +19,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return data as Row<T>[];
+      return data as unknown as Row<T>[];
     },
   });
 
@@ -27,25 +27,25 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert([newData as any])
+        .insert([newData])
         .select()
         .single();
 
       if (error) throw error;
       toast.success("Created successfully");
       refetch();
-      return insertedData as Row<T>;
+      return insertedData as unknown as Row<T>;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
     }
   };
 
-  const update = async (id: string | number, updateData: Partial<Update<T>>) => {
+  const update = async (id: string | number, updateData: Update<T>) => {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
-        .update(updateData as any)
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();
@@ -53,7 +53,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
       if (error) throw error;
       toast.success("Updated successfully");
       refetch();
-      return updatedData as Row<T>;
+      return updatedData as unknown as Row<T>;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
