@@ -14,7 +14,7 @@ export function useSupabaseCrud<T extends keyof Tables>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return data;
+      return data as Tables[T]['Row'][];
     },
   });
 
@@ -22,14 +22,14 @@ export function useSupabaseCrud<T extends keyof Tables>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert(newData)
+        .insert([newData])
         .select()
         .single();
 
       if (error) throw error;
       toast.success("Created successfully");
       refetch();
-      return insertedData;
+      return insertedData as Tables[T]['Row'];
     } catch (error: any) {
       toast.error(error.message);
       throw error;
@@ -48,7 +48,7 @@ export function useSupabaseCrud<T extends keyof Tables>(tableName: T) {
       if (error) throw error;
       toast.success("Updated successfully");
       refetch();
-      return updatedData;
+      return updatedData as Tables[T]['Row'];
     } catch (error: any) {
       toast.error(error.message);
       throw error;
