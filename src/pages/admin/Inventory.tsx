@@ -9,17 +9,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryDialog } from "@/components/admin/inventory/CategoryDialog";
 import { CategoryList } from "@/components/admin/inventory/CategoryList";
 import { ItemDialog } from "@/components/admin/inventory/ItemDialog";
+import { useState } from "react";
 
 export default function Inventory() {
-  const { data: items, isLoading } = useSupabaseCrud('inventory_items');
+  const { data: items, isLoading, remove } = useSupabaseCrud('inventory_items');
+  const [editingItem, setEditingItem] = useState<any>(null);
 
   if (isLoading) {
     return <div>Loading...</div>;
   }
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this item?')) {
+      await remove(id);
+    }
+  };
 
   return (
     <div className="space-y-4 p-8">
@@ -87,14 +96,33 @@ export default function Inventory() {
                         {item.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">Edit</Button>
+                    <TableCell className="text-right space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setEditingItem(item)}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDelete(item.id)}
+                      >
+                        Delete
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
+          {editingItem && (
+            <ItemDialog 
+              item={editingItem} 
+              onClose={() => setEditingItem(null)} 
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-4">

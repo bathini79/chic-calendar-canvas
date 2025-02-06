@@ -1,6 +1,8 @@
 
 import { useState } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -20,56 +22,82 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export function ItemDialog() {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [sku, setSku] = useState("");
-  const [quantity, setQuantity] = useState(0);
-  const [minimumQuantity, setMinimumQuantity] = useState(0);
-  const [unitPrice, setUnitPrice] = useState(0);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+interface ItemDialogProps {
+  item?: any;
+  onClose?: () => void;
+}
 
-  const { create } = useSupabaseCrud("inventory_items");
+export function ItemDialog({ item, onClose }: ItemDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(item?.name || "");
+  const [description, setDescription] = useState(item?.description || "");
+  const [sku, setSku] = useState(item?.sku || "");
+  const [quantity, setQuantity] = useState(item?.quantity || 0);
+  const [minimumQuantity, setMinimumQuantity] = useState(item?.minimum_quantity || 0);
+  const [unitPrice, setUnitPrice] = useState(item?.unit_price || 0);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(item?.categories || []);
+
+  const { create, update } = useSupabaseCrud("inventory_items");
   const { data: categories } = useSupabaseCrud("inventory_categories");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const item = await create({
-      name,
-      description,
-      sku,
-      quantity,
-      minimum_quantity: minimumQuantity,
-      unit_price: unitPrice,
-      status: 'active'
-    });
+    try {
+      const itemData = {
+        name,
+        description,
+        sku,
+        quantity,
+        minimum_quantity: minimumQuantity,
+        unit_price: unitPrice,
+        status: 'active'
+      };
 
-    if (item && selectedCategories.length > 0) {
-      const { error } = await supabase
-        .from('inventory_items_categories')
-        .insert(
-          selectedCategories.map(categoryId => ({
-            item_id: item.id,
-            category_id: categoryId,
-          }))
-        );
-
-      if (error) {
-        toast.error("Error linking categories");
-        return;
+      let savedItem;
+      if (item) {
+        savedItem = await update(item.id, itemData);
+      } else {
+        savedItem = await create(itemData);
       }
-    }
 
-    // Reset form
-    setName("");
-    setDescription("");
-    setSku("");
-    setQuantity(0);
-    setMinimumQuantity(0);
-    setUnitPrice(0);
-    setSelectedCategories([]);
-    setOpen(false);
+      if (savedItem && selectedCategories.length > 0) {
+        // First remove existing categories if updating
+        if (item) {
+          await supabase
+            .from('inventory_items_categories')
+            .delete()
+            .eq('item_id', savedItem.id);
+        }
+
+        // Add new categories
+        const { error } = await supabase
+          .from('inventory_items_categories')
+          .insert(
+            selectedCategories.map(categoryId => ({
+              item_id: savedItem.id,
+              category_id: categoryId,
+            }))
+          );
+
+        if (error) {
+          toast.error("Error linking categories");
+          return;
+        }
+      }
+
+      // Reset form
+      setName("");
+      setDescription("");
+      setSku("");
+      setQuantity(0);
+      setMinimumQuantity(0);
+      setUnitPrice(0);
+      setSelectedCategories([]);
+      setOpen(false);
+      if (onClose) onClose();
+    } catch (error) {
+      console.error("Error saving item:", error);
+    }
   };
 
   return (
@@ -77,12 +105,12 @@ export function ItemDialog() {
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
-          Add Item
+          {item ? 'Edit Item' : 'Add Item'}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Item</DialogTitle>
+          <DialogTitle>{item ? 'Edit Item' : 'Add New Item'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -179,7 +207,7 @@ export function ItemDialog() {
             </Select>
           </div>
           <Button type="submit" className="w-full">
-            Create Item
+            {item ? 'Update' : 'Create'} Item
           </Button>
         </form>
       </DialogContent>
