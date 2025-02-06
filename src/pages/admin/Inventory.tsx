@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -12,30 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface InventoryItem {
-  id: string;
-  name: string;
-  description: string | null;
-  sku: string | null;
-  quantity: number;
-  minimum_quantity: number;
-  unit_price: number;
-  status: 'active' | 'inactive' | 'discontinued';
-}
-
 export default function Inventory() {
-  const { data: items, isLoading } = useQuery({
-    queryKey: ['inventory_items'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      return data as InventoryItem[];
-    },
-  });
+  const { data: items, isLoading } = useSupabaseCrud('inventory_items');
 
   if (isLoading) {
     return (
@@ -82,7 +59,7 @@ export default function Inventory() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              ₹{items?.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2) || '0.00'}
+              ₹{items?.reduce((sum, item) => sum + (item.quantity * Number(item.unit_price)), 0).toFixed(2) || '0.00'}
             </p>
           </CardContent>
         </Card>
@@ -112,7 +89,7 @@ export default function Inventory() {
                     <TableCell>{item.sku || '-'}</TableCell>
                     <TableCell>{item.quantity}</TableCell>
                     <TableCell>{item.minimum_quantity}</TableCell>
-                    <TableCell>₹{item.unit_price}</TableCell>
+                    <TableCell>₹{Number(item.unit_price).toFixed(2)}</TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                         item.status === 'active' 

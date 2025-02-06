@@ -1,16 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { Database } from "@/integrations/supabase/types";
 
 type Tables = Database['public']['Tables'];
-type TableName = keyof Tables;
 
-type Row<T extends TableName> = Tables[T]['Row'];
-type Insert<T extends TableName> = Tables[T]['Insert'];
-type Update<T extends TableName> = Tables[T]['Update'];
-
-export function useSupabaseCrud<T extends TableName>(tableName: T) {
+export function useSupabaseCrud<T extends keyof Tables>(tableName: T) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [tableName],
     queryFn: async () => {
@@ -19,11 +14,11 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return data as Row<T>[];
+      return data;
     },
   });
 
-  const create = async (newData: Insert<T>) => {
+  const create = async (newData: Tables[T]['Insert']) => {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
@@ -34,14 +29,14 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
       if (error) throw error;
       toast.success("Created successfully");
       refetch();
-      return insertedData as Row<T>;
+      return insertedData;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
     }
   };
 
-  const update = async (id: string, updateData: Update<T>) => {
+  const update = async (id: string, updateData: Tables[T]['Update']) => {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
@@ -53,7 +48,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
       if (error) throw error;
       toast.success("Updated successfully");
       refetch();
-      return updatedData as Row<T>;
+      return updatedData;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
