@@ -28,7 +28,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert(newData as any)
+        .insert(newData)
         .select()
         .single();
 
@@ -46,8 +46,8 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
-        .update(updateData as any)
-        .eq('id' as any, id)
+        .update(updateData)
+        .eq('id', id)
         .select()
         .single();
 
@@ -66,7 +66,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
       const { error } = await supabase
         .from(tableName)
         .delete()
-        .eq('id' as any, id);
+        .eq('id', id);
 
       if (error) throw error;
       toast.success("Deleted successfully");
