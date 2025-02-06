@@ -25,7 +25,7 @@ export default function UnifiedScheduling() {
   }, [items, navigate]);
 
   const handleStylistSelect = (itemId: string, stylistId: string) => {
-    setLocalSelectedStylists((prev) => ({
+    setLocalSelectedStylists((prev: Record<string, string>) => ({
       ...prev,
       [itemId]: stylistId,
     }));

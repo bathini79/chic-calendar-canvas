@@ -4,11 +4,13 @@ import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
 
 type Tables = Database['public']['Tables'];
+type TableName = keyof Tables;
 
-export function useSupabaseCrud<T extends keyof Tables>(tableName: T) {
-  type Row = Tables[T]['Row'];
-  type Insert = Tables[T]['Insert'];
-  type Update = Tables[T]['Update'];
+export function useSupabaseCrud<T extends TableName>(tableName: T) {
+  type TableDefinition = Tables[T];
+  type Row = TableDefinition['Row'];
+  type Insert = TableDefinition['Insert'];
+  type Update = TableDefinition['Update'];
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [tableName],
@@ -26,7 +28,7 @@ export function useSupabaseCrud<T extends keyof Tables>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert([newData])
+        .insert(newData)
         .select()
         .single();
 
