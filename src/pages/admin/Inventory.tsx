@@ -1,7 +1,5 @@
 
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -14,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryDialog } from "@/components/admin/inventory/CategoryDialog";
 import { CategoryList } from "@/components/admin/inventory/CategoryList";
+import { ItemDialog } from "@/components/admin/inventory/ItemDialog";
 
 export default function Inventory() {
   const { data: items, isLoading } = useSupabaseCrud('inventory_items');
@@ -55,10 +54,7 @@ export default function Inventory() {
 
         <TabsContent value="items" className="space-y-4">
           <div className="flex justify-end">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Item
-            </Button>
+            <ItemDialog />
           </div>
 
           <div className="bg-card rounded-lg">
