@@ -4,9 +4,8 @@ import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
 
 type Tables = Database['public']['Tables'];
-type TableName = keyof Tables;
 
-export function useSupabaseCrud<T extends TableName>(tableName: T) {
+export function useSupabaseCrud<T extends keyof Tables>(tableName: T) {
   type Row = Tables[T]['Row'];
   type Insert = Tables[T]['Insert'];
   type Update = Tables[T]['Update'];
@@ -19,7 +18,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return data as unknown as Row[];
+      return data as Row[];
     },
   });
 
@@ -27,7 +26,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert([newData as unknown as Tables[T]['Insert']])
+        .insert([newData])
         .select()
         .single();
 
@@ -45,7 +44,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
-        .update(updateData as unknown as Tables[T]['Update'])
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();
