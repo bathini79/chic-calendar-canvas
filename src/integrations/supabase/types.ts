@@ -263,9 +263,43 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_items: {
         Row: {
-          category_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -278,7 +312,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          category_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -291,7 +324,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          category_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -303,12 +335,34 @@ export type Database = {
           unit_price?: number
           updated_at?: string
         }
+        Relationships: []
+      }
+      inventory_items_categories: {
+        Row: {
+          category_id: string
+          item_id: string
+        }
+        Insert: {
+          category_id: string
+          item_id: string
+        }
+        Update: {
+          category_id?: string
+          item_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "inventory_items_category_id_fkey"
+            foreignKeyName: "inventory_items_categories_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: "categories"
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_categories_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
             referencedColumns: ["id"]
           },
         ]

@@ -1,3 +1,4 @@
+
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -10,6 +11,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CategoryDialog } from "@/components/admin/inventory/CategoryDialog";
+import { CategoryList } from "@/components/admin/inventory/CategoryList";
 
 export default function Inventory() {
   const { data: items, isLoading } = useSupabaseCrud('inventory_items');
@@ -22,10 +26,6 @@ export default function Inventory() {
     <div className="space-y-4 p-8">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Inventory</h1>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -47,44 +47,67 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div className="bg-card rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Min. Quantity</TableHead>
-              <TableHead>Unit Price</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items?.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{item.sku || '-'}</TableCell>
-                <TableCell>
-                  <Badge variant={item.quantity <= item.minimum_quantity ? "destructive" : "default"}>
-                    {item.quantity}
-                  </Badge>
-                </TableCell>
-                <TableCell>{item.minimum_quantity}</TableCell>
-                <TableCell>${Number(item.unit_price).toFixed(2)}</TableCell>
-                <TableCell>
-                  <Badge variant={item.status === 'active' ? "default" : "secondary"}>
-                    {item.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm">Edit</Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <Tabs defaultValue="items">
+        <TabsList>
+          <TabsTrigger value="items">Items</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="items" className="space-y-4">
+          <div className="flex justify-end">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          </div>
+
+          <div className="bg-card rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Min. Quantity</TableHead>
+                  <TableHead>Unit Price</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items?.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell>{item.sku || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant={item.quantity <= item.minimum_quantity ? "destructive" : "default"}>
+                        {item.quantity}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{item.minimum_quantity}</TableCell>
+                    <TableCell>${Number(item.unit_price).toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Badge variant={item.status === 'active' ? "default" : "secondary"}>
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm">Edit</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          <div className="flex justify-end">
+            <CategoryDialog />
+          </div>
+          <CategoryList />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
