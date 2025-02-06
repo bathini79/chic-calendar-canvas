@@ -27,7 +27,6 @@ export function CategoryList() {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Description</TableHead>
-            <TableHead>Parent Category</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -36,9 +35,6 @@ export function CategoryList() {
             <TableRow key={category.id}>
               <TableCell>{category.name}</TableCell>
               <TableCell>{category.description}</TableCell>
-              <TableCell>
-                {categories?.find((c) => c.id === category.parent_id)?.name || "-"}
-              </TableCell>
               <TableCell className="text-right">
                 <Button variant="ghost" size="sm" className="mr-2">
                   <Pencil className="h-4 w-4" />
