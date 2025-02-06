@@ -19,7 +19,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return data as Row[];
+      return data as unknown as Row[];
     },
   });
 
@@ -27,7 +27,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert([newData])
+        .insert([newData as unknown as Tables[T]['Insert']])
         .select()
         .single();
 
@@ -45,7 +45,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
-        .update(updateData)
+        .update(updateData as unknown as Tables[T]['Update'])
         .eq('id', id)
         .select()
         .single();
