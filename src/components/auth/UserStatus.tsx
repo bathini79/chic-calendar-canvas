@@ -9,10 +9,5 @@ export function UserStatus() {
       return session;
     },
   });
-
-  if (!session) {
-    return <div>Not logged in</div>;
-  }
-
   return null;
 }

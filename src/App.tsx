@@ -11,6 +11,7 @@ import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminServices from "@/pages/admin/AdminServices";
 import Staff from "@/pages/admin/Staff";
 import Inventory from "@/pages/admin/Inventory";
+import Auth from "./pages/Auth";
 
 export default function App() {
   return (
@@ -24,6 +25,8 @@ export default function App() {
           <Route path="cart" element={<Cart />} />
           <Route path="profile" element={<Profile />} />
         </Route>
+
+        <Route path="/auth" element={<Auth />} />
 
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
