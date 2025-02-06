@@ -32,7 +32,7 @@ export default function UnifiedScheduling() {
   };
 
   const handleTimeSlotSelect = (itemId: string, timeSlot: string) => {
-    setSelectedTimeSlots((prev) => ({
+    setSelectedTimeSlots((prev: Record<string, string>) => ({
       ...prev,
       [itemId]: timeSlot,
     }));
