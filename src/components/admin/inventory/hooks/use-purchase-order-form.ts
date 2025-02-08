@@ -49,6 +49,7 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
           purchase_order_id: savedOrder.id,
           item_id: item.item_id,
           quantity: item.quantity,
+          unit_price: item.purchase_price,
           purchase_price: item.purchase_price,
           tax_rate: item.tax_rate,
           expiry_date: item.expiry_date ? format(item.expiry_date, 'yyyy-MM-dd') : null,

@@ -23,8 +23,13 @@ export function useItemForm(item?: any, onClose?: () => void) {
   const handleSubmit = async (values: ItemFormValues) => {
     try {
       const itemData = {
-        ...values,
-        status: 'active'
+        name: values.name,
+        description: values.description,
+        sku: values.sku,
+        quantity: values.quantity,
+        minimum_quantity: values.minimum_quantity,
+        unit_price: values.unit_price,
+        status: values.status
       };
 
       let savedItem;
