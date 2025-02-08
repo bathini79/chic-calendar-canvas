@@ -13,6 +13,7 @@ import AdminServices from "@/pages/admin/AdminServices";
 import Staff from "@/pages/admin/Staff";
 import Inventory from "@/pages/admin/Inventory";
 import Auth from "./pages/Auth";
+import UnifiedScheduling from "./pages/customer/UnifiedScheduling";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="packages" element={<Packages />} />
           <Route path="cart" element={<Cart />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="schedule" element={<UnifiedScheduling />} />
         </Route>
 
         <Route path="/auth" element={<Auth />} />
