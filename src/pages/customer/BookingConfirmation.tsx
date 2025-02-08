@@ -2,13 +2,16 @@
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
-import { Clock, Package } from "lucide-react";
+import { Clock, Package, Store } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function BookingConfirmation() {
   const { items, selectedTimeSlots, selectedDate, selectedStylists, getTotalPrice, getTotalDuration } = useCart();
   const navigate = useNavigate();
+  const [notes, setNotes] = useState("");
 
   if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
     navigate('/schedule');
@@ -47,33 +50,54 @@ export default function BookingConfirmation() {
                 </CardContent>
               </Card>
             ))}
+
+            <Card className="border rounded-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Booking Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  placeholder="Add any special requests or notes for your booking..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="resize-none"
+                  rows={4}
+                />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 border-t bg-background">
         <div className="container max-w-2xl mx-auto px-4">
-          <div className="flex items-center justify-between py-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="py-4 space-y-3">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
                 <span>{items.length} services</span>
                 <span>•</span>
                 <span>{getTotalDuration()} minutes</span>
               </div>
+              <div className="flex items-center gap-2">
+                <Store className="h-4 w-4" />
+                <span>Pay at Salon</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
               <div className="text-2xl font-bold">
                 ₹{getTotalPrice()}
               </div>
+              <Button 
+                size="lg"
+                onClick={() => {
+                  // Handle booking confirmation
+                  console.log("Booking confirmed", { notes });
+                }}
+              >
+                Confirm Booking
+              </Button>
             </div>
-            <Button 
-              size="lg"
-              onClick={() => {
-                // Handle booking confirmation
-                console.log("Booking confirmed");
-              }}
-            >
-              Confirm Booking
-            </Button>
           </div>
         </div>
       </div>
