@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import {
   Table,
@@ -10,9 +11,11 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
+import { CategoryDialog } from "./CategoryDialog";
 
 export function CategoryList() {
   const { data: categories, remove } = useSupabaseCrud("inventory_categories");
+  const [editingCategory, setEditingCategory] = useState<any>(null);
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this category?")) {
@@ -36,7 +39,12 @@ export function CategoryList() {
               <TableCell>{category.name}</TableCell>
               <TableCell>{category.description}</TableCell>
               <TableCell className="text-right">
-                <Button variant="ghost" size="sm" className="mr-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="mr-2"
+                  onClick={() => setEditingCategory(category)}
+                >
                   <Pencil className="h-4 w-4" />
                 </Button>
                 <Button
@@ -51,6 +59,12 @@ export function CategoryList() {
           ))}
         </TableBody>
       </Table>
+      {editingCategory && (
+        <CategoryDialog 
+          category={editingCategory} 
+          onClose={() => setEditingCategory(null)} 
+        />
+      )}
     </div>
   );
 }

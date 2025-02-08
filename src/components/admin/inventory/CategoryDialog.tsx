@@ -13,22 +13,39 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
 
-export function CategoryDialog() {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+interface CategoryDialogProps {
+  category?: any;
+  onClose?: () => void;
+}
 
-  const { create } = useSupabaseCrud("inventory_categories");
+export function CategoryDialog({ category, onClose }: CategoryDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(category?.name || "");
+  const [description, setDescription] = useState(category?.description || "");
+
+  const { create, update } = useSupabaseCrud("inventory_categories");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await create({
-      name,
-      description,
-    });
-    setName("");
-    setDescription("");
-    setOpen(false);
+    try {
+      if (category) {
+        await update(category.id, {
+          name,
+          description,
+        });
+      } else {
+        await create({
+          name,
+          description,
+        });
+      }
+      setName("");
+      setDescription("");
+      setOpen(false);
+      if (onClose) onClose();
+    } catch (error) {
+      console.error("Error saving category:", error);
+    }
   };
 
   return (
@@ -36,12 +53,12 @@ export function CategoryDialog() {
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
-          Add Category
+          {category ? 'Edit Category' : 'Add Category'}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Category</DialogTitle>
+          <DialogTitle>{category ? 'Edit Category' : 'Add New Category'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -66,7 +83,7 @@ export function CategoryDialog() {
             />
           </div>
           <Button type="submit" className="w-full">
-            Create Category
+            {category ? 'Update' : 'Create'} Category
           </Button>
         </form>
       </DialogContent>
