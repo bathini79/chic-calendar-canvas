@@ -22,9 +22,11 @@ export function CartSummary() {
     return sum + (item.service?.selling_price || item.package?.price || 0);
   }, 0);
 
+  const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
+
   const handleContinue = () => {
     if (isSchedulingPage) {
-      if (selectedDate && Object.keys(selectedTimeSlots).length === items.length) {
+      if (selectedDate && isTimeSelected) {
         navigate('/booking-confirmation');
       }
     } else {
@@ -87,7 +89,7 @@ export function CartSummary() {
           className="w-full" 
           onClick={handleContinue}
           disabled={items.length === 0 || (isSchedulingPage && 
-            (!selectedDate || Object.keys(selectedTimeSlots).length !== items.length))}
+            (!selectedDate || !isTimeSelected))}
         >
           {isSchedulingPage ? 'Continue to Booking' : 'Continue to Schedule'}
         </Button>

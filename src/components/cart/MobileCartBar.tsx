@@ -16,9 +16,11 @@ export function MobileCartBar() {
 
   if (items.length === 0) return null;
 
+  const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
+
   const handleContinue = () => {
     if (isSchedulingPage) {
-      if (selectedDate && Object.keys(selectedTimeSlots).length === items.length) {
+      if (selectedDate && isTimeSelected) {
         navigate('/booking-confirmation');
       }
     } else {
@@ -38,8 +40,7 @@ export function MobileCartBar() {
       <Button 
         onClick={handleContinue}
         className="flex-shrink-0"
-        disabled={isSchedulingPage && 
-          (!selectedDate || Object.keys(selectedTimeSlots).length !== items.length)}
+        disabled={isSchedulingPage && (!selectedDate || !isTimeSelected)}
       >
         {isSchedulingPage ? 'Continue' : 'Schedule'}
       </Button>
