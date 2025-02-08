@@ -16,19 +16,29 @@ import { CategoryList } from "@/components/admin/inventory/CategoryList";
 import { ItemDialog } from "@/components/admin/inventory/ItemDialog";
 import { SupplierDialog } from "@/components/admin/inventory/SupplierDialog";
 import { SupplierList } from "@/components/admin/inventory/SupplierList";
+import { PurchaseOrderDialog } from "@/components/admin/inventory/PurchaseOrderDialog";
 import { useState } from "react";
+import { format } from "date-fns";
 
 export default function Inventory() {
   const { data: items, isLoading, remove } = useSupabaseCrud('inventory_items');
+  const { data: purchaseOrders, remove: removePurchaseOrder } = useSupabaseCrud('purchase_orders');
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingPurchaseOrder, setEditingPurchaseOrder] = useState<any>(null);
 
   if (isLoading) {
     return <div>Loading...</div>;
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteItem = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this item?')) {
       await remove(id);
+    }
+  };
+
+  const handleDeletePurchaseOrder = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this purchase order?')) {
+      await removePurchaseOrder(id);
     }
   };
 
@@ -62,6 +72,7 @@ export default function Inventory() {
           <TabsTrigger value="items">Items</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items" className="space-y-4">
@@ -110,7 +121,7 @@ export default function Inventory() {
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() => handleDeleteItem(item.id)}
                       >
                         Delete
                       </Button>
@@ -140,6 +151,63 @@ export default function Inventory() {
             <SupplierDialog />
           </div>
           <SupplierList />
+        </TabsContent>
+
+        <TabsContent value="purchase-orders" className="space-y-4">
+          <div className="flex justify-end">
+            <PurchaseOrderDialog />
+          </div>
+          <div className="bg-card rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice Number</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead>Order Date</TableHead>
+                  <TableHead>Tax Inclusive</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {purchaseOrders?.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell>{order.invoice_number}</TableCell>
+                    <TableCell>{order.supplier_id}</TableCell>
+                    <TableCell>{format(new Date(order.order_date), 'PPP')}</TableCell>
+                    <TableCell>{order.tax_inclusive ? 'Yes' : 'No'}</TableCell>
+                    <TableCell>
+                      <Badge variant={order.status === 'pending' ? "warning" : "success"}>
+                        {order.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setEditingPurchaseOrder(order)}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeletePurchaseOrder(order.id)}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          {editingPurchaseOrder && (
+            <PurchaseOrderDialog
+              purchaseOrder={editingPurchaseOrder}
+              onClose={() => setEditingPurchaseOrder(null)}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>

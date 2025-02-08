@@ -590,28 +590,37 @@ export type Database = {
       purchase_order_items: {
         Row: {
           created_at: string
+          expiry_date: string | null
           id: string
           item_id: string | null
           purchase_order_id: string | null
+          purchase_price: number | null
           quantity: number
+          tax_rate: number | null
           unit_price: number
           updated_at: string
         }
         Insert: {
           created_at?: string
+          expiry_date?: string | null
           id?: string
           item_id?: string | null
           purchase_order_id?: string | null
+          purchase_price?: number | null
           quantity: number
+          tax_rate?: number | null
           unit_price: number
           updated_at?: string
         }
         Update: {
           created_at?: string
+          expiry_date?: string | null
           id?: string
           item_id?: string | null
           purchase_order_id?: string | null
+          purchase_price?: number | null
           quantity?: number
+          tax_rate?: number | null
           unit_price?: number
           updated_at?: string
         }
@@ -636,30 +645,36 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          invoice_number: string | null
           notes: string | null
           order_date: string
           status: string | null
           supplier_id: string | null
+          tax_inclusive: boolean | null
           total_amount: number | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
+          invoice_number?: string | null
           notes?: string | null
           order_date?: string
           status?: string | null
           supplier_id?: string | null
+          tax_inclusive?: boolean | null
           total_amount?: number | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
+          invoice_number?: string | null
           notes?: string | null
           order_date?: string
           status?: string | null
           supplier_id?: string | null
+          tax_inclusive?: boolean | null
           total_amount?: number | null
           updated_at?: string
         }
