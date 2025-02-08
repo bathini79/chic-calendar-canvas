@@ -11,13 +11,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export default function BookingConfirmation() {
-  const { 
-    items, 
-    selectedTimeSlots, 
-    selectedDate, 
-    selectedStylists, 
-    getTotalPrice, 
-    getTotalDuration 
+  const {
+    items,
+    selectedTimeSlots,
+    selectedDate,
+    selectedStylists,
+    getTotalPrice,
+    getTotalDuration
   } = useCart();
   const navigate = useNavigate();
   const [notes, setNotes] = useState("");
@@ -32,14 +32,14 @@ export default function BookingConfirmation() {
   const totalDuration = getTotalDuration();
   const totalHours = Math.floor(totalDuration / 60);
   const remainingMinutes = totalDuration % 60;
-  const durationDisplay = totalHours > 0 
+  const durationDisplay = totalHours > 0
     ? `${totalHours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`
     : `${remainingMinutes}m`;
 
   const handleBookingConfirmation = async () => {
     try {
       setIsLoading(true);
-      
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Please login to continue");
@@ -47,10 +47,21 @@ export default function BookingConfirmation() {
       }
 
       // Create bookings for each item
-      for (const item of items) {
-        const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlots[item.id]}`);
-        const endDateTime = addMinutes(startDateTime, item.service?.duration || item.package?.duration || 0);
+for (const item of items) {
+        const timeSlot = selectedTimeSlots[item.id];
+        if (!timeSlot) {
+          console.error(`No time slot found for item id: ${item.id}`);
+          continue; // Skip to the next item if no time slot is found
+        }
+        const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${timeSlot}`);
+        
+        if (isNaN(startDateTime.getTime())) {
+            console.error(`Invalid date generated for item id: ${item.id}, date: ${format(selectedDate, 'yyyy-MM-dd')}, time: ${timeSlot}`);
+            continue; // Skip to the next item if the date is invalid
+        }
 
+        const endDateTime = addMinutes(startDateTime, item.service?.duration || item.package?.duration || 0);
+        console.log(startDateTime);
         const { error: bookingError } = await supabase
           .from('bookings')
           .insert({
@@ -78,6 +89,7 @@ export default function BookingConfirmation() {
           throw cartError;
         }
       }
+
 
       toast.success("Booking confirmed successfully!");
       navigate('/profile'); // Redirect to profile or booking success page
@@ -115,7 +127,7 @@ export default function BookingConfirmation() {
               const itemDuration = item.service?.duration || item.package?.duration || 0;
               const hours = Math.floor(itemDuration / 60);
               const minutes = itemDuration % 60;
-              const itemDurationDisplay = hours > 0 
+              const itemDurationDisplay = hours > 0
                 ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`
                 : `${minutes}m`;
 
@@ -143,11 +155,12 @@ export default function BookingConfirmation() {
             })}
 
             <Card className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-2 ">
                 <Store className="h-4 w-4" />
-                <span>Pay At Salon</span>
+                <span className="font-bold">Pay at Salon</span>
               </div>
             </Card>
+
 
             <div className="space-y-2 mt-8">
               <span className="font-medium">Booking Notes</span>
