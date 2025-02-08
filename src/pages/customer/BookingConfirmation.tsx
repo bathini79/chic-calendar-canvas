@@ -28,22 +28,37 @@ export default function BookingConfirmation() {
           </div>
 
           <div className="space-y-4">
+            <Card className="border rounded-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Payment Method</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Store className="h-4 w-4" />
+                  <span>Pay at Salon</span>
+                </div>
+              </CardContent>
+            </Card>
+
             {items.map((item) => (
               <Card key={item.id} className="border rounded-lg">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xl">
+                  <CardTitle className="text-base font-medium">
                     {item.service?.name || item.package?.name}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span>{format(selectedDate, "MMMM d, yyyy")}</span>
                     <span>at</span>
                     <span>{selectedTimeSlots[item.id]}</span>
                   </div>
+                  <div className="text-sm text-muted-foreground">
+                    {item.service?.duration || item.package?.duration} minutes • ₹{item.service?.selling_price || item.package?.price}
+                  </div>
                   {selectedStylists[item.id] && selectedStylists[item.id] !== 'any' && (
-                    <div className="text-muted-foreground">
+                    <div className="text-sm text-muted-foreground">
                       with {selectedStylists[item.id]}
                     </div>
                   )}
@@ -78,10 +93,6 @@ export default function BookingConfirmation() {
                 <span>{items.length} services</span>
                 <span>•</span>
                 <span>{getTotalDuration()} minutes</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Store className="h-4 w-4" />
-                <span>Pay at Salon</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
