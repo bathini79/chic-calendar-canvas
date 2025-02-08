@@ -1,10 +1,9 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
-import { Clock, Package, Store } from "lucide-react";
+import { ArrowRight, Clock, Package } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -18,29 +17,32 @@ export default function BookingConfirmation() {
     return null;
   }
 
+  const startTime = Object.values(selectedTimeSlots)[0];
+
   return (
     <div className="min-h-screen pb-24">
       <div className="container max-w-2xl mx-auto py-6 px-4">
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Review and confirm</h1>
+            <h1 className="text-2xl font-bold">Make Sure Everything's Right</h1>
             <p className="text-muted-foreground mt-2">
               {format(selectedDate, "EEEE d MMMM")}
             </p>
-            <p className="text-muted-foreground">
-              {Object.values(selectedTimeSlots)[0]} • {getTotalDuration()} mins duration
-            </p>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span>{startTime}</span>
+              <ArrowRight className="h-4 w-4" />
+              <span>{format(new Date(selectedDate.setMinutes(selectedDate.getMinutes() + getTotalDuration())), 'HH:mm')}</span>
+            </div>
           </div>
 
           <div className="space-y-4">
             {items.map((item) => (
               <div key={item.id} className="flex justify-between items-start py-4 border-b">
                 <div className="space-y-1">
-                  <h3 className="font-medium">{item.service?.name || item.package?.name}</h3>
+                  <h3 className="font-medium text-sm">{item.service?.name || item.package?.name}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {item.service?.duration || item.package?.duration} mins
                     {selectedStylists[item.id] && selectedStylists[item.id] !== 'any' && (
-                      <> with {selectedStylists[item.id]}</>
+                      <>with {selectedStylists[item.id]}</>
                     )}
                   </p>
                 </div>
@@ -49,26 +51,6 @@ export default function BookingConfirmation() {
                 </div>
               </div>
             ))}
-
-            <Card className="border rounded-lg mt-6">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">Payment method</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Store className="h-4 w-4" />
-                  <span>Pay at venue</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="space-y-2">
-              <h3 className="font-medium">Important info</h3>
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>Hello! Just a heads up! Unfortunately We do not have card swiping machine. Thank you!</p>
-                <p>ALSO PLEASE NOTE THAT IF YOU ARRIVE MORE THAN 15 MINUTES LATE, WE MAY NEED TO RESCHEDULE YOUR APPOINTMENT.</p>
-              </div>
-            </div>
 
             <div className="space-y-2">
               <span className="font-medium">Booking Notes</span>
@@ -88,28 +70,25 @@ export default function BookingConfirmation() {
         <div className="container max-w-2xl mx-auto px-4">
           <div className="py-4 space-y-3">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <div className="text-2xl font-bold">₹{getTotalPrice()}</div>
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
                 <span>{items.length} services</span>
                 <span>•</span>
+                <Clock className="h-4 w-4" />
                 <span>{getTotalDuration()} minutes</span>
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold">₹{getTotalPrice()}</div>
-                <div className="text-sm text-muted-foreground">Pay at venue</div>
-              </div>
-              <Button
-                size="lg"
-                onClick={() => {
-                  // Handle booking confirmation
-                  console.log("Booking confirmed", { notes });
-                }}
-              >
-                Confirm
-              </Button>
-            </div>
+            <Button
+              size="lg"
+              className="w-full"
+              onClick={() => {
+                // Handle booking confirmation
+                console.log("Booking confirmed", { notes });
+              }}
+            >
+              Confirm
+            </Button>
           </div>
         </div>
       </div>
