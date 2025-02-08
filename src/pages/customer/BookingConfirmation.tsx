@@ -3,15 +3,25 @@ import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { format } from "date-fns";
+import { format, addMinutes } from "date-fns";
 import { ArrowRight, Calendar, Clock, Package, Store } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export default function BookingConfirmation() {
-  const { items, selectedTimeSlots, selectedDate, selectedStylists, getTotalPrice, getTotalDuration } = useCart();
+  const { 
+    items, 
+    selectedTimeSlots, 
+    selectedDate, 
+    selectedStylists, 
+    getTotalPrice, 
+    getTotalDuration 
+  } = useCart();
   const navigate = useNavigate();
   const [notes, setNotes] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
     navigate('/schedule');
@@ -25,6 +35,59 @@ export default function BookingConfirmation() {
   const durationDisplay = totalHours > 0 
     ? `${totalHours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`
     : `${remainingMinutes}m`;
+
+  const handleBookingConfirmation = async () => {
+    try {
+      setIsLoading(true);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please login to continue");
+        return;
+      }
+
+      // Create bookings for each item
+      for (const item of items) {
+        const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlots[item.id]}`);
+        const endDateTime = addMinutes(startDateTime, item.service?.duration || item.package?.duration || 0);
+
+        const { error: bookingError } = await supabase
+          .from('bookings')
+          .insert({
+            customer_id: session.user.id,
+            service_id: item.service_id,
+            package_id: item.package_id,
+            employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString(),
+            notes: notes,
+            status: 'confirmed'
+          });
+
+        if (bookingError) {
+          throw bookingError;
+        }
+
+        // Update cart item status to booked
+        const { error: cartError } = await supabase
+          .from('cart_items')
+          .update({ status: 'scheduled' })
+          .eq('id', item.id);
+
+        if (cartError) {
+          throw cartError;
+        }
+      }
+
+      toast.success("Booking confirmed successfully!");
+      navigate('/profile'); // Redirect to profile or booking success page
+    } catch (error: any) {
+      toast.error(error.message || "Failed to confirm booking");
+      console.error("Booking error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen pb-24">
@@ -116,12 +179,10 @@ export default function BookingConfirmation() {
             <Button
               size="lg"
               className="w-full"
-              onClick={() => {
-                // Handle booking confirmation
-                console.log("Booking confirmed", { notes });
-              }}
+              onClick={handleBookingConfirmation}
+              disabled={isLoading}
             >
-              Confirm
+              {isLoading ? "Confirming..." : "Confirm"}
             </Button>
           </div>
         </div>
