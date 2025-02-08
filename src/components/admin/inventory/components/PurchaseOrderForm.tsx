@@ -29,16 +29,11 @@ interface PurchaseOrderFormProps {
 export function PurchaseOrderForm({ defaultValues, onSubmit }: PurchaseOrderFormProps) {
   const { data: suppliers } = useSupabaseCrud("suppliers");
   const { data: items } = useSupabaseCrud("inventory_items");
-  const { create, update } = useSupabaseCrud("purchase_orders");
-console.log("pur")
+console.log({onSubmit})
   const form = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderSchema),
     defaultValues,
   });
-  const handleSubmit = (e:React.FormEvent) => {
-    console.log({e})
-
-  }
 
   return (
     <Form {...form}>
