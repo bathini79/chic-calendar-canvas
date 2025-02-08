@@ -1,4 +1,3 @@
-
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import {
   Table,
@@ -157,50 +156,53 @@ export default function Inventory() {
           <div className="flex justify-end">
             <PurchaseOrderDialog />
           </div>
-          <div className="bg-card rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice Number</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Order Date</TableHead>
-                  <TableHead>Tax Inclusive</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {purchaseOrders?.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell>{order.invoice_number}</TableCell>
-                    <TableCell>{order.supplier_id}</TableCell>
-                    <TableCell>{format(new Date(order.order_date), 'PPP')}</TableCell>
-                    <TableCell>{order.tax_inclusive ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>
-                      <Badge variant={order.status === 'pending' ? "warning" : "success"}>
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setEditingPurchaseOrder(order)}
-                      >
-                        Edit
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleDeletePurchaseOrder(order.id)}
-                      >
-                        Delete
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="grid gap-4">
+            {purchaseOrders?.map((order) => (
+              <div key={order.id} className="bg-card p-4 rounded-lg shadow-sm border">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="font-semibold">Invoice #{order.invoice_number}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {format(new Date(order.order_date), 'PPP')}
+                    </p>
+                  </div>
+                  <Badge variant={order.status === 'pending' ? "secondary" : "default"}>
+                    {order.status}
+                  </Badge>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span className="font-medium">Supplier:</span> {order.supplier_id}
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Tax Inclusive:</span> {order.tax_inclusive ? 'Yes' : 'No'}
+                  </div>
+                  {order.notes && (
+                    <div className="text-sm">
+                      <span className="font-medium">Notes:</span> {order.notes}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setEditingPurchaseOrder(order)}
+                  >
+                    Edit
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => handleDeletePurchaseOrder(order.id)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
           {editingPurchaseOrder && (
             <PurchaseOrderDialog
