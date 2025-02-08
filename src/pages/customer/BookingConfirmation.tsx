@@ -1,9 +1,9 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
-import { ArrowRight, Clock, Package } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Package } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -25,10 +25,12 @@ export default function BookingConfirmation() {
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold">Make Sure Everything's Right</h1>
-            <p className="text-muted-foreground mt-2">
-              {format(selectedDate, "EEEE d MMMM")}
-            </p>
+            <div className="flex items-center gap-2 text-muted-foreground mt-2">
+              <Calendar className="h-4 w-4" />
+              <p>{format(selectedDate, "EEEE d MMMM")}</p>
+            </div>
             <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-4 w-4" />
               <span>{startTime}</span>
               <ArrowRight className="h-4 w-4" />
               <span>{format(new Date(selectedDate.setMinutes(selectedDate.getMinutes() + getTotalDuration())), 'HH:mm')}</span>
@@ -39,7 +41,7 @@ export default function BookingConfirmation() {
             {items.map((item) => (
               <div key={item.id} className="flex justify-between items-start py-4 border-b">
                 <div className="space-y-1">
-                  <h3 className="font-medium text-sm">{item.service?.name || item.package?.name}</h3>
+                  <h3 className="text-sm">{item.service?.name || item.package?.name}</h3>
                   <p className="text-sm text-muted-foreground">
                     {selectedStylists[item.id] && selectedStylists[item.id] !== 'any' && (
                       <>with {selectedStylists[item.id]}</>
@@ -51,6 +53,10 @@ export default function BookingConfirmation() {
                 </div>
               </div>
             ))}
+
+            <div className="py-4 border-b">
+              <div className="text-muted-foreground">Pay at Venue</div>
+            </div>
 
             <div className="space-y-2">
               <span className="font-medium">Booking Notes</span>
@@ -70,7 +76,7 @@ export default function BookingConfirmation() {
         <div className="container max-w-2xl mx-auto px-4">
           <div className="py-4 space-y-3">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <div className="text-2xl font-bold">₹{getTotalPrice()}</div>
+              <div className="text-2xl font-bold text-foreground">₹{getTotalPrice()}</div>
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
                 <span>{items.length} services</span>
