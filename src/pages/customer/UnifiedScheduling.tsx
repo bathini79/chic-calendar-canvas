@@ -1,3 +1,4 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
 import { UnifiedCalendar } from "@/components/scheduling/UnifiedCalendar";
@@ -25,17 +26,17 @@ export default function UnifiedScheduling() {
   }, [items, navigate]);
 
   const handleStylistSelect = (itemId: string, stylistId: string) => {
-    setLocalSelectedStylists((prev: Record<string, string>) => ({
+    setLocalSelectedStylists((prev) => ({
       ...prev,
       [itemId]: stylistId,
     }));
   };
 
   const handleTimeSlotSelect = (itemId: string, timeSlot: string) => {
-    setSelectedTimeSlots((prev: Record<string, string>) => ({
-      ...prev,
+    setSelectedTimeSlots({
+      ...selectedTimeSlots,
       [itemId]: timeSlot,
-    }));
+    });
   };
 
   const handleContinue = () => {
