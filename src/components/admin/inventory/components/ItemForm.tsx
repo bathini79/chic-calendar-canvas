@@ -1,0 +1,123 @@
+
+import { Form } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { itemSchema, type ItemFormValues } from "../schemas/item-schema";
+import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
+
+interface ItemFormProps {
+  defaultValues: ItemFormValues;
+  onSubmit: (values: ItemFormValues) => Promise<void>;
+}
+
+export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
+  const form = useForm<ItemFormValues>({
+    resolver: zodResolver(itemSchema),
+    defaultValues,
+  });
+
+  const { data: categories } = useSupabaseCrud("inventory_categories");
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <label htmlFor="name" className="text-sm font-medium">
+            Name
+          </label>
+          <Input
+            id="name"
+            {...form.register("name")}
+          />
+        </div>
+        <div>
+          <label htmlFor="description" className="text-sm font-medium">
+            Description
+          </label>
+          <Textarea
+            id="description"
+            {...form.register("description")}
+          />
+        </div>
+        <div>
+          <label htmlFor="sku" className="text-sm font-medium">
+            SKU
+          </label>
+          <Input
+            id="sku"
+            {...form.register("sku")}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="quantity" className="text-sm font-medium">
+              Quantity
+            </label>
+            <Input
+              id="quantity"
+              type="number"
+              min="0"
+              {...form.register("quantity", { valueAsNumber: true })}
+            />
+          </div>
+          <div>
+            <label htmlFor="minimumQuantity" className="text-sm font-medium">
+              Minimum Quantity
+            </label>
+            <Input
+              id="minimumQuantity"
+              type="number"
+              min="0"
+              {...form.register("minimum_quantity", { valueAsNumber: true })}
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="unitPrice" className="text-sm font-medium">
+            Unit Price
+          </label>
+          <Input
+            id="unitPrice"
+            type="number"
+            min="0"
+            step="0.01"
+            {...form.register("unit_price", { valueAsNumber: true })}
+          />
+        </div>
+        <div>
+          <label htmlFor="categories" className="text-sm font-medium">
+            Categories
+          </label>
+          <Select
+            value={form.watch("categories")[0]}
+            onValueChange={(value) => form.setValue("categories", [value])}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories?.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button type="submit" className="w-full">
+          {defaultValues.name ? 'Update' : 'Create'} Item
+        </Button>
+      </form>
+    </Form>
+  );
+}
