@@ -9,6 +9,7 @@ import { format } from "date-fns";
 export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) {
   const [open, setOpen] = useState(false);
   const { create, update } = useSupabaseCrud("purchase_orders");
+
   const defaultValues: PurchaseOrderFormValues = {
     supplier_id: purchaseOrder?.supplier_id || "",
     invoice_number: purchaseOrder?.invoice_number || "",
@@ -17,9 +18,8 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
     notes: purchaseOrder?.notes || "",
     items: purchaseOrder?.items || [],
   };
-  
+
   const handleSubmit = async (values: PurchaseOrderFormValues) => {
-    console.log("test-hook",{values,purchaseOrder})
     try {
       const orderData = {
         supplier_id: values.supplier_id,
@@ -29,7 +29,7 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
         notes: values.notes,
         status: 'pending',
       };
-       
+
       let savedOrder;
       if (purchaseOrder) {
         savedOrder = await update(purchaseOrder.id, orderData);
