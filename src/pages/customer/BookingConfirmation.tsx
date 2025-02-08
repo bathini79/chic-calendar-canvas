@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
-import { ArrowRight, Calendar, Clock, Package, Shop } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Package, Store } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -63,7 +63,7 @@ export default function BookingConfirmation() {
 
             <Card className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Shop className="h-4 w-4" />
+                <Store className="h-4 w-4" />
                 <span>Pay At Salon</span>
               </div>
             </Card>
