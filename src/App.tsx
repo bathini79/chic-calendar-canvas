@@ -14,6 +14,7 @@ import Staff from "@/pages/admin/Staff";
 import Inventory from "@/pages/admin/Inventory";
 import Auth from "./pages/Auth";
 import UnifiedScheduling from "./pages/customer/UnifiedScheduling";
+import BookingConfirmation from "./pages/customer/BookingConfirmation";
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="cart" element={<Cart />} />
           <Route path="profile" element={<Profile />} />
           <Route path="schedule" element={<UnifiedScheduling />} />
+          <Route path="booking-confirmation" element={<BookingConfirmation />} />
         </Route>
 
         <Route path="/auth" element={<Auth />} />
