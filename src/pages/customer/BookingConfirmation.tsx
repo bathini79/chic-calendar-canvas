@@ -1,9 +1,10 @@
 
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
-import { ArrowRight, Calendar, Clock, Package } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Package, Shop } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -31,9 +32,9 @@ export default function BookingConfirmation() {
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Clock className="h-4 w-4" />
-              <span>{startTime}</span>
+              <span>{format(new Date(`2000/01/01 ${startTime}`), 'hh:mm a')}</span>
               <ArrowRight className="h-4 w-4" />
-              <span>{format(new Date(selectedDate.setMinutes(selectedDate.getMinutes() + getTotalDuration())), 'HH:mm')}</span>
+              <span>{format(new Date(selectedDate.setMinutes(selectedDate.getMinutes() + getTotalDuration())), 'hh:mm a')}</span>
             </div>
           </div>
 
@@ -42,11 +43,17 @@ export default function BookingConfirmation() {
               <div key={item.id} className="flex justify-between items-start py-4 border-b">
                 <div className="space-y-1">
                   <h3 className="text-sm">{item.service?.name || item.package?.name}</h3>
-                  <p className="text-sm text-muted-foreground">
+                  <div className="space-y-0.5">
                     {selectedStylists[item.id] && selectedStylists[item.id] !== 'any' && (
-                      <>with {selectedStylists[item.id]}</>
+                      <p className="text-sm text-muted-foreground">
+                        with {selectedStylists[item.id]}
+                      </p>
                     )}
-                  </p>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {item.service?.duration || item.package?.duration} mins
+                    </p>
+                  </div>
                 </div>
                 <div className="font-medium">
                   ₹{item.service?.selling_price || item.package?.price}
@@ -54,11 +61,14 @@ export default function BookingConfirmation() {
               </div>
             ))}
 
-            <div className="py-4 border-b">
-              <div className="text-muted-foreground">Pay at Venue</div>
-            </div>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Shop className="h-4 w-4" />
+                <span>Pay At Salon</span>
+              </div>
+            </Card>
 
-            <div className="space-y-2">
+            <div className="space-y-2 mt-8">
               <span className="font-medium">Booking Notes</span>
               <Textarea
                 placeholder="Add any special requests or notes for your booking..."
