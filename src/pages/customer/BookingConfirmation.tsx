@@ -28,18 +28,6 @@ export default function BookingConfirmation() {
           </div>
 
           <div className="space-y-4">
-            <Card className="border rounded-lg">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">Payment Method</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Store className="h-4 w-4" />
-                  <span>Pay at Salon</span>
-                </div>
-              </CardContent>
-            </Card>
-
             {items.map((item) => (
               <Card key={item.id} className="border rounded-lg">
                 <CardHeader className="pb-2">
@@ -68,18 +56,25 @@ export default function BookingConfirmation() {
 
             <Card className="border rounded-lg">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">Booking Notes</CardTitle>
+                <CardTitle className="text-base font-medium">Payment Method</CardTitle>
               </CardHeader>
               <CardContent>
-                <Textarea
-                  placeholder="Add any special requests or notes for your booking..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="resize-none"
-                  rows={4}
-                />
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Store className="h-4 w-4" />
+                  <span>Pay at Salon</span>
+                </div>
               </CardContent>
             </Card>
+            <div>
+              <span >Booking Notes</span>
+              <Textarea
+                placeholder="Add any special requests or notes for your booking..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="resize-none"
+                rows={4}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -99,7 +94,7 @@ export default function BookingConfirmation() {
               <div className="text-2xl font-bold">
                 ₹{getTotalPrice()}
               </div>
-              <Button 
+              <Button
                 size="lg"
                 onClick={() => {
                   // Handle booking confirmation
