@@ -23,50 +23,55 @@ export default function BookingConfirmation() {
       <div className="container max-w-2xl mx-auto py-6 px-4">
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Make Sure Everything's Good</h1>
-            <p className="text-muted-foreground mt-1">Review your booking details before confirming</p>
+            <h1 className="text-2xl font-bold">Review and confirm</h1>
+            <p className="text-muted-foreground mt-2">
+              {format(selectedDate, "EEEE d MMMM")}
+            </p>
+            <p className="text-muted-foreground">
+              {Object.values(selectedTimeSlots)[0]} • {getTotalDuration()} mins duration
+            </p>
           </div>
 
           <div className="space-y-4">
             {items.map((item) => (
-              <Card key={item.id} className="border rounded-lg">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-medium">
-                    {item.service?.name || item.package?.name}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>{format(selectedDate, "MMMM d, yyyy")}</span>
-                    <span>at</span>
-                    <span>{selectedTimeSlots[item.id]}</span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {item.service?.duration || item.package?.duration} minutes • ₹{item.service?.selling_price || item.package?.price}
-                  </div>
-                  {selectedStylists[item.id] && selectedStylists[item.id] !== 'any' && (
-                    <div className="text-sm text-muted-foreground">
-                      with {selectedStylists[item.id]}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <div key={item.id} className="flex justify-between items-start py-4 border-b">
+                <div className="space-y-1">
+                  <h3 className="font-medium">{item.service?.name || item.package?.name}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {item.service?.duration || item.package?.duration} mins
+                    {selectedStylists[item.id] && selectedStylists[item.id] !== 'any' && (
+                      <> with {selectedStylists[item.id]}</>
+                    )}
+                  </p>
+                </div>
+                <div className="font-medium">
+                  ₹{item.service?.selling_price || item.package?.price}
+                </div>
+              </div>
             ))}
 
-            <Card className="border rounded-lg">
+            <Card className="border rounded-lg mt-6">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">Payment Method</CardTitle>
+                <CardTitle className="text-base font-medium">Payment method</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Store className="h-4 w-4" />
-                  <span>Pay at Salon</span>
+                  <span>Pay at venue</span>
                 </div>
               </CardContent>
             </Card>
-            <div>
-              <span >Booking Notes</span>
+
+            <div className="space-y-2">
+              <h3 className="font-medium">Important info</h3>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>Hello! Just a heads up! Unfortunately We do not have card swiping machine. Thank you!</p>
+                <p>ALSO PLEASE NOTE THAT IF YOU ARRIVE MORE THAN 15 MINUTES LATE, WE MAY NEED TO RESCHEDULE YOUR APPOINTMENT.</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="font-medium">Booking Notes</span>
               <Textarea
                 placeholder="Add any special requests or notes for your booking..."
                 value={notes}
@@ -91,8 +96,9 @@ export default function BookingConfirmation() {
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">
-                ₹{getTotalPrice()}
+              <div>
+                <div className="text-2xl font-bold">₹{getTotalPrice()}</div>
+                <div className="text-sm text-muted-foreground">Pay at venue</div>
               </div>
               <Button
                 size="lg"
@@ -101,7 +107,7 @@ export default function BookingConfirmation() {
                   console.log("Booking confirmed", { notes });
                 }}
               >
-                Confirm Booking
+                Confirm
               </Button>
             </div>
           </div>
