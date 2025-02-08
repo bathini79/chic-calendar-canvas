@@ -1,23 +1,39 @@
+
 import { useCart } from "./CartContext";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { format } from "date-fns";
 
 export function CartSummary() {
-  const { items, removeFromCart } = useCart();
+  const { 
+    items, 
+    removeFromCart, 
+    selectedDate, 
+    selectedTimeSlots,
+    selectedStylists
+  } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSchedulingPage = location.pathname === '/schedule';
 
   const totalPrice = items.reduce((sum, item) => {
     return sum + (item.service?.selling_price || item.package?.price || 0);
   }, 0);
 
   const handleContinue = () => {
-    navigate('/schedule');
+    if (isSchedulingPage) {
+      if (selectedDate && Object.keys(selectedTimeSlots).length === items.length) {
+        navigate('/booking-confirmation');
+      }
+    } else {
+      navigate('/schedule');
+    }
   };
 
   return (
-    <Card className="hidden lg:flex flex-col h-full">
+    <Card className="flex flex-col h-full">
       <div className="p-4 border-b">
         <h2 className="font-semibold text-lg">Your Cart ({items.length} items)</h2>
         <p className="text-2xl font-bold mt-2">₹{totalPrice}</p>
@@ -45,14 +61,21 @@ export function CartSummary() {
                     <p className="text-sm font-medium">
                       ₹{item.service?.selling_price || item.package?.price}
                     </p>
+                    {isSchedulingPage && selectedTimeSlots[item.id] && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {format(selectedDate!, "MMM d")} at {selectedTimeSlots[item.id]}
+                      </p>
+                    )}
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => removeFromCart(item.id)}
-                  >
-                    Remove
-                  </Button>
+                  {!isSchedulingPage && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => removeFromCart(item.id)}
+                    >
+                      Remove
+                    </Button>
+                  )}
                 </div>
               </div>
             ))
@@ -63,9 +86,10 @@ export function CartSummary() {
         <Button 
           className="w-full" 
           onClick={handleContinue}
-          disabled={items.length === 0}
+          disabled={items.length === 0 || (isSchedulingPage && 
+            (!selectedDate || Object.keys(selectedTimeSlots).length !== items.length))}
         >
-          Continue
+          {isSchedulingPage ? 'Continue to Booking' : 'Continue to Schedule'}
         </Button>
       </div>
     </Card>
