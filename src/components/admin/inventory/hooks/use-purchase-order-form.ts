@@ -59,6 +59,7 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
           tax_rate: item.tax_rate || 0,
           expiry_date: item.expiry_date ? format(item.expiry_date, 'yyyy-MM-dd') : null,
           received_quantity: item.received_quantity || null,
+          unit_price: item.purchase_price, // Added to match the required schema
         }));
 
         const { error: itemsError } = await supabase
