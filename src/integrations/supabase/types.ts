@@ -9,52 +9,90 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      bookings: {
+      appointments: {
         Row: {
-          created_at: string
+          created_at: string | null
           customer_id: string
-          employee_id: string | null
           end_time: string
           id: string
+          location: string | null
           notes: string | null
-          package_id: string | null
-          service_id: string | null
+          number_of_bookings: number | null
           start_time: string
-          status: Database["public"]["Enums"]["booking_status"] | null
-          updated_at: string
+          status: string | null
+          updated_at: string | null
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           customer_id: string
-          employee_id?: string | null
           end_time: string
           id?: string
+          location?: string | null
           notes?: string | null
-          package_id?: string | null
-          service_id?: string | null
+          number_of_bookings?: number | null
           start_time: string
-          status?: Database["public"]["Enums"]["booking_status"] | null
-          updated_at?: string
+          status?: string | null
+          updated_at?: string | null
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           customer_id?: string
-          employee_id?: string | null
           end_time?: string
           id?: string
+          location?: string | null
           notes?: string | null
-          package_id?: string | null
-          service_id?: string | null
+          number_of_bookings?: number | null
           start_time?: string
-          status?: Database["public"]["Enums"]["booking_status"] | null
-          updated_at?: string
+          status?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "bookings_customer_id_fkey"
+            foreignKeyName: "appointments_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          appointment_id: string
+          created_at: string | null
+          employee_id: string | null
+          id: string
+          package_id: string | null
+          service_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          package_id?: string | null
+          service_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          package_id?: string | null
+          service_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
           {
@@ -940,10 +978,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_customer_bookings: {
+        Args: {
+          customer_id_param: string
+        }
+        Returns: {
+          appointment_id: string
+          customer_id: string
+          start_time: string
+          end_time: string
+          appointment_notes: string
+          appointment_status: string
+          bookings: Json
+        }[]
+      }
     }
     Enums: {
-      booking_status: "pending" | "confirmed" | "canceled" | "completed"
+      booking_status:
+        | "pending"
+        | "confirmed"
+        | "canceled"
+        | "completed"
+        | "inprogress"
       cart_item_status: "pending" | "scheduled" | "removed"
       employee_status: "active" | "inactive"
       employee_type: "stylist" | "operations"
