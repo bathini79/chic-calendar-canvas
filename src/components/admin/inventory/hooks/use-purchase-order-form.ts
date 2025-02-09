@@ -37,39 +37,44 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
         savedOrder = await create(orderData);
       }
 
-      if (savedOrder && values.items.length > 0) {
+      if (!savedOrder) {
+        throw new Error("Failed to save purchase order");
+      }
+
+      if (values.items && values.items.length > 0) {
         if (purchaseOrder) {
+          // Delete existing items if updating
           await supabase
             .from('purchase_order_items')
             .delete()
             .eq('purchase_order_id', savedOrder.id);
         }
 
+        // Insert new items
         const purchaseOrderItems = values.items.map(item => ({
           purchase_order_id: savedOrder.id,
           item_id: item.item_id,
           quantity: item.quantity,
           unit_price: item.purchase_price,
           purchase_price: item.purchase_price,
-          tax_rate: item.tax_rate,
+          tax_rate: item.tax_rate || 0,
           expiry_date: item.expiry_date ? format(item.expiry_date, 'yyyy-MM-dd') : null,
         }));
 
-        const { error } = await supabase
+        const { error: itemsError } = await supabase
           .from('purchase_order_items')
           .insert(purchaseOrderItems);
 
-        if (error) {
-          toast.error("Error saving purchase order items");
-          return;
+        if (itemsError) {
+          throw new Error("Error saving purchase order items");
         }
       }
 
       toast.success(purchaseOrder ? "Purchase order updated" : "Purchase order created");
       setOpen(false);
       if (onClose) onClose();
-    } catch (error) {
-      toast.error("Error saving purchase order");
+    } catch (error: any) {
+      toast.error(error.message || "Error saving purchase order");
       console.error("Error saving purchase order:", error);
     }
   };

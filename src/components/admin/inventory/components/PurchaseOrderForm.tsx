@@ -107,7 +107,7 @@ export function PurchaseOrderForm({ defaultValues, onSubmit }: PurchaseOrderForm
                     selected={field.value}
                     onSelect={field.onChange}
                     disabled={(date) =>
-                      date > new Date() || date < new Date("1900-01-01")
+                      date > new Date()
                     }
                   />
                 </PopoverContent>
@@ -149,8 +149,63 @@ export function PurchaseOrderForm({ defaultValues, onSubmit }: PurchaseOrderForm
           )}
         />
 
+        <FormField
+          control={form.control}
+          name="items"
+          render={() => (
+            <FormItem>
+              <FormLabel>Items</FormLabel>
+              <div className="space-y-2">
+                {form.getValues('items')?.map((_, index) => (
+                  <div key={index} className="flex gap-2">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.item_id`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <select
+                              {...field}
+                              className="w-full border rounded-md p-2"
+                            >
+                              <option value="">Select an item</option>
+                              {items?.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name}
+                                </option>
+                              ))}
+                            </select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.quantity`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              onChange={e => field.onChange(Number(e.target.value))}
+                              placeholder="Quantity"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ))}
+              </div>
+            </FormItem>
+          )}
+        />
+
         <Button type="submit" className="w-full">
-          Submit
+          Submit Purchase Order
         </Button>
       </form>
     </Form>
