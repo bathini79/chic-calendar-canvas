@@ -634,6 +634,7 @@ export type Database = {
           purchase_order_id: string | null
           purchase_price: number | null
           quantity: number
+          received_quantity: number | null
           tax_rate: number | null
           unit_price: number
           updated_at: string
@@ -646,6 +647,7 @@ export type Database = {
           purchase_order_id?: string | null
           purchase_price?: number | null
           quantity: number
+          received_quantity?: number | null
           tax_rate?: number | null
           unit_price: number
           updated_at?: string
@@ -658,6 +660,7 @@ export type Database = {
           purchase_order_id?: string | null
           purchase_price?: number | null
           quantity?: number
+          received_quantity?: number | null
           tax_rate?: number | null
           unit_price?: number
           updated_at?: string
@@ -686,6 +689,7 @@ export type Database = {
           invoice_number: string | null
           notes: string | null
           order_date: string
+          receipt_number: string | null
           status: string | null
           supplier_id: string | null
           tax_inclusive: boolean | null
@@ -698,6 +702,7 @@ export type Database = {
           invoice_number?: string | null
           notes?: string | null
           order_date?: string
+          receipt_number?: string | null
           status?: string | null
           supplier_id?: string | null
           tax_inclusive?: boolean | null
@@ -710,6 +715,7 @@ export type Database = {
           invoice_number?: string | null
           notes?: string | null
           order_date?: string
+          receipt_number?: string | null
           status?: string | null
           supplier_id?: string | null
           tax_inclusive?: boolean | null
