@@ -7,6 +7,7 @@ import { SupplierList } from "@/components/admin/inventory/SupplierList";
 import { InventoryStats } from "@/components/admin/inventory/components/InventoryStats";
 import { ItemsList } from "@/components/admin/inventory/components/ItemsList";
 import { PurchaseOrdersList } from "@/components/admin/inventory/components/PurchaseOrdersList";
+import { ServiceInventoryRequirements } from "@/components/admin/inventory/ServiceInventoryRequirements";
 
 export default function Inventory() {
   return (
@@ -23,6 +24,7 @@ export default function Inventory() {
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
           <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
+          <TabsTrigger value="requirements">Service Requirements</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items" className="space-y-4">
@@ -45,6 +47,10 @@ export default function Inventory() {
 
         <TabsContent value="purchase-orders" className="space-y-4">
           <PurchaseOrdersList />
+        </TabsContent>
+
+        <TabsContent value="requirements" className="space-y-4">
+          <ServiceInventoryRequirements />
         </TabsContent>
       </Tabs>
     </div>
