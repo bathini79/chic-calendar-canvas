@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { PurchaseOrderForm } from "./components/PurchaseOrderForm";
 import { usePurchaseOrderForm } from "./hooks/use-purchase-order-form";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface PurchaseOrderDialogProps {
   purchaseOrder?: any;
@@ -27,16 +28,18 @@ export function PurchaseOrderDialog({ purchaseOrder, onClose }: PurchaseOrderDia
           {purchaseOrder ? 'Edit Purchase Order' : 'Add Purchase Order'}
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] p-0">
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle>
             {purchaseOrder ? 'Edit Purchase Order' : 'Add New Purchase Order'}
           </DialogTitle>
         </DialogHeader>
-        <PurchaseOrderForm 
-          defaultValues={defaultValues}
-          onSubmit={handleSubmit}
-        />
+        <ScrollArea className="px-6 pb-6" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+          <PurchaseOrderForm 
+            defaultValues={defaultValues}
+            onSubmit={handleSubmit}
+          />
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
