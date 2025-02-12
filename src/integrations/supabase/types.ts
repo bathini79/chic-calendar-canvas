@@ -19,7 +19,8 @@ export type Database = {
           notes: string | null
           number_of_bookings: number | null
           start_time: string
-          status: string | null
+          status: Database["public"]["Enums"]["appointment_status"] | null
+          total_price: number
           updated_at: string | null
         }
         Insert: {
@@ -31,7 +32,8 @@ export type Database = {
           notes?: string | null
           number_of_bookings?: number | null
           start_time: string
-          status?: string | null
+          status?: Database["public"]["Enums"]["appointment_status"] | null
+          total_price: number
           updated_at?: string | null
         }
         Update: {
@@ -43,7 +45,8 @@ export type Database = {
           notes?: string | null
           number_of_bookings?: number | null
           start_time?: string
-          status?: string | null
+          status?: Database["public"]["Enums"]["appointment_status"] | null
+          total_price?: number
           updated_at?: string | null
         }
         Relationships: [
@@ -63,6 +66,7 @@ export type Database = {
           employee_id: string | null
           id: string
           package_id: string | null
+          price_paid: number
           service_id: string | null
           status: string | null
           updated_at: string | null
@@ -73,6 +77,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           package_id?: string | null
+          price_paid: number
           service_id?: string | null
           status?: string | null
           updated_at?: string | null
@@ -83,6 +88,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           package_id?: string | null
+          price_paid?: number
           service_id?: string | null
           status?: string | null
           updated_at?: string | null
@@ -1047,6 +1053,35 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_appointment_and_bookings: {
+        Args: {
+          customer_id_param: string
+          total_price_param: number
+          booking_data: Json[]
+        }
+        Returns: undefined
+      }
+      get_customer_appointments: {
+        Args: {
+          customer_id_param: string
+        }
+        Returns: {
+          appointment_id: string
+          customer_id: string
+          start_time: string
+          end_time: string
+          appointment_notes: string
+          appointment_status: string
+          booking_id: string
+          service_id: string
+          package_id: string
+          employee_id: string
+          booking_status: string
+          service: Json
+          package: Json
+          employee: Json
+        }[]
+      }
       get_customer_bookings: {
         Args: {
           customer_id_param: string
@@ -1063,6 +1098,12 @@ export type Database = {
       }
     }
     Enums: {
+      appointment_status:
+        | "pending"
+        | "confirmed"
+        | "canceled"
+        | "completed"
+        | "inprogress"
       booking_status:
         | "pending"
         | "confirmed"

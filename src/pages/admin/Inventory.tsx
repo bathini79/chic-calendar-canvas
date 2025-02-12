@@ -8,6 +8,7 @@ import { InventoryStats } from "@/components/admin/inventory/components/Inventor
 import { ItemsList } from "@/components/admin/inventory/components/ItemsList";
 import { PurchaseOrdersList } from "@/components/admin/inventory/components/PurchaseOrdersList";
 import { ServiceInventoryRequirements } from "@/components/admin/inventory/ServiceInventoryRequirements";
+import { LowStockManager } from "@/components/admin/inventory/LowStockManager";
 
 export default function Inventory() {
   return (
@@ -25,6 +26,7 @@ export default function Inventory() {
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
           <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
           <TabsTrigger value="requirements">Service Requirements</TabsTrigger>
+          <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items" className="space-y-4">
@@ -51,6 +53,10 @@ export default function Inventory() {
 
         <TabsContent value="requirements" className="space-y-4">
           <ServiceInventoryRequirements />
+        </TabsContent>
+
+        <TabsContent value="low-stock" className="space-y-4">
+          <LowStockManager />
         </TabsContent>
       </Tabs>
     </div>
