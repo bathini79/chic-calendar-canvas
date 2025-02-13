@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryDialog } from "@/components/admin/inventory/CategoryDialog";
 import { CategoryList } from "@/components/admin/inventory/CategoryList";
@@ -7,26 +8,31 @@ import { SupplierList } from "@/components/admin/inventory/SupplierList";
 import { InventoryStats } from "@/components/admin/inventory/components/InventoryStats";
 import { ItemsList } from "@/components/admin/inventory/components/ItemsList";
 import { PurchaseOrdersList } from "@/components/admin/inventory/components/PurchaseOrdersList";
-import { ServiceInventoryRequirements } from "@/components/admin/inventory/ServiceInventoryRequirements";
-import { LowStockManager } from "@/components/admin/inventory/LowStockManager";
+import { HeaderActions } from "@/components/admin/inventory/components/HeaderActions";
 
 export default function Inventory() {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [view, setView] = useState<"grid" | "list">("list");
+  const [searchQuery, setSearchQuery] = useState("");
+
   return (
-    <div className="space-y-4 p-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Inventory</h1>
-      </div>
+    <div className="container py-6 space-y-4">
+      <HeaderActions 
+        onAdd={() => setIsDialogOpen(true)} 
+        view={view} 
+        onViewChange={setView}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       <InventoryStats />
 
-      <Tabs defaultValue="items">
+      <Tabs defaultValue="items" className="space-y-4">
         <TabsList>
           <TabsTrigger value="items">Items</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
           <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
-          <TabsTrigger value="requirements">Service Requirements</TabsTrigger>
-          <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items" className="space-y-4">
@@ -49,14 +55,6 @@ export default function Inventory() {
 
         <TabsContent value="purchase-orders" className="space-y-4">
           <PurchaseOrdersList />
-        </TabsContent>
-
-        <TabsContent value="requirements" className="space-y-4">
-          <ServiceInventoryRequirements />
-        </TabsContent>
-
-        <TabsContent value="low-stock" className="space-y-4">
-          <LowStockManager />
         </TabsContent>
       </Tabs>
     </div>
