@@ -1,7 +1,7 @@
 
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
-import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Command, CommandGroup, CommandItem, CommandInput } from "@/components/ui/command";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export function MultiSelect({
   placeholder = "Select items...",
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   const handleUnselect = (value: string) => {
     onChange(selected.filter((s) => s !== value));
@@ -42,6 +43,14 @@ export function MultiSelect({
     return option ? option.label : value;
   });
 
+  const filteredOptions = React.useMemo(() => {
+    if (!searchQuery) return options;
+    const lowerQuery = searchQuery.toLowerCase();
+    return options.filter(option => 
+      option.label.toLowerCase().includes(lowerQuery)
+    );
+  }, [options, searchQuery]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -49,10 +58,10 @@ export function MultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("min-h-[40px] h-auto relative w-full", className)}
+          className={cn("min-h-[40px] h-auto relative w-full justify-start", className)}
         >
           <div className="flex gap-1 flex-wrap">
-            {selectedItems.length === 0 && placeholder}
+            {selectedItems.length === 0 && <span className="text-muted-foreground">{placeholder}</span>}
             {selectedItems.map((item) => (
               <Badge
                 variant="secondary"
@@ -95,9 +104,15 @@ export function MultiSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0">
-        <Command className="max-h-[300px] overflow-auto">
-          <CommandGroup>
-            {options.map((option) => (
+        <Command className="max-h-[300px]">
+          <CommandInput 
+            placeholder="Search items..." 
+            value={searchQuery}
+            onValueChange={setSearchQuery}
+            className="h-9"
+          />
+          <CommandGroup className="overflow-auto max-h-[200px]">
+            {filteredOptions.map((option) => (
               <CommandItem
                 key={option.value}
                 onSelect={() => {
@@ -132,10 +147,14 @@ export function MultiSelect({
                 <span>{option.label}</span>
               </CommandItem>
             ))}
+            {filteredOptions.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No items found.
+              </p>
+            )}
           </CommandGroup>
         </Command>
       </PopoverContent>
     </Popover>
   );
 }
-

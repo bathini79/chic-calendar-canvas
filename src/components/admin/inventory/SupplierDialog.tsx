@@ -30,32 +30,56 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
   const [address, setAddress] = useState(supplier?.address || "");
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [availableItems, setAvailableItems] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { create, update } = useSupabaseCrud("suppliers");
 
   useEffect(() => {
     const fetchItems = async () => {
-      const { data: items } = await supabase
-        .from('inventory_items')
-        .select('id, name');
-      setAvailableItems(items || []);
+      setIsLoading(true);
+      try {
+        const { data: items, error } = await supabase
+          .from('inventory_items')
+          .select('id, name')
+          .eq('status', 'active')
+          .order('name');
+          
+        if (error) throw error;
+        console.log('Fetched items:', items); // Debug log
+        setAvailableItems(items || []);
+      } catch (error: any) {
+        console.error('Error fetching items:', error);
+        toast.error('Failed to load items');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     const fetchSupplierItems = async () => {
       if (supplier) {
-        const { data: supplierItems } = await supabase
-          .from('supplier_items')
-          .select('item_id')
-          .eq('supplier_id', supplier.id);
-        setSelectedItems((supplierItems || []).map(si => si.item_id));
+        try {
+          const { data: supplierItems, error } = await supabase
+            .from('supplier_items')
+            .select('item_id')
+            .eq('supplier_id', supplier.id);
+            
+          if (error) throw error;
+          console.log('Fetched supplier items:', supplierItems); // Debug log
+          setSelectedItems((supplierItems || []).map(si => si.item_id));
+        } catch (error: any) {
+          console.error('Error fetching supplier items:', error);
+          toast.error('Failed to load supplier items');
+        }
       }
     };
 
-    fetchItems();
-    if (supplier) {
-      fetchSupplierItems();
+    if (open) {
+      fetchItems();
+      if (supplier) {
+        fetchSupplierItems();
+      }
     }
-  }, [supplier]);
+  }, [supplier, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,8 +200,14 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
               }))}
               selected={selectedItems}
               onChange={setSelectedItems}
-              placeholder="Select items..."
+              placeholder={isLoading ? "Loading items..." : "Select items..."}
+              className="w-full"
             />
+            {availableItems.length === 0 && !isLoading && (
+              <p className="text-sm text-muted-foreground mt-1">
+                No items available. Add items in the Items tab first.
+              </p>
+            )}
           </div>
           <div className="flex justify-end pt-4">
             <Button type="submit">
