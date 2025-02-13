@@ -174,7 +174,7 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
                 label: item.name,
                 value: item.id
               }))}
-              value={selectedItems}
+              selected={selectedItems}
               onChange={setSelectedItems}
               placeholder="Select items..."
             />
