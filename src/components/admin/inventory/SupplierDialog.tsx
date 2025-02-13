@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import {
   Dialog,
@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SupplierDialogProps {
   supplier?: any;
@@ -25,33 +28,87 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
   const [email, setEmail] = useState(supplier?.email || "");
   const [phone, setPhone] = useState(supplier?.phone || "");
   const [address, setAddress] = useState(supplier?.address || "");
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [availableItems, setAvailableItems] = useState<any[]>([]);
 
   const { create, update } = useSupabaseCrud("suppliers");
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      const { data: items } = await supabase
+        .from('inventory_items')
+        .select('id, name');
+      setAvailableItems(items || []);
+    };
+
+    const fetchSupplierItems = async () => {
+      if (supplier) {
+        const { data: supplierItems } = await supabase
+          .from('supplier_items')
+          .select('item_id')
+          .eq('supplier_id', supplier.id);
+        setSelectedItems((supplierItems || []).map(si => si.item_id));
+      }
+    };
+
+    fetchItems();
+    if (supplier) {
+      fetchSupplierItems();
+    }
+  }, [supplier]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      let supplierId;
       if (supplier) {
-        await update(supplier.id, {
+        const updatedSupplier = await update(supplier.id, {
           name,
           contact_name: contactName,
           email,
           phone,
           address,
         });
+        supplierId = supplier.id;
       } else {
-        await create({
+        const newSupplier = await create({
           name,
           contact_name: contactName,
           email,
           phone,
           address,
         });
+        supplierId = newSupplier.id;
       }
+
+      // Handle supplier items
+      if (supplierId) {
+        // Delete existing relationships
+        await supabase
+          .from('supplier_items')
+          .delete()
+          .eq('supplier_id', supplierId);
+
+        // Insert new relationships
+        if (selectedItems.length > 0) {
+          const supplierItems = selectedItems.map(itemId => ({
+            supplier_id: supplierId,
+            item_id: itemId,
+          }));
+
+          const { error } = await supabase
+            .from('supplier_items')
+            .insert(supplierItems);
+
+          if (error) throw error;
+        }
+      }
+
       setOpen(false);
       if (onClose) onClose();
-    } catch (error) {
-      console.error("Error saving supplier:", error);
+      toast.success(supplier ? 'Supplier updated' : 'Supplier created');
+    } catch (error: any) {
+      toast.error(error.message);
     }
   };
 
@@ -63,7 +120,7 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
           {supplier ? 'Edit Supplier' : 'Add Supplier'}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{supplier ? 'Edit Supplier' : 'Add New Supplier'}</DialogTitle>
         </DialogHeader>
@@ -82,39 +139,4 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
             <Input
               id="contactName"
               value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="email" className="text-sm font-medium">Email</label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="phone" className="text-sm font-medium">Phone</label>
-            <Input
-              id="phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="address" className="text-sm font-medium">Address</label>
-            <Textarea
-              id="address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
-          </div>
-          <Button type="submit" className="w-full">
-            {supplier ? 'Update' : 'Create'} Supplier
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
+              onChange
