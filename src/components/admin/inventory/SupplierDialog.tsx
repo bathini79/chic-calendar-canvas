@@ -139,4 +139,53 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
             <Input
               id="contactName"
               value={contactName}
-              onChange
+              onChange={(e) => setContactName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="email" className="text-sm font-medium">Email</label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="phone" className="text-sm font-medium">Phone</label>
+            <Input
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="address" className="text-sm font-medium">Address</label>
+            <Textarea
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Items</label>
+            <MultiSelect
+              options={availableItems.map(item => ({
+                label: item.name,
+                value: item.id
+              }))}
+              value={selectedItems}
+              onChange={setSelectedItems}
+              placeholder="Select items..."
+            />
+          </div>
+          <div className="flex justify-end pt-4">
+            <Button type="submit">
+              {supplier ? 'Update Supplier' : 'Create Supplier'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
