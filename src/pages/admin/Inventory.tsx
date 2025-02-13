@@ -11,52 +11,60 @@ import { PurchaseOrdersList } from "@/components/admin/inventory/components/Purc
 import { HeaderActions } from "@/components/admin/inventory/components/HeaderActions";
 
 export default function Inventory() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [view, setView] = useState<"grid" | "list">("list");
   const [searchQuery, setSearchQuery] = useState("");
 
   return (
-    <div className="container py-6 space-y-4">
-      <HeaderActions 
-        onAdd={() => setIsDialogOpen(true)} 
-        view={view} 
-        onViewChange={setView}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-      />
+    <div className="container mx-auto p-6">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6">
+          <HeaderActions 
+            onAdd={() => {}} 
+            view={view} 
+            onViewChange={setView}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+          <InventoryStats />
+        </div>
 
-      <InventoryStats />
+        <div className="rounded-lg border bg-card">
+          <Tabs defaultValue="items" className="w-full">
+            <div className="border-b px-4">
+              <TabsList className="bg-transparent">
+                <TabsTrigger value="items">Items</TabsTrigger>
+                <TabsTrigger value="categories">Categories</TabsTrigger>
+                <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+                <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
+              </TabsList>
+            </div>
 
-      <Tabs defaultValue="items" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="items">Items</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-          <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
-        </TabsList>
+            <div className="p-4">
+              <TabsContent value="items" className="m-0">
+                <ItemsList />
+              </TabsContent>
 
-        <TabsContent value="items" className="space-y-4">
-          <ItemsList />
-        </TabsContent>
+              <TabsContent value="categories" className="m-0">
+                <div className="flex justify-end mb-4">
+                  <CategoryDialog />
+                </div>
+                <CategoryList />
+              </TabsContent>
 
-        <TabsContent value="categories" className="space-y-4">
-          <div className="flex justify-end">
-            <CategoryDialog />
-          </div>
-          <CategoryList />
-        </TabsContent>
+              <TabsContent value="suppliers" className="m-0">
+                <div className="flex justify-end mb-4">
+                  <SupplierDialog />
+                </div>
+                <SupplierList />
+              </TabsContent>
 
-        <TabsContent value="suppliers" className="space-y-4">
-          <div className="flex justify-end">
-            <SupplierDialog />
-          </div>
-          <SupplierList />
-        </TabsContent>
-
-        <TabsContent value="purchase-orders" className="space-y-4">
-          <PurchaseOrdersList />
-        </TabsContent>
-      </Tabs>
+              <TabsContent value="purchase-orders" className="m-0">
+                <PurchaseOrdersList />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
+      </div>
     </div>
   );
 }

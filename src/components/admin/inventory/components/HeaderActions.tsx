@@ -19,35 +19,41 @@ export function HeaderActions({
   onSearchChange,
 }: HeaderActionsProps) {
   return (
-    <div className="flex justify-between items-center gap-4">
-      <div className="flex-1 max-w-sm">
-        <Input
-          placeholder="Search inventory..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="flex items-center border rounded-lg">
-          <Button
-            variant={view === "grid" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => onViewChange("grid")}
-          >
-            <Grid className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={view === "list" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => onViewChange("list")}
-          >
-            <List className="h-4 w-4" />
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
+      <div className="flex items-center gap-4">
+        <div className="relative w-full max-w-[180px] sm:max-w-[200px]">
+          <Input
+            placeholder="Search inventory..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border">
+            <Button
+              variant={view === "grid" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => onViewChange("grid")}
+              className="rounded-r-none"
+            >
+              <Grid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={view === "list" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => onViewChange("list")}
+              className="rounded-l-none"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={onAdd} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Item
           </Button>
         </div>
-        <Button onClick={onAdd}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
       </div>
     </div>
   );
