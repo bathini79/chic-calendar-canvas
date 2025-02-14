@@ -14,6 +14,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { itemSchema, type ItemFormValues } from "../schemas/item-schema";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ItemFormProps {
   defaultValues: ItemFormValues;
@@ -27,10 +29,25 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
   });
 
   const { data: categories } = useSupabaseCrud("inventory_categories");
+  const [selectedCategory, setSelectedCategory] = useState<string>(defaultValues.categories[0] || "");
+
+  useEffect(() => {
+    if (defaultValues.categories[0]) {
+      setSelectedCategory(defaultValues.categories[0]);
+    }
+  }, [defaultValues.categories]);
+
+  const handleSubmit = async (values: ItemFormValues) => {
+    const formValues = {
+      ...values,
+      categories: selectedCategory ? [selectedCategory] : []
+    };
+    await onSubmit(formValues);
+  };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
         <div>
           <label htmlFor="name" className="text-sm font-medium">
             Name
@@ -97,12 +114,12 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
           />
         </div>
         <div>
-          <label htmlFor="categories" className="text-sm font-medium">
-            Categories
+          <label htmlFor="category" className="text-sm font-medium">
+            Category
           </label>
           <Select
-            value={form.watch("categories")[0]}
-            onValueChange={(value) => form.setValue("categories", [value])}
+            value={selectedCategory}
+            onValueChange={setSelectedCategory}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a category" />
