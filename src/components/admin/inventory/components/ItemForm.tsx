@@ -49,15 +49,6 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
             {...form.register("description")}
           />
         </div>
-        <div>
-          <label htmlFor="sku" className="text-sm font-medium">
-            SKU
-          </label>
-          <Input
-            id="sku"
-            {...form.register("sku")}
-          />
-        </div>
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label htmlFor="quantity" className="text-sm font-medium">

@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ItemDialog } from "../ItemDialog";
+import { Plus, Trash2 } from "lucide-react";
 
 export function ItemsList() {
   const { data: items, remove } = useSupabaseCrud('inventory_items');
@@ -24,9 +25,12 @@ export function ItemsList() {
   };
 
   return (
-    <>
+    <div className="space-y-4">
       <div className="flex justify-end">
-        <ItemDialog />
+        <Button onClick={() => setEditingItem(null)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Item
+        </Button>
       </div>
 
       <div className="bg-card rounded-lg">
@@ -34,9 +38,9 @@ export function ItemsList() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>SKU</TableHead>
               <TableHead>Quantity</TableHead>
               <TableHead>Min. Quantity</TableHead>
+              <TableHead>Max. Quantity</TableHead>
               <TableHead>Unit Price</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -45,14 +49,14 @@ export function ItemsList() {
           <TableBody>
             {items?.map((item) => (
               <TableRow key={item.id}>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{item.sku || '-'}</TableCell>
+                <TableCell className="font-medium">{item.name}</TableCell>
                 <TableCell>
                   <Badge variant={item.quantity <= item.minimum_quantity ? "destructive" : "default"}>
                     {item.quantity}
                   </Badge>
                 </TableCell>
                 <TableCell>{item.minimum_quantity}</TableCell>
+                <TableCell>{item.max_quantity}</TableCell>
                 <TableCell>${Number(item.unit_price).toFixed(2)}</TableCell>
                 <TableCell>
                   <Badge variant={item.status === 'active' ? "default" : "secondary"}>
@@ -72,7 +76,7 @@ export function ItemsList() {
                     size="sm"
                     onClick={() => handleDeleteItem(item.id)}
                   >
-                    Delete
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </TableCell>
               </TableRow>
@@ -80,12 +84,12 @@ export function ItemsList() {
           </TableBody>
         </Table>
       </div>
-      {editingItem && (
-        <ItemDialog 
-          item={editingItem} 
-          onClose={() => setEditingItem(null)} 
-        />
-      )}
-    </>
+
+      <ItemDialog 
+        open={editingItem !== null || false}
+        item={editingItem} 
+        onClose={() => setEditingItem(null)} 
+      />
+    </div>
   );
 }

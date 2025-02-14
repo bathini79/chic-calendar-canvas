@@ -4,29 +4,21 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { ItemForm } from "./components/ItemForm";
 import { useItemForm } from "./hooks/use-item-form";
 
 interface ItemDialogProps {
   item?: any;
   onClose?: () => void;
+  open?: boolean;
 }
 
-export function ItemDialog({ item, onClose }: ItemDialogProps) {
-  const { open, setOpen, defaultValues, handleSubmit } = useItemForm(item, onClose);
+export function ItemDialog({ item, onClose, open }: ItemDialogProps) {
+  const { defaultValues, handleSubmit } = useItemForm(item, onClose);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          {item ? 'Edit Item' : 'Add Item'}
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose?.()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{item ? 'Edit Item' : 'Add New Item'}</DialogTitle>
