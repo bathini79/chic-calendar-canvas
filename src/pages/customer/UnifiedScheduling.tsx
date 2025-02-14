@@ -26,17 +26,17 @@ export default function UnifiedScheduling() {
   }, [items, navigate]);
 
   const handleStylistSelect = (itemId: string, stylistId: string) => {
-    setSelectedStylists((prev: Record<string, string>) => ({
+    setSelectedStylists((prev) => ({
       ...prev,
       [itemId]: stylistId,
     }));
   };
 
   const handleTimeSlotSelect = (itemId: string, timeSlot: string) => {
-    setSelectedTimeSlots({
-      ...selectedTimeSlots,
+    setSelectedTimeSlots((prev) => ({
+      ...prev,
       [itemId]: timeSlot,
-    });
+    }));
   };
 
   return (

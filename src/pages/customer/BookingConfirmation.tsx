@@ -46,7 +46,24 @@ export default function BookingConfirmation() {
         return;
       }
 
-      // Create bookings for each item
+      // First create the appointment
+      const { data: appointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .insert({
+          customer_id: session.user.id,
+          start_time: new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${startTime}`).toISOString(),
+          end_time: addMinutes(new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${startTime}`), totalDuration).toISOString(),
+          notes: notes,
+          total_price: getTotalPrice(),
+          status: 'confirmed',
+          number_of_bookings: items.length
+        })
+        .select()
+        .single();
+
+      if (appointmentError) throw appointmentError;
+
+      // Then create bookings for each item
       for (const item of items) {
         const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlots[item.id]}`);
         const endDateTime = addMinutes(startDateTime, item.service?.duration || item.package?.duration || 0);
@@ -54,13 +71,11 @@ export default function BookingConfirmation() {
         const { error: bookingError } = await supabase
           .from('bookings')
           .insert({
-            customer_id: session.user.id,
+            appointment_id: appointment.id,
             service_id: item.service_id,
             package_id: item.package_id,
             employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
-            start_time: startDateTime.toISOString(),
-            end_time: endDateTime.toISOString(),
-            notes: notes,
+            price_paid: item.service?.selling_price || item.package?.price || 0,
             status: 'confirmed'
           });
 
