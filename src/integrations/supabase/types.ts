@@ -347,11 +347,13 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          max_quantity: number
           minimum_quantity: number
           name: string
           quantity: number
           sku: string | null
           status: string | null
+          suggested_order_quantity: number | null
           unit_price: number
           updated_at: string
         }
@@ -359,11 +361,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          max_quantity?: number
           minimum_quantity?: number
           name: string
           quantity?: number
           sku?: string | null
           status?: string | null
+          suggested_order_quantity?: number | null
           unit_price?: number
           updated_at?: string
         }
@@ -371,11 +375,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          max_quantity?: number
           minimum_quantity?: number
           name?: string
           quantity?: number
           sku?: string | null
           status?: string | null
+          suggested_order_quantity?: number | null
           unit_price?: number
           updated_at?: string
         }
@@ -1092,6 +1098,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_suggested_order_quantity: {
+        Args: {
+          current_qty: number
+          min_qty: number
+          max_qty: number
+        }
+        Returns: number
+      }
       create_appointment_and_bookings: {
         Args: {
           customer_id_param: string

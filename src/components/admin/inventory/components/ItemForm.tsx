@@ -58,7 +58,7 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
             {...form.register("sku")}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <label htmlFor="quantity" className="text-sm font-medium">
               Quantity
@@ -79,6 +79,17 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
               type="number"
               min="0"
               {...form.register("minimum_quantity", { valueAsNumber: true })}
+            />
+          </div>
+          <div>
+            <label htmlFor="maxQuantity" className="text-sm font-medium">
+              Maximum Quantity
+            </label>
+            <Input
+              id="maxQuantity"
+              type="number"
+              min="0"
+              {...form.register("max_quantity", { valueAsNumber: true })}
             />
           </div>
         </div>

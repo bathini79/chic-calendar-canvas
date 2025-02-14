@@ -74,7 +74,7 @@ export function LowStockManager() {
         const poItems = group.items.map((item: any) => ({
           purchase_order_id: po.id,
           item_id: item.id,
-          quantity: Math.max(item.minimum_quantity - item.quantity, 0),
+          quantity: Math.max(item.max_quantity - item.quantity, 0),
           purchase_price: item.unit_price,
           unit_price: item.unit_price,
         }));
@@ -129,6 +129,7 @@ export function LowStockManager() {
               <TableHead>Item</TableHead>
               <TableHead>Current Stock</TableHead>
               <TableHead>Minimum Stock</TableHead>
+              <TableHead>Maximum Stock</TableHead>
               <TableHead>Supplier</TableHead>
               <TableHead>Required Quantity</TableHead>
             </TableRow>
@@ -139,9 +140,10 @@ export function LowStockManager() {
                 <TableCell>{item.name}</TableCell>
                 <TableCell>{item.quantity}</TableCell>
                 <TableCell>{item.minimum_quantity}</TableCell>
+                <TableCell>{item.max_quantity}</TableCell>
                 <TableCell>{item.supplier.name}</TableCell>
                 <TableCell>
-                  {Math.max(item.minimum_quantity - item.quantity, 0)}
+                  {Math.max(item.max_quantity - item.quantity, 0)}
                 </TableCell>
               </TableRow>
             ))}
