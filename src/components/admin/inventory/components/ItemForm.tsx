@@ -29,7 +29,7 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
   });
 
   const { data: categories } = useSupabaseCrud("inventory_categories");
-  const [selectedCategory, setSelectedCategory] = useState<string>(defaultValues.categories[0] || "");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     if (defaultValues.categories[0]) {
@@ -118,7 +118,7 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
             Category
           </label>
           <Select
-            value={selectedCategory}
+            value={selectedCategory || undefined}
             onValueChange={setSelectedCategory}
           >
             <SelectTrigger>

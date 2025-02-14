@@ -37,7 +37,7 @@ export function ItemsList() {
   const { data: items, remove, refetch } = useSupabaseCrud('inventory_items');
   const [editingItem, setEditingItem] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [displayItems, setDisplayItems] = useState<InventoryItem[]>([]);
 
   useEffect(() => {
@@ -76,14 +76,14 @@ export function ItemsList() {
         })
       );
 
-      if (selectedCategory) {
+      if (selectedCategory === "all") {
+        setDisplayItems(itemsWithCategories);
+      } else {
         setDisplayItems(
           itemsWithCategories.filter(item => 
             item.categories.includes(selectedCategory)
           )
         );
-      } else {
-        setDisplayItems(itemsWithCategories);
       }
     };
 
@@ -109,7 +109,7 @@ export function ItemsList() {
               <SelectValue placeholder="Filter by category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.id} value={category.id}>
                   {category.name}
