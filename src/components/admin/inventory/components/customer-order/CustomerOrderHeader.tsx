@@ -8,29 +8,42 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { UseFormReturn } from "react-hook-form";
-import { PurchaseOrderFormValues } from "../../schemas/purchase-order-schema";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-interface OrderHeaderProps {
-  form: UseFormReturn<PurchaseOrderFormValues>;
-  suppliers: any[];
+interface CustomerOrderHeaderProps {
+  form: UseFormReturn<any>; // You'll need to create proper types for customer orders
 }
 
-export function OrderHeader({ form, suppliers }: OrderHeaderProps) {
+export function CustomerOrderHeader({ form }: CustomerOrderHeaderProps) {
+  const { data: customers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'customer');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
     <>
       <div className="grid grid-cols-2 gap-4">
         <FormField
           control={form.control}
-          name="supplier_id"
+          name="customer_id"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Supplier</FormLabel>
+              <FormLabel>Customer</FormLabel>
               <FormControl>
                 <select {...field} className="w-full border rounded-md p-2">
-                  <option value="">Select a supplier</option>
-                  {suppliers?.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
+                  <option value="">Select a customer</option>
+                  {customers?.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.full_name || customer.email}
                     </option>
                   ))}
                 </select>
@@ -73,36 +86,6 @@ export function OrderHeader({ form, suppliers }: OrderHeaderProps) {
                   />
                 </PopoverContent>
               </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <FormField
-          control={form.control}
-          name="invoice_number"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Invoice Number</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="receipt_number"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Receipt Number</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
               <FormMessage />
             </FormItem>
           )}
