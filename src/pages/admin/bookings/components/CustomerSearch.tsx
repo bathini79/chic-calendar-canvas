@@ -2,9 +2,25 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { QuickCustomerCreate } from "./QuickCustomerCreate";
 import type { Customer } from "../types";
 
 interface CustomerSearchProps {
@@ -15,6 +31,8 @@ const CUSTOMERS_PER_PAGE = 10;
 
 export function CustomerSearch({ onSelect }: CustomerSearchProps) {
   const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   const fetchCustomers = async ({ pageParam = 0 }) => {
@@ -85,52 +103,106 @@ export function CustomerSearch({ onSelect }: CustomerSearchProps) {
 
   const allCustomers = data?.pages.flatMap(page => page.customers) ?? [];
 
+  const handleSelect = (customer: Customer) => {
+    onSelect(customer);
+    setOpen(false);
+  };
+
+  const handleCreateCustomer = (customer: Customer) => {
+    onSelect(customer);
+    setShowCreateDialog(false);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search customers..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-      
-      <ScrollArea className="h-[300px] rounded-md border" ref={scrollContainerRef}>
-        <div className="divide-y">
-          {isLoading ? (
-            <div className="p-4 text-center text-muted-foreground">
-              Loading customers...
-            </div>
-          ) : allCustomers.length === 0 ? (
-            <div className="p-4 text-center text-muted-foreground">
-              No customers found
-            </div>
-          ) : (
-            allCustomers.map((customer) => (
-              <div
-                key={customer.id}
-                className="p-3 hover:bg-gray-50 cursor-pointer"
-                onClick={() => onSelect(customer)}
-              >
-                <div className="font-medium">{customer.full_name}</div>
-                <div className="text-sm text-muted-foreground">{customer.email}</div>
-                {customer.phone_number && (
-                  <div className="text-sm text-muted-foreground">
-                    {customer.phone_number}
+      <div className="flex gap-2">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between"
+            >
+              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              Search customers...
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[400px] p-0" align="start">
+            <Command>
+              <CommandInput
+                placeholder="Search customers..."
+                value={search}
+                onValueChange={setSearch}
+              />
+              <CommandList>
+                <CommandEmpty>
+                  <div className="p-4 text-center">
+                    <p className="text-sm text-muted-foreground">No customers found</p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-2"
+                      onClick={() => {
+                        setOpen(false);
+                        setShowCreateDialog(true);
+                      }}
+                    >
+                      Create New Customer
+                    </Button>
                   </div>
-                )}
-              </div>
-            ))
-          )}
-          {isFetchingNextPage && (
-            <div className="p-4 text-center text-muted-foreground">
-              Loading more...
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+                </CommandEmpty>
+                <CommandGroup>
+                  <ScrollArea className="h-[300px]" ref={scrollContainerRef}>
+                    {isLoading ? (
+                      <div className="p-4 text-center text-muted-foreground">
+                        Loading customers...
+                      </div>
+                    ) : (
+                      allCustomers.map((customer) => (
+                        <CommandItem
+                          key={customer.id}
+                          onSelect={() => handleSelect(customer)}
+                          className="p-2"
+                        >
+                          <div>
+                            <div className="font-medium">{customer.full_name}</div>
+                            <div className="text-sm text-muted-foreground">{customer.email}</div>
+                            {customer.phone_number && (
+                              <div className="text-sm text-muted-foreground">
+                                {customer.phone_number}
+                              </div>
+                            )}
+                          </div>
+                        </CommandItem>
+                      ))
+                    )}
+                    {isFetchingNextPage && (
+                      <div className="p-4 text-center text-muted-foreground">
+                        Loading more...
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        <Button
+          variant="outline"
+          onClick={() => setShowCreateDialog(true)}
+        >
+          Create New
+        </Button>
+      </div>
+
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Customer</DialogTitle>
+          </DialogHeader>
+          <QuickCustomerCreate onCreated={handleCreateCustomer} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
