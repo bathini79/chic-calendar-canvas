@@ -97,8 +97,6 @@ serve(async (req) => {
 
     if (updateError) throw updateError;
 
-    console.log("Email sent successfully:", emailResponse);
-
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

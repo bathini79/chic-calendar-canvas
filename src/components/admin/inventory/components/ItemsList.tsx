@@ -59,7 +59,6 @@ export function ItemsList() {
       return (data || []) as Category[];
     },
   });
-
   // Query for items with categories
   const { data: items, refetch } = useQuery({
     queryKey: ['inventory_items'],
@@ -153,7 +152,7 @@ export function ItemsList() {
                 <TableCell>${Number(item.unit_price).toFixed(2)}</TableCell>
                 <TableCell>
                   {categories
-                    ?.filter(cat => item.categories.includes(cat.id))
+                    ?.filter(cat => item?.categories?.includes(cat.id))
                     .map(cat => (
                       <Badge key={cat.id} variant="secondary" className="mr-1">
                         {cat.name}

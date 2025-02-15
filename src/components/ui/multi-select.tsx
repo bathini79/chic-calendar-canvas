@@ -112,7 +112,7 @@ export function MultiSelect({
             className="h-9"
           />
           <CommandGroup className="overflow-auto max-h-[200px]">
-            {filteredOptions.map((option) => (
+            {filteredOptions?.map((option) => (
               <CommandItem
                 key={option.value}
                 onSelect={() => {
