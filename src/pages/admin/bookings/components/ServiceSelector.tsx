@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import { Package, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -33,6 +32,21 @@ export function ServiceSelector({
   const [showCustomizeDialog, setShowCustomizeDialog] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [customizableServices, setCustomizableServices] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Query for categories
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Query for services with categories
   const { data: services } = useQuery({
@@ -56,7 +70,7 @@ export function ServiceSelector({
     },
   });
 
-  // Query for packages with categories
+  // Query for packages with services
   const { data: packages } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
@@ -64,12 +78,6 @@ export function ServiceSelector({
         .from('packages')
         .select(`
           *,
-          package_categories (
-            categories (
-              id,
-              name
-            )
-          ),
           package_services (
             service:services (
               id,
@@ -107,124 +115,114 @@ export function ServiceSelector({
     }
   };
 
+  // Filter items based on selected category
+  const filteredServices = selectedCategory
+    ? services?.filter(service => 
+        service.services_categories.some((sc: any) => sc.categories.id === selectedCategory)
+      )
+    : services;
+
+  const filteredPackages = selectedCategory
+    ? packages?.filter(pkg => pkg.categories?.includes(selectedCategory))
+    : packages;
+
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="services" className="w-full">
-        <TabsList className="w-full">
-          <TabsTrigger value="services" className="flex-1">Services</TabsTrigger>
-          <TabsTrigger value="packages" className="flex-1">Packages</TabsTrigger>
-        </TabsList>
+      {/* Categories Filter */}
+      <ScrollArea className="w-full" orientation="horizontal">
+        <div className="flex gap-2 pb-4">
+          <Button
+            variant={selectedCategory === null ? "secondary" : "outline"}
+            onClick={() => setSelectedCategory(null)}
+          >
+            All
+          </Button>
+          {categories?.map((category) => (
+            <Button
+              key={category.id}
+              variant={selectedCategory === category.id ? "secondary" : "outline"}
+              onClick={() => setSelectedCategory(category.id)}
+            >
+              {category.name}
+            </Button>
+          ))}
+        </div>
+      </ScrollArea>
 
-        <TabsContent value="services">
-          <ScrollArea className="h-[600px] border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Service Name</TableHead>
-                  <TableHead>Categories</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {services?.map((service) => (
-                  <TableRow key={service.id}>
-                    <TableCell className="font-medium">{service.name}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {service.services_categories.map((sc: any) => (
-                          <Badge key={sc.categories.id} variant="secondary">
-                            {sc.categories.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>{service.duration} min</TableCell>
-                    <TableCell>₹{service.selling_price}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onServiceSelect?.(service.id)}
-                      >
-                        {selectedServices.includes(service.id) ? (
-                          <Minus className="h-4 w-4" />
-                        ) : (
-                          <Plus className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </TabsContent>
+      {/* Services and Packages List */}
+      <ScrollArea className="h-[600px] border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead className="w-[100px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {/* Services */}
+            {filteredServices?.map((service) => (
+              <TableRow key={`service-${service.id}`}>
+                <TableCell className="font-medium">{service.name}</TableCell>
+                <TableCell>
+                  <Badge variant="outline">Service</Badge>
+                </TableCell>
+                <TableCell>{service.duration} min</TableCell>
+                <TableCell>₹{service.selling_price}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onServiceSelect?.(service.id)}
+                  >
+                    {selectedServices.includes(service.id) ? (
+                      <Minus className="h-4 w-4" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
 
-        <TabsContent value="packages">
-          <ScrollArea className="h-[600px] border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Package Name</TableHead>
-                  <TableHead>Categories</TableHead>
-                  <TableHead>Included Services</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {packages?.map((pkg) => (
-                  <TableRow key={pkg.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        <span className="font-medium">{pkg.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {pkg.package_categories.map((pc: any) => (
-                          <Badge key={pc.categories.id} variant="secondary">
-                            {pc.categories.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {pkg.package_services.map((ps: any) => (
-                          <Badge key={ps.service.id} variant="outline">
-                            {ps.service.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>{pkg.duration} min</TableCell>
-                    <TableCell>₹{pkg.price}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handlePackageSelect(pkg)}
-                      >
-                        {selectedPackages.includes(pkg.id) ? (
-                          <Minus className="h-4 w-4" />
-                        ) : (
-                          <Plus className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </TabsContent>
-      </Tabs>
+            {/* Packages */}
+            {filteredPackages?.map((pkg) => (
+              <TableRow key={`package-${pkg.id}`}>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    <span className="font-medium">{pkg.name}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge>
+                    {pkg.is_customizable ? 'Customizable Package' : 'Package'}
+                  </Badge>
+                </TableCell>
+                <TableCell>{pkg.duration} min</TableCell>
+                <TableCell>₹{pkg.price}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handlePackageSelect(pkg)}
+                  >
+                    {selectedPackages.includes(pkg.id) ? (
+                      <Minus className="h-4 w-4" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ScrollArea>
 
+      {/* Customize Package Dialog */}
       <Dialog open={showCustomizeDialog} onOpenChange={setShowCustomizeDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
