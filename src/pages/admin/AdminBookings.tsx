@@ -4,6 +4,11 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { ResizableBox } from "react-resizable";
 import "react-resizable/css/styles.css";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { Search, UserPlus, Calendar, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 // A simple calendar icon (SVG)
 function CalendarIcon(props) {
@@ -150,6 +155,148 @@ function CalendarEvent({ event, onEventUpdate }) {
         </div>
       </ResizableBox>
     </div>
+  );
+}
+
+// Customer Search Component
+function CustomerSearch({ onSelect }: { onSelect: (customer: Customer) => void }) {
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<Customer[]>([]);
+
+  const handleSearch = async (query: string) => {
+    setSearch(query);
+    if (query.length < 2) {
+      setResults([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .ilike('full_name', `%${query}%`)
+      .limit(5);
+
+    if (error) {
+      console.error('Search error:', error);
+      return;
+    }
+
+    setResults(data || []);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search customers..."
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+      
+      {results.length > 0 && (
+        <div className="border rounded-md divide-y">
+          {results.map((customer) => (
+            <div
+              key={customer.id}
+              className="p-3 hover:bg-gray-50 cursor-pointer"
+              onClick={() => onSelect(customer)}
+            >
+              <div className="font-medium">{customer.full_name}</div>
+              <div className="text-sm text-muted-foreground">{customer.email}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Quick Customer Create Component
+function QuickCustomerCreate({ onCreated }: { onCreated: (customer: Customer) => void }) {
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+    phone_number: ''
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      // Create auth user with a random password
+      const password = Math.random().toString(36).slice(-8);
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password,
+        options: {
+          data: {
+            full_name: formData.full_name,
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Update profile with admin_created flag
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            phone_number: formData.phone_number,
+            admin_created: true
+          })
+          .eq('id', authData.user.id)
+          .select()
+          .single();
+
+        if (profileError) throw profileError;
+
+        toast.success("Customer created successfully");
+        onCreated(profileData);
+      }
+    } catch (error) {
+      console.error('Create customer error:', error);
+      toast.error("Error creating customer");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Full Name</label>
+        <Input
+          required
+          value={formData.full_name}
+          onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Email</label>
+        <Input
+          type="email"
+          required
+          value={formData.email}
+          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Phone</label>
+        <Input
+          type="tel"
+          value={formData.phone_number}
+          onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
+        />
+      </div>
+      
+      <Button type="submit" className="w-full">
+        Create Customer
+      </Button>
+    </form>
   );
 }
 
@@ -306,6 +453,9 @@ export default function DefineSalonView() {
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
   };
+
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -496,15 +646,69 @@ export default function DefineSalonView() {
             isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className="p-6">
-            <button
-              onClick={closeAddAppointment}
-              className="text-gray-600 hover:text-gray-800"
-            >
-              Close
-            </button>
-            <h2 className="text-2xl font-bold mt-4">Add Appointment</h2>
-            {/* Add your form or content for adding appointments here */}
+          <div className="p-6 h-full flex flex-col">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Add Appointment</h2>
+              <button
+                onClick={closeAddAppointment}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-6 flex-1 overflow-y-auto">
+              {!selectedCustomer ? (
+                <div className="space-y-6">
+                  <CustomerSearch onSelect={(customer) => {
+                    setSelectedCustomer(customer);
+                    setShowCreateForm(false);
+                  }} />
+                  
+                  {!showCreateForm ? (
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Can't find the customer?
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowCreateForm(true)}
+                      >
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Create New Customer
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-t pt-6">
+                      <h3 className="text-lg font-medium mb-4">Create New Customer</h3>
+                      <QuickCustomerCreate onCreated={(customer) => {
+                        setSelectedCustomer(customer);
+                        setShowCreateForm(false);
+                      }} />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">{selectedCustomer.full_name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedCustomer.email}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setSelectedCustomer(null)}
+                    >
+                      Change Customer
+                    </Button>
+                  </div>
+                  
+                  {/* Service selection will be added here in the next step */}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
