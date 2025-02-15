@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Package, Plus, Minus, ChevronRight } from "lucide-react";
+import { Package, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -138,23 +138,17 @@ export function ServiceSelector({
                     <TableCell>{service.duration} min</TableCell>
                     <TableCell>₹{service.selling_price}</TableCell>
                     <TableCell>
-                      {selectedServices.includes(service.id) ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onServiceSelect?.(service.id)}
-                        >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onServiceSelect?.(service.id)}
+                      >
+                        {selectedServices.includes(service.id) ? (
                           <Minus className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onServiceSelect?.(service.id)}
-                        >
+                        ) : (
                           <Plus className="h-4 w-4" />
-                        </Button>
-                      )}
+                        )}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -196,23 +190,17 @@ export function ServiceSelector({
                     <TableCell>{pkg.duration} min</TableCell>
                     <TableCell>₹{pkg.price}</TableCell>
                     <TableCell>
-                      {selectedPackages.includes(pkg.id) ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handlePackageSelect(pkg)}
-                        >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePackageSelect(pkg)}
+                      >
+                        {selectedPackages.includes(pkg.id) ? (
                           <Minus className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handlePackageSelect(pkg)}
-                        >
+                        ) : (
                           <Plus className="h-4 w-4" />
-                        </Button>
-                      )}
+                        )}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -263,27 +251,25 @@ export function ServiceSelector({
                           <TableCell>{service.duration} min</TableCell>
                           <TableCell>₹{service.selling_price}</TableCell>
                           <TableCell>
-                            {customizableServices.includes(service.id) ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setCustomizableServices(prev => 
-                                  prev.filter(id => id !== service.id)
-                                )}
-                              >
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (customizableServices.includes(service.id)) {
+                                  setCustomizableServices(prev => 
+                                    prev.filter(id => id !== service.id)
+                                  );
+                                } else {
+                                  setCustomizableServices(prev => [...prev, service.id]);
+                                }
+                              }}
+                            >
+                              {customizableServices.includes(service.id) ? (
                                 <Minus className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setCustomizableServices(prev => 
-                                  [...prev, service.id]
-                                )}
-                              >
+                              ) : (
                                 <Plus className="h-4 w-4" />
-                              </Button>
-                            )}
+                              )}
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
