@@ -1,10 +1,15 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { ResizableBox } from "react-resizable";
 import "react-resizable/css/styles.css";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { Search, UserPlus, Calendar, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // A simple calendar icon (SVG)
 function CalendarIcon(props) {
@@ -154,8 +159,148 @@ function CalendarEvent({ event, onEventUpdate }) {
   );
 }
 
+// New type definitions
+interface Customer {
+  id: string;
+  full_name: string;
+  email: string;
+  phone_number?: string;
+}
+
+interface CustomerSearchProps {
+  onSelect: (customer: Customer) => void;
+}
+
+// Customer search component
+function CustomerSearch({ onSelect }: CustomerSearchProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const { data: customers, isLoading } = useQuery({
+    queryKey: ["customers", searchQuery],
+    queryFn: async () => {
+      if (!searchQuery) return [];
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,phone_number.ilike.%${searchQuery}%`)
+        .eq('role', 'customer')
+        .limit(5);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: searchQuery.length > 2
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search customers..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-8"
+        />
+      </div>
+      
+      {isLoading && <div className="text-sm text-muted-foreground">Searching...</div>}
+      
+      {customers && customers.length > 0 && (
+        <ScrollArea className="h-[200px]">
+          {customers.map((customer) => (
+            <div
+              key={customer.id}
+              className="p-2 hover:bg-accent rounded-md cursor-pointer"
+              onClick={() => onSelect(customer)}
+            >
+              <div className="font-medium">{customer.full_name}</div>
+              <div className="text-sm text-muted-foreground">{customer.email}</div>
+              {customer.phone_number && (
+                <div className="text-sm text-muted-foreground">{customer.phone_number}</div>
+              )}
+            </div>
+          ))}
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
+
+// Quick customer create component
+function QuickCustomerCreate({ onSuccess }: { onSuccess: (customer: Customer) => void }) {
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    phone_number: ""
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      // Create auth user with a random password
+      const password = Math.random().toString(36).slice(-8);
+      const { data: authUser, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password,
+        options: {
+          data: {
+            full_name: formData.full_name
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Update the profile with additional info
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          phone_number: formData.phone_number,
+          admin_created: true
+        })
+        .eq('id', authUser.user!.id)
+        .select()
+        .single();
+
+      if (profileError) throw profileError;
+
+      onSuccess(profile);
+    } catch (error) {
+      console.error('Error creating customer:', error);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Input
+        placeholder="Full Name"
+        value={formData.full_name}
+        onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
+        required
+      />
+      <Input
+        type="email"
+        placeholder="Email"
+        value={formData.email}
+        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+        required
+      />
+      <Input
+        type="tel"
+        placeholder="Phone Number"
+        value={formData.phone_number}
+        onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
+      />
+      <Button type="submit" className="w-full">Create Customer</Button>
+    </form>
+  );
+}
+
 // Main Component
-export default function DefineSalonView() {
+export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
   const [events, setEvents] = useState(initialEvents);
   const [stats] = useState(initialStats);
@@ -306,6 +451,17 @@ export default function DefineSalonView() {
 
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
+  };
+
+  // New state for customer selection dialog
+  const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+  const handleCustomerSelect = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsCustomerDialogOpen(false);
+    // Proceed to next step (service selection - to be implemented)
+    openAddAppointment();
   };
 
   return (
@@ -476,20 +632,60 @@ export default function DefineSalonView() {
               top: clickedCell.y,
             }}
           >
-            {/* Black top bar with time */}
             <div className="bg-black px-4 py-2 text-sm font-medium text-white">
               {formatTime(clickedCell.time)}
             </div>
-            {/* "Add appointment" row */}
             <div
               className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={openAddAppointment}
+              onClick={() => {
+                setIsCustomerDialogOpen(true);
+                closePopup();
+              }}
             >
-              <CalendarIcon className="h-4 w-4 text-gray-600" />
+              <Calendar className="h-4 w-4 text-gray-600" />
               <span className="text-gray-700">Add Appointment</span>
             </div>
           </div>
         )}
+
+        {/* Customer Selection Dialog */}
+        <Dialog 
+          open={isCustomerDialogOpen} 
+          onOpenChange={setIsCustomerDialogOpen}
+        >
+          <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center">
+            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" />
+            <div className="z-50 gap-4 border bg-background p-6 shadow-lg sm:rounded-lg w-full max-w-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Select Customer</h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsCustomerDialogOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                <CustomerSearch onSelect={handleCustomerSelect} />
+                
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or create new customer
+                    </span>
+                  </div>
+                </div>
+
+                <QuickCustomerCreate onSuccess={handleCustomerSelect} />
+              </div>
+            </div>
+          </div>
+        </Dialog>
 
         {/* Slide-in Full-Screen Add Appointment Popup */}
         <div
