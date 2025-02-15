@@ -25,38 +25,20 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
   useEffect(() => {
     const fetchPackageData = async () => {
       if (initialData?.id) {
-        const [servicesResponse, categoriesResponse] = await Promise.all([
-          supabase
-            .from('package_services')
-            .select('service_id')
-            .eq('package_id', initialData.id),
-          supabase
-            .from('package_categories')
-            .select(`
-              category_id,
-              categories:category_id (
-                id,
-                name
-              )
-            `)
-            .eq('package_id', initialData.id)
-        ]);
+        const { data: servicesResponse, error: servicesError } = await supabase
+          .from('package_services')
+          .select('service_id')
+          .eq('package_id', initialData.id);
         
-        if (servicesResponse.error) {
-          console.error('Error fetching package services:', servicesResponse.error);
-          return;
-        }
-
-        if (categoriesResponse.error) {
-          console.error('Error fetching package categories:', categoriesResponse.error);
+        if (servicesError) {
+          console.error('Error fetching package services:', servicesError);
           return;
         }
 
         setEnhancedData({
           ...initialData,
-          services: servicesResponse.data.map(ps => ps.service_id),
-          categories: categoriesResponse.data.map(pc => pc.category_id),
-          package_categories: categoriesResponse.data
+          services: servicesResponse.map(ps => ps.service_id),
+          categories: initialData.categories || []
         });
       } else {
         setEnhancedData(null);
@@ -83,6 +65,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
             discount_type: data.discount_type,
             discount_value: data.discount_value,
             image_urls: data.image_urls,
+            categories: data.categories,
           })
           .eq('id', initialData.id);
         
@@ -106,25 +89,6 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
           
           if (insertServicesError) throw insertServicesError;
         }
-
-        // Handle package categories update
-        if (data.categories && data.categories.length > 0) {
-          await supabase
-            .from('package_categories')
-            .delete()
-            .eq('package_id', initialData.id);
-
-          const packageCategoriesData = data.categories.map((categoryId: string) => ({
-            package_id: initialData.id,
-            category_id: categoryId,
-          }));
-
-          const { error: insertCategoriesError } = await supabase
-            .from('package_categories')
-            .insert(packageCategoriesData);
-          
-          if (insertCategoriesError) throw insertCategoriesError;
-        }
         
         toast.success('Package updated successfully');
       } else {
@@ -142,6 +106,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
             discount_type: data.discount_type,
             discount_value: data.discount_value,
             image_urls: data.image_urls,
+            categories: data.categories,
           })
           .select()
           .single();
@@ -160,20 +125,6 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
             .insert(packageServicesData);
           
           if (servicesError) throw servicesError;
-        }
-
-        // Insert categories for new package
-        if (data.categories && data.categories.length > 0) {
-          const packageCategoriesData = data.categories.map((categoryId: string) => ({
-            package_id: newPackage.id,
-            category_id: categoryId,
-          }));
-
-          const { error: categoriesError } = await supabase
-            .from('package_categories')
-            .insert(packageCategoriesData);
-          
-          if (categoriesError) throw categoriesError;
         }
         
         toast.success('Package created successfully');

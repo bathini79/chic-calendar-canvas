@@ -16,16 +16,10 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
   const { data: packages, isLoading } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: packagesData, error: packagesError } = await supabase
         .from('packages')
         .select(`
           *,
-          package_categories (
-            categories (
-              id,
-              name
-            )
-          ),
           package_services (
             service:services (
               id,
@@ -35,8 +29,22 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
         `)
         .order('name');
       
-      if (error) throw error;
-      return data;
+      if (packagesError) throw packagesError;
+
+      // Fetch categories for all packages
+      const { data: categories, error: categoriesError } = await supabase
+        .from('categories')
+        .select('id, name');
+
+      if (categoriesError) throw categoriesError;
+
+      // Map categories to packages
+      return packagesData.map(pkg => ({
+        ...pkg,
+        package_categories: pkg.categories?.map(categoryId => ({
+          categories: categories.find(cat => cat.id === categoryId)
+        })) || []
+      }));
     },
   });
 
@@ -74,8 +82,8 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
             <div className="space-y-2">
               <div className="flex flex-wrap gap-1">
                 {pkg.package_categories.map((pc: any) => (
-                  <Badge key={pc.categories.id} variant="secondary">
-                    {pc.categories.name}
+                  <Badge key={pc.categories?.id} variant="secondary">
+                    {pc.categories?.name}
                   </Badge>
                 ))}
               </div>
