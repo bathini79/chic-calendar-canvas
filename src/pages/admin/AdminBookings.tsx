@@ -5,11 +5,12 @@ import { ResizableBox } from "react-resizable";
 import "react-resizable/css/styles.css";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Search, UserPlus, Calendar, X } from "lucide-react";
+import { Search, UserPlus, Calendar, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "sonner";
 
 // A simple calendar icon (SVG)
 function CalendarIcon(props) {
@@ -296,6 +297,150 @@ function QuickCustomerCreate({ onSuccess }: { onSuccess: (customer: Customer) =>
       />
       <Button type="submit" className="w-full">Create Customer</Button>
     </form>
+  );
+}
+
+interface BookingStepProps {
+  selectedCustomer: Customer | null;
+  selectedSlot: { time: number; employeeId: string } | null;
+  onClose: () => void;
+}
+
+function BookingStep({ selectedCustomer, selectedSlot, onClose }: BookingStepProps) {
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [step, setStep] = useState(1);
+
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const handleServiceSelect = (serviceId: string) => {
+    setSelectedServices(prev => 
+      prev.includes(serviceId) 
+        ? prev.filter(id => id !== serviceId)
+        : [...prev, serviceId]
+    );
+  };
+
+  const handleBooking = async () => {
+    if (!selectedCustomer || !selectedSlot || selectedServices.length === 0) {
+      toast.error("Please select all required information");
+      return;
+    }
+
+    try {
+      // Create admin booking session
+      const { error: sessionError } = await supabase
+        .from('admin_booking_sessions')
+        .insert({
+          customer_id: selectedCustomer.id,
+          selected_date: new Date().toISOString(),
+          selected_time: selectedSlot.time.toString(),
+          selected_employee_id: selectedSlot.employeeId,
+          status: 'draft'
+        });
+
+      if (sessionError) throw sessionError;
+
+      toast.success("Booking created successfully");
+      onClose();
+    } catch (error) {
+      console.error('Booking error:', error);
+      toast.error("Error creating booking");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {step === 1 ? (
+        <>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Select Services</h3>
+            <ScrollArea className="h-[400px] pr-4">
+              <div className="grid gap-4">
+                {services?.map((service) => (
+                  <div
+                    key={service.id}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedServices.includes(service.id)
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:border-primary/50'
+                    }`}
+                    onClick={() => handleServiceSelect(service.id)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-medium">{service.name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {service.duration} minutes
+                        </p>
+                      </div>
+                      <p className="font-medium">₹{service.selling_price}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => setStep(2)}
+              disabled={selectedServices.length === 0}
+            >
+              Continue <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Booking Summary</h3>
+            <div className="space-y-4">
+              <div className="p-4 border rounded-lg">
+                <h4 className="font-medium mb-2">Customer Details</h4>
+                <p>{selectedCustomer?.full_name}</p>
+                <p className="text-sm text-muted-foreground">{selectedCustomer?.email}</p>
+              </div>
+              
+              <div className="p-4 border rounded-lg">
+                <h4 className="font-medium mb-2">Selected Services</h4>
+                {services?.filter(s => selectedServices.includes(s.id)).map((service) => (
+                  <div key={service.id} className="flex justify-between py-1">
+                    <span>{service.name}</span>
+                    <span>₹{service.selling_price}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-4 border rounded-lg">
+                <h4 className="font-medium mb-2">Appointment Time</h4>
+                <p>{formatTime(selectedSlot?.time || 0)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => setStep(1)}>
+              Back
+            </Button>
+            <Button onClick={handleBooking}>
+              Confirm Booking
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -704,6 +849,46 @@ export default function AdminBookings() {
             {/* Add your form or content for adding appointments here */}
           </div>
         </div>
+
+        {/* Enhanced Full-Screen Add Appointment Dialog */}
+        <Dialog 
+          open={isAddAppointmentOpen} 
+          onOpenChange={setIsAddAppointmentOpen}
+        >
+          <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center">
+            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" />
+            <div className="z-50 gap-4 border bg-background p-6 shadow-lg sm:rounded-lg w-full max-w-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">New Appointment</h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsAddAppointmentOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {selectedCustomer ? (
+                <BookingStep
+                  selectedCustomer={selectedCustomer}
+                  selectedSlot={clickedCell ? {
+                    time: clickedCell.time,
+                    employeeId: clickedCell.employeeId
+                  } : null}
+                  onClose={() => {
+                    setIsAddAppointmentOpen(false);
+                    setSelectedCustomer(null);
+                  }}
+                />
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground">Please select a customer first</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Dialog>
       </div>
     </DndProvider>
   );
