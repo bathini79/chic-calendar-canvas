@@ -10,6 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
+// Define the Customer type based on the profiles table
+interface Customer {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone_number: string | null;
+  role: 'customer' | 'admin';
+  created_at: string;
+  updated_at: string;
+}
+
 // A simple calendar icon (SVG)
 function CalendarIcon(props) {
   return (
@@ -172,7 +183,8 @@ function CustomerSearch({ onSelect }: { onSelect: (customer: Customer) => void }
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, email')
+      .select('id, full_name, email, phone_number, role, created_at, updated_at')
+      .eq('role', 'customer')
       .ilike('full_name', `%${query}%`)
       .limit(5);
 
@@ -255,7 +267,7 @@ function QuickCustomerCreate({ onCreated }: { onCreated: (customer: Customer) =>
         if (profileError) throw profileError;
 
         toast.success("Customer created successfully");
-        onCreated(profileData);
+        onCreated(profileData as Customer);
       }
     } catch (error) {
       console.error('Create customer error:', error);
