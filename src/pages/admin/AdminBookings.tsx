@@ -1,84 +1,22 @@
+
 import React, { useState, useEffect } from "react";
-import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { ResizableBox } from "react-resizable";
-import "react-resizable/css/styles.css";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { Search, UserPlus, Calendar, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { CalendarEvent } from "./bookings/components/CalendarEvent";
+import { CustomerSearch } from "./bookings/components/CustomerSearch";
+import { QuickCustomerCreate } from "./bookings/components/QuickCustomerCreate";
+import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
+import type { Customer } from "./bookings/types";
 
-// Define the Customer type based on the profiles table
-interface Customer {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  phone_number: string | null;
-  role: 'customer' | 'admin';
-  created_at: string;
-  updated_at: string;
-}
-
-// A simple calendar icon (SVG)
-function CalendarIcon(props) {
-  return (
-    <svg
-      className="w-4 h-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-      {...props}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M8 7V3m8 4V3m-8 4h8m-8 4h8m-8 4h8m-8 4h8M5 7h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"
-      />
-    </svg>
-  );
-}
-
-// Simple arrow icons for date navigation
-function ArrowLeftIcon() {
-  return (
-    <svg
-      className="w-4 h-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-    </svg>
-  );
-}
-function ArrowRightIcon() {
-  return (
-    <svg
-      className="w-4 h-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-    </svg>
-  );
-}
-
-// ---- Configuration ----
-const ItemTypes = { EVENT: "event" };
+// Configuration
 const START_HOUR = 8; // 8:00 AM
 const END_HOUR = 20; // 8:00 PM
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const PIXELS_PER_HOUR = 60;
-const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60;
 
 // Format a fractional hour as "h:mmam/pm"
-function formatTime(time) {
+function formatTime(time: number) {
   const hours = Math.floor(time);
   const minutes = Math.round((time - hours) * 60);
   const period = hours >= 12 ? "pm" : "am";
@@ -102,227 +40,21 @@ const initialStats = [
   { label: "Pending Confirmation", value: 0 },
   { label: "Upcoming Bookings", value: 11 },
   { label: "Today's Bookings", value: 5 },
-  { label: "Today's Revenue", value:
- 1950 },
+  { label: "Today's Revenue", value: 1950 },
 ];
 
-// Draggable & Resizable Event
-function CalendarEvent({ event, onEventUpdate }) {
-  const [{ isDragging }, dragRef] = useDrag({
-    type: ItemTypes.EVENT,
-    item: { eventId: event.id },
-    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
-    end: (item, monitor) => {
-      const delta = monitor.getDifferenceFromInitialOffset();
-      if (delta) {
-        const minuteDelta = delta.y / PIXELS_PER_MINUTE;
-        let hourDelta = minuteDelta / 60;
-        let newStart = event.startHour + hourDelta;
-        // Snap to 15 minutes
-        newStart = Math.round(newStart * 4) / 4;
-        // Clamp
-        const maxStart = END_HOUR - event.duration;
-        newStart = Math.max(START_HOUR, Math.min(newStart, maxStart));
-        onEventUpdate(event.id, { startHour: newStart });
-      }
-    },
-  });
-
-  const topPos = (event.startHour - START_HOUR) * PIXELS_PER_HOUR;
-  const eventHeight = event.duration * PIXELS_PER_HOUR;
-
-  const onResizeStop = (e, data) => {
-    const newHeight = data.size.height;
-    let newDuration = newHeight / PIXELS_PER_HOUR;
-    // Snap to 15 minutes
-    newDuration = Math.round(newDuration * 4) / 4;
-    const maxDuration = END_HOUR - event.startHour;
-    newDuration = Math.min(newDuration, maxDuration);
-    onEventUpdate(event.id, { duration: newDuration });
-  };
-
-  return (
-    <div
-      ref={dragRef}
-      className="absolute left-2 right-2"
-      style={{
-        top: topPos,
-        height: eventHeight,
-        opacity: isDragging ? 0.5 : 1,
-        cursor: "move",
-        zIndex: 2,
-      }}
-    >
-      <ResizableBox
-        width={Infinity}
-        height={eventHeight}
-        axis="y"
-        minConstraints={[0, 15]}
-        onResizeStop={onResizeStop}
-        resizeHandles={["s"]}
-      >
-        <div className="bg-blue-500 text-white text-xs rounded flex items-center justify-center h-full select-none">
-          {event.title}
-        </div>
-      </ResizableBox>
-    </div>
-  );
-}
-
-// Customer Search Component
-function CustomerSearch({ onSelect }: { onSelect: (customer: Customer) => void }) {
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<Customer[]>([]);
-
-  const handleSearch = async (query: string) => {
-    setSearch(query);
-    if (query.length < 2) {
-      setResults([]);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, phone_number, role, created_at, updated_at')
-      .eq('role', 'customer')
-      .ilike('full_name', `%${query}%`)
-      .limit(5);
-
-    if (error) {
-      console.error('Search error:', error);
-      return;
-    }
-
-    setResults(data || []);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search customers..."
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-      
-      {results.length > 0 && (
-        <div className="border rounded-md divide-y">
-          {results.map((customer) => (
-            <div
-              key={customer.id}
-              className="p-3 hover:bg-gray-50 cursor-pointer"
-              onClick={() => onSelect(customer)}
-            >
-              <div className="font-medium">{customer.full_name}</div>
-              <div className="text-sm text-muted-foreground">{customer.email}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Quick Customer Create Component
-function QuickCustomerCreate({ onCreated }: { onCreated: (customer: Customer) => void }) {
-  const [formData, setFormData] = useState({
-    full_name: '',
-    email: '',
-    phone_number: ''
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      // Create auth user with a random password
-      const password = Math.random().toString(36).slice(-8);
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password,
-        options: {
-          data: {
-            full_name: formData.full_name,
-          }
-        }
-      });
-
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // Update profile with admin_created flag
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            phone_number: formData.phone_number,
-            admin_created: true
-          })
-          .eq('id', authData.user.id)
-          .select()
-          .single();
-
-        if (profileError) throw profileError;
-
-        toast.success("Customer created successfully");
-        onCreated(profileData as Customer);
-      }
-    } catch (error) {
-      console.error('Create customer error:', error);
-      toast.error("Error creating customer");
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Full Name</label>
-        <Input
-          required
-          value={formData.full_name}
-          onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Email</label>
-        <Input
-          type="email"
-          required
-          value={formData.email}
-          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Phone</label>
-        <Input
-          type="tel"
-          value={formData.phone_number}
-          onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
-        />
-      </div>
-      
-      <Button type="submit" className="w-full">
-        Create Customer
-      </Button>
-    </form>
-  );
-}
-
-// Main Component
-export default function DefineSalonView() {
+export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
   const [events, setEvents] = useState(initialEvents);
   const [stats] = useState(initialStats);
+  const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 11));
+  const [nowPosition, setNowPosition] = useState<number | null>(null);
+  const [clickedCell, setClickedCell] = useState<any>(null);
+  const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
-  // Example date in state
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 11)); // 11 Feb 2025
-
-  // "Now" line
-  const [nowPosition, setNowPosition] = useState(null);
+  // Update now line
   useEffect(() => {
     const updateNow = () => {
       const now = new Date();
@@ -338,6 +70,7 @@ export default function DefineSalonView() {
     return () => clearInterval(intervalId);
   }, []);
 
+  // Fetch employees
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
@@ -361,84 +94,36 @@ export default function DefineSalonView() {
   }, []);
 
   // Format the displayed date as "Tue 11 Feb"
-  function formatCurrentDate(date) {
+  function formatCurrentDate(date: Date) {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const dayOfWeek = days[date.getDay()];
     const dayOfMonth = date.getDate();
     const month = months[date.getMonth()];
     return `${dayOfWeek} ${dayOfMonth} ${month}`;
   }
 
-  // Nav: go to "Today"
-  function goToday() {
-    setCurrentDate(new Date());
-  }
-  // Nav: previous day
-  function goPrev() {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setCurrentDate(newDate);
-  }
-  // Nav: next day
-  function goNext() {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + 1);
-    setCurrentDate(newDate);
-  }
-
-  // Update an event (drag or resize)
-  const handleEventUpdate = (eventId, changes) => {
+  const handleEventUpdate = (eventId: number, changes: any) => {
     setEvents((prev) =>
       prev.map((ev) => (ev.id === eventId ? { ...ev, ...changes } : ev))
     );
   };
 
-  // Hover tooltip
-  const [hoverCell, setHoverCell] = useState(null);
+  // Navigation functions
+  const goToday = () => setCurrentDate(new Date());
+  const goPrev = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() - 1);
+    setCurrentDate(newDate);
+  };
+  const goNext = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + 1);
+    setCurrentDate(newDate);
+  };
 
-  // Click popup
-  const [clickedCell, setClickedCell] = useState(null);
-  const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
-
-  // Mouse move in an employee column
-  function handleMouseMove(e, empId) {
-    if (e.target !== e.currentTarget) {
-      setHoverCell(null);
-      return;
-    }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const offsetY = e.clientY - rect.top;
-    let hoveredTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
-    hoveredTime = Math.round(hoveredTime * 4) / 4;
-
-    setHoverCell({
-      employeeId: empId,
-      time: hoveredTime,
-      x: e.pageX + 10,
-      y: e.pageY - 20,
-    });
-  }
-
-  function handleMouseLeave() {
-    setHoverCell(null);
-  }
-
-  // Click in an employee column
-  function handleColumnClick(e, empId) {
+  // Column click handling
+  function handleColumnClick(e: React.MouseEvent, empId: number) {
     if (e.target !== e.currentTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
@@ -453,31 +138,24 @@ export default function DefineSalonView() {
     });
   }
 
-  function closePopup() {
-    setClickedCell(null);
-  }
-
   const openAddAppointment = () => {
     setIsAddAppointmentOpen(true);
-    setClickedCell(null); // Close the small popup
+    setClickedCell(null);
   };
 
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
   };
 
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
-        {/* Top Bar */}
+        {/* Header */}
         <header className="p-4 border-b bg-white flex justify-between items-center">
           <div className="font-bold text-xl">Define Salon</div>
         </header>
 
-        {/* Stats Cards */}
+        {/* Stats */}
         <div className="p-4 border-b bg-white flex space-x-4 overflow-x-auto">
           {stats.map((stat) => (
             <div
@@ -492,30 +170,23 @@ export default function DefineSalonView() {
           ))}
         </div>
 
-        {/* Subheader with date navigation */}
+        {/* Date Navigation */}
         <div className="p-4 border-b bg-white flex items-center space-x-2">
-          {/* "Today" button */}
           <button
             onClick={goToday}
             className="px-4 py-1 border rounded-full hover:bg-gray-100 text-sm"
           >
             Today
           </button>
-
-          {/* Left arrow */}
           <button
             onClick={goPrev}
             className="px-3 py-1 border rounded-full hover:bg-gray-100 flex items-center justify-center"
           >
             <ArrowLeftIcon />
           </button>
-
-          {/* Date label */}
           <div className="px-6 py-1 border rounded-full text-sm flex items-center justify-center">
             {formatCurrentDate(currentDate)}
           </div>
-
-          {/* Right arrow */}
           <button
             onClick={goNext}
             className="px-3 py-1 border rounded-full hover:bg-gray-100 flex items-center justify-center"
@@ -524,31 +195,28 @@ export default function DefineSalonView() {
           </button>
         </div>
 
-        {/* Employee header row (displays each employee's avatar/name) */}
+        {/* Employee Header */}
         <div className="flex border-b bg-white">
-          {/* Blank space for the hour column */}
           <div className="w-16 border-r" />
-          {employees.map((emp) => (
+          {employees.map((emp: any) => (
             <div
               key={emp.id}
               className="flex-1 border-r flex items-center justify-center p-2"
             >
               <div className="flex flex-col items-center space-y-1">
-                {/* Employee avatar circle */}
                 <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
                   {emp.avatar}
                 </div>
-                {/* Employee name */}
                 <div className="text-xs font-medium text-gray-700">{emp.name}</div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Main Scheduler */}
+        {/* Main Schedule Grid */}
         <div className="flex-1 overflow-auto">
           <div className="flex">
-            {/* Left Column (Hours) */}
+            {/* Hours Column */}
             <div className="w-16 border-r">
               {hourLabels.map((hr) => (
                 <div
@@ -561,7 +229,7 @@ export default function DefineSalonView() {
             </div>
 
             {/* Employee Columns */}
-            {employees.map((emp) => (
+            {employees.map((emp: any) => (
               <div
                 key={emp.id}
                 className="flex-1 border-r relative"
@@ -569,11 +237,9 @@ export default function DefineSalonView() {
                   minWidth: "150px",
                   height: TOTAL_HOURS * PIXELS_PER_HOUR,
                 }}
-                onMouseMove={(e) => handleMouseMove(e, emp.id)}
-                onMouseLeave={handleMouseLeave}
                 onClick={(e) => handleColumnClick(e, emp.id)}
               >
-                {/* Background lines for each 15-min slot */}
+                {/* Background Grid */}
                 {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
                   <div
                     key={idx}
@@ -582,7 +248,7 @@ export default function DefineSalonView() {
                   />
                 ))}
 
-                {/* "Now" Line */}
+                {/* Now Line */}
                 {nowPosition !== null && (
                   <div
                     className="absolute left-0 right-0 h-[2px] bg-red-500"
@@ -590,7 +256,7 @@ export default function DefineSalonView() {
                   />
                 )}
 
-                {/* Render events for this employee */}
+                {/* Events */}
                 {events
                   .filter((ev) => ev.employeeId === emp.id)
                   .map((evt) => (
@@ -600,35 +266,12 @@ export default function DefineSalonView() {
                       onEventUpdate={handleEventUpdate}
                     />
                   ))}
-
-                {/* Gray area after timeline */}
-                <div
-                  className="absolute left-0 right-0 bg-gray-200 bg-opacity-50"
-                  style={{
-                    top: TOTAL_HOURS * PIXELS_PER_HOUR,
-                    bottom: 0,
-                  }}
-                />
               </div>
             ))}
           </div>
         </div>
 
-        {/* Hover Tooltip (time) */}
-        {hoverCell && (
-          <div
-            className="fixed z-50 px-2 py-1 text-sm bg-gray-200 text-black rounded shadow"
-            style={{
-              left: hoverCell.x,
-              top: hoverCell.y,
-              pointerEvents: "none",
-            }}
-          >
-            {formatTime(hoverCell.time)}
-          </div>
-        )}
-
-        {/* Clicked Popup (Add appointment) */}
+        {/* Clicked Cell Popup */}
         {clickedCell && (
           <div
             className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
@@ -637,11 +280,9 @@ export default function DefineSalonView() {
               top: clickedCell.y,
             }}
           >
-            {/* Black top bar with time */}
             <div className="bg-black px-4 py-2 text-sm font-medium text-white">
               {formatTime(clickedCell.time)}
             </div>
-            {/* "Add appointment" row */}
             <div
               className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
               onClick={openAddAppointment}
@@ -652,79 +293,64 @@ export default function DefineSalonView() {
           </div>
         )}
 
-        {/* Slide-in Add Appointment Popup */}
+        {/* Add Appointment Slide-in */}
         <div
           className={`fixed top-0 right-0 w-1/2 h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
             isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
           <div className="p-6 h-full flex flex-col">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">Add Appointment</h2>
-              <button
-                onClick={closeAddAppointment}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="mt-6 flex-1 overflow-y-auto">
-              {!selectedCustomer ? (
-                <div className="space-y-6">
-                  <CustomerSearch onSelect={(customer) => {
-                    setSelectedCustomer(customer);
-                    setShowCreateForm(false);
-                  }} />
-                  
-                  {!showCreateForm ? (
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Can't find the customer?
-                      </p>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowCreateForm(true)}
-                      >
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Create New Customer
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="border-t pt-6">
-                      <h3 className="text-lg font-medium mb-4">Create New Customer</h3>
-                      <QuickCustomerCreate onCreated={(customer) => {
-                        setSelectedCustomer(customer);
-                        setShowCreateForm(false);
-                      }} />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">{selectedCustomer.full_name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedCustomer.email}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setSelectedCustomer(null)}
+            {!selectedCustomer ? (
+              <div className="space-y-6">
+                <CustomerSearch onSelect={(customer) => {
+                  setSelectedCustomer(customer);
+                  setShowCreateForm(false);
+                }} />
+                
+                {!showCreateForm ? (
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Can't find the customer?
+                    </p>
+                    <button
+                      className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                      onClick={() => setShowCreateForm(true)}
                     >
-                      Change Customer
-                    </Button>
+                      Create New Customer
+                    </button>
                   </div>
-                  
-                  {/* Service selection will be added here in the next step */}
+                ) : (
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium mb-4">Create New Customer</h3>
+                    <QuickCustomerCreate onCreated={(customer) => {
+                      setSelectedCustomer(customer);
+                      setShowCreateForm(false);
+                    }} />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">{selectedCustomer.full_name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedCustomer.email}
+                    </p>
+                  </div>
+                  <button
+                    className="text-sm text-gray-600 hover:text-gray-900"
+                    onClick={() => setSelectedCustomer(null)}
+                  >
+                    Change Customer
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Click outside to close the popup */}
+        {/* Backdrop */}
         {isAddAppointmentOpen && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
