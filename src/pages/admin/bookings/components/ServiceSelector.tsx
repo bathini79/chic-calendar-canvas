@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 
 interface ServiceSelectorProps {
   onServiceSelect?: (serviceId: string) => void;
@@ -70,7 +71,7 @@ export function ServiceSelector({
     },
   });
 
-  // Query for packages with services
+  // Query for packages with services and categories
   const { data: packages } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
@@ -123,31 +124,19 @@ export function ServiceSelector({
     : services;
 
   const filteredPackages = selectedCategory
-    ? packages?.filter(pkg => pkg.categories?.includes(selectedCategory))
+    ? packages?.filter(pkg => 
+        pkg.categories?.includes(selectedCategory)
+      )
     : packages;
 
   return (
     <div className="space-y-6">
       {/* Categories Filter */}
-      <ScrollArea className="w-full" orientation="horizontal">
-        <div className="flex gap-2 pb-4">
-          <Button
-            variant={selectedCategory === null ? "secondary" : "outline"}
-            onClick={() => setSelectedCategory(null)}
-          >
-            All
-          </Button>
-          {categories?.map((category) => (
-            <Button
-              key={category.id}
-              variant={selectedCategory === category.id ? "secondary" : "outline"}
-              onClick={() => setSelectedCategory(category.id)}
-            >
-              {category.name}
-            </Button>
-          ))}
-        </div>
-      </ScrollArea>
+      <CategoryFilter
+        categories={categories || []}
+        selectedCategory={selectedCategory}
+        onCategorySelect={setSelectedCategory}
+      />
 
       {/* Services and Packages List */}
       <ScrollArea className="h-[600px] border rounded-md">
