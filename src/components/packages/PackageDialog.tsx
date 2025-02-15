@@ -32,7 +32,13 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
             .eq('package_id', initialData.id),
           supabase
             .from('package_categories')
-            .select('category_id')
+            .select(`
+              category_id,
+              categories:category_id (
+                id,
+                name
+              )
+            `)
             .eq('package_id', initialData.id)
         ]);
         
@@ -50,6 +56,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
           ...initialData,
           services: servicesResponse.data.map(ps => ps.service_id),
           categories: categoriesResponse.data.map(pc => pc.category_id),
+          package_categories: categoriesResponse.data
         });
       } else {
         setEnhancedData(null);
