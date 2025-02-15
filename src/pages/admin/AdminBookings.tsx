@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -491,9 +490,9 @@ export default function DefineSalonView() {
           </div>
         )}
 
-        {/* Slide-in Full-Screen Add Appointment Popup */}
+        {/* Slide-in Add Appointment Popup */}
         <div
-          className={`fixed top-0 right-0 w-full h-full bg-white z-50 transform transition-transform duration-300 ease-in-out ${
+          className={`fixed top-0 right-0 w-1/2 h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
             isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
@@ -508,6 +507,14 @@ export default function DefineSalonView() {
             {/* Add your form or content for adding appointments here */}
           </div>
         </div>
+
+        {/* Click outside to close the popup */}
+        {isAddAppointmentOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={closeAddAppointment}
+          />
+        )}
       </div>
     </DndProvider>
   );
