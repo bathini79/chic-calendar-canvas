@@ -1,7 +1,7 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button }
+ from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Command,
@@ -10,7 +10,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList
-} from "@/components/ui/command";
+} from
+ "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
@@ -32,6 +33,15 @@ export function CustomerSearch({ onSelect }: CustomerSearchProps) {
   const [search, setSearch] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [open, setOpen] = useState(false);
+    const [debouncedSearch, setDebouncedSearch] = useState(search);
+
+    useEffect(() => {
+      const timeoutId = setTimeout(() => {
+        setDebouncedSearch(search);
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    }, [search]);
 
   const fetchCustomers = async ({ pageParam = 0 }) => {
     let query = supabase
@@ -41,8 +51,8 @@ export function CustomerSearch({ onSelect }: CustomerSearchProps) {
       .order('created_at', { ascending: false })
       .range(pageParam * CUSTOMERS_PER_PAGE, (pageParam + 1) * CUSTOMERS_PER_PAGE - 1);
 
-    if (search) {
-      query = query.ilike('full_name', `%${search}%`);
+    if (debouncedSearch) {
+      query = query.ilike('full_name', `%${debouncedSearch}%`);
     }
 
     const { data, error } = await query;
@@ -61,7 +71,7 @@ export function CustomerSearch({ onSelect }: CustomerSearchProps) {
     isLoading,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['customers', search],
+    queryKey: ['customers', debouncedSearch],
     queryFn: fetchCustomers,
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,

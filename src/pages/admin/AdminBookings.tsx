@@ -7,7 +7,8 @@ import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
 import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
 import type { Customer } from "./bookings/types";
-
+import { Button } from "@/components/ui/button";
+import {format} from "date-fns"
 // Configuration
 const START_HOUR = 8; // 8:00 AM
 const END_HOUR = 20; // 8:00 PM
@@ -368,7 +369,7 @@ export default function AdminBookings() {
             {/* Footer Actions */}
             <div className="border-t p-6">
               <div className="flex justify-end gap-3">
-                <Button 
+                <Button
                   variant="outline" 
                   onClick={closeAddAppointment}
                 >
