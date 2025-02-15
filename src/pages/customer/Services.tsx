@@ -60,7 +60,6 @@ export default function Services() {
           )
         `)
         .eq("status", "active");
-      
       if (error) {
         toast.error("Error loading packages");
         throw error;

@@ -13,7 +13,7 @@ export function CategoryFilter({
   onCategorySelect 
 }: CategoryFilterProps) {
   return (
-    <ScrollArea className="w-full border rounded-lg p-2">
+    <ScrollArea className="w-full p-2">
       <div className="flex gap-2 pb-4">
         <Badge
           variant={selectedCategory === null ? "default" : "outline"}

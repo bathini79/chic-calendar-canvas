@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { isErrored } from "stream";
 
 type CartItem = {
   id: string;
@@ -18,6 +19,7 @@ type CartItem = {
     price: number;
     duration: number;
   };
+  selling_price: number
 };
 
 type CartContextType = {

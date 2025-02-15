@@ -1,4 +1,3 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,13 +10,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export default function BookingConfirmation() {
-  const { 
-    items, 
-    selectedTimeSlots, 
-    selectedDate, 
-    selectedStylists, 
-    getTotalPrice, 
-    getTotalDuration 
+  const {
+    items,
+    selectedTimeSlots,
+    selectedDate,
+    selectedStylists,
+    getTotalPrice,
+    getTotalDuration,
+    removeFromCart
   } = useCart();
   const navigate = useNavigate();
   const [notes, setNotes] = useState("");
@@ -32,78 +32,91 @@ export default function BookingConfirmation() {
   const totalDuration = getTotalDuration();
   const totalHours = Math.floor(totalDuration / 60);
   const remainingMinutes = totalDuration % 60;
-  const durationDisplay = totalHours > 0 
+  const durationDisplay = totalHours > 0
     ? `${totalHours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`
     : `${remainingMinutes}m`;
 
   const handleBookingConfirmation = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Please login to continue");
         return;
       }
 
-      // First create the appointment
-      const { data: appointment, error: appointmentError } = await supabase
+      const customer_id = session.user.id;
+
+      const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${startTime}`);
+      if (isNaN(startDateTime.getTime())) {
+        console.error(`Invalid date generated, date: ${format(selectedDate, 'yyyy-MM-dd')}, time: ${startTime}`);
+        return;
+      }
+      const endDateTime = addMinutes(startDateTime, totalDuration);
+
+      // 1. Insert into appointments table
+      const { data: appointmentData, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
-          customer_id: session.user.id,
-          start_time: new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${startTime}`).toISOString(),
-          end_time: addMinutes(new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${startTime}`), totalDuration).toISOString(),
+          customer_id: customer_id,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
           notes: notes,
-          total_price: getTotalPrice(),
           status: 'confirmed',
-          number_of_bookings: items.length
+          number_of_bookings:items.length,
+          total_price: getTotalPrice(),
+          total_duration: totalDuration
         })
-        .select()
-        .single();
+        .select(); // Fetch the inserted appointment data
 
-      if (appointmentError) throw appointmentError;
+      if (appointmentError) {
+        console.error("Error inserting appointment:", appointmentError);
+        toast.error("Failed to create appointment. Please try again.");
+        throw appointmentError;
+      }
 
-      // Then create bookings for each item
+      const appointmentId = appointmentData[0].id;
+
+      // 2. Iterate through each item in the cart to create bookings
       for (const item of items) {
-        const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlots[item.id]}`);
-        const endDateTime = addMinutes(startDateTime, item.service?.duration || item.package?.duration || 0);
-
-        const { error: bookingError } = await supabase
-          .from('bookings')
-          .insert({
-            appointment_id: appointment.id,
-            service_id: item.service_id,
-            package_id: item.package_id,
-            employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
-            price_paid: item.service?.selling_price || item.package?.price || 0,
-            status: 'confirmed'
-          });
+        console.log("item",item)
+        // Insert a new booking into the 'bookings' table.
+        const { error: bookingError } = await supabase.from('bookings').insert({
+          appointment_id: appointmentId,
+          service_id: item.service_id,
+          package_id: item.package_id,
+          employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
+          status: 'confirmed',
+          price_paid: item.service.selling_price
+        });
 
         if (bookingError) {
+          console.error("Error inserting booking:", bookingError);
+          if (bookingError.code === '23505') { // Unique constraint violation
+            toast.error(`Booking conflict: ${bookingError.message}`);
+          } else {
+            toast.error("Failed to create booking. Please try again.");
+          }
           throw bookingError;
-        }
-
-        // Update cart item status to booked
-        const { error: cartError } = await supabase
-          .from('cart_items')
-          .update({ status: 'scheduled' })
-          .eq('id', item.id);
-
-        if (cartError) {
-          throw cartError;
         }
       }
 
       toast.success("Booking confirmed successfully!");
-      navigate('/profile'); // Redirect to profile or booking success page
+      clearCart()
+      navigate('/profile'); // Redirect to profile
+
     } catch (error: any) {
-      toast.error(error.message || "Failed to confirm booking");
       console.error("Booking error:", error);
+      toast.error(error.message || "Failed to confirm booking");
     } finally {
       setIsLoading(false);
     }
   };
-
+  const clearCart = async () => {
+    for (const item of items) {
+      await removeFromCart(item.id);
+    }
+  };
   return (
     <div className="min-h-screen pb-24">
       <div className="container max-w-2xl mx-auto py-6 px-4">
@@ -119,7 +132,7 @@ export default function BookingConfirmation() {
               <span>{format(new Date(`2000/01/01 ${startTime}`), 'hh:mm a')}</span>
               <ArrowRight className="h-4 w-4" />
               <span>
-                {format(new Date(selectedDate.setMinutes(selectedDate.getMinutes() + getTotalDuration())), 'hh:mm a')}
+              {format(addMinutes(new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${startTime}`),getTotalDuration()), 'hh:mm a')}
                 <span className="ml-1 text-sm">({durationDisplay})</span>
               </span>
             </div>
@@ -130,7 +143,7 @@ export default function BookingConfirmation() {
               const itemDuration = item.service?.duration || item.package?.duration || 0;
               const hours = Math.floor(itemDuration / 60);
               const minutes = itemDuration % 60;
-              const itemDurationDisplay = hours > 0 
+              const itemDurationDisplay = hours > 0
                 ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`
                 : `${minutes}m`;
 
@@ -158,9 +171,9 @@ export default function BookingConfirmation() {
             })}
 
             <Card className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-2 ">
                 <Store className="h-4 w-4" />
-                <span>Pay At Salon</span>
+                <span className="font-bold">Pay at Salon</span>
               </div>
             </Card>
 
