@@ -129,6 +129,18 @@ export function ServiceSelector({
       )
     : packages;
 
+  // Combine and sort items to show packages first
+  const allItems = [
+    ...(filteredPackages || []).map(pkg => ({
+      ...pkg,
+      type: 'package'
+    })),
+    ...(filteredServices || []).map(service => ({
+      ...service,
+      type: 'service'
+    }))
+  ];
+
   return (
     <div className="space-y-6">
       {/* Categories Filter */}
@@ -151,54 +163,39 @@ export function ServiceSelector({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {/* Services */}
-            {filteredServices?.map((service) => (
-              <TableRow key={`service-${service.id}`}>
-                <TableCell className="font-medium">{service.name}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">Service</Badge>
-                </TableCell>
-                <TableCell>{service.duration} min</TableCell>
-                <TableCell>₹{service.selling_price}</TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onServiceSelect?.(service.id)}
-                  >
-                    {selectedServices.includes(service.id) ? (
-                      <Minus className="h-4 w-4" />
-                    ) : (
-                      <Plus className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-
-            {/* Packages */}
-            {filteredPackages?.map((pkg) => (
-              <TableRow key={`package-${pkg.id}`}>
+            {allItems.map((item) => (
+              <TableRow key={`${item.type}-${item.id}`}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    <span className="font-medium">{pkg.name}</span>
+                    {item.type === 'package' && <Package className="h-4 w-4" />}
+                    <span className="font-medium">{item.name}</span>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge>
-                    {pkg.is_customizable ? 'Customizable Package' : 'Package'}
+                  <Badge variant={item.type === 'package' ? 'default' : 'outline'}>
+                    {item.type === 'package' 
+                      ? (item.is_customizable ? 'Customizable Package' : 'Package')
+                      : 'Service'
+                    }
                   </Badge>
                 </TableCell>
-                <TableCell>{pkg.duration} min</TableCell>
-                <TableCell>₹{pkg.price}</TableCell>
+                <TableCell>{item.duration} min</TableCell>
+                <TableCell>
+                  ₹{item.type === 'package' ? item.price : item.selling_price}
+                </TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handlePackageSelect(pkg)}
+                    onClick={() => {
+                      if (item.type === 'package') {
+                        handlePackageSelect(item);
+                      } else {
+                        onServiceSelect?.(item.id);
+                      }
+                    }}
                   >
-                    {selectedPackages.includes(pkg.id) ? (
+                    {(item.type === 'package' ? selectedPackages : selectedServices).includes(item.id) ? (
                       <Minus className="h-4 w-4" />
                     ) : (
                       <Plus className="h-4 w-4" />
