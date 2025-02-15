@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import { Package, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -35,7 +34,7 @@ export function ServiceSelector({
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [customizableServices, setCustomizableServices] = useState<string[]>([]);
 
-  // Query for services
+  // Query for services with categories
   const { data: services } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -57,7 +56,7 @@ export function ServiceSelector({
     },
   });
 
-  // Query for packages
+  // Query for packages with categories
   const { data: packages } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
@@ -65,6 +64,12 @@ export function ServiceSelector({
         .from('packages')
         .select(`
           *,
+          package_categories (
+            categories (
+              id,
+              name
+            )
+          ),
           package_services (
             service:services (
               id,
@@ -163,6 +168,7 @@ export function ServiceSelector({
               <TableHeader>
                 <TableRow>
                   <TableHead>Package Name</TableHead>
+                  <TableHead>Categories</TableHead>
                   <TableHead>Included Services</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Price</TableHead>
@@ -176,6 +182,15 @@ export function ServiceSelector({
                       <div className="flex items-center gap-2">
                         <Package className="h-4 w-4" />
                         <span className="font-medium">{pkg.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {pkg.package_categories.map((pc: any) => (
+                          <Badge key={pc.categories.id} variant="secondary">
+                            {pc.categories.name}
+                          </Badge>
+                        ))}
                       </div>
                     </TableCell>
                     <TableCell>

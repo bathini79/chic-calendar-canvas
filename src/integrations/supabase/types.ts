@@ -576,6 +576,39 @@ export type Database = {
         }
         Relationships: []
       }
+      package_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          package_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          package_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          package_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_categories_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       package_services: {
         Row: {
           package_id: string
