@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { CustomerSearch } from "./CustomerSearch";
 import { ServiceSelector } from "./ServiceSelector";
+import { Badge } from "@/components/ui/badge";
 import type { Customer } from "../types";
 
 export function AdminBooking() {
