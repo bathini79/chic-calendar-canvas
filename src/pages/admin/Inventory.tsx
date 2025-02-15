@@ -9,17 +9,19 @@ import { InventoryStats } from "@/components/admin/inventory/components/Inventor
 import { ItemsList } from "@/components/admin/inventory/components/ItemsList";
 import { PurchaseOrdersList } from "@/components/admin/inventory/components/PurchaseOrdersList";
 import { HeaderActions } from "@/components/admin/inventory/components/HeaderActions";
+import { ItemDialog } from "@/components/admin/inventory/ItemDialog";
 
 export default function Inventory() {
   const [view, setView] = useState<"grid" | "list">("list");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showItemDialog, setShowItemDialog] = useState(false);
 
   return (
     <div className="container mx-auto p-6">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-6">
           <HeaderActions 
-            onAdd={() => {}} 
+            onAdd={() => setShowItemDialog(true)} 
             view={view} 
             onViewChange={setView}
             searchQuery={searchQuery}
@@ -42,6 +44,10 @@ export default function Inventory() {
             <div className="p-4">
               <TabsContent value="items" className="m-0">
                 <ItemsList />
+                <ItemDialog
+                  open={showItemDialog}
+                  onClose={() => setShowItemDialog(false)}
+                />
               </TabsContent>
 
               <TabsContent value="categories" className="m-0">

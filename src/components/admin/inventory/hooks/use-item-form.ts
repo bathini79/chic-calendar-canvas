@@ -4,10 +4,12 @@ import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ItemFormValues } from "../schemas/item-schema";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function useItemForm(item?: any, onClose?: () => void) {
   const [open, setOpen] = useState(false);
   const { create, update } = useSupabaseCrud("inventory_items");
+  const queryClient = useQueryClient();
 
   const defaultValues: ItemFormValues = {
     name: item?.name || "",
@@ -64,8 +66,10 @@ export function useItemForm(item?: any, onClose?: () => void) {
         }
       }
 
+      // Invalidate and refetch queries
+      await queryClient.invalidateQueries({ queryKey: ['inventory_items'] });
+      
       toast.success(item ? "Item updated" : "Item created");
-      setOpen(false);
       if (onClose) onClose();
     } catch (error: any) {
       toast.error(error.message);

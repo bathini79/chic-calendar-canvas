@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQuery } from "@tanstack/react-query";
 
 interface InventoryItem {
   id: string;
@@ -34,60 +35,58 @@ interface InventoryItem {
 }
 
 export function ItemsList() {
-  const { data: items, remove, refetch } = useSupabaseCrud('inventory_items');
+  const { remove } = useSupabaseCrud('inventory_items');
   const [editingItem, setEditingItem] = useState<any>(null);
-  const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [displayItems, setDisplayItems] = useState<InventoryItem[]>([]);
 
-  useEffect(() => {
-    const fetchCategories = async () => {
+  // Query for categories
+  const { data: categories } = useQuery({
+    queryKey: ['inventory_categories'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_categories')
         .select('*')
         .order('name');
       
-      if (error) {
-        console.error('Error fetching categories:', error);
-        return;
-      }
-      
-      setCategories(data || []);
-    };
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
-    fetchCategories();
-  }, []);
+  // Query for items with categories
+  const { data: items, refetch } = useQuery({
+    queryKey: ['inventory_items'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select(`
+          *,
+          inventory_items_categories (
+            category_id
+          )
+        `);
+      
+      if (error) throw error;
+      return data.map(item => ({
+        ...item,
+        categories: item.inventory_items_categories.map((ic: any) => ic.category_id)
+      }));
+    },
+  });
 
   useEffect(() => {
-    const fetchItemsWithCategories = async () => {
-      if (!items) return;
-
-      const itemsWithCategories = await Promise.all(
-        items.map(async (item) => {
-          const { data: categoryRelations } = await supabase
-            .from('inventory_items_categories')
-            .select('category_id')
-            .eq('item_id', item.id);
-
-          return {
-            ...item,
-            categories: (categoryRelations || []).map(rel => rel.category_id)
-          };
-        })
-      );
-
+    if (items) {
       if (selectedCategory === "all") {
-        setDisplayItems(itemsWithCategories);
+        setDisplayItems(items);
       } else {
         setDisplayItems(
-          itemsWithCategories.filter(item => 
+          items.filter(item => 
             item.categories.includes(selectedCategory)
           )
         );
       }
-    };
-
-    fetchItemsWithCategories();
+    }
   }, [items, selectedCategory]);
 
   const handleDeleteItem = async (id: string) => {
@@ -110,7 +109,7 @@ export function ItemsList() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((category) => (
+              {categories?.map((category) => (
                 <SelectItem key={category.id} value={category.id}>
                   {category.name}
                 </SelectItem>
@@ -118,10 +117,6 @@ export function ItemsList() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={() => setEditingItem(null)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
       </div>
 
       <div className="bg-card rounded-lg">
@@ -152,7 +147,7 @@ export function ItemsList() {
                 <TableCell>${Number(item.unit_price).toFixed(2)}</TableCell>
                 <TableCell>
                   {categories
-                    .filter(cat => item.categories.includes(cat.id))
+                    ?.filter(cat => item.categories.includes(cat.id))
                     .map(cat => (
                       <Badge key={cat.id} variant="secondary" className="mr-1">
                         {cat.name}
