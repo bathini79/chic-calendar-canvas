@@ -25,11 +25,11 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     },
   });
 
-  const create = async (newData: Insert) => {
+  const create = async (newData: Insert): Promise<Row> => {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert(newData)
+        .insert(newData as any)
         .select()
         .single();
 
@@ -43,11 +43,11 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     }
   };
 
-  const update = async (id: string, updateData: Update) => {
+  const update = async (id: string, updateData: Update): Promise<Row> => {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();

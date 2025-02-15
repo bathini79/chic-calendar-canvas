@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ItemDialog } from "../ItemDialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
@@ -32,11 +32,17 @@ interface InventoryItem {
   unit_price: number;
   status: string;
   categories: string[];
+  inventory_items_categories: Array<{ category_id: string }>;
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 export function ItemsList() {
   const { remove } = useSupabaseCrud('inventory_items');
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [displayItems, setDisplayItems] = useState<InventoryItem[]>([]);
 
@@ -50,7 +56,7 @@ export function ItemsList() {
         .order('name');
       
       if (error) throw error;
-      return data || [];
+      return (data || []) as Category[];
     },
   });
 
@@ -68,9 +74,9 @@ export function ItemsList() {
         `);
       
       if (error) throw error;
-      return data.map(item => ({
+      return (data || []).map((item: InventoryItem) => ({
         ...item,
-        categories: item.inventory_items_categories.map((ic: any) => ic.category_id)
+        categories: item.inventory_items_categories.map(ic => ic.category_id)
       }));
     },
   });
@@ -182,7 +188,7 @@ export function ItemsList() {
       </div>
 
       <ItemDialog 
-        open={editingItem !== null || false}
+        open={editingItem !== null}
         item={editingItem} 
         onClose={() => {
           setEditingItem(null);
