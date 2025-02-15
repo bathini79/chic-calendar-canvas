@@ -79,7 +79,6 @@ export default function BookingConfirmation() {
 
       // 2. Iterate through each item in the cart to create bookings
       for (const item of items) {
-        console.log("item",item)
         // Insert a new booking into the 'bookings' table.
         const { error: bookingError } = await supabase.from('bookings').insert({
           appointment_id: appointmentId,

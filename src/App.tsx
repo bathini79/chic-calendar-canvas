@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { AdminRoute } from "@/components/auth/AdminRoute";
@@ -15,32 +14,48 @@ import Inventory from "@/pages/admin/Inventory";
 import Auth from "./pages/Auth";
 import UnifiedScheduling from "./pages/customer/UnifiedScheduling";
 import BookingConfirmation from "./pages/customer/BookingConfirmation";
+import AdminBookings from "./pages/admin/AdminBookings";
+
+// 1) Import DnD
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Customer Routes */}
-        <Route path="/" element={<CustomerLayout />}>
-          <Route index element={<Home />} />
-          <Route path="services" element={<Services />} />
-          <Route path="packages" element={<Packages />} />
-          <Route path="cart" element={<Cart />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="schedule" element={<UnifiedScheduling />} />
-          <Route path="booking-confirmation" element={<BookingConfirmation />} />
-        </Route>
+      {/* 2) Wrap all <Routes> (or at least admin routes) with DndProvider */}
+      <DndProvider backend={HTML5Backend}>
+        <Routes>
+          {/* Customer Routes */}
+          <Route path="/" element={<CustomerLayout />}>
+            <Route index element={<Home />} />
+            <Route path="services" element={<Services />} />
+            <Route path="packages" element={<Packages />} />
+            <Route path="cart" element={<Cart />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="schedule" element={<UnifiedScheduling />} />
+            <Route path="booking-confirmation" element={<BookingConfirmation />} />
+          </Route>
 
-        <Route path="/auth" element={<Auth />} />
+          <Route path="/auth" element={<Auth />} />
 
-        {/* Admin Routes */}
-        <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="services" element={<AdminServices />} />
-          <Route path="staff" element={<Staff />} />
-          <Route path="inventory" element={<Inventory />} />
-        </Route>
-      </Routes>
+          {/* Admin Routes */}
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminLayout />
+              </AdminRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="bookings" element={<AdminBookings />} />
+            <Route path="services" element={<AdminServices />} />
+            <Route path="staff" element={<Staff />} />
+            <Route path="inventory" element={<Inventory />} />
+          </Route>
+        </Routes>
+      </DndProvider>
     </BrowserRouter>
   );
 }

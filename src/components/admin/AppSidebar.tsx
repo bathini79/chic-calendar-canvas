@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, Users, Calendar, Package2 } from "lucide-react";
+import { LayoutGrid, Users, Calendar, Package2, Home } from "lucide-react";
 
 export function AppSidebar() {
   return (
@@ -16,8 +16,21 @@ export function AppSidebar() {
             }`
           }
         >
-          <Calendar className="w-5 h-5" />
+          <Home className="w-5 h-5" />
           <span>Dashboard</span>
+        </NavLink>
+        <NavLink
+          to="/admin/bookings"
+          className={({ isActive }) =>
+            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            }`
+          }
+        >
+          <Calendar className="w-5 h-5" />
+          <span>Bookings</span>
         </NavLink>
         <NavLink
           to="/admin/services"

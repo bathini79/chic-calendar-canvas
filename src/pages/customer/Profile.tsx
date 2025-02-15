@@ -59,10 +59,15 @@ const AppointmentCard = ({
   const hours = Math.floor(duration / 60);
   const minutes = duration % 60;
   const durationDisplay =
-    hours > 0 ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}` : `${minutes}m`;
+    hours > 0 ? `${hours}h${minutes > 0 ? `, ${minutes}m` : ""}` : `${minutes}m`;
   return (
     <PopupWrapper
-      popupContent={<AppointmentDetails appointment={appointment} />}
+      popupContent={
+        <AppointmentDetails
+          appointment={appointment}
+          durationDisplay={durationDisplay}
+        />
+      }
     >
       <Card className="mt-4 p-4 rounded-xl shadow-md hover:shadow-lg bg-white/80 backdrop-blur-md border border-gray-200 cursor-pointer transition-shadow">
         <div className="flex justify-between items-center">
@@ -93,7 +98,10 @@ function InfoRow({ icon: Icon, title, subtitle }) {
   );
 }
 // New Component: AppointmentDetails
-const AppointmentDetails = ({ appointment }: { appointment: Appointment }) => {
+const AppointmentDetails = (
+  { appointment,durationDisplay }: { appointment: Appointment }
+  
+) => {
   const { toast } = useToast();
   const fetchBookings = async (appointment_id: string) => {
     const { data, error } = await supabase
@@ -102,7 +110,6 @@ const AppointmentDetails = ({ appointment }: { appointment: Appointment }) => {
         "*, service:service_id(*), package:package_id(*), employee:employee_id(*)"
       )
       .eq("appointment_id", appointment_id);
-    console.log("data", data);
     if (error) {
       console.error("Error fetching bookings:", error);
       toast({
@@ -205,6 +212,9 @@ const AppointmentDetails = ({ appointment }: { appointment: Appointment }) => {
           new Date(appointment.start_time),
           "EEE, dd MMM, yyyy 'at' hh:mm a"
         )}
+      <p className="text-lg text-gray-400 text-sm">
+      {durationDisplay} duration
+      </p>
       </h2>
       <p className="text-lg text-gray-700 font-medium">
         Total Cost: ₹{appointment.total_price}
