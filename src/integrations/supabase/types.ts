@@ -20,6 +20,7 @@ export type Database = {
           number_of_bookings: number | null
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"] | null
+          total_duration: number | null
           total_price: number
           updated_at: string | null
         }
@@ -33,6 +34,7 @@ export type Database = {
           number_of_bookings?: number | null
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
+          total_duration?: number | null
           total_price: number
           updated_at?: string | null
         }
@@ -46,6 +48,7 @@ export type Database = {
           number_of_bookings?: number | null
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
+          total_duration?: number | null
           total_price?: number
           updated_at?: string | null
         }

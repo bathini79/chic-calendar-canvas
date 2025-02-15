@@ -18,9 +18,9 @@ import { toast } from "sonner";
 const Auth = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
 
   // Check if user is already logged in
   const { data: session } = useQuery({
@@ -49,48 +49,31 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate, session]);
 
-  const handlePhoneSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Format phone number to E.164 format
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-      
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-      });
+      const { error } = isSignUp
+        ? await supabase.auth.signUp({
+            email,
+            password,
+          })
+        : await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
 
       if (error) throw error;
 
-      toast.success("Verification code sent to your phone");
-      setStep("otp");
+      if (isSignUp) {
+        toast.success("Check your email for the confirmation link!");
+      } else {
+        toast.success("Logged in successfully!");
+      }
     } catch (error: any) {
-      toast.error(error.message || "Failed to send verification code");
-      console.error("Phone submission error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOtpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`,
-        token: otp,
-        type: 'sms'
-      });
-
-      if (error) throw error;
-
-      toast.success("Phone number verified successfully");
-      // The onAuthStateChange listener will handle the navigation
-    } catch (error: any) {
-      toast.error(error.message || "Failed to verify code");
-      console.error("OTP verification error:", error);
+      toast.error(error.message);
+      console.error("Authentication error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -100,65 +83,58 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Welcome</CardTitle>
+          <CardTitle>{isSignUp ? "Create Account" : "Welcome Back"}</CardTitle>
           <CardDescription>
-            {step === "phone" 
-              ? "Enter your phone number to sign in or create an account" 
-              : "Enter the verification code sent to your phone"}
+            {isSignUp
+              ? "Enter your email to create an account"
+              : "Enter your email to sign in to your account"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {step === "phone" ? (
-            <form onSubmit={handlePhoneSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="phone" className="text-sm font-medium">
-                  Phone Number
-                </label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+1234567890"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  Include country code (e.g., +1 for US)
-                </p>
-              </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Sending..." : "Send Verification Code"}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleOtpSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="otp" className="text-sm font-medium">
-                  Verification Code
-                </label>
-                <Input
-                  id="otp"
-                  type="text"
-                  placeholder="Enter verification code"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Verifying..." : "Verify Code"}
-              </Button>
-              <Button
-                type="button"
-                variant="link"
-                className="w-full"
-                onClick={() => setStep("phone")}
-                disabled={isLoading}
-              >
-                Change Phone Number
-              </Button>
-            </form>
-          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
+              </label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading
+                ? "Loading..."
+                : isSignUp
+                ? "Create Account"
+                : "Sign In"}
+            </Button>
+            <Button
+              type="button"
+              variant="link"
+              className="w-full"
+              onClick={() => setIsSignUp(!isSignUp)}
+            >
+              {isSignUp
+                ? "Already have an account? Sign in"
+                : "Don't have an account? Sign up"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>
