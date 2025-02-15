@@ -9,50 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      admin_booking_sessions: {
-        Row: {
-          admin_id: string | null
-          created_at: string | null
-          customer_id: string | null
-          id: string
-          selected_date: string | null
-          selected_employee_id: string | null
-          selected_time: string | null
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          admin_id?: string | null
-          created_at?: string | null
-          customer_id?: string | null
-          id?: string
-          selected_date?: string | null
-          selected_employee_id?: string | null
-          selected_time?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          admin_id?: string | null
-          created_at?: string | null
-          customer_id?: string | null
-          id?: string
-          selected_date?: string | null
-          selected_employee_id?: string | null
-          selected_time?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "admin_booking_sessions_selected_employee_id_fkey"
-            columns: ["selected_employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       appointments: {
         Row: {
           created_at: string | null
@@ -656,7 +612,6 @@ export type Database = {
       }
       profiles: {
         Row: {
-          admin_created: boolean | null
           created_at: string
           email: string | null
           full_name: string | null
@@ -667,7 +622,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          admin_created?: boolean | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -678,7 +632,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          admin_created?: boolean | null
           created_at?: string
           email?: string | null
           full_name?: string | null
