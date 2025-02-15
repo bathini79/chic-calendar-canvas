@@ -35,6 +35,7 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
           return;
         }
 
+        console.log('Initial Data:', initialData);
         setEnhancedData({
           ...initialData,
           services: servicesResponse.map(ps => ps.service_id),
@@ -50,33 +51,44 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
 
   const handleSubmit = async (data: any) => {
     try {
+      console.log('Submitting package data:', data);
+      const packageData = {
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        duration: data.duration,
+        is_customizable: data.is_customizable,
+        customizable_services: data.customizable_services || [],
+        status: data.status,
+        discount_type: data.discount_type,
+        discount_value: data.discount_value,
+        image_urls: data.image_urls || [],
+        categories: data.categories || []
+      };
+
       if (initialData) {
         // Update package
         const { error: packageError } = await supabase
           .from('packages')
-          .update({
-            name: data.name,
-            description: data.description,
-            price: data.price,
-            duration: data.duration,
-            is_customizable: data.is_customizable,
-            customizable_services: data.customizable_services,
-            status: data.status,
-            discount_type: data.discount_type,
-            discount_value: data.discount_value,
-            image_urls: data.image_urls,
-            categories: data.categories,
-          })
+          .update(packageData)
           .eq('id', initialData.id);
         
-        if (packageError) throw packageError;
+        if (packageError) {
+          console.error('Error updating package:', packageError);
+          throw packageError;
+        }
 
         // Handle package services update
         if (data.services && data.services.length > 0) {
-          await supabase
+          const { error: deleteError } = await supabase
             .from('package_services')
             .delete()
             .eq('package_id', initialData.id);
+          
+          if (deleteError) {
+            console.error('Error deleting package services:', deleteError);
+            throw deleteError;
+          }
 
           const packageServicesData = data.services.map((serviceId: string) => ({
             package_id: initialData.id,
@@ -87,31 +99,26 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
             .from('package_services')
             .insert(packageServicesData);
           
-          if (insertServicesError) throw insertServicesError;
+          if (insertServicesError) {
+            console.error('Error inserting package services:', insertServicesError);
+            throw insertServicesError;
+          }
         }
         
         toast.success('Package updated successfully');
       } else {
         // Create new package
+        console.log('Creating new package with data:', packageData);
         const { data: newPackage, error: packageError } = await supabase
           .from('packages')
-          .insert({
-            name: data.name,
-            description: data.description,
-            price: data.price,
-            duration: data.duration,
-            is_customizable: data.is_customizable,
-            customizable_services: data.customizable_services,
-            status: data.status,
-            discount_type: data.discount_type,
-            discount_value: data.discount_value,
-            image_urls: data.image_urls,
-            categories: data.categories,
-          })
+          .insert(packageData)
           .select()
           .single();
         
-        if (packageError) throw packageError;
+        if (packageError) {
+          console.error('Error creating package:', packageError);
+          throw packageError;
+        }
 
         // Insert services for new package
         if (data.services && data.services.length > 0) {
@@ -124,7 +131,10 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
             .from('package_services')
             .insert(packageServicesData);
           
-          if (servicesError) throw servicesError;
+          if (servicesError) {
+            console.error('Error inserting package services:', servicesError);
+            throw servicesError;
+          }
         }
         
         toast.success('Package created successfully');

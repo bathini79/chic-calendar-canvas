@@ -16,6 +16,7 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
   const { data: packages, isLoading } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
+      // First fetch packages with their services
       const { data: packagesData, error: packagesError } = await supabase
         .from('packages')
         .select(`
@@ -29,21 +30,27 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
         `)
         .order('name');
       
-      if (packagesError) throw packagesError;
+      if (packagesError) {
+        console.error('Error fetching packages:', packagesError);
+        throw packagesError;
+      }
 
-      // Fetch categories for all packages
+      // Then fetch all categories to map them to packages
       const { data: categories, error: categoriesError } = await supabase
         .from('categories')
         .select('id, name');
 
-      if (categoriesError) throw categoriesError;
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError);
+        throw categoriesError;
+      }
 
       // Map categories to packages
       return packagesData.map(pkg => ({
         ...pkg,
-        package_categories: pkg.categories?.map(categoryId => ({
+        package_categories: (pkg.categories || []).map(categoryId => ({
           categories: categories.find(cat => cat.id === categoryId)
-        })) || []
+        }))
       }));
     },
   });
