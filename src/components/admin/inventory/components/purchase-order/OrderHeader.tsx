@@ -9,6 +9,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { UseFormReturn } from "react-hook-form";
 import { PurchaseOrderFormValues } from "../../schemas/purchase-order-schema";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface OrderHeaderProps {
   form: UseFormReturn<PurchaseOrderFormValues>;
@@ -16,6 +18,19 @@ interface OrderHeaderProps {
 }
 
 export function OrderHeader({ form, suppliers }: OrderHeaderProps) {
+  const { data: customers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'customer');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
     <>
       <div className="grid grid-cols-2 gap-4">
@@ -24,13 +39,13 @@ export function OrderHeader({ form, suppliers }: OrderHeaderProps) {
           name="supplier_id"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Supplier</FormLabel>
+              <FormLabel>Customer</FormLabel>
               <FormControl>
                 <select {...field} className="w-full border rounded-md p-2">
-                  <option value="">Select a supplier</option>
-                  {suppliers?.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
+                  <option value="">Select a customer</option>
+                  {customers?.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.full_name || customer.email}
                     </option>
                   ))}
                 </select>
