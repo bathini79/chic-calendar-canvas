@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarEvent } from "./bookings/components/CalendarEvent";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
-import { QuickCustomerCreate } from "./bookings/components/QuickCustomerCreate";
+import { ServiceSelector } from "./bookings/components/ServiceSelector";
 import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
 import type { Customer } from "./bookings/types";
 
@@ -295,58 +294,91 @@ export default function AdminBookings() {
 
         {/* Add Appointment Slide-in */}
         <div
-          className={`fixed top-0 right-0 w-1/2 h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
+          className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
             isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className="p-6 h-full flex flex-col">
-            {!selectedCustomer ? (
-              <div className="space-y-6">
-                <CustomerSearch onSelect={(customer) => {
-                  setSelectedCustomer(customer);
-                  setShowCreateForm(false);
-                }} />
-                
-                {!showCreateForm ? (
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Can't find the customer?
-                    </p>
-                    <button
-                      className="px-4 py-2 border rounded-md hover:bg-gray-50"
-                      onClick={() => setShowCreateForm(true)}
-                    >
-                      Create New Customer
-                    </button>
-                  </div>
-                ) : (
-                  <div className="border-t pt-6">
-                    <h3 className="text-lg font-medium mb-4">Create New Customer</h3>
-                    <QuickCustomerCreate onCreated={(customer) => {
+          <div className="h-full flex flex-col">
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold">New Appointment</h2>
+                <button
+                  onClick={closeAddAppointment}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              {clickedCell && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {format(currentDate, "MMMM d, yyyy")} at {formatTime(clickedCell.time)}
+                </p>
+              )}
+            </div>
+
+            <div className="flex-1 flex overflow-hidden">
+              {/* Customer Selection Panel - 40% */}
+              <div className="w-[40%] border-r overflow-y-auto p-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-medium">Select Customer</h3>
+                  {!selectedCustomer ? (
+                    <CustomerSearch onSelect={(customer) => {
                       setSelectedCustomer(customer);
                       setShowCreateForm(false);
                     }} />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">{selectedCustomer.full_name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedCustomer.email}
-                    </p>
-                  </div>
-                  <button
-                    className="text-sm text-gray-600 hover:text-gray-900"
-                    onClick={() => setSelectedCustomer(null)}
-                  >
-                    Change Customer
-                  </button>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium">{selectedCustomer.full_name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {selectedCustomer.email}
+                          </p>
+                        </div>
+                        <button
+                          className="text-sm text-gray-600 hover:text-gray-900"
+                          onClick={() => setSelectedCustomer(null)}
+                        >
+                          Change Customer
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+
+              {/* Services Selection Panel - 60% */}
+              <div className="w-[60%] overflow-y-auto p-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-medium">Select Services</h3>
+                  <ServiceSelector
+                    onServiceSelect={(serviceId) => {
+                      // TODO: Implement service selection
+                      console.log('Service selected:', serviceId);
+                    }}
+                    onPackageSelect={(packageId, services) => {
+                      // TODO: Implement package selection
+                      console.log('Package selected:', packageId, services);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="border-t p-6">
+              <div className="flex justify-end gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={closeAddAppointment}
+                >
+                  Cancel
+                </Button>
+                <Button>
+                  Create Appointment
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
