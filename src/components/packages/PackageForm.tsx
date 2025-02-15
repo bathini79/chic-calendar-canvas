@@ -19,10 +19,12 @@ import { PriceSection } from "./form/PriceSection";
 import { ServicesSection } from "./form/ServicesSection";
 import { ImageUploadSection } from "./form/ImageUploadSection";
 import { CustomizationSection } from "./form/CustomizationSection";
+import { CategoryMultiSelect } from "../categories/CategoryMultiSelect";
 
 const formSchema = z.object({
   name: z.string().min(1, "Package name is required"),
   services: z.array(z.string()).min(1, "At least one service is required"),
+  categories: z.array(z.string()).min(1, "At least one category is required"),
   price: z.number().min(0, "Price must be greater than or equal to 0"),
   description: z.string().optional(),
   duration: z.number().min(1, "Duration must be at least 1 minute"),
@@ -44,6 +46,9 @@ interface PackageFormProps {
 
 export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProps) {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    initialData?.package_categories?.map((pc: any) => pc.categories.id) || []
+  );
   const [customizableServices, setCustomizableServices] = useState<string[]>(
     initialData?.customizable_services || []
   );
@@ -55,6 +60,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     defaultValues: {
       name: initialData?.name || '',
       services: selectedServices,
+      categories: selectedCategories,
       price: initialData?.price || 0,
       description: initialData?.description || '',
       duration: initialData?.duration || 0,
@@ -85,11 +91,13 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
   useEffect(() => {
     if (initialData) {
       setSelectedServices(initialData?.services || []);
+      setSelectedCategories(initialData?.package_categories?.map((pc: any) => pc.categories.id) || []);
       setCustomizableServices(initialData?.customizable_services || []);
       setImages(initialData?.image_urls || []);
       form.reset({
         name: initialData?.name || '',
         services: initialData?.services || [],
+        categories: initialData?.package_categories?.map((pc: any) => pc.categories.id) || [],
         price: initialData?.price || 0,
         description: initialData?.description || '',
         duration: initialData?.duration || 0,
@@ -123,6 +131,17 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     const updatedServices = customizableServices.filter(id => id !== serviceId);
     setCustomizableServices(updatedServices);
     form.setValue('customizable_services', updatedServices);
+  };
+
+  const handleCategorySelect = (categoryId: string) => {
+    setSelectedCategories([...selectedCategories, categoryId]);
+    form.setValue('categories', [...selectedCategories, categoryId]);
+  };
+
+  const handleCategoryRemove = (categoryId: string) => {
+    const updatedCategories = selectedCategories.filter(id => id !== categoryId);
+    setSelectedCategories(updatedCategories);
+    form.setValue('categories', updatedCategories);
   };
 
   // Calculate total price based on selected services and apply discount
@@ -185,6 +204,24 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
               <FormLabel>Description</FormLabel>
               <FormControl>
                 <Textarea {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="categories"
+          render={() => (
+            <FormItem>
+              <FormLabel>Categories *</FormLabel>
+              <FormControl>
+                <CategoryMultiSelect
+                  selectedCategories={selectedCategories}
+                  onCategorySelect={handleCategorySelect}
+                  onCategoryRemove={handleCategoryRemove}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
