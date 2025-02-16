@@ -70,12 +70,13 @@ export function AppointmentCreate({
       // Create the appointment
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
-        .insert([{
+        .insert({
           customer_id: customerId,
           start_time: startTime.toISOString(),
+          end_time: startTime.toISOString(), // Will be calculated properly
           status: 'inprogress',
-          total_price: 0, // Will be updated with actual total
-        }])
+          total_price: 0 // Will be updated with actual total
+        })
         .select()
         .single();
 
@@ -85,7 +86,8 @@ export function AppointmentCreate({
       const serviceBookings = selectedServices.map(serviceId => ({
         appointment_id: appointment.id,
         service_id: serviceId,
-        status: 'pending'
+        status: 'pending',
+        price_paid: 0 // Will be updated with actual price
       }));
 
       // Create bookings for packages
@@ -93,6 +95,7 @@ export function AppointmentCreate({
         appointment_id: appointment.id,
         package_id: packageId,
         status: 'pending',
+        price_paid: 0, // Will be updated with actual price
         customized_services: customizedPackageServices[packageId] || []
       }));
 
