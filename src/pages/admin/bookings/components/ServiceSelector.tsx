@@ -16,6 +16,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
+import { Service, Package } from "../types";
 
 interface ServiceSelectorProps {
   onServiceSelect?: (serviceId: string) => void;
@@ -31,7 +32,7 @@ export function ServiceSelector({
   selectedPackages = []
 }: ServiceSelectorProps) {
   const [showCustomizeDialog, setShowCustomizeDialog] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [customizableServices, setCustomizableServices] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -67,11 +68,11 @@ export function ServiceSelector({
         .eq('status', 'active');
       
       if (error) throw error;
-      return data;
+      return data as Service[];
     },
   });
 
-  // Query for packages with services and categories
+  // Query for packages with services
   const { data: packages } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
@@ -91,24 +92,24 @@ export function ServiceSelector({
         .eq('status', 'active');
       
       if (error) throw error;
-      return data;
+      return data as Package[];
     },
   });
 
-  const handlePackageSelect = (pkg: any) => {
+  const handlePackageSelect = (pkg: Package) => {
     if (pkg.is_customizable) {
       setSelectedPackage(pkg);
       setCustomizableServices([]);
       setShowCustomizeDialog(true);
     } else {
-      const services = pkg.package_services.map((ps: any) => ps.service.id);
+      const services = pkg.package_services.map(ps => ps.service.id);
       onPackageSelect?.(pkg.id, services);
     }
   };
 
   const handlePackageConfirm = () => {
     if (selectedPackage) {
-      const baseServices = selectedPackage.package_services.map((ps: any) => ps.service.id);
+      const baseServices = selectedPackage.package_services.map(ps => ps.service.id);
       onPackageSelect?.(selectedPackage.id, [...baseServices, ...customizableServices]);
       setShowCustomizeDialog(false);
       setSelectedPackage(null);
@@ -119,25 +120,29 @@ export function ServiceSelector({
   // Filter items based on selected category
   const filteredServices = selectedCategory
     ? services?.filter(service => 
-        service.services_categories.some((sc: any) => sc.categories.id === selectedCategory)
+        service.services_categories.some(sc => sc.categories.id === selectedCategory)
       )
     : services;
 
   const filteredPackages = selectedCategory
     ? packages?.filter(pkg => 
-        pkg.categories?.includes(selectedCategory)
+        pkg.package_services.some(ps => 
+          services?.find(s => s.id === ps.service.id)?.services_categories.some(
+            sc => sc.categories.id === selectedCategory
+          )
+        )
       )
     : packages;
 
   // Combine and sort items to show packages first
   const allItems = [
     ...(filteredPackages || []).map(pkg => ({
-      ...pkg,
-      type: 'package'
+      type: 'package' as const,
+      ...pkg
     })),
     ...(filteredServices || []).map(service => ({
-      ...service,
-      type: 'service'
+      type: 'service' as const,
+      ...service
     }))
   ];
 
@@ -219,7 +224,7 @@ export function ServiceSelector({
             <div className="space-y-2">
               <h4 className="font-medium">Included Services</h4>
               <div className="flex flex-wrap gap-2">
-                {selectedPackage?.package_services.map((ps: any) => (
+                {selectedPackage?.package_services.map((ps) => (
                   <Badge key={ps.service.id}>
                     {ps.service.name}
                   </Badge>
@@ -242,7 +247,7 @@ export function ServiceSelector({
                   <TableBody>
                     {services
                       ?.filter(service => 
-                        !selectedPackage?.package_services.some((ps: any) => ps.service.id === service.id)
+                        !selectedPackage?.package_services.some(ps => ps.service.id === service.id)
                       )
                       .map((service) => (
                         <TableRow key={service.id}>
