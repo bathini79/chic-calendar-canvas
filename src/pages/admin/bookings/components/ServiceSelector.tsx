@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Package, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +15,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
-import { Service, Package } from "../types";
+import { Service, Package as PackageType } from "../types";
 
 interface ServiceSelectorProps {
   onServiceSelect?: (serviceId: string) => void;
@@ -32,7 +31,7 @@ export function ServiceSelector({
   selectedPackages = []
 }: ServiceSelectorProps) {
   const [showCustomizeDialog, setShowCustomizeDialog] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null);
   const [customizableServices, setCustomizableServices] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -92,11 +91,11 @@ export function ServiceSelector({
         .eq('status', 'active');
       
       if (error) throw error;
-      return data as Package[];
+      return data as PackageType[];
     },
   });
 
-  const handlePackageSelect = (pkg: Package) => {
+  const handlePackageSelect = (pkg: PackageType) => {
     if (pkg.is_customizable) {
       setSelectedPackage(pkg);
       setCustomizableServices([]);
