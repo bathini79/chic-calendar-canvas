@@ -23,7 +23,7 @@ interface AppointmentCreateProps {
   defaultStylistId?: string;
 }
 
-type EmployeeType = {
+type Stylist = {
   id: string;
   name: string;
   employment_type: 'stylist';
@@ -47,20 +47,25 @@ export function AppointmentCreate({
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch active stylists
-  const { data: stylists } = useQuery({
+  const { data: stylists = [], isLoading: isLoadingStylists } = useQuery({
     queryKey: ['active-stylists'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
-        .select('*')
+        .select('id, name, employment_type, status')
         .eq('employment_type', 'stylist')
         .eq('status', 'active')
         .order('name');
       
-      if (error) throw error;
-      return data as EmployeeType[];
+      if (error) {
+        console.error('Error fetching stylists:', error);
+        throw error;
+      }
+      return data as Stylist[];
     },
   });
+
+  console.log('Fetched stylists:', stylists); // Debug log
 
   // Set default stylist when available
   useEffect(() => {
@@ -191,6 +196,7 @@ export function AppointmentCreate({
   };
 
   const handleStylistSelect = (itemId: string, stylistId: string) => {
+    console.log('Selecting stylist:', { itemId, stylistId }); // Debug log
     setSelectedStylists(prev => ({
       ...prev,
       [itemId]: stylistId
@@ -288,6 +294,10 @@ export function AppointmentCreate({
     }
   };
 
+  if (isLoadingStylists) {
+    return <div>Loading stylists...</div>;
+  }
+
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
       <Card>
@@ -298,16 +308,11 @@ export function AppointmentCreate({
           <ServiceSelector
             onServiceSelect={handleServiceSelect}
             onPackageSelect={handlePackageSelect}
-            onStylistSelect={(itemId, stylistId) => {
-              setSelectedStylists(prev => ({
-                ...prev,
-                [itemId]: stylistId
-              }));
-            }}
+            onStylistSelect={handleStylistSelect}
             selectedServices={selectedServices}
             selectedPackages={selectedPackages}
             selectedStylists={selectedStylists}
-            stylists={stylists || []}
+            stylists={stylists}
           />
 
           <div className="grid gap-4 md:grid-cols-2">
