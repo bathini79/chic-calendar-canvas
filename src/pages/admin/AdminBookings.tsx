@@ -54,6 +54,8 @@ export default function AdminBookings() {
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
 
   // Update now line
   useEffect(() => {
@@ -355,13 +357,21 @@ export default function AdminBookings() {
                   <h3 className="text-lg font-medium">Select Services</h3>
                   <ServiceSelector
                     onServiceSelect={(serviceId) => {
-                      // TODO: Implement service selection
-                      console.log('Service selected:', serviceId);
+                      setSelectedServices(prev => 
+                        prev.includes(serviceId) 
+                          ? prev.filter(id => id !== serviceId)
+                          : [...prev, serviceId]
+                      );
                     }}
                     onPackageSelect={(packageId, services) => {
-                      // TODO: Implement package selection
-                      console.log('Package selected:', packageId, services);
+                      setSelectedPackages(prev => 
+                        prev.includes(packageId)
+                          ? prev.filter(id => id !== packageId)
+                          : [...prev, packageId]
+                      );
                     }}
+                    selectedServices={selectedServices}
+                    selectedPackages={selectedPackages}
                   />
                 </div>
               </div>

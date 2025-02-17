@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from "react";
-import { Package, Plus, Minus } from "lucide-react";
+import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -16,8 +15,18 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
-import type { Service, Package } from "../types";
+import type { Service } from "../types";
 import { cn } from "@/lib/utils";
+
+interface ServicePackage {
+  id: string;
+  name: string;
+  price: number;
+  duration: number;
+  package_services: {
+    service: Service;
+  }[];
+}
 
 interface ServiceSelectorProps {
   onServiceSelect: (serviceId: string) => void;
@@ -32,9 +41,6 @@ export function ServiceSelector({
   selectedServices = [],
   selectedPackages = []
 }: ServiceSelectorProps) {
-  const [showCustomizeDialog, setShowCustomizeDialog] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
-  const [customizableServices, setCustomizableServices] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
 
@@ -76,7 +82,7 @@ export function ServiceSelector({
         .eq('status', 'active');
       
       if (error) throw error;
-      return data;
+      return data as ServicePackage[];
     },
   });
 
@@ -165,7 +171,7 @@ export function ServiceSelector({
                 >
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {item.type === 'package' && <Package className="h-4 w-4" />}
+                      {item.type === 'package' && <PackageIcon className="h-4 w-4" />}
                       <span className="font-medium">{item.name}</span>
                     </div>
                   </TableCell>
