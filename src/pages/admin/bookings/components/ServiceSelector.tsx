@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Package, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { Service, Package as PackageType } from "../types";
+import { cn } from "@/lib/utils";
 
 interface ServiceSelectorProps {
   onServiceSelect?: (serviceId: string) => void;
@@ -35,6 +36,7 @@ export function ServiceSelector({
   const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null);
   const [customizableServices, setCustomizableServices] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [totalAmount, setTotalAmount] = useState(0);
 
   // Query for categories
   const { data: categories } = useQuery({
@@ -96,26 +98,28 @@ export function ServiceSelector({
     },
   });
 
-  const handlePackageSelect = (pkg: PackageType) => {
-    if (pkg.is_customizable) {
-      setSelectedPackage(pkg);
-      setCustomizableServices([]);
-      setShowCustomizeDialog(true);
-    } else {
-      const services = pkg.package_services.map(ps => ps.service.id);
-      onPackageSelect?.(pkg.id, services);
-    }
-  };
+  // Calculate total amount whenever selections change
+  useEffect(() => {
+    let total = 0;
+    
+    // Add service prices
+    selectedServices.forEach(serviceId => {
+      const service = services?.find(s => s.id === serviceId);
+      if (service) {
+        total += service.selling_price;
+      }
+    });
 
-  const handlePackageConfirm = () => {
-    if (selectedPackage) {
-      const baseServices = selectedPackage.package_services.map(ps => ps.service.id);
-      onPackageSelect?.(selectedPackage.id, [...baseServices, ...customizableServices]);
-      setShowCustomizeDialog(false);
-      setSelectedPackage(null);
-      setCustomizableServices([]);
-    }
-  };
+    // Add package prices
+    selectedPackages.forEach(packageId => {
+      const pkg = packages?.find(p => p.id === packageId);
+      if (pkg) {
+        total += pkg.price;
+      }
+    });
+
+    setTotalAmount(total);
+  }, [selectedServices, selectedPackages, services, packages]);
 
   // Filter items based on selected category
   const filteredServices = selectedCategory
@@ -155,7 +159,7 @@ export function ServiceSelector({
       />
 
       {/* Services and Packages List */}
-      <ScrollArea className="h-[600px] border rounded-md">
+      <ScrollArea className="h-[400px] border rounded-md">
         <Table>
           <TableHeader>
             <TableRow>
@@ -168,7 +172,13 @@ export function ServiceSelector({
           </TableHeader>
           <TableBody>
             {allItems.map((item) => (
-              <TableRow key={`${item.type}-${item.id}`}>
+              <TableRow 
+                key={`${item.type}-${item.id}`}
+                className={cn(
+                  (item.type === 'package' ? selectedPackages : selectedServices).includes(item.id) &&
+                  "bg-red-50"
+                )}
+              >
                 <TableCell>
                   <div className="flex items-center gap-2">
                     {item.type === 'package' && <Package className="h-4 w-4" />}
@@ -184,23 +194,26 @@ export function ServiceSelector({
                   </Badge>
                 </TableCell>
                 <TableCell>{item.duration} min</TableCell>
-                <TableCell>
-                  ₹{item.type === 'package' ? item.price : item.selling_price}
-                </TableCell>
+                <TableCell>${item.type === 'package' ? item.price : item.selling_price}</TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => {
                       if (item.type === 'package') {
-                        handlePackageSelect(item);
+                        if (item.is_customizable) {
+                          setSelectedPackage(item);
+                          setShowCustomizeDialog(true);
+                        } else {
+                          onPackageSelect?.(item.id, []);
+                        }
                       } else {
                         onServiceSelect?.(item.id);
                       }
                     }}
                   >
                     {(item.type === 'package' ? selectedPackages : selectedServices).includes(item.id) ? (
-                      <Minus className="h-4 w-4" />
+                      <Minus className="h-4 w-4 text-red-500" />
                     ) : (
                       <Plus className="h-4 w-4" />
                     )}
@@ -211,6 +224,14 @@ export function ServiceSelector({
           </TableBody>
         </Table>
       </ScrollArea>
+
+      {/* Total Amount */}
+      <div className="border-t pt-4">
+        <div className="flex justify-between items-center">
+          <span className="text-lg font-medium">Total Amount:</span>
+          <span className="text-xl font-bold">${totalAmount.toFixed(2)}</span>
+        </div>
+      </div>
 
       {/* Customize Package Dialog */}
       <Dialog open={showCustomizeDialog} onOpenChange={setShowCustomizeDialog}>
@@ -249,10 +270,15 @@ export function ServiceSelector({
                         !selectedPackage?.package_services.some(ps => ps.service.id === service.id)
                       )
                       .map((service) => (
-                        <TableRow key={service.id}>
+                        <TableRow 
+                          key={service.id}
+                          className={cn(
+                            customizableServices.includes(service.id) && "bg-red-50"
+                          )}
+                        >
                           <TableCell className="font-medium">{service.name}</TableCell>
                           <TableCell>{service.duration} min</TableCell>
-                          <TableCell>₹{service.selling_price}</TableCell>
+                          <TableCell>${service.selling_price}</TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -268,7 +294,7 @@ export function ServiceSelector({
                               }}
                             >
                               {customizableServices.includes(service.id) ? (
-                                <Minus className="h-4 w-4" />
+                                <Minus className="h-4 w-4 text-red-500" />
                               ) : (
                                 <Plus className="h-4 w-4" />
                               )}
@@ -285,7 +311,14 @@ export function ServiceSelector({
               <Button variant="outline" onClick={() => setShowCustomizeDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handlePackageConfirm}>
+              <Button onClick={() => {
+                if (selectedPackage) {
+                  onPackageSelect?.(selectedPackage.id, customizableServices);
+                  setShowCustomizeDialog(false);
+                  setSelectedPackage(null);
+                  setCustomizableServices([]);
+                }
+              }}>
                 Confirm Package
               </Button>
             </div>
