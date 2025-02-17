@@ -9,6 +9,7 @@ import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/componen
 import type { Customer } from "./bookings/types";
 import { Button } from "@/components/ui/button";
 import {format} from "date-fns"
+
 // Configuration
 const START_HOUR = 8; // 8:00 AM
 const END_HOUR = 20; // 8:00 PM
@@ -375,8 +376,48 @@ export default function AdminBookings() {
                 >
                   Cancel
                 </Button>
-                <Button>
-                  Create Appointment
+                <Button
+                  onClick={async () => {
+                    try {
+                      if (!selectedCustomer || !clickedCell) {
+                        toast.error("Please select a customer and appointment time");
+                        return;
+                      }
+
+                      // Calculate start time
+                      const startTime = new Date(currentDate);
+                      const [hours, minutes] = formatTime(clickedCell.time)
+                        .replace(/[ap]m/, '')
+                        .split(':')
+                        .map(Number);
+                      startTime.setHours(hours, minutes, 0, 0);
+
+                      // Create appointment
+                      const { data: appointment, error: appointmentError } = await supabase
+                        .from('appointments')
+                        .insert({
+                          customer_id: selectedCustomer.id,
+                          start_time: startTime.toISOString(),
+                          end_time: startTime.toISOString(), // Will be calculated based on service duration
+                          status: 'confirmed',
+                          total_price: 0 // Will be calculated based on selected services
+                        })
+                        .select()
+                        .single();
+
+                      if (appointmentError) throw appointmentError;
+
+                      toast.success("Appointment created successfully");
+                      closeAddAppointment();
+                      // Refresh calendar data
+                      // TODO: Implement refresh logic
+                    } catch (error: any) {
+                      console.error('Error creating appointment:', error);
+                      toast.error(error.message);
+                    }
+                  }}
+                >
+                  Save Appointment
                 </Button>
               </div>
             </div>
