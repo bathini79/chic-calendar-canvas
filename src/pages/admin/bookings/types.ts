@@ -4,37 +4,49 @@ export interface Customer {
   full_name: string | null;
   email: string | null;
   phone_number: string | null;
+  role: 'customer' | 'admin';
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Service {
   id: string;
   name: string;
-  selling_price: number;
+  description: string | null;
   duration: number;
-  description?: string;
-  status?: string;
+  selling_price: number;
+  status: 'active' | 'inactive' | 'archived';
+  services_categories: {
+    categories: {
+      id: string;
+      name: string;
+    };
+  }[];
 }
 
 export interface Package {
   id: string;
   name: string;
+  description: string | null;
   price: number;
   duration: number;
-  description?: string;
-  status?: string;
-  package_services?: {
-    service: Service;
+  is_customizable: boolean;
+  status: 'active' | 'inactive' | 'archived';
+  package_services: {
+    service: {
+      id: string;
+      name: string;
+      selling_price: number;
+      duration: number;
+    };
   }[];
 }
 
-export interface Booking {
+export interface CartItem {
+  type: 'service' | 'package';
   id: string;
-  appointment_id: string;
-  service_id?: string;
-  package_id?: string;
-  employee_id?: string;
-  price_paid: number;
-  status?: string;
-  service?: Service;
-  package?: Package;
+  name: string;
+  duration: number;
+  price: number;
+  customized_services?: string[];
 }

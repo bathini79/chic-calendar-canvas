@@ -1,308 +1,350 @@
-
 import React, { useState, useEffect } from "react";
-import { Calendar } from "@/components/ui/calendar";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
-import { enUS } from "date-fns/locale";
-import { DateRange } from "react-day-picker";
-import { cn } from "@/lib/utils";
-import { MoreVertical, Edit, Trash, UserPlus, CheckCircle, XCircle } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import { useQuery } from "@tanstack/react-query";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
-import { formatTime } from "@/lib/time";
-import { toast } from "sonner";
+import { CalendarEvent } from "./bookings/components/CalendarEvent";
+import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
+import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
+import type { Customer } from "./bookings/types";
+import { Button } from "@/components/ui/button";
+import {format} from "date-fns"
 
-interface Customer {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  phone_number: string | null;
+// Configuration
+const START_HOUR = 8; // 8:00 AM
+const END_HOUR = 20; // 8:00 PM
+const TOTAL_HOURS = END_HOUR - START_HOUR;
+const PIXELS_PER_HOUR = 60;
+
+// Format a fractional hour as "h:mmam/pm"
+function formatTime(time: number) {
+  const hours = Math.floor(time);
+  const minutes = Math.round((time - hours) * 60);
+  const period = hours >= 12 ? "pm" : "am";
+  let displayHour = hours % 12;
+  if (displayHour === 0) displayHour = 12;
+  return `${displayHour}:${minutes.toString().padStart(2, "0")}${period}`;
 }
 
+// For the left column: integer hours only (8..19) => 12 hours
+const hourLabels = Array.from({ length: 12 }, (_, i) => i + START_HOUR);
+
+// Sample events
+const initialEvents = [
+  { id: 1, employeeId: 1, title: "Haircut", startHour: 9, duration: 1 },
+  { id: 2, employeeId: 2, title: "Facial", startHour: 9.5, duration: 1.5 },
+  { id: 3, employeeId: 3, title: "Manicure", startHour: 13, duration: 1 },
+];
+
+// Example stats
+const initialStats = [
+  { label: "Pending Confirmation", value: 0 },
+  { label: "Upcoming Bookings", value: 11 },
+  { label: "Today's Bookings", value: 5 },
+  { label: "Today's Revenue", value: 1950 },
+];
+
 export default function AdminBookings() {
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: new Date(),
-    to: new Date(),
-  });
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [employees, setEmployees] = useState([]);
+  const [events, setEvents] = useState(initialEvents);
+  const [stats] = useState(initialStats);
+  const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 11));
+  const [nowPosition, setNowPosition] = useState<number | null>(null);
+  const [clickedCell, setClickedCell] = useState<any>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
-  const [clickedCell, setClickedCell] = useState<{ time: string } | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
-  const [customizedPackageServices, setCustomizedPackageServices] = useState<Record<string, string[]>>({});
+  // Update now line
+  useEffect(() => {
+    const updateNow = () => {
+      const now = new Date();
+      const currentHour = now.getHours() + now.getMinutes() / 60;
+      if (currentHour >= START_HOUR && currentHour <= END_HOUR) {
+        setNowPosition((currentHour - START_HOUR) * PIXELS_PER_HOUR);
+      } else {
+        setNowPosition(null);
+      }
+    };
+    updateNow();
+    const intervalId = setInterval(updateNow, 60000);
+    return () => clearInterval(intervalId);
+  }, []);
 
-  const { data: customers } = useQuery({
-    queryKey: ['customers'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, phone_number')
-        .eq('role', 'customer');
-      
-      if (error) throw error;
-      return data as Customer[];
-    },
-  });
+  // Fetch employees
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const { data, error } = await supabase.from("employees").select("*");
+        if (error) throw error;
+        const employeeWithAvatar = data.map((employee) => ({
+          ...employee,
+          avatar: employee.name
+            .split(" ")
+            .map((n) => n[0])
+            .join(""),
+        }));
+        setEmployees(employeeWithAvatar);
+      } catch (error) {
+        console.error("Error fetching employees:", error);
+        setEmployees([]);
+      }
+    };
 
-  const { data: services } = useQuery({
-    queryKey: ['services'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
+    fetchEmployees();
+  }, []);
 
-  const { data: packages } = useQuery({
-    queryKey: ['packages'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('packages')
-        .select('*');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Format the displayed date as "Tue 11 Feb"
+  function formatCurrentDate(date: Date) {
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const dayOfWeek = days[date.getDay()];
+    const dayOfMonth = date.getDate();
+    const month = months[date.getMonth()];
+    return `${dayOfWeek} ${dayOfMonth} ${month}`;
+  }
 
-  const { data: appointments, refetch: refetchAppointments } = useQuery({
-    queryKey: ['appointments', currentDate],
-    queryFn: async () => {
-      const startOfDay = new Date(currentDate);
-      startOfDay.setHours(0, 0, 0, 0);
-  
-      const endOfDay = new Date(currentDate);
-      endOfDay.setHours(23, 59, 59, 999);
-  
-      const { data, error } = await supabase
-        .from('appointments')
-        .select(`
-          *,
-          bookings (
-            *,
-            service:services (*),
-            package:packages (*)
-          ),
-          customer:customers (*)
-        `)
-        .gte('start_time', startOfDay.toISOString())
-        .lte('end_time', endOfDay.toISOString());
-  
-      if (error) throw error;
-      return data;
-    },
-  });
+  const handleEventUpdate = (eventId: number, changes: any) => {
+    setEvents((prev) =>
+      prev.map((ev) => (ev.id === eventId ? { ...ev, ...changes } : ev))
+    );
+  };
 
-  const times = Array.from({ length: 24 }, (_, i) => {
-    const hour = i % 24;
-    const ampm = hour >= 12 ? 'pm' : 'am';
-    const displayHour = hour % 12 === 0 ? 12 : hour % 12;
-    return `${displayHour}:00${ampm}`;
-  });
+  // Navigation functions
+  const goToday = () => setCurrentDate(new Date());
+  const goPrev = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() - 1);
+    setCurrentDate(newDate);
+  };
+  const goNext = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + 1);
+    setCurrentDate(newDate);
+  };
 
-  const filteredCustomers = customers?.filter(customer =>
-    customer.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.phone_number?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Column click handling
+  function handleColumnClick(e: React.MouseEvent, empId: number) {
+    if (e.target !== e.currentTarget) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    let clickedTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
+    clickedTime = Math.round(clickedTime * 4) / 4;
 
-  const openAddAppointment = (time: string) => {
-    setClickedCell({ time });
+    setClickedCell({
+      employeeId: empId,
+      time: clickedTime,
+      x: e.pageX + 10,
+      y: e.pageY - 20,
+    });
+  }
+
+  const openAddAppointment = () => {
     setIsAddAppointmentOpen(true);
+    setClickedCell(null);
   };
 
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
-    setClickedCell(null);
-    setSelectedCustomer(null);
   };
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex h-screen bg-gray-100">
-        {/* Calendar - 20% */}
-        <div className="w-[20%] p-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Calendar</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <Calendar
-                mode="single"
-                captionLayout="dropdown"
-                locale={enUS}
-                selected={currentDate}
-                onSelect={setCurrentDate}
-                className="rounded-md border"
-              />
-              <p>
-                <span className="font-medium">Selected Date:</span>{' '}
-                {format(currentDate, 'PPP')}
-              </p>
-            </CardContent>
-          </Card>
+      <div className="flex flex-col h-screen bg-gray-50 relative">
+        {/* Header */}
+        <header className="p-4 border-b bg-white flex justify-between items-center">
+          <div className="font-bold text-xl">Define Salon</div>
+        </header>
+
+        {/* Stats */}
+        <div className="p-4 border-b bg-white flex space-x-4 overflow-x-auto">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-white border rounded shadow-sm px-4 py-2 min-w-[150px]"
+            >
+              <div className="text-gray-500 text-sm">{stat.label}</div>
+              <div className="text-xl font-bold">
+                {stat.label === "Today's Revenue" ? `$${stat.value}` : stat.value}
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Schedule - 60% */}
-        <div className="w-[60%] p-6">
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">
-                Schedule for {format(currentDate, 'PPP')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="relative h-[calc(100%-80px)]">
-              <ScrollArea className="h-full">
-                <div className="grid grid-cols-[60px_1fr] border-b sticky top-0 z-10 bg-background">
-                  <div></div>
-                  <div className="grid grid-cols-1">
-                    <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">
-                      {format(currentDate, 'EEEE')}
-                    </div>
-                  </div>
+        {/* Date Navigation */}
+        <div className="p-4 border-b bg-white flex items-center space-x-2">
+          <button
+            onClick={goToday}
+            className="px-4 py-1 border rounded-full hover:bg-gray-100 text-sm"
+          >
+            Today
+          </button>
+          <button
+            onClick={goPrev}
+            className="px-3 py-1 border rounded-full hover:bg-gray-100 flex items-center justify-center"
+          >
+            <ArrowLeftIcon />
+          </button>
+          <div className="px-6 py-1 border rounded-full text-sm flex items-center justify-center">
+            {formatCurrentDate(currentDate)}
+          </div>
+          <button
+            onClick={goNext}
+            className="px-3 py-1 border rounded-full hover:bg-gray-100 flex items-center justify-center"
+          >
+            <ArrowRightIcon />
+          </button>
+        </div>
+
+        {/* Employee Header */}
+        <div className="flex border-b bg-white">
+          <div className="w-16 border-r" />
+          {employees.map((emp: any) => (
+            <div
+              key={emp.id}
+              className="flex-1 border-r flex items-center justify-center p-2"
+            >
+              <div className="flex flex-col items-center space-y-1">
+                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
+                  {emp.avatar}
                 </div>
-                {times.map((time) => (
-                  <div key={time} className="grid grid-cols-[60px_1fr] border-b">
-                    <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">
-                      {time}
-                    </div>
-                    <div
-                      className="grid grid-cols-1 hover:bg-secondary/50 cursor-pointer"
-                      onClick={() => openAddAppointment(time)}
-                    >
-                      <div className="px-2 py-1.5 text-sm">
-                        {appointments?.filter(appointment => {
-                          const startTime = formatTime(appointment.start_time);
-                          return startTime === time;
-                        }).map(appointment => (
-                          <div key={appointment.id} className="relative group">
-                            <div className="bg-primary text-primary-foreground rounded-md p-2 mb-1">
-                              <p className="font-medium">{appointment.customer?.full_name}</p>
-                              <p className="text-sm">{appointment.bookings?.map(booking => booking.service?.name).join(', ')}</p>
-                            </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 h-6 w-6 p-0">
-                                  <MoreVertical className="h-4 w-4" />
-                                  <span className="sr-only">Open menu</span>
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-[160px]">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  <span>Edit</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Trash className="mr-2 h-4 w-4" />
-                                  <span>Delete</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem>
-                                  <UserPlus className="mr-2 h-4 w-4" />
-                                  <span>Invite to team</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                <div className="text-xs font-medium text-gray-700">{emp.name}</div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Add Appointment Panel - 20% */}
-        <div
-          className={cn(
-            "fixed inset-y-0 right-0 w-[40%] bg-gray-50 border-l border-gray-200 p-6 transform transition-transform duration-300 ease-in-out z-50",
-            isAddAppointmentOpen ? 'translate-x-0' : 'translate-x-full',
-          )}
-        >
-          <div className="flex flex-col h-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Add Appointment</h2>
-              <Button variant="ghost" onClick={closeAddAppointment}>
-                <XCircle className="h-5 w-5" />
-              </Button>
+        {/* Main Schedule Grid */}
+        <div className="flex-1 overflow-auto">
+          <div className="flex">
+            {/* Hours Column */}
+            <div className="w-16 border-r">
+              {hourLabels.map((hr) => (
+                <div
+                  key={hr}
+                  className="h-[60px] flex items-center justify-end pr-1 text-[10px] text-gray-700 font-bold border-b"
+                >
+                  {formatTime(hr)}
+                </div>
+              ))}
             </div>
 
-            <div className="flex space-x-4 h-full">
+            {/* Employee Columns */}
+            {employees.map((emp: any) => (
+              <div
+                key={emp.id}
+                className="flex-1 border-r relative"
+                style={{
+                  minWidth: "150px",
+                  height: TOTAL_HOURS * PIXELS_PER_HOUR,
+                }}
+                onClick={(e) => handleColumnClick(e, emp.id)}
+              >
+                {/* Background Grid */}
+                {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="absolute left-0 right-0 border-b"
+                    style={{ top: idx * 15 }}
+                  />
+                ))}
+
+                {/* Now Line */}
+                {nowPosition !== null && (
+                  <div
+                    className="absolute left-0 right-0 h-[2px] bg-red-500"
+                    style={{ top: nowPosition }}
+                  />
+                )}
+
+                {/* Events */}
+                {events
+                  .filter((ev) => ev.employeeId === emp.id)
+                  .map((evt) => (
+                    <CalendarEvent
+                      key={evt.id}
+                      event={evt}
+                      onEventUpdate={handleEventUpdate}
+                    />
+                  ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Clicked Cell Popup */}
+        {clickedCell && (
+          <div
+            className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
+            style={{
+              left: clickedCell.x,
+              top: clickedCell.y,
+            }}
+          >
+            <div className="bg-black px-4 py-2 text-sm font-medium text-white">
+              {formatTime(clickedCell.time)}
+            </div>
+            <div
+              className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={openAddAppointment}
+            >
+              <CalendarIcon className="h-4 w-4 text-gray-600" />
+              <span className="text-gray-700">Add Appointment</span>
+            </div>
+          </div>
+        )}
+
+        {/* Add Appointment Slide-in */}
+        <div
+          className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
+            isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="h-full flex flex-col">
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold">New Appointment</h2>
+                <button
+                  onClick={closeAddAppointment}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              {clickedCell && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {format(currentDate, "MMMM d, yyyy")} at {formatTime(clickedCell.time)}
+                </p>
+              )}
+            </div>
+
+            <div className="flex-1 flex overflow-hidden">
               {/* Customer Selection Panel - 40% */}
-              <div className="w-[40%] overflow-y-auto p-6">
+              <div className="w-[40%] border-r overflow-y-auto p-6">
                 <div className="space-y-6">
                   <h3 className="text-lg font-medium">Select Customer</h3>
-                  <Input
-                    type="search"
-                    placeholder="Search customers..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <ScrollArea className="h-[300px] border rounded-md">
-                    <div className="divide-y divide-gray-200">
-                      {filteredCustomers?.map((customer) => (
-                        <div
-                          key={customer.id}
-                          className="flex items-center space-x-4 p-4 hover:bg-gray-100 cursor-pointer"
-                          onClick={() => setSelectedCustomer(customer)}
+                  {!selectedCustomer ? (
+                    <CustomerSearch onSelect={(customer) => {
+                      setSelectedCustomer(customer);
+                      setShowCreateForm(false);
+                    }} />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium">{selectedCustomer.full_name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {selectedCustomer.email}
+                          </p>
+                        </div>
+                        <button
+                          className="text-sm text-gray-600 hover:text-gray-900"
+                          onClick={() => setSelectedCustomer(null)}
                         >
-                          <Avatar>
-                            <AvatarImage src={`https://avatar.vercel.sh/${customer.email}.png`} />
-                            <AvatarFallback>{customer.full_name?.slice(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium leading-none">{customer.full_name}</p>
-                            <p className="text-sm text-muted-foreground">{customer.email}</p>
-                          </div>
-                          {selectedCustomer?.id === customer.id && (
-                            <CheckCircle className="h-5 w-5 ml-auto text-green-500" />
-                          )}
-                        </div>
-                      ))}
+                          Change Customer
+                        </button>
+                      </div>
                     </div>
-                  </ScrollArea>
-                  {selectedCustomer && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Selected Customer</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center space-x-4">
-                          <Avatar>
-                            <AvatarImage src={`https://avatar.vercel.sh/${selectedCustomer.email}.png`} />
-                            <AvatarFallback>{selectedCustomer.full_name?.slice(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium leading-none">{selectedCustomer.full_name}</p>
-                            <p className="text-sm text-muted-foreground">{selectedCustomer.email}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
                   )}
                 </div>
               </div>
@@ -313,34 +355,13 @@ export default function AdminBookings() {
                   <h3 className="text-lg font-medium">Select Services</h3>
                   <ServiceSelector
                     onServiceSelect={(serviceId) => {
-                      setSelectedServices(prev => 
-                        prev.includes(serviceId) 
-                          ? prev.filter(id => id !== serviceId)
-                          : [...prev, serviceId]
-                      );
+                      // TODO: Implement service selection
+                      console.log('Service selected:', serviceId);
                     }}
                     onPackageSelect={(packageId, services) => {
-                      setSelectedPackages(prev => 
-                        prev.includes(packageId)
-                          ? prev.filter(id => id !== packageId)
-                          : [...prev, packageId]
-                      );
-                      
-                      if (services.length > 0) {
-                        setCustomizedPackageServices(prev => ({
-                          ...prev,
-                          [packageId]: services
-                        }));
-                      } else {
-                        setCustomizedPackageServices(prev => {
-                          const newState = { ...prev };
-                          delete newState[packageId];
-                          return newState;
-                        });
-                      }
+                      // TODO: Implement package selection
+                      console.log('Package selected:', packageId, services);
                     }}
-                    selectedServices={selectedServices}
-                    selectedPackages={selectedPackages}
                   />
                 </div>
               </div>
@@ -351,12 +372,7 @@ export default function AdminBookings() {
               <div className="flex justify-end gap-3">
                 <Button
                   variant="outline" 
-                  onClick={() => {
-                    closeAddAppointment();
-                    setSelectedServices([]);
-                    setSelectedPackages([]);
-                    setCustomizedPackageServices({});
-                  }}
+                  onClick={closeAddAppointment}
                 >
                   Cancel
                 </Button>
@@ -368,11 +384,6 @@ export default function AdminBookings() {
                         return;
                       }
 
-                      if (selectedServices.length === 0 && selectedPackages.length === 0) {
-                        toast.error("Please select at least one service or package");
-                        return;
-                      }
-
                       // Calculate start time
                       const startTime = new Date(currentDate);
                       const [hours, minutes] = formatTime(clickedCell.time)
@@ -381,78 +392,25 @@ export default function AdminBookings() {
                         .map(Number);
                       startTime.setHours(hours, minutes, 0, 0);
 
-                      // Calculate total duration and price
-                      let totalDuration = 0;
-                      let totalPrice = 0;
-
-                      // Add service durations and prices
-                      selectedServices.forEach(serviceId => {
-                        const service = services?.find(s => s.id === serviceId);
-                        if (service) {
-                          totalDuration += service.duration;
-                          totalPrice += service.selling_price;
-                        }
-                      });
-
-                      // Add package durations and prices
-                      selectedPackages.forEach(packageId => {
-                        const pkg = packages?.find(p => p.id === packageId);
-                        if (pkg) {
-                          totalDuration += pkg.duration;
-                          totalPrice += pkg.price;
-                        }
-                      });
-
-                      // Calculate end time
-                      const endTime = new Date(startTime);
-                      endTime.setMinutes(endTime.getMinutes() + totalDuration);
-
                       // Create appointment
                       const { data: appointment, error: appointmentError } = await supabase
                         .from('appointments')
                         .insert({
                           customer_id: selectedCustomer.id,
                           start_time: startTime.toISOString(),
-                          end_time: endTime.toISOString(),
+                          end_time: startTime.toISOString(), // Will be calculated based on service duration
                           status: 'confirmed',
-                          total_price: totalPrice,
-                          total_duration: totalDuration
+                          total_price: 0 // Will be calculated based on selected services
                         })
                         .select()
                         .single();
 
                       if (appointmentError) throw appointmentError;
 
-                      // Create bookings for services
-                      const serviceBookings = selectedServices.map(serviceId => ({
-                        appointment_id: appointment.id,
-                        service_id: serviceId,
-                        status: 'confirmed',
-                        price_paid: services?.find(s => s.id === serviceId)?.selling_price || 0
-                      }));
-
-                      // Create bookings for packages
-                      const packageBookings = selectedPackages.map(packageId => ({
-                        appointment_id: appointment.id,
-                        package_id: packageId,
-                        status: 'confirmed',
-                        price_paid: packages?.find(p => p.id === packageId)?.price || 0,
-                        customized_services: customizedPackageServices[packageId] || []
-                      }));
-
-                      // Insert all bookings
-                      const { error: bookingsError } = await supabase
-                        .from('bookings')
-                        .insert([...serviceBookings, ...packageBookings]);
-
-                      if (bookingsError) throw bookingsError;
-
                       toast.success("Appointment created successfully");
                       closeAddAppointment();
-                      setSelectedServices([]);
-                      setSelectedPackages([]);
-                      setCustomizedPackageServices({});
-                      refetchAppointments();
+                      // Refresh calendar data
+                      // TODO: Implement refresh logic
                     } catch (error: any) {
                       console.error('Error creating appointment:', error);
                       toast.error(error.message);
@@ -463,7 +421,6 @@ export default function AdminBookings() {
                 </Button>
               </div>
             </div>
-
           </div>
         </div>
 
