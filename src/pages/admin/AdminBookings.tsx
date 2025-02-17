@@ -8,7 +8,9 @@ import { ServiceSelector } from "./bookings/components/ServiceSelector";
 import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
 import type { Customer } from "./bookings/types";
 import { Button } from "@/components/ui/button";
-import {format} from "date-fns"
+import { format } from "date-fns";
+import { addMinutes } from "date-fns";
+import { toast } from "sonner";
 
 // Configuration
 const START_HOUR = 8; // 8:00 AM
@@ -56,6 +58,9 @@ export default function AdminBookings() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [selectedTime, setSelectedTime] = useState<string | undefined>();
+  const [notes, setNotes] = useState("");
 
   // Update now line
   useEffect(() => {
@@ -148,6 +153,146 @@ export default function AdminBookings() {
 
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
+  };
+
+  // Calculate total price
+  const getTotalPrice = () => {
+    let total = 0;
+    
+    // Add service prices
+    selectedServices.forEach(serviceId => {
+      const service = services?.find(s => s.id === serviceId);
+      if (service) {
+        total += service.selling_price;
+      }
+    });
+
+    // Add package prices
+    selectedPackages.forEach(packageId => {
+      const pkg = packages?.find(p => p.id === packageId);
+      if (pkg) {
+        total += pkg.price;
+      }
+    });
+
+    return total;
+  };
+
+  // Calculate total duration
+  const getTotalDuration = () => {
+    let totalDuration = 0;
+    
+    // Add service durations
+    selectedServices.forEach(serviceId => {
+      const service = services?.find(s => s.id === serviceId);
+      if (service) {
+        totalDuration += service.duration;
+      }
+    });
+
+    // Add package durations
+    selectedPackages.forEach(packageId => {
+      const pkg = packages?.find(p => p.id === packageId);
+      if (pkg) {
+        totalDuration += pkg.duration;
+      }
+    });
+
+    return totalDuration;
+  };
+
+  // Save appointment function
+  const handleSaveAppointment = async () => {
+    try {
+      if (!selectedDate || !selectedTime || !selectedCustomer) {
+        toast.error("Please select a date, time and customer");
+        return;
+      }
+
+      const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTime}`);
+      if (isNaN(startDateTime.getTime())) {
+        console.error(`Invalid date generated, date: ${format(selectedDate, 'yyyy-MM-dd')}, time: ${selectedTime}`);
+        return;
+      }
+      
+      const totalDuration = getTotalDuration();
+      const endDateTime = addMinutes(startDateTime, totalDuration);
+
+      // 1. Insert into appointments table
+      const { data: appointmentData, error: appointmentError } = await supabase
+        .from('appointments')
+        .insert({
+          customer_id: selectedCustomer.id,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          notes: notes,
+          status: 'confirmed',
+          number_of_bookings: selectedServices.length + selectedPackages.length,
+          total_price: getTotalPrice(),
+          total_duration: totalDuration
+        })
+        .select();
+
+      if (appointmentError) {
+        console.error("Error inserting appointment:", appointmentError);
+        toast.error("Failed to create appointment. Please try again.");
+        throw appointmentError;
+      }
+
+      const appointmentId = appointmentData[0].id;
+
+      // 2. Create bookings for services
+      for (const serviceId of selectedServices) {
+        const service = services?.find(s => s.id === serviceId);
+        if (!service) continue;
+
+        const { error: bookingError } = await supabase.from('bookings').insert({
+          appointment_id: appointmentId,
+          service_id: serviceId,
+          status: 'confirmed',
+          price_paid: service.selling_price
+        });
+
+        if (bookingError) {
+          console.error("Error inserting booking:", bookingError);
+          toast.error("Failed to create booking. Please try again.");
+          throw bookingError;
+        }
+      }
+
+      // 3. Create bookings for packages
+      for (const packageId of selectedPackages) {
+        const pkg = packages?.find(p => p.id === packageId);
+        if (!pkg) continue;
+
+        const { error: bookingError } = await supabase.from('bookings').insert({
+          appointment_id: appointmentId,
+          package_id: packageId,
+          status: 'confirmed',
+          price_paid: pkg.price
+        });
+
+        if (bookingError) {
+          console.error("Error inserting booking:", bookingError);
+          toast.error("Failed to create booking. Please try again.");
+          throw bookingError;
+        }
+      }
+
+      toast.success("Appointment created successfully");
+      setIsAddAppointmentOpen(false);
+      
+      // Reset selection states
+      setSelectedServices([]);
+      setSelectedPackages([]);
+      setSelectedDate(undefined);
+      setSelectedTime(undefined);
+      setNotes("");
+      
+    } catch (error: any) {
+      console.error("Error saving appointment:", error);
+      toast.error(error.message || "Failed to save appointment");
+    }
   };
 
   return (
@@ -387,45 +532,8 @@ export default function AdminBookings() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={async () => {
-                    try {
-                      if (!selectedCustomer || !clickedCell) {
-                        toast.error("Please select a customer and appointment time");
-                        return;
-                      }
-
-                      // Calculate start time
-                      const startTime = new Date(currentDate);
-                      const [hours, minutes] = formatTime(clickedCell.time)
-                        .replace(/[ap]m/, '')
-                        .split(':')
-                        .map(Number);
-                      startTime.setHours(hours, minutes, 0, 0);
-
-                      // Create appointment
-                      const { data: appointment, error: appointmentError } = await supabase
-                        .from('appointments')
-                        .insert({
-                          customer_id: selectedCustomer.id,
-                          start_time: startTime.toISOString(),
-                          end_time: startTime.toISOString(), // Will be calculated based on service duration
-                          status: 'confirmed',
-                          total_price: 0 // Will be calculated based on selected services
-                        })
-                        .select()
-                        .single();
-
-                      if (appointmentError) throw appointmentError;
-
-                      toast.success("Appointment created successfully");
-                      closeAddAppointment();
-                      // Refresh calendar data
-                      // TODO: Implement refresh logic
-                    } catch (error: any) {
-                      console.error('Error creating appointment:', error);
-                      toast.error(error.message);
-                    }
-                  }}
+                  onClick={handleSaveAppointment}
+                  disabled={!selectedCustomer || selectedServices.length === 0 && selectedPackages.length === 0}
                 >
                   Save Appointment
                 </Button>
