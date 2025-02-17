@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { addMinutes } from "date-fns";
 import { toast } from "sonner";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 
 // Configuration
 const START_HOUR = 8; // 8:00 AM
