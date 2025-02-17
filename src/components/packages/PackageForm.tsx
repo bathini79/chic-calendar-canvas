@@ -34,8 +34,6 @@ const formSchema = z.object({
   discount_value: z.number().min(0).default(0),
   image_urls: z.array(z.string()).optional(),
   customizable_services: z.array(z.string()).default([]),
-  stylist_id: z.string().min(1, "Stylist is required"),
-  notes: z.string().optional(),
 });
 
 type PackageFormData = z.infer<typeof formSchema>;
@@ -72,8 +70,6 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
       discount_value: initialData?.discount_value || 0,
       image_urls: images,
       customizable_services: customizableServices,
-      stylist_id: initialData?.stylist_id || '',
-      notes: initialData?.notes || '',
     },
   });
 
@@ -111,8 +107,6 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
         discount_value: initialData?.discount_value || 0,
         image_urls: initialData?.image_urls || [],
         customizable_services: initialData?.customizable_services || [],
-        stylist_id: initialData?.stylist_id || '',
-        notes: initialData?.notes || '',
       });
     }
   }, [initialData, form]);
