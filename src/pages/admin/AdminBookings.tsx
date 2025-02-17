@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { addMinutes } from "date-fns";
 import { toast } from "sonner";
+import { useQuery } from "react-query";
 
 // Configuration
 const START_HOUR = 8; // 8:00 AM
@@ -52,7 +53,13 @@ export default function AdminBookings() {
   const [stats] = useState(initialStats);
   const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 11));
   const [nowPosition, setNowPosition] = useState<number | null>(null);
-  const [clickedCell, setClickedCell] = useState<any>(null);
+  const [clickedCell, setClickedCell] = useState<{
+    employeeId: number;
+    time: number;
+    x: number;
+    y: number;
+    date?: Date;
+  } | null>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -143,10 +150,19 @@ export default function AdminBookings() {
       time: clickedTime,
       x: e.pageX + 10,
       y: e.pageY - 20,
+      date: currentDate
     });
   }
 
   const openAddAppointment = () => {
+    if (clickedCell) {
+      const hours = Math.floor(clickedCell.time);
+      const minutes = Math.round((clickedCell.time - hours) * 60);
+      const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      
+      setSelectedDate(clickedCell.date);
+      setSelectedTime(timeString);
+    }
     setIsAddAppointmentOpen(true);
     setClickedCell(null);
   };
@@ -294,6 +310,32 @@ export default function AdminBookings() {
       toast.error(error.message || "Failed to save appointment");
     }
   };
+
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: packages } = useQuery({
+    queryKey: ['packages'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -523,7 +565,12 @@ export default function AdminBookings() {
             </div>
 
             {/* Footer Actions */}
-            <div className="border-t p-6">
+            <div className="p-4 space-y-4">
+              {selectedDate && selectedTime && (
+                <div className="text-sm text-muted-foreground">
+                  Appointment for: {format(selectedDate, "MMMM d, yyyy")} at {selectedTime}
+                </div>
+              )}
               <div className="flex justify-end gap-3">
                 <Button
                   variant="outline" 
@@ -533,7 +580,7 @@ export default function AdminBookings() {
                 </Button>
                 <Button
                   onClick={handleSaveAppointment}
-                  disabled={!selectedCustomer || selectedServices.length === 0 && selectedPackages.length === 0}
+                  disabled={!selectedCustomer || (selectedServices.length === 0 && selectedPackages.length === 0)}
                 >
                   Save Appointment
                 </Button>
