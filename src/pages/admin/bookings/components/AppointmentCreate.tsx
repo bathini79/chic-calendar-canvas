@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,12 +20,21 @@ interface AppointmentCreateProps {
   customerId: string;
   selectedDate?: Date | null;
   selectedTime?: string;
+  defaultStylistId?: string;
 }
+
+type EmployeeType = {
+  id: string;
+  name: string;
+  employment_type: 'stylist';
+  status: 'active' | 'inactive';
+};
 
 export function AppointmentCreate({ 
   customerId, 
   selectedDate, 
-  selectedTime 
+  selectedTime,
+  defaultStylistId
 }: AppointmentCreateProps) {
   const navigate = useNavigate();
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -38,20 +46,32 @@ export function AppointmentCreate({
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch stylists
+  // Fetch active stylists
   const { data: stylists } = useQuery({
-    queryKey: ['stylists'],
+    queryKey: ['active-stylists'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
         .select('*')
         .eq('employment_type', 'stylist')
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .order('name');
       
       if (error) throw error;
-      return data;
+      return data as EmployeeType[];
     },
   });
+
+  // Set default stylist when available
+  useEffect(() => {
+    if (defaultStylistId && stylists?.some(s => s.id === defaultStylistId)) {
+      const newSelectedStylists: Record<string, string> = {};
+      [...selectedServices, ...selectedPackages].forEach(itemId => {
+        newSelectedStylists[itemId] = defaultStylistId;
+      });
+      setSelectedStylists(newSelectedStylists);
+    }
+  }, [defaultStylistId, selectedServices, selectedPackages, stylists]);
 
   // Fetch services and packages for price calculation
   const { data: services } = useQuery({
@@ -130,19 +150,37 @@ export function AppointmentCreate({
   };
 
   const handleServiceSelect = (serviceId: string) => {
-    setSelectedServices(prev => 
-      prev.includes(serviceId) 
+    setSelectedServices(prev => {
+      const updated = prev.includes(serviceId) 
         ? prev.filter(id => id !== serviceId)
-        : [...prev, serviceId]
-    );
+        : [...prev, serviceId];
+      
+      // Automatically assign the default stylist to newly selected services
+      if (!prev.includes(serviceId) && defaultStylistId) {
+        setSelectedStylists(prev => ({
+          ...prev,
+          [serviceId]: defaultStylistId
+        }));
+      }
+      return updated;
+    });
   };
 
   const handlePackageSelect = (packageId: string, services: string[]) => {
-    setSelectedPackages(prev => 
-      prev.includes(packageId)
+    setSelectedPackages(prev => {
+      const updated = prev.includes(packageId)
         ? prev.filter(id => id !== packageId)
-        : [...prev, packageId]
-    );
+        : [...prev, packageId];
+      
+      // Automatically assign the default stylist to newly selected packages
+      if (!prev.includes(packageId) && defaultStylistId) {
+        setSelectedStylists(prev => ({
+          ...prev,
+          [packageId]: defaultStylistId
+        }));
+      }
+      return updated;
+    });
     
     if (services.length > 0) {
       setCustomizedPackageServices(prev => ({
@@ -251,7 +289,7 @@ export function AppointmentCreate({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1200px] mx-auto">
       <Card>
         <CardHeader>
           <CardTitle>Create Appointment</CardTitle>
@@ -260,10 +298,15 @@ export function AppointmentCreate({
           <ServiceSelector
             onServiceSelect={handleServiceSelect}
             onPackageSelect={handlePackageSelect}
+            onStylistSelect={(itemId, stylistId) => {
+              setSelectedStylists(prev => ({
+                ...prev,
+                [itemId]: stylistId
+              }));
+            }}
             selectedServices={selectedServices}
             selectedPackages={selectedPackages}
             selectedStylists={selectedStylists}
-            onStylistSelect={handleStylistSelect}
             stylists={stylists || []}
           />
 
@@ -271,7 +314,7 @@ export function AppointmentCreate({
             <div className="space-y-2">
               <label className="text-sm font-medium">Discount Type</label>
               <Select value={discountType} onValueChange={(value: 'none' | 'percentage' | 'fixed') => setDiscountType(value)}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select discount type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -291,6 +334,7 @@ export function AppointmentCreate({
                 value={discountValue}
                 onChange={(e) => setDiscountValue(Number(e.target.value))}
                 disabled={discountType === 'none'}
+                className="w-full"
               />
             </div>
           </div>
@@ -301,6 +345,7 @@ export function AppointmentCreate({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Add any special instructions or notes..."
+              className="min-h-[100px]"
             />
           </div>
 
@@ -326,6 +371,12 @@ export function AppointmentCreate({
         <CardFooter className="flex justify-end gap-4">
           <Button 
             variant="outline"
+            onClick={() => navigate('/admin/bookings')}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="default"
             onClick={handleSaveAppointment}
             disabled={isLoading || (selectedServices.length === 0 && selectedPackages.length === 0) || !validateStylistSelection()}
           >
