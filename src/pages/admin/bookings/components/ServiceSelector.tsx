@@ -18,6 +18,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { cn } from "@/lib/utils";
 
+type Stylist = {
+  id: string;
+  name: string;
+  employment_type: 'stylist';
+  status: 'active' | 'inactive';
+};
+
 interface ServiceSelectorProps {
   onServiceSelect: (serviceId: string) => void;
   onPackageSelect: (packageId: string, services: string[]) => void;
@@ -25,11 +32,11 @@ interface ServiceSelectorProps {
   selectedServices: string[];
   selectedPackages: string[];
   selectedStylists: Record<string, string>;
-  stylists: any[];
+  stylists: Stylist[];
 }
 
-export function ServiceSelector({ 
-  onServiceSelect, 
+export function ServiceSelector({
+  onServiceSelect,
   onPackageSelect,
   onStylistSelect,
   selectedServices = [],
@@ -126,7 +133,7 @@ export function ServiceSelector({
               <TableHead>Type</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Price</TableHead>
-              <TableHead>Stylist</TableHead>
+              <TableHead className="w-[200px]">Stylist</TableHead>
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -139,7 +146,7 @@ export function ServiceSelector({
               return (
                 <TableRow 
                   key={`${item.type}-${item.id}`}
-                  className={cn(isSelected && "bg-red-50")}
+                  className={cn(isSelected && "bg-muted")}
                 >
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -162,7 +169,7 @@ export function ServiceSelector({
                         value={selectedStylists[item.id] || ''} 
                         onValueChange={(value) => onStylistSelect(item.id, value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-[180px]">
                           <SelectValue placeholder="Select stylist" />
                         </SelectTrigger>
                         <SelectContent>
@@ -188,7 +195,7 @@ export function ServiceSelector({
                       }}
                     >
                       {isSelected ? (
-                        <Minus className="h-4 w-4 text-red-500" />
+                        <Minus className="h-4 w-4 text-destructive" />
                       ) : (
                         <Plus className="h-4 w-4" />
                       )}
