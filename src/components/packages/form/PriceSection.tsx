@@ -1,8 +1,10 @@
+
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useFormContext } from "react-hook-form";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 
 interface PriceSectionProps {
   calculatedPrice: number;
@@ -39,6 +41,30 @@ export function PriceSection({ calculatedPrice, selectedServices, services }: Pr
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="stylist_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Stylist *</FormLabel>
+              <FormControl>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select stylist" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {/* We'll populate this with actual stylists data */}
+                      <SelectItem value="any">Any Available Stylist</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="discount_type"
@@ -120,6 +146,23 @@ export function PriceSection({ calculatedPrice, selectedServices, services }: Pr
           </div>
         </CardContent>
       </Card>
+
+      <FormField
+        control={form.control}
+        name="notes"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Notes</FormLabel>
+            <FormControl>
+              <Textarea 
+                placeholder="Add any special instructions or notes here"
+                {...field}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
 
       <FormField
         control={form.control}

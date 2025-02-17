@@ -13,11 +13,14 @@ export type Database = {
         Row: {
           created_at: string | null
           customer_id: string
+          discount_type: string | null
+          discount_value: number | null
           end_time: string
           id: string
           location: string | null
           notes: string | null
           number_of_bookings: number | null
+          original_total_price: number | null
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"] | null
           total_duration: number | null
@@ -27,11 +30,14 @@ export type Database = {
         Insert: {
           created_at?: string | null
           customer_id: string
+          discount_type?: string | null
+          discount_value?: number | null
           end_time: string
           id?: string
           location?: string | null
           notes?: string | null
           number_of_bookings?: number | null
+          original_total_price?: number | null
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           total_duration?: number | null
@@ -41,11 +47,14 @@ export type Database = {
         Update: {
           created_at?: string | null
           customer_id?: string
+          discount_type?: string | null
+          discount_value?: number | null
           end_time?: string
           id?: string
           location?: string | null
           notes?: string | null
           number_of_bookings?: number | null
+          original_total_price?: number | null
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           total_duration?: number | null
@@ -66,8 +75,9 @@ export type Database = {
         Row: {
           appointment_id: string
           created_at: string | null
-          employee_id: string | null
+          employee_id: string
           id: string
+          original_price: number | null
           package_id: string | null
           price_paid: number
           service_id: string | null
@@ -77,8 +87,9 @@ export type Database = {
         Insert: {
           appointment_id: string
           created_at?: string | null
-          employee_id?: string | null
+          employee_id: string
           id?: string
+          original_price?: number | null
           package_id?: string | null
           price_paid: number
           service_id?: string | null
@@ -88,8 +99,9 @@ export type Database = {
         Update: {
           appointment_id?: string
           created_at?: string | null
-          employee_id?: string | null
+          employee_id?: string
           id?: string
+          original_price?: number | null
           package_id?: string | null
           price_paid?: number
           service_id?: string | null
