@@ -9,59 +9,18 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      admin_booking_sessions: {
-        Row: {
-          admin_id: string | null
-          created_at: string | null
-          customer_id: string | null
-          id: string
-          selected_date: string | null
-          selected_employee_id: string | null
-          selected_time: string | null
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          admin_id?: string | null
-          created_at?: string | null
-          customer_id?: string | null
-          id?: string
-          selected_date?: string | null
-          selected_employee_id?: string | null
-          selected_time?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          admin_id?: string | null
-          created_at?: string | null
-          customer_id?: string | null
-          id?: string
-          selected_date?: string | null
-          selected_employee_id?: string | null
-          selected_time?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "admin_booking_sessions_selected_employee_id_fkey"
-            columns: ["selected_employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       appointments: {
         Row: {
           created_at: string | null
           customer_id: string
+          discount_type: string | null
+          discount_value: number | null
           end_time: string
           id: string
           location: string | null
           notes: string | null
           number_of_bookings: number | null
+          original_total_price: number | null
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"] | null
           total_duration: number | null
@@ -71,11 +30,14 @@ export type Database = {
         Insert: {
           created_at?: string | null
           customer_id: string
+          discount_type?: string | null
+          discount_value?: number | null
           end_time: string
           id?: string
           location?: string | null
           notes?: string | null
           number_of_bookings?: number | null
+          original_total_price?: number | null
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           total_duration?: number | null
@@ -85,11 +47,14 @@ export type Database = {
         Update: {
           created_at?: string | null
           customer_id?: string
+          discount_type?: string | null
+          discount_value?: number | null
           end_time?: string
           id?: string
           location?: string | null
           notes?: string | null
           number_of_bookings?: number | null
+          original_total_price?: number | null
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           total_duration?: number | null
@@ -110,8 +75,9 @@ export type Database = {
         Row: {
           appointment_id: string
           created_at: string | null
-          employee_id: string | null
+          employee_id: string
           id: string
+          original_price: number | null
           package_id: string | null
           price_paid: number
           service_id: string | null
@@ -121,8 +87,9 @@ export type Database = {
         Insert: {
           appointment_id: string
           created_at?: string | null
-          employee_id?: string | null
+          employee_id: string
           id?: string
+          original_price?: number | null
           package_id?: string | null
           price_paid: number
           service_id?: string | null
@@ -132,8 +99,9 @@ export type Database = {
         Update: {
           appointment_id?: string
           created_at?: string | null
-          employee_id?: string | null
+          employee_id?: string
           id?: string
+          original_price?: number | null
           package_id?: string | null
           price_paid?: number
           service_id?: string | null
