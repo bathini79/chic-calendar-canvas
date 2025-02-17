@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Package, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -147,7 +148,6 @@ export function ServiceSelector({
 
   return (
     <div className="space-y-6">
-      {/* Categories Filter */}
       <CategoryFilter
         categories={categories || []}
         selectedCategory={selectedCategory}
