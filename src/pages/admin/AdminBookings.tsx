@@ -1,9 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
@@ -23,10 +23,16 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Customer } from "./bookings/types";
 import { formatTime } from "@/lib/time";
 import { toast } from "sonner";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
+
+interface Customer {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone_number: string | null;
+}
 
 export default function AdminBookings() {
   const [date, setDate] = useState<DateRange | undefined>({
@@ -47,8 +53,9 @@ export default function AdminBookings() {
     queryKey: ['customers'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('customers')
-        .select('*');
+        .from('profiles')
+        .select('id, full_name, email, phone_number')
+        .eq('role', 'customer');
       
       if (error) throw error;
       return data as Customer[];
