@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,10 +8,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { ServiceSelector } from "./ServiceSelector";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 interface AppointmentCreateProps {
   customerId: string;
@@ -28,7 +32,102 @@ export function AppointmentCreate({
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [customizedPackageServices, setCustomizedPackageServices] = useState<Record<string, string[]>>({});
+  const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch stylists
+  const { data: stylists } = useQuery({
+    queryKey: ['stylists'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('employment_type', 'stylist')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch services and packages for price calculation
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: packages } = useQuery({
+    queryKey: ['packages'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const calculateTotalPrice = () => {
+    let total = 0;
+    
+    // Add service prices
+    selectedServices.forEach(serviceId => {
+      const service = services?.find(s => s.id === serviceId);
+      if (service) {
+        total += service.selling_price;
+      }
+    });
+
+    // Add package prices
+    selectedPackages.forEach(packageId => {
+      const pkg = packages?.find(p => p.id === packageId);
+      if (pkg) {
+        total += pkg.price;
+      }
+    });
+
+    // Apply discount
+    if (discountType === 'percentage') {
+      total = total * (1 - (discountValue / 100));
+    } else if (discountType === 'fixed') {
+      total = Math.max(0, total - discountValue);
+    }
+
+    return total;
+  };
+
+  const calculateOriginalPrice = () => {
+    let total = 0;
+    
+    selectedServices.forEach(serviceId => {
+      const service = services?.find(s => s.id === serviceId);
+      if (service) {
+        total += service.selling_price;
+      }
+    });
+
+    selectedPackages.forEach(packageId => {
+      const pkg = packages?.find(p => p.id === packageId);
+      if (pkg) {
+        total += pkg.price;
+      }
+    });
+
+    return total;
+  };
 
   const handleServiceSelect = (serviceId: string) => {
     setSelectedServices(prev => 
@@ -53,6 +152,18 @@ export function AppointmentCreate({
     }
   };
 
+  const handleStylistSelect = (itemId: string, stylistId: string) => {
+    setSelectedStylists(prev => ({
+      ...prev,
+      [itemId]: stylistId
+    }));
+  };
+
+  const validateStylistSelection = () => {
+    const allItems = [...selectedServices, ...selectedPackages];
+    return allItems.every(itemId => selectedStylists[itemId]);
+  };
+
   const handleSaveAppointment = async () => {
     try {
       setIsLoading(true);
@@ -62,10 +173,18 @@ export function AppointmentCreate({
         return;
       }
 
+      if (!validateStylistSelection()) {
+        toast.error("Please select a stylist for each service/package");
+        return;
+      }
+
       // Calculate start_time by combining date and time
       const [hours, minutes] = selectedTime.split(':').map(Number);
       const startTime = new Date(selectedDate);
       startTime.setHours(hours, minutes, 0, 0);
+
+      const originalTotalPrice = calculateOriginalPrice();
+      const finalTotalPrice = calculateTotalPrice();
 
       // Create the appointment
       const { data: appointment, error: appointmentError } = await supabase
@@ -74,8 +193,13 @@ export function AppointmentCreate({
           customer_id: customerId,
           start_time: startTime.toISOString(),
           end_time: startTime.toISOString(), // Will be calculated properly
-          status: 'inprogress',
-          total_price: 0 // Will be updated with actual total
+          status: 'confirmed',
+          total_price: finalTotalPrice,
+          original_total_price: originalTotalPrice,
+          discount_type: discountType,
+          discount_value: discountValue,
+          notes: notes,
+          number_of_bookings: selectedServices.length + selectedPackages.length
         })
         .select()
         .single();
@@ -83,21 +207,31 @@ export function AppointmentCreate({
       if (appointmentError) throw appointmentError;
 
       // Create bookings for services
-      const serviceBookings = selectedServices.map(serviceId => ({
-        appointment_id: appointment.id,
-        service_id: serviceId,
-        status: 'pending',
-        price_paid: 0 // Will be updated with actual price
-      }));
+      const serviceBookings = selectedServices.map(serviceId => {
+        const service = services?.find(s => s.id === serviceId);
+        return {
+          appointment_id: appointment.id,
+          service_id: serviceId,
+          employee_id: selectedStylists[serviceId],
+          status: 'confirmed',
+          price_paid: service?.selling_price || 0,
+          original_price: service?.selling_price || 0
+        };
+      });
 
       // Create bookings for packages
-      const packageBookings = selectedPackages.map(packageId => ({
-        appointment_id: appointment.id,
-        package_id: packageId,
-        status: 'pending',
-        price_paid: 0, // Will be updated with actual price
-        customized_services: customizedPackageServices[packageId] || []
-      }));
+      const packageBookings = selectedPackages.map(packageId => {
+        const pkg = packages?.find(p => p.id === packageId);
+        return {
+          appointment_id: appointment.id,
+          package_id: packageId,
+          employee_id: selectedStylists[packageId],
+          status: 'confirmed',
+          price_paid: pkg?.price || 0,
+          original_price: pkg?.price || 0,
+          customized_services: customizedPackageServices[packageId] || []
+        };
+      });
 
       // Insert all bookings
       const { error: bookingsError } = await supabase
@@ -116,39 +250,86 @@ export function AppointmentCreate({
     }
   };
 
-  const handleCheckout = async () => {
-    await handleSaveAppointment();
-    // Navigate to checkout page
-    // This will be implemented in the next phase
-  };
-
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Create Appointment</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           <ServiceSelector
             onServiceSelect={handleServiceSelect}
             onPackageSelect={handlePackageSelect}
             selectedServices={selectedServices}
             selectedPackages={selectedPackages}
+            selectedStylists={selectedStylists}
+            onStylistSelect={handleStylistSelect}
+            stylists={stylists || []}
           />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Discount Type</label>
+              <Select value={discountType} onValueChange={(value: 'none' | 'percentage' | 'fixed') => setDiscountType(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select discount type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="percentage">Percentage</SelectItem>
+                  <SelectItem value="fixed">Fixed Amount</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {discountType === 'percentage' ? 'Discount (%)' : 'Discount Amount'}
+              </label>
+              <Input
+                type="number"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(Number(e.target.value))}
+                disabled={discountType === 'none'}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Notes</label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any special instructions or notes..."
+            />
+          </div>
+
+          <div className="rounded-lg bg-muted p-4">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">Original Total:</span>
+              <span>${calculateOriginalPrice().toFixed(2)}</span>
+            </div>
+            {discountType !== 'none' && (
+              <div className="flex justify-between items-center mt-2">
+                <span className="font-medium">Discount:</span>
+                <span className="text-red-500">
+                  -${(calculateOriginalPrice() - calculateTotalPrice()).toFixed(2)}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between items-center mt-2 text-lg font-bold">
+              <span>Final Total:</span>
+              <span>${calculateTotalPrice().toFixed(2)}</span>
+            </div>
+          </div>
         </CardContent>
         <CardFooter className="flex justify-end gap-4">
           <Button 
             variant="outline"
             onClick={handleSaveAppointment}
-            disabled={isLoading || (selectedServices.length === 0 && selectedPackages.length === 0)}
+            disabled={isLoading || (selectedServices.length === 0 && selectedPackages.length === 0) || !validateStylistSelection()}
           >
             Save Appointment
-          </Button>
-          <Button
-            onClick={handleCheckout}
-            disabled={isLoading || (selectedServices.length === 0 && selectedPackages.length === 0)}
-          >
-            Checkout
           </Button>
         </CardFooter>
       </Card>

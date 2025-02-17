@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,37 +12,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
-import type { Service } from "../types";
 import { cn } from "@/lib/utils";
-
-interface ServicePackage {
-  id: string;
-  name: string;
-  price: number;
-  duration: number;
-  package_services: {
-    service: Service;
-  }[];
-}
 
 interface ServiceSelectorProps {
   onServiceSelect: (serviceId: string) => void;
   onPackageSelect: (packageId: string, services: string[]) => void;
+  onStylistSelect: (itemId: string, stylistId: string) => void;
   selectedServices: string[];
   selectedPackages: string[];
+  selectedStylists: Record<string, string>;
+  stylists: any[];
 }
 
 export function ServiceSelector({ 
   onServiceSelect, 
   onPackageSelect,
+  onStylistSelect,
   selectedServices = [],
-  selectedPackages = []
+  selectedPackages = [],
+  selectedStylists = {},
+  stylists = []
 }: ServiceSelectorProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
 
   // Query for categories
   const { data: categories } = useQuery({
@@ -82,32 +77,9 @@ export function ServiceSelector({
         .eq('status', 'active');
       
       if (error) throw error;
-      return data as ServicePackage[];
+      return data;
     },
   });
-
-  // Calculate total whenever selections change
-  useEffect(() => {
-    let newTotal = 0;
-    
-    // Add service prices
-    selectedServices.forEach(serviceId => {
-      const service = services?.find(s => s.id === serviceId);
-      if (service) {
-        newTotal += service.selling_price;
-      }
-    });
-
-    // Add package prices
-    selectedPackages.forEach(packageId => {
-      const pkg = packages?.find(p => p.id === packageId);
-      if (pkg) {
-        newTotal += pkg.price;
-      }
-    });
-
-    setTotal(newTotal);
-  }, [selectedServices, selectedPackages, services, packages]);
 
   // Filter items based on selected category
   const filteredServices = selectedCategory
@@ -146,7 +118,6 @@ export function ServiceSelector({
         onCategorySelect={setSelectedCategory}
       />
 
-      {/* Services and Packages List */}
       <ScrollArea className="h-[400px] border rounded-md">
         <Table>
           <TableHeader>
@@ -155,6 +126,7 @@ export function ServiceSelector({
               <TableHead>Type</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Price</TableHead>
+              <TableHead>Stylist</TableHead>
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -185,6 +157,25 @@ export function ServiceSelector({
                     ${item.type === 'package' ? item.price : item.selling_price}
                   </TableCell>
                   <TableCell>
+                    {isSelected && (
+                      <Select 
+                        value={selectedStylists[item.id] || ''} 
+                        onValueChange={(value) => onStylistSelect(item.id, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select stylist" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stylists.map((stylist) => (
+                            <SelectItem key={stylist.id} value={stylist.id}>
+                              {stylist.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -209,14 +200,6 @@ export function ServiceSelector({
           </TableBody>
         </Table>
       </ScrollArea>
-
-      {/* Total Amount */}
-      <div className="border-t pt-4">
-        <div className="flex justify-between items-center">
-          <span className="text-lg font-medium">Total Amount:</span>
-          <span className="text-xl font-bold">${total.toFixed(2)}</span>
-        </div>
-      </div>
     </div>
   );
 }
