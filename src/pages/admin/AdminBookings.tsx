@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, Badge } from "@radix-ui/react-dialog";
 
 // Configuration
 const START_HOUR = 8; // 8:00 AM
@@ -69,6 +70,7 @@ export default function AdminBookings() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [notes, setNotes] = useState("");
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
 
   // Update now line
   useEffect(() => {
@@ -362,6 +364,52 @@ export default function AdminBookings() {
     },
   });
 
+  const { data: appointments = [] } = useQuery({
+    queryKey: ['appointments', format(currentDate, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const startOfDay = new Date(currentDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(currentDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          bookings (
+            *,
+            service:services (*),
+            package:packages (*),
+            employee:employees (*)
+          ),
+          customer:profiles (*)
+        `)
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString());
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const getAppointmentStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return 'bg-green-100 hover:bg-green-200 border-green-300';
+      case 'canceled':
+        return 'bg-red-100 hover:bg-red-200 border-red-300';
+      default:
+        return 'bg-purple-100 hover:bg-purple-200 border-purple-300';
+    }
+  };
+
+  const isSameDay = (date1: Date, date2: Date) => {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -464,27 +512,123 @@ export default function AdminBookings() {
                 ))}
 
                 {/* Now Line */}
-                {nowPosition !== null && (
+                {nowPosition !== null && isSameDay(currentDate, new Date()) && (
                   <div
-                    className="absolute left-0 right-0 h-[2px] bg-red-500"
+                    className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
                     style={{ top: nowPosition }}
                   />
                 )}
 
-                {/* Events */}
-                {events
-                  .filter((ev) => ev.employeeId === emp.id)
-                  .map((evt) => (
-                    <CalendarEvent
-                      key={evt.id}
-                      event={evt}
-                      onEventUpdate={handleEventUpdate}
-                    />
-                  ))}
+                {/* Appointment Blocks */}
+                {appointments.map((appointment) => (
+                  appointment.bookings.map((booking) => {
+                    if (booking.employee?.id !== emp.id) return null;
+                    
+                    const startTime = new Date(appointment.start_time);
+                    const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+                    const duration = booking.service?.duration || booking.package?.duration || 60;
+                    const topPosition = (startHour - START_HOUR) * PIXELS_PER_HOUR;
+                    const height = (duration / 60) * PIXELS_PER_HOUR;
+
+                    const statusColor = getAppointmentStatusColor(appointment.status);
+
+                    return (
+                      <div
+                        key={booking.id}
+                        className={`absolute left-2 right-2 rounded border ${statusColor} cursor-pointer z-10`}
+                        style={{
+                          top: topPosition,
+                          height: height,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAppointment(appointment);
+                        }}
+                      >
+                        <div className="p-2 text-xs">
+                          <div className="font-medium truncate">
+                            {appointment.customer?.full_name}
+                          </div>
+                          <div className="truncate text-gray-600">
+                            {booking.service?.name || booking.package?.name}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ))}
               </div>
             ))}
           </div>
         </div>
+
+        {/* Appointment Details Dialog */}
+        <Dialog open={!!selectedAppointment} onOpenChange={() => setSelectedAppointment(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Appointment Details</DialogTitle>
+            </DialogHeader>
+            {selectedAppointment && (
+              <div className="space-y-4 p-4">
+                <div>
+                  <Badge
+                    variant={
+                      selectedAppointment.status === "confirmed" ? "default" :
+                      selectedAppointment.status === "canceled" ? "destructive" :
+                      "secondary"
+                    }
+                  >
+                    {selectedAppointment.status.toUpperCase()}
+                  </Badge>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium">Customer</h3>
+                  <p>{selectedAppointment.customer?.full_name}</p>
+                  <p className="text-sm text-gray-500">{selectedAppointment.customer?.email}</p>
+                </div>
+
+                <div>
+                  <h3 className="font-medium">Date & Time</h3>
+                  <p>{format(new Date(selectedAppointment.start_time), "PPpp")}</p>
+                </div>
+
+                <div>
+                  <h3 className="font-medium">Services</h3>
+                  <div className="space-y-2">
+                    {selectedAppointment.bookings.map((booking: any) => (
+                      <div key={booking.id} className="border rounded p-2">
+                        <div className="font-medium">
+                          {booking.service?.name || booking.package?.name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          with {booking.employee?.name}
+                        </div>
+                        <div className="text-sm">
+                          Duration: {booking.service?.duration || booking.package?.duration}min
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {selectedAppointment.notes && (
+                  <div>
+                    <h3 className="font-medium">Notes</h3>
+                    <p className="text-gray-600">{selectedAppointment.notes}</p>
+                  </div>
+                )}
+
+                <div>
+                  <h3 className="font-medium">Total</h3>
+                  <p className="text-lg font-semibold">
+                    ${selectedAppointment.total_price}
+                  </p>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Clicked Cell Popup */}
         {clickedCell && (
