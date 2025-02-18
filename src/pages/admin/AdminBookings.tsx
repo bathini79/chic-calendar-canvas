@@ -8,10 +8,17 @@ import { ServiceSelector } from "./bookings/components/ServiceSelector";
 import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
 import type { Customer } from "./bookings/types";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { addMinutes } from "date-fns";
+import { format, addMinutes, isSameDay } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
 // Configuration
 const START_HOUR = 8; // 8:00 AM
@@ -32,29 +39,12 @@ function formatTime(time: number) {
 // For the left column: integer hours only (8..19) => 12 hours
 const hourLabels = Array.from({ length: 12 }, (_, i) => i + START_HOUR);
 
-// Sample events
-const initialEvents = [
-  { id: 1, employeeId: 1, title: "Haircut", startHour: 9, duration: 1 },
-  { id: 2, employeeId: 2, title: "Facial", startHour: 9.5, duration: 1.5 },
-  { id: 3, employeeId: 3, title: "Manicure", startHour: 13, duration: 1 },
-];
-
-// Example stats
-const initialStats = [
-  { label: "Pending Confirmation", value: 0 },
-  { label: "Upcoming Bookings", value: 11 },
-  { label: "Today's Bookings", value: 5 },
-  { label: "Today's Revenue", value: 1950 },
-];
-
 export default function AdminBookings() {
-  const [employees, setEmployees] = useState([]);
-  const [events, setEvents] = useState(initialEvents);
-  const [stats] = useState(initialStats);
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 11));
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [nowPosition, setNowPosition] = useState<number | null>(null);
   const [clickedCell, setClickedCell] = useState<{
-    employeeId: number;
+    employeeId: string;
     time: number;
     x: number;
     y: number;
@@ -62,13 +52,63 @@ export default function AdminBookings() {
   } | null>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [notes, setNotes] = useState("");
+
+  // Query for employees
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('employment_type', 'stylist')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data.map(employee => ({
+        ...employee,
+        avatar: employee.name
+          .split(" ")
+          .map((n: string) => n[0])
+          .join(""),
+      }));
+    },
+  });
+
+  // Query for appointments
+  const { data: appointments = [] } = useQuery({
+    queryKey: ['appointments', format(currentDate, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const startOfDay = new Date(currentDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(currentDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          bookings (
+            *,
+            service:services (*),
+            package:packages (*),
+            employee:employees (*)
+          ),
+          customer:profiles (*)
+        `)
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString());
+
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Update now line
   useEffect(() => {
@@ -86,45 +126,6 @@ export default function AdminBookings() {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Fetch employees
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const { data, error } = await supabase.from("employees").select("*").eq("employment_type", "stylist");
-        if (error) throw error;
-        const employeeWithAvatar = data.map((employee) => ({
-          ...employee,
-          avatar: employee.name
-            .split(" ")
-            .map((n) => n[0])
-            .join(""),
-        }));
-        setEmployees(employeeWithAvatar);
-      } catch (error) {
-        console.error("Error fetching employees:", error);
-        setEmployees([]);
-      }
-    };
-
-    fetchEmployees();
-  }, []);
-
-  // Format the displayed date as "Tue 11 Feb"
-  function formatCurrentDate(date: Date) {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const dayOfWeek = days[date.getDay()];
-    const dayOfMonth = date.getDate();
-    const month = months[date.getMonth()];
-    return `${dayOfWeek} ${dayOfMonth} ${month}`;
-  }
-
-  const handleEventUpdate = (eventId: number, changes: any) => {
-    setEvents((prev) =>
-      prev.map((ev) => (ev.id === eventId ? { ...ev, ...changes } : ev))
-    );
-  };
-
   // Navigation functions
   const goToday = () => setCurrentDate(new Date());
   const goPrev = () => {
@@ -139,7 +140,7 @@ export default function AdminBookings() {
   };
 
   // Column click handling
-  function handleColumnClick(e: React.MouseEvent, empId: number) {
+  function handleColumnClick(e: React.MouseEvent, empId: string) {
     if (e.target !== e.currentTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
@@ -370,21 +371,6 @@ export default function AdminBookings() {
           <div className="font-bold text-xl">Define Salon</div>
         </header>
 
-        {/* Stats */}
-        <div className="p-4 border-b bg-white flex space-x-4 overflow-x-auto">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white border rounded shadow-sm px-4 py-2 min-w-[150px]"
-            >
-              <div className="text-gray-500 text-sm">{stat.label}</div>
-              <div className="text-xl font-bold">
-                {stat.label === "Today's Revenue" ? `$${stat.value}` : stat.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
         {/* Date Navigation */}
         <div className="p-4 border-b bg-white flex items-center space-x-2">
           <button
@@ -400,7 +386,7 @@ export default function AdminBookings() {
             <ArrowLeftIcon />
           </button>
           <div className="px-6 py-1 border rounded-full text-sm flex items-center justify-center">
-            {formatCurrentDate(currentDate)}
+            {format(currentDate, "EEE, MMM d, yyyy")}
           </div>
           <button
             onClick={goNext}
@@ -464,49 +450,121 @@ export default function AdminBookings() {
                 ))}
 
                 {/* Now Line */}
-                {nowPosition !== null && (
+                {nowPosition !== null && isSameDay(currentDate, new Date()) && (
                   <div
-                    className="absolute left-0 right-0 h-[2px] bg-red-500"
+                    className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
                     style={{ top: nowPosition }}
                   />
                 )}
 
-                {/* Events */}
-                {events
-                  .filter((ev) => ev.employeeId === emp.id)
-                  .map((evt) => (
-                    <CalendarEvent
-                      key={evt.id}
-                      event={evt}
-                      onEventUpdate={handleEventUpdate}
-                    />
-                  ))}
+                {/* Appointments */}
+                {appointments.map((appointment) => {
+                  const startTime = new Date(appointment.start_time);
+                  const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+                  
+                  return appointment.bookings.map((booking) => {
+                    if (booking.employee?.id !== emp.id) return null;
+                    
+                    const serviceDuration = booking.service?.duration || booking.package?.duration || 60;
+                    const topPosition = (startHour - START_HOUR) * PIXELS_PER_HOUR;
+                    const height = (serviceDuration / 60) * PIXELS_PER_HOUR;
+
+                    let bgColor = "bg-purple-100 hover:bg-purple-200";
+                    if (appointment.status === "confirmed") bgColor = "bg-green-100 hover:bg-green-200";
+                    if (appointment.status === "canceled") bgColor = "bg-red-100 hover:bg-red-200";
+
+                    return (
+                      <div
+                        key={booking.id}
+                        className={`absolute left-2 right-2 rounded ${bgColor} cursor-pointer transition-colors`}
+                        style={{
+                          top: topPosition,
+                          height: height,
+                        }}
+                        onClick={() => setSelectedAppointment(appointment)}
+                      >
+                        <div className="p-2 text-xs">
+                          <div className="font-medium truncate">
+                            {appointment.customer?.full_name}
+                          </div>
+                          <div className="truncate text-gray-600">
+                            {booking.service?.name || booking.package?.name}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Clicked Cell Popup */}
-        {clickedCell && (
-          <div
-            className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
-            style={{
-              left: clickedCell.x,
-              top: clickedCell.y,
-            }}
-          >
-            <div className="bg-black px-4 py-2 text-sm font-medium text-white">
-              {formatTime(clickedCell.time)}
-            </div>
-            <div
-              className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={openAddAppointment}
-            >
-              <CalendarIcon className="h-4 w-4 text-gray-600" />
-              <span className="text-gray-700">Add Appointment</span>
-            </div>
-          </div>
-        )}
+        {/* Appointment Details Dialog */}
+        <Dialog open={!!selectedAppointment} onOpenChange={() => setSelectedAppointment(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Appointment Details</DialogTitle>
+            </DialogHeader>
+            {selectedAppointment && (
+              <ScrollArea className="max-h-[80vh]">
+                <div className="space-y-4 p-4">
+                  <div>
+                    <Badge variant={selectedAppointment.status === "confirmed" ? "default" : 
+                              selectedAppointment.status === "canceled" ? "destructive" : 
+                              "secondary"}>
+                      {selectedAppointment.status.toUpperCase()}
+                    </Badge>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-medium">Customer</h3>
+                    <p>{selectedAppointment.customer?.full_name}</p>
+                    <p className="text-sm text-gray-500">{selectedAppointment.customer?.email}</p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-medium">Date & Time</h3>
+                    <p>{format(new Date(selectedAppointment.start_time), "PPpp")}</p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-medium">Services</h3>
+                    <div className="space-y-2">
+                      {selectedAppointment.bookings.map((booking) => (
+                        <div key={booking.id} className="border rounded p-2">
+                          <div className="font-medium">
+                            {booking.service?.name || booking.package?.name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            with {booking.employee?.name}
+                          </div>
+                          <div className="text-sm">
+                            Duration: {booking.service?.duration || booking.package?.duration}min
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {selectedAppointment.notes && (
+                    <div>
+                      <h3 className="font-medium">Notes</h3>
+                      <p className="text-gray-600">{selectedAppointment.notes}</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="font-medium">Total</h3>
+                    <p className="text-lg font-semibold">
+                      ${selectedAppointment.total_price}
+                    </p>
+                  </div>
+                </div>
+              </ScrollArea>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Add Appointment Slide-in */}
         <div
@@ -541,7 +599,6 @@ export default function AdminBookings() {
                   {!selectedCustomer ? (
                     <CustomerSearch onSelect={(customer) => {
                       setSelectedCustomer(customer);
-                      setShowCreateForm(false);
                     }} />
                   ) : (
                     <div className="space-y-4">
