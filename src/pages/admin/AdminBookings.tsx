@@ -221,7 +221,6 @@ export default function AdminBookings() {
     return totalDuration;
   };
 
-  // Save appointment function
   const handleSaveAppointment = async () => {
     try {
       if (!selectedDate || !selectedTime || !selectedCustomer) {
@@ -238,7 +237,7 @@ export default function AdminBookings() {
       const totalDuration = getTotalDuration();
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
-      // 1. Insert into appointments table
+      // 1. Insert into appointments table with total duration
       const { data: appointmentData, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
@@ -260,18 +259,23 @@ export default function AdminBookings() {
       }
 
       const appointmentId = appointmentData[0].id;
+      let currentStartTime = startDateTime;
 
-      // 2. Create bookings for services
+      // 2. Create bookings for services with individual start/end times
       for (const serviceId of selectedServices) {
         const service = services?.find(s => s.id === serviceId);
         if (!service) continue;
-        console.log(selectedStylists[serviceId])
+
+        const bookingEndTime = addMinutes(currentStartTime, service.duration);
+        
         const { error: bookingError } = await supabase.from('bookings').insert({
           appointment_id: appointmentId,
           service_id: serviceId,
           status: 'confirmed',
           price_paid: service.selling_price,
-          employee_id:selectedStylists[serviceId]
+          employee_id: selectedStylists[serviceId],
+          start_time: currentStartTime.toISOString(),
+          end_time: bookingEndTime.toISOString()
         });
 
         if (bookingError) {
@@ -279,18 +283,25 @@ export default function AdminBookings() {
           toast.error("Failed to create booking. Please try again.");
           throw bookingError;
         }
+
+        // Update start time for next booking
+        currentStartTime = bookingEndTime;
       }
 
-      // 3. Create bookings for packages
+      // 3. Create bookings for packages with individual start/end times
       for (const packageId of selectedPackages) {
         const pkg = packages?.find(p => p.id === packageId);
         if (!pkg) continue;
+
+        const bookingEndTime = addMinutes(currentStartTime, pkg.duration);
 
         const { error: bookingError } = await supabase.from('bookings').insert({
           appointment_id: appointmentId,
           package_id: packageId,
           status: 'confirmed',
-          price_paid: pkg.price
+          price_paid: pkg.price,
+          start_time: currentStartTime.toISOString(),
+          end_time: bookingEndTime.toISOString()
         });
 
         if (bookingError) {
@@ -298,6 +309,9 @@ export default function AdminBookings() {
           toast.error("Failed to create booking. Please try again.");
           throw bookingError;
         }
+
+        // Update start time for next booking
+        currentStartTime = bookingEndTime;
       }
 
       toast.success("Appointment created successfully");
