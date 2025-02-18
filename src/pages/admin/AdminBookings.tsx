@@ -89,7 +89,7 @@ export default function AdminBookings() {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const { data, error } = await supabase.from("employees").select("*");
+        const { data, error } = await supabase.from("employees").select("*").eq("employment_type", "stylist");
         if (error) throw error;
         const employeeWithAvatar = data.map((employee) => ({
           ...employee,
@@ -559,6 +559,7 @@ export default function AdminBookings() {
                     }}
                     selectedServices={selectedServices}
                     selectedPackages={selectedPackages}
+                    stylists={employees}
                   />
                 </div>
               </div>

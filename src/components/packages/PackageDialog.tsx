@@ -34,8 +34,6 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
           console.error('Error fetching package services:', servicesError);
           return;
         }
-
-        console.log('Initial Data:', initialData);
         setEnhancedData({
           ...initialData,
           services: servicesResponse.map(ps => ps.service_id),
@@ -51,7 +49,6 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
 
   const handleSubmit = async (data: any) => {
     try {
-      console.log('Submitting package data:', data);
       const packageData = {
         name: data.name,
         description: data.description,
@@ -108,7 +105,6 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
         toast.success('Package updated successfully');
       } else {
         // Create new package
-        console.log('Creating new package with data:', packageData);
         const { data: newPackage, error: packageError } = await supabase
           .from('packages')
           .insert(packageData)

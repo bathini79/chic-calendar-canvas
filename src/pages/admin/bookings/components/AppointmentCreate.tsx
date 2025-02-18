@@ -65,8 +65,6 @@ export function AppointmentCreate({
     },
   });
 
-  console.log('Fetched stylists:', stylists); // Debug log
-
   // Set default stylist when available
   useEffect(() => {
     if (defaultStylistId && stylists?.some(s => s.id === defaultStylistId)) {
@@ -196,7 +194,6 @@ export function AppointmentCreate({
   };
 
   const handleStylistSelect = (itemId: string, stylistId: string) => {
-    console.log('Selecting stylist:', { itemId, stylistId }); // Debug log
     setSelectedStylists(prev => ({
       ...prev,
       [itemId]: stylistId
