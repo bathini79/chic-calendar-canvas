@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,10 +10,10 @@ import { toast } from 'sonner';
 import { QuickCustomerCreate } from './QuickCustomerCreate';
 
 interface CustomerSearchProps {
-  onCustomerSelect: (customer: Customer) => void;
+  onSelect: (customer: Customer) => void;
 }
 
-const CustomerSearch = () => {
+export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -60,11 +61,13 @@ const CustomerSearch = () => {
 
   const handleCustomerSelect = (customer: Customer) => {
     setSelectedCustomer(customer);
+    onSelect(customer);
   };
 
   const handleCustomerCreated = (customer: Customer) => {
     setSearchResults((prev) => [customer, ...prev]);
     setSelectedCustomer(customer);
+    onSelect(customer);
     toast.success(`Customer ${customer.full_name} created!`);
   };
 
@@ -119,5 +122,3 @@ const CustomerSearch = () => {
     </div>
   );
 };
-
-export default CustomerSearch;

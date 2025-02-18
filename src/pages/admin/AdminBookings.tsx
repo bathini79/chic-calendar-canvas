@@ -1,3 +1,4 @@
+<lov-code>
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -920,65 +921,3 @@ export default function AdminBookings() {
                         </button>
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Services Selection Panel - 60% */}
-              <div className="w-[60%] overflow-y-auto p-6">
-                <div className="space-y-6">
-                  <h3 className="text-lg font-medium">Select Services</h3>
-                  <ServiceSelector
-                    onServiceSelect={handleServiceSelect}
-                    onPackageSelect={handlePackageSelect}
-                    onStylistSelect={handleStylistSelect}
-                    selectedServices={selectedServices}
-                    selectedPackages={selectedPackages}
-                    selectedStylists={selectedStylists}
-                    stylists={employees}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Actions */}
-            <div className="p-4 space-y-4">
-              {selectedDate && selectedTime && (
-                <div className="text-sm text-muted-foreground">
-                  Appointment for: {format(selectedDate, "MMMM d, yyyy")} at{" "}
-                  {selectedTime}
-                </div>
-              )}
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={closeAddAppointment}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveAppointment}
-                  disabled={
-                    !selectedCustomer ||
-                    (selectedServices.length === 0 &&
-                      selectedPackages.length === 0)
-                  }
-                >
-                  Save Appointment
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Backdrop */}
-        {isAddAppointmentOpen && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={closeAddAppointment}
-          />
-        )}
-
-        {/* Checkout Dialog */}
-        <CheckoutDialog />
-      </div>
-    </DndProvider>
-  );
-}

@@ -3,13 +3,14 @@ import React, { useState } from "react";
 import { CustomerSearch } from "./CustomerSearch";
 import { QuickCustomerCreate } from "./QuickCustomerCreate";
 import { AppointmentCreate } from "./AppointmentCreate";
+import type { Customer } from "../types";
 
 export function AdminBooking() {
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
-  const handleCustomerSelect = (customer: any) => {
+  const handleCustomerSelect = (customer: Customer) => {
     setSelectedCustomer(customer);
   };
 
