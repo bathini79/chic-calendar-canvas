@@ -1,96 +1,90 @@
+import React from 'react';
+import { Customer } from '../types';
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import type { Customer } from "../types";
-
-interface QuickCustomerCreateProps {
-  onCreated: (customer: Customer) => void;
+export interface QuickCustomerCreateProps {
+  onCustomerCreated: (customer: Customer) => void;
 }
 
-export function QuickCustomerCreate({ onCreated }: QuickCustomerCreateProps) {
-  const [formData, setFormData] = useState({
-    full_name: '',
-    email: '',
-    phone_number: ''
-  });
+export const QuickCustomerCreate: React.FC<QuickCustomerCreateProps> = ({ onCustomerCreated }) => {
+  const [name, setName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [phone, setPhone] = React.useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    try {
-      // Create auth user with a random password
-      const password = Math.random().toString(36).slice(-8);
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password,
-        options: {
-          data: {
-            full_name: formData.full_name,
-          }
-        }
-      });
-
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // Update profile with admin_created flag
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            phone_number: formData.phone_number,
-            admin_created: true
-          })
-          .eq('id', authData.user.id)
-          .select()
-          .single();
-
-        if (profileError) throw profileError;
-
-        toast.success("Customer created successfully");
-        onCreated(profileData as Customer);
-      }
-    } catch (error) {
-      console.error('Create customer error:', error);
-      toast.error("Error creating customer");
+    // Basic validation
+    if (!name || !email) {
+      alert('Please fill in all fields.');
+      return;
     }
+
+    // Optimistic customer data
+    const newCustomer: Customer = {
+      id: Math.random().toString(36).substring(7), // Generate a random ID
+      full_name: name,
+      email: email,
+      phone_number: phone,
+      role: 'customer',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    onCustomerCreated(newCustomer);
+
+    // Clear the form
+    setName('');
+    setEmail('');
+    setPhone('');
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700">Full Name</label>
-        <Input
+        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+          Name:
+        </label>
+        <input
+          type="text"
+          id="name"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           required
-          value={formData.full_name}
-          onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
         />
       </div>
-      
       <div>
-        <label className="block text-sm font-medium text-gray-700">Email</label>
-        <Input
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+          Email:
+        </label>
+        <input
           type="email"
+          id="email"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
-          value={formData.email}
-          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
         />
       </div>
-      
       <div>
-        <label className="block text-sm font-medium text-gray-700">Phone</label>
-        <Input
+        <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+          Phone:
+        </label>
+        <input
           type="tel"
-          value={formData.phone_number}
-          onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
+          id="phone"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
         />
       </div>
-      
-      <Button type="submit" className="w-full">
-        Create Customer
-      </Button>
+      <div>
+        <button
+          type="submit"
+          className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          Create Customer
+        </button>
+      </div>
     </form>
   );
-}
+};

@@ -1,13 +1,8 @@
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
+import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { format, isPast } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { Session } from "@supabase/supabase-js";
-import { PopupWrapper } from "@/components/ui/PopupWrapper";
-import { MapPin, ClipboardList, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+import { format, formatDistanceToNow } from "date-fns";
+import { enUS } from 'date-fns/locale';
 
 interface Appointment {
   id: string;
@@ -15,466 +10,216 @@ interface Appointment {
   start_time: string;
   end_time: string;
   notes: string | null;
-  status: "pending" | "confirmed" | "canceled" | "completed" | "inprogress";
-  number_of_bookings: number;
+  status: string;
   total_price: number;
+  bookings: Booking[];
 }
 
 interface Booking {
   id: string;
-  appointment_id: string;
   service_id: string | null;
   package_id: string | null;
-  employee_id: string | null;
-  status: string;
-  service?: {
-    id: string;
-    name: string;
-    selling_price: number;
-    duration: number;
-  } | null;
-  package?: {
-    id: string;
-    name: string;
-    price: number;
-  } | null;
-  employee?: {
-    id: string;
-    name: string;
-  } | null;
+  employee_id: string;
+  start_time: string;
+  end_time: string;
+  price_paid: number;
+  service: Service | null;
+  package: Package | null;
+  employee: Employee | null;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  duration: number;
+}
+
+interface Package {
+  id: string;
+  name: string;
+  duration: number;
+}
+
+interface Employee {
+  id: string;
+  name: string;
 }
 
 interface LocationData {
-  address: string | null;
-  created_at: string;
-  email: string | null;
   id: string;
   name: string;
-  phone: string | null;
-  status: string | null;
-  updated_at: string;
-  location_hours: Array<{
-    created_at: string;
-    day_of_week: number;
-    end_time: string;
-    id: string;
-    is_closed: boolean;
-    location_id: string;
-    start_time: string;
-    updated_at: string;
-  }>;
+  address?: string;
+  phone?: string;
+  email?: string;
+  status?: string;
 }
 
-const AppointmentCard = ({
-  appointment,
-  onSelect,
-}: {
+interface AppointmentDisplayProps {
   appointment: Appointment;
-  onSelect: (appointment: Appointment) => void;
-}) => {
-  const formattedDate = format(
-    new Date(appointment.start_time),
-    "EEE, dd MMM, yyyy 'at' hh:mm a"
-  );
-  const duration = appointment.total_duration || 0;
-  const hours = Math.floor(duration / 60);
-  const minutes = duration % 60;
-  const durationDisplay =
-    hours > 0 ? `${hours}h${minutes > 0 ? `, ${minutes}m` : ""}` : `${minutes}m`;
-  return (
-    <PopupWrapper
-      popupContent={
-        <AppointmentDetails
-          appointment={appointment}
-          durationDisplay={durationDisplay}
-        />
-      }
-    >
-      <Card className="mt-4 p-4 rounded-xl shadow-md hover:shadow-lg bg-white/80 backdrop-blur-md border border-gray-200 cursor-pointer transition-shadow">
-        <div className="flex justify-between items-center">
-          <p className="font-medium">{formattedDate}</p>
-          <p className="font-bold text-lg">₹{appointment.total_price}</p>
-        </div>
-        <div className="flex gap-1  mt-2 text-sm text-gray-600">
-          <span>{durationDisplay} </span> .
-          <span>
-            {appointment.number_of_bookings}{" "}
-            {appointment.number_of_bookings > 1 ? "Bookings" : "Booking"}
-          </span>
-        </div>
-      </Card>
-    </PopupWrapper>
-  );
-};
-
-function InfoRow({ icon: Icon, title, subtitle }) {
-  return (
-    <div className="flex items-start gap-3">
-      <Icon size={20} className="text-600" />
-      <div>
-        <p className="font-semibold text-gray-900">{title}</p>
-        <p className="text-sm text-gray-600">{subtitle}</p>
-      </div>
-    </div>
-  );
+  totalDuration: string; // Changed from durationDisplay
 }
 
-const AppointmentDetails = (
-  { appointment,durationDisplay }: { appointment: Appointment }
-) => {
-  const { toast } = useToast();
-  const fetchBookings = async (appointment_id: string) => {
-    const { data, error } = await supabase
-      .from("bookings")
-      .select(
-        "*, service:service_id(*), package:package_id(*), employee:employee_id(*)"
-      )
-      .eq("appointment_id", appointment_id);
-    if (error) {
-      console.error("Error fetching bookings:", error);
-      toast({
-        variant: "destructive",
-        title: "Error loading bookings",
-        description: error.message,
-      });
-      throw new Error(error.message);
-    }
-    return data as Booking[];
-  };
-
-  const createGoogleMapsUrl = (location?: Location) => {
-    if (!location?.address) return "";
-    const addressEncoded = location.address.replace(/ /g, "+");
-    return `https://www.google.com/maps/search/?api=1&query=${addressEncoded}`;
-  };
-
-  const { data: locationData } = useQuery<LocationData>({
-    queryKey: ['location'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select(`*, location_hours (*)`)
-        .eq('status', 'active')
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const googleMapsUrl = createGoogleMapsUrl(locationData);
-
-  const {
-    data: bookings,
-    isLoading: bookingsLoading,
-    error: bookingsError,
-    isError: bookingsIsError,
-  } = useQuery<Booking[], Error>({
-    queryKey: ["bookings", appointment?.id],
-    queryFn: () => fetchBookings(appointment!.id),
-    enabled: !!appointment?.id,
-    refetchOnWindowFocus: false,
-  });
-
-  if (!appointment)
-    return (
-      <div className="mt-4 text-gray-600">
-        Select an appointment to view details.
-      </div>
-    );
-
-  if (bookingsLoading) {
-    return <div className="mt-4">Loading Bookings</div>;
-  }
-
-  if (bookingsIsError) {
-    return (
-      <div className="mt-4">
-        Error loading bookings : {bookingsError?.message}
-      </div>
-    );
-  }
-
-  const statusStyles = {
-    pending: {
-      style: "bg-yellow-200 text-yellow-800",
-      label: "Pending Confirmation",
-    },
-    confirmed: { style: "bg-green-200 text-green-800", label: "Confirmed" },
-    canceled: { style: "bg-red-200 text-red-800", label: "Canceled" },
-    completed: { style: "bg-blue-200 text-blue-800", label: "Completed" },
-    inprogress: {
-      style: "bg-purple-200 text-purple-800",
-      label: "In Progress",
-    },
-  };
-
-  const formatDuration = (minutes) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours > 0 ? `${hours}h` : ""}${
-      hours > 0 && mins > 0 ? ", " : ""
-    }${mins > 0 ? `${mins}min` : ""}`;
-  };
-
-  return (
-    <div className="space-y-6 p-6">
-      <div
-        className={`flex items-center gap-2 px-3 py-1 rounded-full w-fit text-sm font-semibold ${
-          statusStyles[appointment.status]?.style || "bg-gray-200 text-gray-800"
-        }`}
-      >
-        <CheckCircle size={18} />
-        <span>
-          {statusStyles[appointment.status]?.label || "Unknown Status"}
-        </span>
-      </div>
-      <h2 className="text-2xl font-bold text-gray-900">
-        {format(
-          new Date(appointment.start_time),
-          "EEE, dd MMM, yyyy 'at' hh:mm a"
-        )}
-        <p className="text-lg text-gray-400 text-sm">
-          {durationDisplay} duration
-        </p>
-      </h2>
-      <p className="text-lg text-gray-700 font-medium">
-        Total Cost: ₹{appointment.total_price}
-      </p>
-
-      <div className="mt-5 space-y-6">
-        {locationData?.address && (
-          <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer">
-            <InfoRow
-              icon={MapPin}
-              title="Location Details"
-              subtitle={locationData.address}
-            />
-          </a>
-        )}
-        <InfoRow
-          icon={ClipboardList}
-          title="Manage Appointment"
-          subtitle="Reschedule or cancel"
-        />
-      </div>
-
-      <div className="border-t border-gray-300 my-6"></div>
-      <h3 className="text-lg font-semibold text-gray-900">Your Bookings</h3>
-      <ul className="mt-3 space-y-4 text-gray-700">
-        {bookings?.map((booking) => (
-          <li
-            key={booking.id}
-            className="flex items-center justify-between bg-gray-100 p-4 rounded-lg text-sm"
-          >
-            <div className="flex flex-col w-1/2">
-              <span className="font-medium text-gray-900">
-                {booking.service?.name ||
-                  booking.package?.name ||
-                  "Service not specified"}
-              </span>
-              <span className="text-gray-500 text-xs">
-                {formatDuration(booking.service?.duration)} with{" "}
-                {booking.employee?.name || "Assigned Stylist"}
-              </span>
-            </div>
-            <span className="text-gray-800 font-semibold w-1/4 text-right">
-              ₹{booking.price_paid}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <Button className="w-full bg-black text-white font-semibold py-3 mt-6 rounded-xl hover:bg-gray-800 transition-all text-lg">
-        Download Invoice
-      </Button>
-    </div>
-  );
-};
-
-const AppointmentList = ({
-  appointments,
-  onSelect,
-}: {
-  appointments: Appointment[];
-  onSelect: (appointment: Appointment) => void;
+const AppointmentDisplay: React.FC<AppointmentDisplayProps> = ({ 
+  appointment,
+  totalDuration, // Changed from durationDisplay
 }) => {
-  const upcomingAppointments = appointments.filter(
-    (appointment) =>
-      ["pending", "confirmed", "inprogress"].includes(appointment.status) &&
-      !isPast(new Date(appointment.start_time))
-  );
-
-  const pastAppointments = appointments.filter(
-    (appointment) =>
-      ["completed", "canceled"].includes(appointment.status) ||
-      isPast(new Date(appointment.start_time))
-  );
-
   return (
-    <div className="w-full">
-      <div className="mt-6">
-        <h2 className="text-lg font-semibold flex items-center">
-          Upcoming{" "}
-          <span className="ml-2 bg-blue-500 text-white px-2 py-0.5 rounded-full text-xs">
-            {upcomingAppointments.length}
-          </span>
-        </h2>
-        {upcomingAppointments.length > 0 ? (
-          upcomingAppointments.map((appointment) => (
-            <AppointmentCard
-              key={appointment.id}
-              appointment={appointment}
-              onSelect={onSelect}
-            />
-          ))
-        ) : (
-          <div className="mt-4 p-6 text-center border rounded-xl shadow-md bg-white/80 backdrop-blur-md border-gray-200">
-            <p className="text-sm text-gray-600">No upcoming appointments.</p>
-            <Button variant="default" className="mt-4">
-              Book an appointment
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold flex items-center">
-          Past{" "}
-          <span className="ml-2 bg-gray-400 text-white px-2 py-0.5 rounded-full text-xs">
-            {pastAppointments.length}
-          </span>
-        </h2>
-        {pastAppointments.length > 0 ? (
-          pastAppointments.map((appointment) => (
-            <AppointmentCard
-              key={appointment.id}
-              appointment={appointment}
-              onSelect={onSelect}
-            />
-          ))
-        ) : (
-          <div className="mt-4 p-6 text-center border rounded-xl shadow-md bg-white/80 backdrop-blur-md border-gray-200">
-            <p className="text-sm text-gray-600">No past appointments.</p>
-          </div>
-        )}
-      </div>
+    <div>
+      <p>Total Duration: {totalDuration}</p>
     </div>
   );
 };
 
-export default function Appointments() {
-  const { toast } = useToast();
-  const [selectedAppointment, setSelectedAppointment] =
-    useState<Appointment | null>(null);
+const Profile = () => {
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [location, setLocation] = useState<LocationData | null>(null);
 
-  const {
-    data: session,
-    isLoading: sessionLoading,
-    isError: sessionIsError,
-    error: sessionError,
-  } = useQuery<Session | null, Error>({
-    queryKey: ["session"],
-    queryFn: async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      return session;
-    },
-  });
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      setLoading(true);
+      try {
+        const { data: profile } = await supabase.auth.getUser()
+        const customerId = profile.user?.id;
 
-  const fetchAppointments = async (customer_id: string) => {
-    const { data, error: supabaseError } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("customer_id", customer_id);
+        if (!customerId) {
+          toast.error("Could not get user ID.");
+          setLoading(false);
+          return;
+        }
 
-    if (supabaseError) {
-      console.error("Error fetching appointments:", supabaseError);
-      toast({
-        variant: "destructive",
-        title: "Error loading appointments",
-        description: supabaseError.message,
-      });
-      throw new Error(supabaseError.message);
-    }
-    return data.map((appointment) => ({
-      ...appointment,
-      total_price: appointment.total_price,
-    })) as Appointment[];
-  };
+        const { data: appointmentsData, error } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            bookings (
+              *,
+              service:services (*),
+              package:packages (*),
+              employee:employees (*)
+            )
+          `)
+          .eq('customer_id', customerId)
+          .order('start_time', { ascending: false });
 
-  const {
-    data: appointments,
-    isLoading: appointmentsLoading,
-    error: appointmentsError,
-    isError: appointmentsIsError,
-  } = useQuery<Appointment[], Error>({
-    queryKey: ["appointments", session?.user?.id],
-    queryFn: () => fetchAppointments(session!.user.id),
-    enabled: !!session?.user?.id && !sessionIsError,
-    refetchOnWindowFocus: false,
-  });
+        if (error) {
+          throw error;
+        }
 
-  if (sessionLoading) {
-    return (
-      <div className="p-6 max-w-lg mx-auto text-gray-900">
-        Loading session...
-      </div>
-    );
-  }
+        setAppointments(appointmentsData || []);
+      } catch (error: any) {
+        toast.error(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  if (sessionIsError) {
-    return (
-      <div className="p-6 max-w-lg mx-auto text-gray-900">
-        <h1 className="text-3xl font-bold mb-4">Appointments</h1>
-        <p>Error loading session: {sessionError?.message}</p>
-      </div>
-    );
-  }
+    fetchAppointments();
+  }, []);
 
-  if (!session?.user) {
-    return (
-      <div className="p-6 max-w-lg mx-auto text-gray-900">
-        <h1 className="text-3xl font-bold mb-4">Appointments</h1>
-        <p>You are not logged in.</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const fetchLocation = async () => {
+      try {
+        const { data: locations, error } = await supabase
+          .from('locations')
+          .select('*')
+          .limit(1);
 
-  if (appointmentsIsError) {
-    return (
-      <div className="p-6 max-w-lg mx-auto text-gray-900">
-        <h1 className="text-3xl font-bold mb-4">Appointments</h1>
-        <p>Error loading appointments: {appointmentsError?.message}</p>
-      </div>
-    );
-  }
+        if (error) {
+          throw error;
+        }
 
-  if (appointmentsLoading) {
-    return (
-      <div className="p-6 max-w-lg mx-auto text-gray-900">
-        Loading Appointments...
-      </div>
-    );
+        if (locations && locations.length > 0) {
+          const locationData: LocationData = {
+            id: locations[0].id,
+            name: locations[0].name,
+            address: locations[0].address || undefined,
+            phone: locations[0].phone || undefined,
+            email: locations[0].email || undefined,
+            status: locations[0].status || undefined,
+          };
+          setLocation(locationData);
+        }
+      } catch (error: any) {
+        toast.error(error.message);
+      }
+    };
+
+    fetchLocation();
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
   }
 
   return (
-    <div className="p-6 mx-auto text-gray-900">
-      <h1 className="text-3xl font-bold mb-4">Appointments</h1>
-      <div className="md:flex gap-6">
-        <div className="md:w-1/2 w-full">
-          <AppointmentList
-            appointments={appointments}
-            onSelect={setSelectedAppointment}
-          />
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Your Appointments</h1>
+
+      {appointments.length === 0 ? (
+        <p>No appointments found.</p>
+      ) : (
+        <div className="space-y-4">
+          {appointments.map((appointment) => {
+            const totalDurationMinutes = appointment.bookings.reduce((total, booking) => {
+              return total + (booking.service?.duration || booking.package?.duration || 0);
+            }, 0);
+
+            const hours = Math.floor(totalDurationMinutes / 60);
+            const minutes = totalDurationMinutes % 60;
+            const durationDisplay = `${hours}h ${minutes}m`;
+
+            return (
+              <div key={appointment.id} className="border rounded p-4">
+                <h2 className="text-lg font-semibold">
+                  Appointment on {format(new Date(appointment.start_time), 'MMMM dd, yyyy')}
+                </h2>
+                <p>
+                  {format(new Date(appointment.start_time), 'h:mm a')} -{' '}
+                  {format(new Date(appointment.end_time), 'h:mm a')}
+                </p>
+                <p>
+                  {formatDistanceToNow(new Date(appointment.start_time), {
+                    addSuffix: true,
+                    locale: enUS,
+                  })}
+                </p>
+                <p>Status: {appointment.status}</p>
+                <p>Total Price: ${appointment.total_price}</p>
+                <AppointmentDisplay appointment={appointment} totalDuration={durationDisplay} />
+
+                <h3 className="text-md font-semibold mt-2">Bookings:</h3>
+                {appointment.bookings.map((booking) => (
+                  <div key={booking.id} className="ml-4">
+                    <p>
+                      {booking.service
+                        ? `Service: ${booking.service.name} (${booking.service.duration} minutes)`
+                        : `Package: ${booking.package?.name} (${booking.package?.duration} minutes)`}
+                    </p>
+                    {booking.employee && <p>Employee: {booking.employee.name}</p>}
+                    <p>Price Paid: ${booking.price_paid}</p>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </div>
-      </div>
-      {selectedAppointment && (
-        <div className="w-full">
-          <AppointmentDetails appointment={selectedAppointment} />
+      )}
+
+      <h2 className="text-xl font-bold mt-8">Our Location</h2>
+      {location ? (
+        <div>
+          <p>Name: {location.name}</p>
+          <p>Address: {location.address}</p>
+          <p>Phone: {location.phone}</p>
+          <p>Email: {location.email}</p>
+          <p>Status: {location.status}</p>
         </div>
+      ) : (
+        <p>No location information found.</p>
       )}
     </div>
   );
-}
+};
+
+export default Profile;

@@ -1,322 +1,140 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
-import { format, isSameDay, addMinutes, isWithinInterval, parse } from "date-fns";
-import { toast } from "sonner";
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Customer } from '@/pages/admin/bookings/types';
+import { CalendarIcon } from '@/pages/admin/bookings/components/Icons';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BookingDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  item: any;
+  isOpen: boolean;
+  onClose: () => void;
+  selectedCustomer: Customer | null;
+  selectedServices: any[];
+  selectedPackages: any[];
+  selectedDate: Date | undefined;
+  selectedTime: string | undefined;
+  selectedStylists: Record<string, string>;
+  notes: string;
+  getTotalPrice: () => number;
+  getTotalDuration: () => number;
+  paymentMethod: 'cash' | 'online';
+  discountType: 'none' | 'percentage' | 'fixed';
+  discountValue: number;
+  onFinalSave: () => Promise<void>;
 }
 
-export function BookingDialog({ open, onOpenChange, item }: BookingDialogProps) {
-  const [selectedDate, setSelectedDate] = useState<Date>();
-  const [selectedStylist, setSelectedStylist] = useState<string>('any_stylist'); // Set default value
-  const [selectedTime, setSelectedTime] = useState<string>();
+const BookingDialog: React.FC<BookingDialogProps> = ({
+  isOpen,
+  onClose,
+  selectedCustomer,
+  selectedServices,
+  selectedPackages,
+  selectedDate,
+  selectedTime,
+  selectedStylists,
+  notes,
+  getTotalPrice,
+  getTotalDuration,
+  paymentMethod,
+  discountType,
+  discountValue,
+  onFinalSave,
+}) => {
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Query for current user session
-  const { data: session } = useQuery({
-    queryKey: ['session'],
-    queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      return session;
-    },
-  });
-
-  // Query for location data
-  const { data: location } = useQuery({
-    queryKey: ['location'],
-    enabled: open,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select(`
-          *,
-          location_hours (*)
-        `)
-        .eq('status', 'active')
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: stylists } = useQuery({
-    queryKey: ['stylists'],
-    enabled: open,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('employment_type', 'stylist')
-        .eq('status', 'active');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: shifts } = useQuery({
-    queryKey: ['shifts', selectedStylist],
-    enabled: open && selectedStylist && selectedStylist !== 'any_stylist',
-    queryFn: async () => {
-      let query = supabase
-        .from('shifts')
-        .select('*')
-        .gte('start_time', new Date().toISOString());
-
-      if (selectedStylist) {
-        query = query.eq('employee_id', selectedStylist);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: existingBookings } = useQuery({
-    queryKey: ['existing-bookings', selectedDate, selectedStylist],
-    enabled: open && !!selectedDate,
-    queryFn: async () => {
-      let query = supabase
-        .from('bookings')
-        .select('*')
-        .gte('start_time', format(selectedDate!, 'yyyy-MM-dd'));
-
-      if (selectedStylist && selectedStylist !== 'any_stylist') {
-        query = query.eq('employee_id', selectedStylist);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const handleBook = async () => {
-    if (!selectedDate || !selectedTime || !session?.user?.id) {
-      toast.error("Please select booking details and ensure you're logged in");
-      return;
+  const handleConfirm = async () => {
+    setIsSaving(true);
+    try {
+      await onFinalSave();
+      toast.success('Booking confirmed successfully!');
+      onClose();
+    } catch (error: any) {
+      toast.error(`Failed to confirm booking: ${error.message}`);
+    } finally {
+      setIsSaving(false);
     }
-
-    const startTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTime}`);
-    const endTime = addMinutes(startTime, item.service?.duration || item.package?.duration || 30);
-
-    const { error } = await supabase
-      .from('bookings')
-      .insert([
-        {
-          service_id: item.service_id,
-          package_id: item.package_id,
-          employee_id: selectedStylist === 'any_stylist' ? null : selectedStylist,
-          customer_id: session.user.id,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-        },
-      ]);
-
-    if (error) {
-      toast.error("Error creating booking");
-      console.error("Booking error:", error);
-      return;
-    }
-
-    await supabase
-      .from('cart_items')
-      .update({ status: 'scheduled' })
-      .eq('id', item.id);
-
-    toast.success("Appointment scheduled successfully");
-    onOpenChange(false);
-  };
-
-  const getAvailableDates = () => {
-    if (!location) return [];
-    if (selectedStylist === 'any_stylist') {
-      // Return all dates that have location hours and aren't closed
-      const today = new Date();
-      const dates: Date[] = [];
-      for (let i = 0; i < 30; i++) {
-        const date = addMinutes(today, i * 24 * 60);
-        const dayOfWeek = date.getDay();
-        const locationHours = location.location_hours.find(h => h.day_of_week === dayOfWeek);
-        if (locationHours && !locationHours.is_closed) {
-          dates.push(date);
-        }
-      }
-      return dates;
-    }
-    if (!shifts) return [];
-    return shifts.map(shift => new Date(shift.start_time));
-  };
-
-  const getAvailableTimeSlots = () => {
-    if (!selectedDate) return [];
-    
-    const slots: { value: string; label: string; }[] = [];
-    const duration = item.service?.duration || item.package?.duration || 30;
-    
-    if (selectedStylist === 'any_stylist' && location) {
-      // Use location hours
-      const dayOfWeek = selectedDate.getDay();
-      const locationHours = location.location_hours.find(h => h.day_of_week === dayOfWeek);
-      
-      if (locationHours && !locationHours.is_closed) {
-        const startTime = parse(locationHours.start_time, 'HH:mm:ss', selectedDate);
-        const endTime = parse(locationHours.end_time, 'HH:mm:ss', selectedDate);
-        let currentSlot = startTime;
-
-        while (addMinutes(currentSlot, duration) <= endTime) {
-          const slotEnd = addMinutes(currentSlot, duration);
-          const isSlotAvailable = !existingBookings?.some(booking => {
-            const bookingStart = new Date(booking.start_time);
-            const bookingEnd = new Date(booking.end_time);
-            return (
-              isWithinInterval(currentSlot, { start: bookingStart, end: bookingEnd }) ||
-              isWithinInterval(slotEnd, { start: bookingStart, end: bookingEnd })
-            );
-          });
-
-          if (isSlotAvailable) {
-            slots.push({
-              value: format(currentSlot, 'HH:mm'),
-              label: format(currentSlot, 'h:mm a'),
-            });
-          }
-          currentSlot = addMinutes(currentSlot, duration);
-        }
-      }
-    } else if (shifts) {
-      // Use stylist shifts
-      const dayShifts = shifts.filter(shift => 
-        isSameDay(new Date(shift.start_time), selectedDate)
-      );
-
-      dayShifts.forEach(shift => {
-        const startTime = new Date(shift.start_time);
-        const endTime = new Date(shift.end_time);
-        let currentSlot = startTime;
-
-        while (addMinutes(currentSlot, duration) <= endTime) {
-          const slotEnd = addMinutes(currentSlot, duration);
-          const isSlotAvailable = !existingBookings?.some(booking => {
-            const bookingStart = new Date(booking.start_time);
-            const bookingEnd = new Date(booking.end_time);
-            return (
-              isWithinInterval(currentSlot, { start: bookingStart, end: bookingEnd }) ||
-              isWithinInterval(slotEnd, { start: bookingStart, end: bookingEnd })
-            );
-          });
-
-          if (isSlotAvailable) {
-            slots.push({
-              value: format(currentSlot, 'HH:mm'),
-              label: format(currentSlot, 'h:mm a'),
-            });
-          }
-          currentSlot = addMinutes(currentSlot, duration);
-        }
-      });
-    }
-
-    return slots;
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle>Schedule Appointment</DialogTitle>
+          <DialogTitle>Confirm Booking</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to confirm this booking?
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          {!session?.user ? (
-            <div className="text-center py-4">
-              <p className="text-red-500">Please log in to book an appointment</p>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Select Stylist (Optional)</label>
-                <Select
-                  value={selectedStylist}
-                  onValueChange={(value) => {
-                    setSelectedStylist(value);
-                    setSelectedDate(undefined);
-                    setSelectedTime(undefined);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a stylist or select any" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any_stylist">Any Available Stylist</SelectItem>
-                    {stylists?.map((stylist) => (
-                      <SelectItem key={stylist.id} value={stylist.id}>
-                        {stylist.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Select Date</label>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    setSelectedDate(date);
-                    setSelectedTime(undefined);
-                  }}
-                  disabled={(date) => {
-                    const availableDates = getAvailableDates();
-                    return !availableDates.some(availableDate => 
-                      isSameDay(date, availableDate)
-                    );
-                  }}
-                  className="rounded-md border"
-                />
-              </div>
+        <div className="grid gap-4 py-4">
+          <div>
+            <div className="text-sm font-medium leading-none">Customer</div>
+            <p className="text-sm text-gray-500">{selectedCustomer?.full_name}</p>
+          </div>
+          <div>
+            <div className="text-sm font-medium leading-none">Date and Time</div>
+            <p className="text-sm text-gray-500">
+              {selectedDate && selectedTime
+                ? `${format(selectedDate, 'MMMM d, yyyy')} at ${selectedTime}`
+                : 'Not selected'}
+            </p>
+          </div>
+          <div>
+            <div className="text-sm font-medium leading-none">Services</div>
+            {selectedServices.length > 0 ? (
+              <ul className="list-disc pl-4 text-sm text-gray-500">
+                {selectedServices.map((service: any) => (
+                  <li key={service.id}>{service.name}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">No services selected</p>
+            )}
+          </div>
+          <div>
+            <div className="text-sm font-medium leading-none">Packages</div>
+            {selectedPackages.length > 0 ? (
+              <ul className="list-disc pl-4 text-sm text-gray-500">
+                {selectedPackages.map((pkg: any) => (
+                  <li key={pkg.id}>{pkg.name}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">No packages selected</p>
+            )}
+          </div>
+          <div>
+            <div className="text-sm font-medium leading-none">Notes</div>
+            <p className="text-sm text-gray-500">{notes || 'No notes'}</p>
+          </div>
+          <div>
+            <div className="text-sm font-medium leading-none">Total Price</div>
+            <p className="text-sm text-gray-500">${getTotalPrice()}</p>
+          </div>
+          <div>
+            <div className="text-sm font-medium leading-none">Total Duration</div>
+            <p className="text-sm text-gray-500">{getTotalDuration()} minutes</p>
+          </div>
+        </div>
 
-              {selectedDate && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Select Time</label>
-                  <Select
-                    value={selectedTime}
-                    onValueChange={setSelectedTime}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableTimeSlots().map((slot) => (
-                        <SelectItem key={slot.value} value={slot.value}>
-                          {slot.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <Button
-                className="w-full"
-                onClick={handleBook}
-                disabled={!selectedDate || !selectedTime}
-              >
-                Book Appointment
-              </Button>
-            </>
-          )}
+        <div className="flex justify-end space-x-2">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirm} disabled={isSaving}>
+            {isSaving ? 'Confirming...' : 'Confirm Booking'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
-}
+};
+
+export default BookingDialog;

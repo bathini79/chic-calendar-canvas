@@ -495,16 +495,22 @@ export default function AdminBookings() {
     );
   };
 
-  const renderAppointmentBlock = (appointment, booking) => {
+  const renderAppointmentBlock = (appointment: any, booking: any) => {
     const statusColor = getAppointmentStatusColor(appointment.status);
+    const duration = booking.service?.duration || booking.package?.duration || 60;
+    const startHour = new Date(booking.start_time).getHours() + 
+                   new Date(booking.start_time).getMinutes() / 60;
+    
+    const topPositionPx = ((startHour - START_HOUR) * PIXELS_PER_HOUR);
+    const heightPx = (duration / 60) * PIXELS_PER_HOUR;
     
     return (
       <div
         key={booking.id}
         className={`absolute left-2 right-2 rounded border ${statusColor} cursor-pointer z-10 overflow-hidden`}
         style={{
-          top: topPosition,
-          height: height,
+          top: `${topPositionPx}px`,
+          height: `${heightPx}px`,
         }}
         onClick={(e) => {
           e.stopPropagation();
@@ -743,9 +749,9 @@ export default function AdminBookings() {
                       booking.service?.duration ||
                       booking.package?.duration ||
                       60;
-                    const topPosition =
+                    const topPositionPx =
                       (startHour - START_HOUR) * PIXELS_PER_HOUR;
-                    const height = (duration / 60) * PIXELS_PER_HOUR;
+                    const heightPx = (duration / 60) * PIXELS_PER_HOUR;
 
                     return renderAppointmentBlock(appointment, booking);
                   })
