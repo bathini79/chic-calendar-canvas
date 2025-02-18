@@ -1,9 +1,10 @@
-<lov-code>
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
-import { CalendarEvent } from "./bookings/components/CalendarEvent";
+import { CalendarHeader } from "./bookings/components/CalendarHeader";
+import { StatsPanel } from "./bookings/components/StatsPanel";
+import { CheckoutDialog } from "./bookings/components/CheckoutDialog";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
 import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
@@ -37,14 +38,13 @@ function formatTime(time: number) {
 // For the left column: integer hours only (8..19) => 12 hours
 const hourLabels = Array.from({ length: 12 }, (_, i) => i + START_HOUR);
 
-// Sample events
+// Sample events and stats
 const initialEvents = [
   { id: 1, employeeId: 1, title: "Haircut", startHour: 9, duration: 1 },
   { id: 2, employeeId: 2, title: "Facial", startHour: 9.5, duration: 1.5 },
   { id: 3, employeeId: 3, title: "Manicure", startHour: 13, duration: 1 },
 ];
 
-// Example stats
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
   { label: "Upcoming Bookings", value: 11 },
@@ -530,150 +530,21 @@ export default function AdminBookings() {
     );
   };
 
-  const CheckoutDialog = () => (
-    <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Checkout</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Payment Method</label>
-            <Select value={paymentMethod} onValueChange={(value: 'cash' | 'online') => setPaymentMethod(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select payment method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="online">Online</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Discount Type</label>
-            <Select 
-              value={discountType} 
-              onValueChange={(value: 'none' | 'percentage' | 'fixed') => setDiscountType(value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select discount type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="percentage">Percentage</SelectItem>
-                  <SelectItem value="fixed">Fixed Amount</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {discountType !== 'none' && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {discountType === 'percentage' ? 'Discount (%)' : 'Discount Amount (₹)'}
-              </label>
-              <Input
-                type="number"
-                value={discountValue}
-                onChange={(e) => setDiscountValue(Number(e.target.value))}
-                min={0}
-                max={discountType === 'percentage' ? 100 : undefined}
-              />
-            </div>
-          )}
-
-          <div className="pt-4 border-t">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Original Price:</span>
-              <span>₹{getTotalPrice()}</span>
-            </div>
-            {discountType !== 'none' && discountValue > 0 && (
-              <div className="flex justify-between items-center text-green-600">
-                <span className="font-medium">Discount:</span>
-                <span>
-                  {discountType === 'percentage' 
-                    ? `${discountValue}%`
-                    : `₹${discountValue}`
-                  }
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between items-center font-bold text-lg mt-2">
-              <span>Final Price:</span>
-              <span>
-                ₹{discountType === 'percentage' 
-                  ? getTotalPrice() * (1 - (discountValue / 100))
-                  : Math.max(0, getTotalPrice() - discountValue)
-                }
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={() => setShowCheckout(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleFinalSave}>
-            Complete Booking
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
-        {/* Header */}
         <header className="p-4 border-b bg-white flex justify-between items-center">
           <div className="font-bold text-xl">Define Salon</div>
         </header>
 
-        {/* Stats */}
-        <div className="p-4 border-b bg-white flex space-x-4 overflow-x-auto">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white border rounded shadow-sm px-4 py-2 min-w-[150px]"
-            >
-              <div className="text-gray-500 text-sm">{stat.label}</div>
-              <div className="text-xl font-bold">
-                {stat.label === "Today's Revenue"
-                  ? `$${stat.value}`
-                  : stat.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Date Navigation */}
-        <div className="p-4 border-b bg-white flex items-center space-x-2">
-          <button
-            onClick={goToday}
-            className="px-4 py-1 border rounded-full hover:bg-gray-100 text-sm"
-          >
-            Today
-          </button>
-          <button
-            onClick={goPrev}
-            className="px-3 py-1 border rounded-full hover:bg-gray-100 flex items-center justify-center"
-          >
-            <ArrowLeftIcon />
-          </button>
-          <div className="px-6 py-1 border rounded-full text-sm flex items-center justify-center">
-            {formatCurrentDate(currentDate)}
-          </div>
-          <button
-            onClick={goNext}
-            className="px-3 py-1 border rounded-full hover:bg-gray-100 flex items-center justify-center"
-          >
-            <ArrowRightIcon />
-          </button>
-        </div>
+        <StatsPanel stats={stats} />
+        
+        <CalendarHeader
+          currentDate={currentDate}
+          onToday={goToday}
+          onPrevious={goPrev}
+          onNext={goNext}
+        />
 
         {/* Employee Header */}
         <div className="flex border-b bg-white">
@@ -920,4 +791,61 @@ export default function AdminBookings() {
                           Change Customer
                         </button>
                       </div>
-                    
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Service Selection Panel - 60% */}
+              <div className="w-[60%] overflow-y-auto p-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-medium">Select Services</h3>
+                  <ServiceSelector
+                    onServiceSelect={handleServiceSelect}
+                    onPackageSelect={handlePackageSelect}
+                    onStylistSelect={handleStylistSelect}
+                    selectedServices={selectedServices}
+                    selectedPackages={selectedPackages}
+                    selectedStylists={selectedStylists}
+                    stylists={employees}
+                  />
+                  <div className="space-y-4">
+                    <label className="text-sm font-medium">Notes</label>
+                    <Input
+                      type="text"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Add notes for this appointment"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={closeAddAppointment}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveAppointment}>
+                      Save Appointment
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <CheckoutDialog
+          open={showCheckout}
+          onOpenChange={setShowCheckout}
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={(value) => setPaymentMethod(value)}
+          discountType={discountType}
+          onDiscountTypeChange={(value) => setDiscountType(value)}
+          discountValue={discountValue}
+          onDiscountValueChange={setDiscountValue}
+          totalPrice={getTotalPrice()}
+          onSave={handleFinalSave}
+          onCancel={() => setShowCheckout(false)}
+        />
+      </div>
+    </DndProvider>
+  );
+}
