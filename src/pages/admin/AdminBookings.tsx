@@ -63,6 +63,7 @@ export default function AdminBookings() {
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showServiceSelector, setShowServiceSelector] = useState(true);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
@@ -314,19 +315,33 @@ export default function AdminBookings() {
   };
 
   const handleServiceSelect = (serviceId: string) => {
-    setSelectedServices(prev => 
-      prev.includes(serviceId) 
-        ? prev.filter(id => id !== serviceId)
-        : [...prev, serviceId]
-    );
+    setSelectedServices(prev => {
+      if (prev.includes(serviceId)) {
+        // Remove service if already selected
+        const newServices = prev.filter(id => id !== serviceId);
+        // Also remove stylist selection
+        const { [serviceId]: _, ...restStylists } = selectedStylists;
+        setSelectedStylists(restStylists);
+        return newServices;
+      }
+      return [...prev, serviceId];
+    });
+    setShowServiceSelector(false);
   };
 
   const handlePackageSelect = (packageId: string) => {
-    setSelectedPackages(prev => 
-      prev.includes(packageId)
-        ? prev.filter(id => id !== packageId)
-        : [...prev, packageId]
-    );
+    setSelectedPackages(prev => {
+      if (prev.includes(packageId)) {
+        // Remove package if already selected
+        const newPackages = prev.filter(id => id !== packageId);
+        // Also remove stylist selection
+        const { [packageId]: _, ...restStylists } = selectedStylists;
+        setSelectedStylists(restStylists);
+        return newPackages;
+      }
+      return [...prev, packageId];
+    });
+    setShowServiceSelector(false);
   };
 
   const handleStylistSelect = (itemId: string, stylistId: string) => {
@@ -334,6 +349,10 @@ export default function AdminBookings() {
       ...prev,
       [itemId]: stylistId
     }));
+  };
+
+  const handleAddMoreServices = () => {
+    setShowServiceSelector(true);
   };
 
   const { data: services } = useQuery({
@@ -526,9 +545,9 @@ export default function AdminBookings() {
                   ✕
                 </button>
               </div>
-              {clickedCell && (
+              {selectedDate && selectedTime && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  {format(currentDate, "MMMM d, yyyy")} at {formatTime(clickedCell.time)}
+                  {format(selectedDate, "MMMM d, yyyy")} at {selectedTime}
                 </p>
               )}
             </div>
@@ -539,10 +558,12 @@ export default function AdminBookings() {
                 <div className="space-y-6">
                   <h3 className="text-lg font-medium">Select Customer</h3>
                   {!selectedCustomer ? (
-                    <CustomerSearch onSelect={(customer) => {
-                      setSelectedCustomer(customer);
-                      setShowCreateForm(false);
-                    }} />
+                    <CustomerSearch 
+                      onSelect={(customer) => {
+                        setSelectedCustomer(customer);
+                        setShowCreateForm(false);
+                      }} 
+                    />
                   ) : (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
@@ -567,24 +588,49 @@ export default function AdminBookings() {
               {/* Services Selection Panel - 60% */}
               <div className="w-[60%] overflow-y-auto p-6">
                 <div className="space-y-6">
-                  <h3 className="text-lg font-medium">Select Services</h3>
-                  <ServiceSelector
-                    onServiceSelect={handleServiceSelect}
-                    onPackageSelect={handlePackageSelect}
-                    onStylistSelect={handleStylistSelect}
-                    selectedServices={selectedServices}
-                    selectedPackages={selectedPackages}
-                    selectedStylists={selectedStylists}
-                    stylists={employees}
-                  />
+                  {showServiceSelector ? (
+                    <>
+                      <h3 className="text-lg font-medium">Select Services</h3>
+                      <ServiceSelector
+                        onServiceSelect={handleServiceSelect}
+                        onPackageSelect={handlePackageSelect}
+                        onStylistSelect={handleStylistSelect}
+                        selectedServices={selectedServices}
+                        selectedPackages={selectedPackages}
+                        selectedStylists={selectedStylists}
+                        stylists={employees}
+                      />
+                    </>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-medium">Selected Services</h3>
+                        <Button 
+                          variant="outline"
+                          onClick={handleAddMoreServices}
+                        >
+                          Add Service
+                        </Button>
+                      </div>
+                      <ServiceSelector
+                        onServiceSelect={handleServiceSelect}
+                        onPackageSelect={handlePackageSelect}
+                        onStylistSelect={handleStylistSelect}
+                        selectedServices={selectedServices}
+                        selectedPackages={selectedPackages}
+                        selectedStylists={selectedStylists}
+                        stylists={employees}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Footer Actions */}
-            <div className="p-4 space-y-4">
+            <div className="p-4 border-t">
               {selectedDate && selectedTime && (
-                <div className="text-sm text-muted-foreground">
+                <div className="text-sm text-muted-foreground mb-4">
                   Appointment for: {format(selectedDate, "MMMM d, yyyy")} at {selectedTime}
                 </div>
               )}
