@@ -5,24 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { CalendarEvent } from "./bookings/components/CalendarEvent";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
-import {
-  CalendarIcon,
-  ArrowLeftIcon,
-  ArrowRightIcon,
-} from "./bookings/components/Icons";
+import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
 import type { Customer } from "./bookings/types";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogHeader,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 // Configuration
 const START_HOUR = 8; // 8:00 AM
@@ -85,6 +78,10 @@ export default function AdminBookings() {
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [notes, setNotes] = useState("");
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash');
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [discountValue, setDiscountValue] = useState<number>(0);
 
   // Update now line
   useEffect(() => {
@@ -253,40 +250,48 @@ export default function AdminBookings() {
   };
 
   const handleSaveAppointment = async () => {
+    if (!selectedDate || !selectedTime || !selectedCustomer) {
+      toast.error("Please select a date, time and customer");
+      return;
+    }
+
+    setShowCheckout(true);
+  };
+
+  const handleFinalSave = async () => {
     try {
-      if (!selectedDate || !selectedTime || !selectedCustomer) {
-        toast.error("Please select a date, time, and customer");
-        return;
-      }
-
-      const startDateTime = new Date(
-        `${format(selectedDate, "yyyy-MM-dd")} ${selectedTime}`
-      );
+      const startDateTime = new Date(`${format(selectedDate!, 'yyyy-MM-dd')} ${selectedTime}`);
       if (isNaN(startDateTime.getTime())) {
-        console.error(
-          `Invalid date generated, date: ${format(
-            selectedDate,
-            "yyyy-MM-dd"
-          )}, time: ${selectedTime}`
-        );
+        console.error(`Invalid date generated, date: ${format(selectedDate!, 'yyyy-MM-dd')}, time: ${selectedTime}`);
         return;
       }
-
+      
       const totalDuration = getTotalDuration();
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
-      // 1. Insert into appointments table with total duration
+      // Calculate final price with discounts
+      let finalPrice = getTotalPrice();
+      if (discountType === 'percentage') {
+        finalPrice = finalPrice * (1 - (discountValue / 100));
+      } else if (discountType === 'fixed') {
+        finalPrice = Math.max(0, finalPrice - discountValue);
+      }
+
+      // 1. Insert into appointments table
       const { data: appointmentData, error: appointmentError } = await supabase
-        .from("appointments")
+        .from('appointments')
         .insert({
-          customer_id: selectedCustomer.id,
+          customer_id: selectedCustomer!.id,
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
           notes: notes,
-          status: "confirmed",
+          status: 'confirmed',
           number_of_bookings: selectedServices.length + selectedPackages.length,
-          total_price: getTotalPrice(),
+          total_price: finalPrice,
           total_duration: totalDuration,
+          discount_type: discountType,
+          discount_value: discountValue,
+          payment_method: paymentMethod
         })
         .select();
 
@@ -372,14 +377,19 @@ export default function AdminBookings() {
       }
 
       toast.success("Appointment created successfully");
+      setShowCheckout(false);
       setIsAddAppointmentOpen(false);
-
-      // Reset selection states
+      toast.success("Appointment created successfully");
+      
+      // Reset all states
       setSelectedServices([]);
       setSelectedPackages([]);
       setSelectedDate(undefined);
       setSelectedTime(undefined);
       setNotes("");
+      setPaymentMethod('cash');
+      setDiscountType('none');
+      setDiscountValue(0);
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
@@ -484,6 +494,129 @@ export default function AdminBookings() {
       date1.getDate() === date2.getDate()
     );
   };
+
+  const renderAppointmentBlock = (appointment, booking) => {
+    const statusColor = getAppointmentStatusColor(appointment.status);
+    
+    return (
+      <div
+        key={booking.id}
+        className={`absolute left-2 right-2 rounded border ${statusColor} cursor-pointer z-10 overflow-hidden`}
+        style={{
+          top: topPosition,
+          height: height,
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedAppointment(appointment);
+        }}
+      >
+        <div className="p-2 text-xs">
+          <div className="font-medium truncate">
+            {appointment.customer?.full_name}
+          </div>
+          <div className="truncate text-gray-600">
+            {booking.service?.name || booking.package?.name}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const CheckoutDialog = () => (
+    <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Checkout</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Payment Method</label>
+            <Select value={paymentMethod} onValueChange={(value: 'cash' | 'online') => setPaymentMethod(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select payment method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Discount Type</label>
+            <Select 
+              value={discountType} 
+              onValueChange={(value: 'none' | 'percentage' | 'fixed') => setDiscountType(value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select discount type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="percentage">Percentage</SelectItem>
+                  <SelectItem value="fixed">Fixed Amount</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {discountType !== 'none' && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {discountType === 'percentage' ? 'Discount (%)' : 'Discount Amount (₹)'}
+              </label>
+              <Input
+                type="number"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(Number(e.target.value))}
+                min={0}
+                max={discountType === 'percentage' ? 100 : undefined}
+              />
+            </div>
+          )}
+
+          <div className="pt-4 border-t">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">Original Price:</span>
+              <span>₹{getTotalPrice()}</span>
+            </div>
+            {discountType !== 'none' && discountValue > 0 && (
+              <div className="flex justify-between items-center text-green-600">
+                <span className="font-medium">Discount:</span>
+                <span>
+                  {discountType === 'percentage' 
+                    ? `${discountValue}%`
+                    : `₹${discountValue}`
+                  }
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between items-center font-bold text-lg mt-2">
+              <span>Final Price:</span>
+              <span>
+                ₹{discountType === 'percentage' 
+                  ? getTotalPrice() * (1 - (discountValue / 100))
+                  : Math.max(0, getTotalPrice() - discountValue)
+                }
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end space-x-2">
+          <Button variant="outline" onClick={() => setShowCheckout(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleFinalSave}>
+            Complete Booking
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -614,33 +747,7 @@ export default function AdminBookings() {
                       (startHour - START_HOUR) * PIXELS_PER_HOUR;
                     const height = (duration / 60) * PIXELS_PER_HOUR;
 
-                    const statusColor = getAppointmentStatusColor(
-                      appointment.status
-                    );
-
-                    return (
-                      <div
-                        key={booking.id}
-                        className={`absolute left-2 right-2 rounded border ${statusColor} cursor-pointer z-10`}
-                        style={{
-                          top: topPosition,
-                          height: height,
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAppointment(appointment);
-                        }}
-                      >
-                        <div className="p-2 text-xs overflow-hidden">
-                          <div className="font-medium overflow-hidden whitespace-nowrap text-ellipsis">
-                            {appointment.customer?.full_name}
-                          </div>
-                          <div className="overflow-hidden whitespace-nowrap text-ellipsis text-gray-600 text-xs">
-                            {booking.service?.name || booking.package?.name}
-                          </div>
-                        </div>
-                      </div>
-                    );
+                    return renderAppointmentBlock(appointment, booking);
                   })
                 )}
               </div>
@@ -862,6 +969,9 @@ export default function AdminBookings() {
             onClick={closeAddAppointment}
           />
         )}
+
+        {/* Checkout Dialog */}
+        <CheckoutDialog />
       </div>
     </DndProvider>
   );
