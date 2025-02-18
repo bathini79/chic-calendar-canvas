@@ -12,7 +12,8 @@ import { format } from "date-fns";
 import { addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogTitle, Badge } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 // Configuration
 const START_HOUR = 8; // 8:00 AM
