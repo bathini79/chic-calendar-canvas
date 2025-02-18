@@ -5,14 +5,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { CalendarEvent } from "./bookings/components/CalendarEvent";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
-import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
+import {
+  CalendarIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+} from "./bookings/components/Icons";
 import type { Customer } from "./bookings/types";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogHeader,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
 // Configuration
@@ -63,11 +72,15 @@ export default function AdminBookings() {
     date?: Date;
   } | null>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
-  const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
+  const [selectedStylists, setSelectedStylists] = useState<
+    Record<string, string>
+  >({});
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [notes, setNotes] = useState("");
@@ -93,7 +106,10 @@ export default function AdminBookings() {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const { data, error } = await supabase.from("employees").select("*").eq("employment_type", "stylist");
+        const { data, error } = await supabase
+          .from("employees")
+          .select("*")
+          .eq("employment_type", "stylist");
         if (error) throw error;
         const employeeWithAvatar = data.map((employee) => ({
           ...employee,
@@ -115,7 +131,20 @@ export default function AdminBookings() {
   // Format the displayed date as "Tue 11 Feb"
   function formatCurrentDate(date: Date) {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     const dayOfWeek = days[date.getDay()];
     const dayOfMonth = date.getDate();
     const month = months[date.getMonth()];
@@ -154,7 +183,7 @@ export default function AdminBookings() {
       time: clickedTime,
       x: e.pageX + 10,
       y: e.pageY - 20,
-      date: currentDate
+      date: currentDate,
     });
   }
 
@@ -162,8 +191,10 @@ export default function AdminBookings() {
     if (clickedCell) {
       const hours = Math.floor(clickedCell.time);
       const minutes = Math.round((clickedCell.time - hours) * 60);
-      const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      
+      const timeString = `${hours.toString().padStart(2, "0")}:${minutes
+        .toString()
+        .padStart(2, "0")}`;
+
       setSelectedDate(clickedCell.date);
       setSelectedTime(timeString);
     }
@@ -178,18 +209,18 @@ export default function AdminBookings() {
   // Calculate total price
   const getTotalPrice = () => {
     let total = 0;
-    
+
     // Add service prices
-    selectedServices.forEach(serviceId => {
-      const service = services?.find(s => s.id === serviceId);
+    selectedServices.forEach((serviceId) => {
+      const service = services?.find((s) => s.id === serviceId);
       if (service) {
         total += service.selling_price;
       }
     });
 
     // Add package prices
-    selectedPackages.forEach(packageId => {
-      const pkg = packages?.find(p => p.id === packageId);
+    selectedPackages.forEach((packageId) => {
+      const pkg = packages?.find((p) => p.id === packageId);
       if (pkg) {
         total += pkg.price;
       }
@@ -201,18 +232,18 @@ export default function AdminBookings() {
   // Calculate total duration
   const getTotalDuration = () => {
     let totalDuration = 0;
-    
+
     // Add service durations
-    selectedServices.forEach(serviceId => {
-      const service = services?.find(s => s.id === serviceId);
+    selectedServices.forEach((serviceId) => {
+      const service = services?.find((s) => s.id === serviceId);
       if (service) {
         totalDuration += service.duration;
       }
     });
 
     // Add package durations
-    selectedPackages.forEach(packageId => {
-      const pkg = packages?.find(p => p.id === packageId);
+    selectedPackages.forEach((packageId) => {
+      const pkg = packages?.find((p) => p.id === packageId);
       if (pkg) {
         totalDuration += pkg.duration;
       }
@@ -224,31 +255,38 @@ export default function AdminBookings() {
   const handleSaveAppointment = async () => {
     try {
       if (!selectedDate || !selectedTime || !selectedCustomer) {
-        toast.error("Please select a date, time and customer");
+        toast.error("Please select a date, time, and customer");
         return;
       }
 
-      const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTime}`);
+      const startDateTime = new Date(
+        `${format(selectedDate, "yyyy-MM-dd")} ${selectedTime}`
+      );
       if (isNaN(startDateTime.getTime())) {
-        console.error(`Invalid date generated, date: ${format(selectedDate, 'yyyy-MM-dd')}, time: ${selectedTime}`);
+        console.error(
+          `Invalid date generated, date: ${format(
+            selectedDate,
+            "yyyy-MM-dd"
+          )}, time: ${selectedTime}`
+        );
         return;
       }
-      
+
       const totalDuration = getTotalDuration();
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
       // 1. Insert into appointments table with total duration
       const { data: appointmentData, error: appointmentError } = await supabase
-        .from('appointments')
+        .from("appointments")
         .insert({
           customer_id: selectedCustomer.id,
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
           notes: notes,
-          status: 'confirmed',
+          status: "confirmed",
           number_of_bookings: selectedServices.length + selectedPackages.length,
           total_price: getTotalPrice(),
-          total_duration: totalDuration
+          total_duration: totalDuration,
         })
         .select();
 
@@ -261,69 +299,87 @@ export default function AdminBookings() {
       const appointmentId = appointmentData[0].id;
       let currentStartTime = startDateTime;
 
-      // 2. Create bookings for services with individual start/end times
-      for (const serviceId of selectedServices) {
-        const service = services?.find(s => s.id === serviceId);
-        if (!service) continue;
+      // Iterate through all selected items (services and packages) together
+      const allSelectedItems = [
+        ...selectedServices.map((id) => ({ type: "service", id })),
+        ...selectedPackages.map((id) => ({ type: "package", id })),
+      ];
 
-        const bookingEndTime = addMinutes(currentStartTime, service.duration);
-        
-        const { error: bookingError } = await supabase.from('bookings').insert({
-          appointment_id: appointmentId,
-          service_id: serviceId,
-          status: 'confirmed',
-          price_paid: service.selling_price,
-          employee_id: selectedStylists[serviceId],
-          start_time: currentStartTime.toISOString(),
-          end_time: bookingEndTime.toISOString()
-        });
+      // Sort all selected items by duration (shortest first)
+      allSelectedItems.sort((a, b) => {
+        let durationA =
+          (a.type === "service"
+            ? services?.find((s) => s.id === a.id)?.duration
+            : packages?.find((p) => p.id === a.id)?.duration) || 0;
+        let durationB =
+          (b.type === "service"
+            ? services?.find((s) => s.id === b.id)?.duration
+            : packages?.find((p) => p.id === b.id)?.duration) || 0;
+        return durationA - durationB;
+      });
 
-        if (bookingError) {
-          console.error("Error inserting booking:", bookingError);
-          toast.error("Failed to create booking. Please try again.");
-          throw bookingError;
+      for (const item of allSelectedItems) {
+        let bookingEndTime: Date;
+        let bookingData;
+        let duration: number;
+
+        if (item.type === "service") {
+          const service = services?.find((s) => s.id === item.id);
+          if (!service) continue;
+          duration = service.duration;
+          bookingEndTime = addMinutes(currentStartTime, service.duration);
+          bookingData = {
+            appointment_id: appointmentId,
+            service_id: service.id,
+            status: "confirmed",
+            price_paid: service.selling_price,
+            employee_id: selectedStylists[service.id],
+            start_time: currentStartTime.toISOString(),
+            end_time: bookingEndTime.toISOString(),
+          };
+        } else {
+          // item.type === 'package'
+          const pkg = packages?.find((p) => p.id === item.id);
+          if (!pkg) continue;
+          duration = pkg.duration;
+          bookingEndTime = addMinutes(currentStartTime, pkg.duration);
+          bookingData = {
+            appointment_id: appointmentId,
+            package_id: pkg.id,
+            status: "confirmed",
+            price_paid: pkg.price,
+            start_time: currentStartTime.toISOString(),
+            end_time: bookingEndTime.toISOString(),
+          };
         }
 
-        // Update start time for next booking
-        currentStartTime = bookingEndTime;
-      }
-
-      // 3. Create bookings for packages with individual start/end times
-      for (const packageId of selectedPackages) {
-        const pkg = packages?.find(p => p.id === packageId);
-        if (!pkg) continue;
-
-        const bookingEndTime = addMinutes(currentStartTime, pkg.duration);
-
-        const { error: bookingError } = await supabase.from('bookings').insert({
-          appointment_id: appointmentId,
-          package_id: packageId,
-          status: 'confirmed',
-          price_paid: pkg.price,
-          start_time: currentStartTime.toISOString(),
-          end_time: bookingEndTime.toISOString()
-        });
+        // Create the booking
+        const { error: bookingError } = await supabase
+          .from("bookings")
+          .insert(bookingData);
 
         if (bookingError) {
-          console.error("Error inserting booking:", bookingError);
-          toast.error("Failed to create booking. Please try again.");
+          console.error(`Error inserting ${item.type} booking:`, bookingError);
+          toast.error(
+            `Failed to create ${item.type} booking. Please try again.`
+          );
           throw bookingError;
         }
+        console.log(`${item.type}  bookingEndTime`, bookingEndTime);
 
-        // Update start time for next booking
+        // Update currentStartTime for next booking correctly, to the previous booking's end time.
         currentStartTime = bookingEndTime;
       }
 
       toast.success("Appointment created successfully");
       setIsAddAppointmentOpen(false);
-      
+
       // Reset selection states
       setSelectedServices([]);
       setSelectedPackages([]);
       setSelectedDate(undefined);
       setSelectedTime(undefined);
       setNotes("");
-      
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
@@ -331,66 +387,67 @@ export default function AdminBookings() {
   };
 
   const handleServiceSelect = (serviceId: string) => {
-    setSelectedServices(prev => 
-      prev.includes(serviceId) 
-        ? prev.filter(id => id !== serviceId)
+    setSelectedServices((prev) =>
+      prev.includes(serviceId)
+        ? prev.filter((id) => id !== serviceId)
         : [...prev, serviceId]
     );
   };
 
   const handlePackageSelect = (packageId: string) => {
-    setSelectedPackages(prev => 
+    setSelectedPackages((prev) =>
       prev.includes(packageId)
-        ? prev.filter(id => id !== packageId)
+        ? prev.filter((id) => id !== packageId)
         : [...prev, packageId]
     );
   };
 
   const handleStylistSelect = (itemId: string, stylistId: string) => {
-    setSelectedStylists(prev => ({
+    setSelectedStylists((prev) => ({
       ...prev,
-      [itemId]: stylistId
+      [itemId]: stylistId,
     }));
   };
 
   const { data: services } = useQuery({
-    queryKey: ['services'],
+    queryKey: ["services"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('status', 'active');
-      
+        .from("services")
+        .select("*")
+        .eq("status", "active");
+
       if (error) throw error;
       return data;
     },
   });
 
   const { data: packages } = useQuery({
-    queryKey: ['packages'],
+    queryKey: ["packages"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('packages')
-        .select('*')
-        .eq('status', 'active');
-      
+        .from("packages")
+        .select("*")
+        .eq("status", "active");
+
       if (error) throw error;
       return data;
     },
   });
 
   const { data: appointments = [] } = useQuery({
-    queryKey: ['appointments', format(currentDate, 'yyyy-MM-dd')],
+    queryKey: ["appointments", format(currentDate, "yyyy-MM-dd")],
     queryFn: async () => {
       const startOfDay = new Date(currentDate);
       startOfDay.setHours(0, 0, 0, 0);
-      
+
       const endOfDay = new Date(currentDate);
       endOfDay.setHours(23, 59, 59, 999);
 
       const { data, error } = await supabase
-        .from('appointments')
-        .select(`
+        .from("appointments")
+        .select(
+          `
           *,
           bookings (
             *,
@@ -399,9 +456,10 @@ export default function AdminBookings() {
             employee:employees (*)
           ),
           customer:profiles (*)
-        `)
-        .gte('start_time', startOfDay.toISOString())
-        .lte('start_time', endOfDay.toISOString());
+        `
+        )
+        .gte("start_time", startOfDay.toISOString())
+        .lte("start_time", endOfDay.toISOString());
 
       if (error) throw error;
       return data;
@@ -410,19 +468,21 @@ export default function AdminBookings() {
 
   const getAppointmentStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed':
-        return 'bg-green-100 hover:bg-green-200 border-green-300';
-      case 'canceled':
-        return 'bg-red-100 hover:bg-red-200 border-red-300';
+      case "confirmed":
+        return "bg-green-100 hover:bg-green-200 border-green-300";
+      case "canceled":
+        return "bg-red-100 hover:bg-red-200 border-red-300";
       default:
-        return 'bg-purple-100 hover:bg-purple-200 border-purple-300';
+        return "bg-purple-100 hover:bg-purple-200 border-purple-300";
     }
   };
 
   const isSameDay = (date1: Date, date2: Date) => {
-    return date1.getFullYear() === date2.getFullYear() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getDate() === date2.getDate();
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
   };
 
   return (
@@ -442,7 +502,9 @@ export default function AdminBookings() {
             >
               <div className="text-gray-500 text-sm">{stat.label}</div>
               <div className="text-xl font-bold">
-                {stat.label === "Today's Revenue" ? `$${stat.value}` : stat.value}
+                {stat.label === "Today's Revenue"
+                  ? `$${stat.value}`
+                  : stat.value}
               </div>
             </div>
           ))}
@@ -485,7 +547,9 @@ export default function AdminBookings() {
                 <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
                   {emp.avatar}
                 </div>
-                <div className="text-xs font-medium text-gray-700">{emp.name}</div>
+                <div className="text-xs font-medium text-gray-700">
+                  {emp.name}
+                </div>
               </div>
             </div>
           ))}
@@ -535,17 +599,24 @@ export default function AdminBookings() {
                 )}
 
                 {/* Appointment Blocks */}
-                {appointments.map((appointment) => (
+                {appointments.map((appointment) =>
                   appointment.bookings.map((booking) => {
                     if (booking.employee?.id !== emp.id) return null;
-                    
-                    const startTime = new Date(appointment.start_time);
-                    const startHour = startTime.getHours() + startTime.getMinutes() / 60;
-                    const duration = booking.service?.duration || booking.package?.duration || 60;
-                    const topPosition = (startHour - START_HOUR) * PIXELS_PER_HOUR;
+
+                    const startTime = new Date(booking.start_time);
+                    const startHour =
+                      startTime.getHours() + startTime.getMinutes() / 60;
+                    const duration =
+                      booking.service?.duration ||
+                      booking.package?.duration ||
+                      60;
+                    const topPosition =
+                      (startHour - START_HOUR) * PIXELS_PER_HOUR;
                     const height = (duration / 60) * PIXELS_PER_HOUR;
 
-                    const statusColor = getAppointmentStatusColor(appointment.status);
+                    const statusColor = getAppointmentStatusColor(
+                      appointment.status
+                    );
 
                     return (
                       <div
@@ -560,25 +631,28 @@ export default function AdminBookings() {
                           setSelectedAppointment(appointment);
                         }}
                       >
-                        <div className="p-2 text-xs">
-                          <div className="font-medium truncate">
+                        <div className="p-2 text-xs overflow-hidden">
+                          <div className="font-medium overflow-hidden whitespace-nowrap text-ellipsis">
                             {appointment.customer?.full_name}
                           </div>
-                          <div className="truncate text-gray-600">
+                          <div className="overflow-hidden whitespace-nowrap text-ellipsis text-gray-600 text-xs">
                             {booking.service?.name || booking.package?.name}
                           </div>
                         </div>
                       </div>
                     );
                   })
-                ))}
+                )}
               </div>
             ))}
           </div>
         </div>
 
         {/* Appointment Details Dialog */}
-        <Dialog open={!!selectedAppointment} onOpenChange={() => setSelectedAppointment(null)}>
+        <Dialog
+          open={!!selectedAppointment}
+          onOpenChange={() => setSelectedAppointment(null)}
+        >
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Appointment Details</DialogTitle>
@@ -588,24 +662,30 @@ export default function AdminBookings() {
                 <div>
                   <Badge
                     variant={
-                      selectedAppointment.status === "confirmed" ? "default" :
-                      selectedAppointment.status === "canceled" ? "destructive" :
-                      "secondary"
+                      selectedAppointment.status === "confirmed"
+                        ? "default"
+                        : selectedAppointment.status === "canceled"
+                        ? "destructive"
+                        : "secondary"
                     }
                   >
                     {selectedAppointment.status.toUpperCase()}
                   </Badge>
                 </div>
-                
+
                 <div>
                   <h3 className="font-medium">Customer</h3>
                   <p>{selectedAppointment.customer?.full_name}</p>
-                  <p className="text-sm text-gray-500">{selectedAppointment.customer?.email}</p>
+                  <p className="text-sm text-gray-500">
+                    {selectedAppointment.customer?.email}
+                  </p>
                 </div>
 
                 <div>
                   <h3 className="font-medium">Date & Time</h3>
-                  <p>{format(new Date(selectedAppointment.start_time), "PPpp")}</p>
+                  <p>
+                    {format(new Date(selectedAppointment.start_time), "PPpp")}
+                  </p>
                 </div>
 
                 <div>
@@ -620,7 +700,10 @@ export default function AdminBookings() {
                           with {booking.employee?.name}
                         </div>
                         <div className="text-sm">
-                          Duration: {booking.service?.duration || booking.package?.duration}min
+                          Duration:{" "}
+                          {booking.service?.duration ||
+                            booking.package?.duration}
+                          min
                         </div>
                       </div>
                     ))}
@@ -687,7 +770,8 @@ export default function AdminBookings() {
               </div>
               {clickedCell && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  {format(currentDate, "MMMM d, yyyy")} at {formatTime(clickedCell.time)}
+                  {format(currentDate, "MMMM d, yyyy")} at{" "}
+                  {formatTime(clickedCell.time)}
                 </p>
               )}
             </div>
@@ -698,15 +782,19 @@ export default function AdminBookings() {
                 <div className="space-y-6">
                   <h3 className="text-lg font-medium">Select Customer</h3>
                   {!selectedCustomer ? (
-                    <CustomerSearch onSelect={(customer) => {
-                      setSelectedCustomer(customer);
-                      setShowCreateForm(false);
-                    }} />
+                    <CustomerSearch
+                      onSelect={(customer) => {
+                        setSelectedCustomer(customer);
+                        setShowCreateForm(false);
+                      }}
+                    />
                   ) : (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-medium">{selectedCustomer.full_name}</h3>
+                          <h3 className="font-medium">
+                            {selectedCustomer.full_name}
+                          </h3>
                           <p className="text-sm text-muted-foreground">
                             {selectedCustomer.email}
                           </p>
@@ -744,19 +832,21 @@ export default function AdminBookings() {
             <div className="p-4 space-y-4">
               {selectedDate && selectedTime && (
                 <div className="text-sm text-muted-foreground">
-                  Appointment for: {format(selectedDate, "MMMM d, yyyy")} at {selectedTime}
+                  Appointment for: {format(selectedDate, "MMMM d, yyyy")} at{" "}
+                  {selectedTime}
                 </div>
               )}
               <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline" 
-                  onClick={closeAddAppointment}
-                >
+                <Button variant="outline" onClick={closeAddAppointment}>
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSaveAppointment}
-                  disabled={!selectedCustomer || (selectedServices.length === 0 && selectedPackages.length === 0)}
+                  disabled={
+                    !selectedCustomer ||
+                    (selectedServices.length === 0 &&
+                      selectedPackages.length === 0)
+                  }
                 >
                   Save Appointment
                 </Button>
