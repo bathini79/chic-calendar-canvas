@@ -262,12 +262,13 @@ export default function AdminBookings() {
       for (const serviceId of selectedServices) {
         const service = services?.find(s => s.id === serviceId);
         if (!service) continue;
-
+        console.log(selectedStylists[serviceId])
         const { error: bookingError } = await supabase.from('bookings').insert({
           appointment_id: appointmentId,
           service_id: serviceId,
           status: 'confirmed',
-          price_paid: service.selling_price
+          price_paid: service.selling_price,
+          employee_id:selectedStylists[serviceId]
         });
 
         if (bookingError) {
