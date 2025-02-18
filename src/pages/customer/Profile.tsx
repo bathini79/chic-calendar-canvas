@@ -43,7 +43,28 @@ interface Booking {
     name: string;
   } | null;
 }
-// New Component: AppointmentCard
+
+interface LocationData {
+  address: string | null;
+  created_at: string;
+  email: string | null;
+  id: string;
+  name: string;
+  phone: string | null;
+  status: string | null;
+  updated_at: string;
+  location_hours: Array<{
+    created_at: string;
+    day_of_week: number;
+    end_time: string;
+    id: string;
+    is_closed: boolean;
+    location_id: string;
+    start_time: string;
+    updated_at: string;
+  }>;
+}
+
 const AppointmentCard = ({
   appointment,
   onSelect,
@@ -97,10 +118,9 @@ function InfoRow({ icon: Icon, title, subtitle }) {
     </div>
   );
 }
-// New Component: AppointmentDetails
+
 const AppointmentDetails = (
   { appointment,durationDisplay }: { appointment: Appointment }
-  
 ) => {
   const { toast } = useToast();
   const fetchBookings = async (appointment_id: string) => {
@@ -120,31 +140,28 @@ const AppointmentDetails = (
       throw new Error(error.message);
     }
     return data as Booking[];
-  }; // Function to create the google maps url
+  };
+
   const createGoogleMapsUrl = (location?: Location) => {
-    if (!location?.address) return ""; // Return an empty string if no address
-    // Replace spaces with "+" for URL encoding
+    if (!location?.address) return "";
     const addressEncoded = location.address.replace(/ /g, "+");
     return `https://www.google.com/maps/search/?api=1&query=${addressEncoded}`;
   };
 
-  // Fetch location data
-  const { data: locationData } = useQuery<Location, Error>({
-    queryKey: ["location"],
+  const { data: locationData } = useQuery<LocationData>({
+    queryKey: ['location'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("locations")
+        .from('locations')
         .select(`*, location_hours (*)`)
-        .eq("status", "active")
+        .eq('status', 'active')
         .single();
 
-      if (error) {
-        console.error("Error fetching location data:", error);
-        throw error;
-      }
+      if (error) throw error;
       return data;
     },
   });
+
   const googleMapsUrl = createGoogleMapsUrl(locationData);
 
   const {
@@ -158,15 +175,18 @@ const AppointmentDetails = (
     enabled: !!appointment?.id,
     refetchOnWindowFocus: false,
   });
+
   if (!appointment)
     return (
       <div className="mt-4 text-gray-600">
         Select an appointment to view details.
       </div>
     );
+
   if (bookingsLoading) {
     return <div className="mt-4">Loading Bookings</div>;
   }
+
   if (bookingsIsError) {
     return (
       <div className="mt-4">
@@ -174,6 +194,7 @@ const AppointmentDetails = (
       </div>
     );
   }
+
   const statusStyles = {
     pending: {
       style: "bg-yellow-200 text-yellow-800",
@@ -195,6 +216,7 @@ const AppointmentDetails = (
       hours > 0 && mins > 0 ? ", " : ""
     }${mins > 0 ? `${mins}min` : ""}`;
   };
+
   return (
     <div className="space-y-6 p-6">
       <div
@@ -212,9 +234,9 @@ const AppointmentDetails = (
           new Date(appointment.start_time),
           "EEE, dd MMM, yyyy 'at' hh:mm a"
         )}
-      <p className="text-lg text-gray-400 text-sm">
-      {durationDisplay} duration
-      </p>
+        <p className="text-lg text-gray-400 text-sm">
+          {durationDisplay} duration
+        </p>
       </h2>
       <p className="text-lg text-gray-700 font-medium">
         Total Cost: ₹{appointment.total_price}
@@ -245,7 +267,6 @@ const AppointmentDetails = (
             key={booking.id}
             className="flex items-center justify-between bg-gray-100 p-4 rounded-lg text-sm"
           >
-            {/* Left Section: Service Name & Duration */}
             <div className="flex flex-col w-1/2">
               <span className="font-medium text-gray-900">
                 {booking.service?.name ||
@@ -257,7 +278,6 @@ const AppointmentDetails = (
                 {booking.employee?.name || "Assigned Stylist"}
               </span>
             </div>
-            {/* Right Section: Price */}
             <span className="text-gray-800 font-semibold w-1/4 text-right">
               ₹{booking.price_paid}
             </span>
@@ -272,7 +292,6 @@ const AppointmentDetails = (
   );
 };
 
-// New Component: AppointmentList
 const AppointmentList = ({
   appointments,
   onSelect,
@@ -294,7 +313,6 @@ const AppointmentList = ({
 
   return (
     <div className="w-full">
-      {/* Upcoming Section */}
       <div className="mt-6">
         <h2 className="text-lg font-semibold flex items-center">
           Upcoming{" "}
@@ -320,7 +338,6 @@ const AppointmentList = ({
         )}
       </div>
 
-      {/* Past Section */}
       <div className="mt-8">
         <h2 className="text-lg font-semibold flex items-center">
           Past{" "}
@@ -351,7 +368,6 @@ export default function Appointments() {
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
 
-  // Query for current user session
   const {
     data: session,
     isLoading: sessionLoading,
@@ -363,7 +379,7 @@ export default function Appointments() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      return session; // Could be null if not authenticated
+      return session;
     },
   });
 
@@ -388,20 +404,18 @@ export default function Appointments() {
     })) as Appointment[];
   };
 
-  // Query for appointments
   const {
-    data: appointments, // Changed to appointments
-    isLoading: appointmentsLoading, // Changed to appointmentsLoading
-    error: appointmentsError, // Changed to appointmentsError
-    isError: appointmentsIsError, // Changed to appointmentsIsError
+    data: appointments,
+    isLoading: appointmentsLoading,
+    error: appointmentsError,
+    isError: appointmentsIsError,
   } = useQuery<Appointment[], Error>({
-    queryKey: ["appointments", session?.user?.id], // Changed queryKey
-    queryFn: () => fetchAppointments(session!.user.id), // Changed function
+    queryKey: ["appointments", session?.user?.id],
+    queryFn: () => fetchAppointments(session!.user.id),
     enabled: !!session?.user?.id && !sessionIsError,
     refetchOnWindowFocus: false,
   });
 
-  // Handle session loading state
   if (sessionLoading) {
     return (
       <div className="p-6 max-w-lg mx-auto text-gray-900">
@@ -410,7 +424,6 @@ export default function Appointments() {
     );
   }
 
-  // Handle session error state
   if (sessionIsError) {
     return (
       <div className="p-6 max-w-lg mx-auto text-gray-900">
@@ -420,7 +433,6 @@ export default function Appointments() {
     );
   }
 
-  // If there is no user in session
   if (!session?.user) {
     return (
       <div className="p-6 max-w-lg mx-auto text-gray-900">
@@ -430,7 +442,6 @@ export default function Appointments() {
     );
   }
 
-  // Handle appointments error state
   if (appointmentsIsError) {
     return (
       <div className="p-6 max-w-lg mx-auto text-gray-900">
@@ -439,7 +450,7 @@ export default function Appointments() {
       </div>
     );
   }
-  //Handle appointments loading
+
   if (appointmentsLoading) {
     return (
       <div className="p-6 max-w-lg mx-auto text-gray-900">

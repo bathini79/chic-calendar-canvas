@@ -29,7 +29,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert(newData as any)
+        .insert([newData as any])
         .select()
         .single();
 

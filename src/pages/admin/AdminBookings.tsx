@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import { addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, Badge } from "@radix-ui/react-dialog";
+import { Dialog, DialogContent, DialogTitle, Badge } from "@/components/ui/dialog";
 
 // Configuration
 const START_HOUR = 8; // 8:00 AM

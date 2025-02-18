@@ -19,7 +19,7 @@ type CartItem = {
     price: number;
     duration: number;
   };
-  selling_price: number
+  selling_price: number;
 };
 
 type CartContextType = {
