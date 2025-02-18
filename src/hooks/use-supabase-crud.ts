@@ -21,15 +21,15 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return result as Row[];
+      return (result || []) as Row[];
     },
   });
 
-  const create = async (newData: Insert): Promise<Row> => {
+  const create = async (newData: Insert) => {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert([newData as any])
+        .insert([newData])
         .select()
         .single();
 
@@ -43,12 +43,12 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     }
   };
 
-  const update = async (id: string, updateData: Update): Promise<Row> => {
+  const update = async (recordId: string, updateData: Update) => {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
-        .update(updateData as any)
-        .eq('id', id)
+        .update(updateData)
+        .eq('id', recordId)
         .select()
         .single();
 
@@ -62,12 +62,12 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     }
   };
 
-  const remove = async (id: string) => {
+  const remove = async (recordId: string) => {
     try {
       const { error } = await supabase
         .from(tableName)
         .delete()
-        .eq('id', id);
+        .eq('id', recordId);
 
       if (error) throw error;
       toast.success("Deleted successfully");

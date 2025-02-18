@@ -14,6 +14,18 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
+type InventoryItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  minimum_quantity: number;
+  max_quantity: number;
+  supplier: {
+    id: string;
+    name: string;
+  };
+};
+
 export function LowStockManager() {
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -26,11 +38,11 @@ export function LowStockManager() {
           *,
           supplier:suppliers(*)
         `)
-        .lte("quantity", supabase.raw("minimum_quantity"))
+        .lte("quantity", "minimum_quantity")
         .eq("status", "active");
 
       if (error) throw error;
-      return data;
+      return data as InventoryItem[];
     },
   });
 

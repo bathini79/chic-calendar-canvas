@@ -1,173 +1,123 @@
-import React, { useState, useEffect } from "react";
-import { Search } from "lucide-react";
-import { Button }
- from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList
-} from
- "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/integrations/supabase/client";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { QuickCustomerCreate } from "./QuickCustomerCreate";
-import type { Customer } from "../types";
+import React, { useState, useEffect } from 'react';
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Customer } from '../types';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { QuickCustomerCreate } from './QuickCustomerCreate';
 
 interface CustomerSearchProps {
-  onSelect: (customer: Customer) => void;
+  onCustomerSelect: (customer: Customer) => void;
 }
 
-const CUSTOMERS_PER_PAGE = 10;
+const CustomerSearch = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-export function CustomerSearch({ onSelect }: CustomerSearchProps) {
-  const [search, setSearch] = useState("");
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [open, setOpen] = useState(false);
-    const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const { data: initialCustomers, isLoading, error } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'customer');
 
-    useEffect(() => {
-      const timeoutId = setTimeout(() => {
-        setDebouncedSearch(search);
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
-    }, [search]);
-
-  const fetchCustomers = async ({ pageParam = 0 }) => {
-    let query = supabase
-      .from('profiles')
-      .select('id, full_name, email, phone_number, role')
-      .eq('role', 'customer')
-      .order('created_at', { ascending: false })
-      .range(pageParam * CUSTOMERS_PER_PAGE, (pageParam + 1) * CUSTOMERS_PER_PAGE - 1);
-
-    if (debouncedSearch) {
-      query = query.ilike('full_name', `%${debouncedSearch}%`);
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-    return {
-      customers: data as Customer[],
-      nextPage: data.length === CUSTOMERS_PER_PAGE ? pageParam + 1 : undefined,
-    };
-  };
-
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isLoading,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['customers', debouncedSearch],
-    queryFn: fetchCustomers,
-    getNextPageParam: (lastPage) => lastPage.nextPage,
-    initialPageParam: 0,
+      if (error) {
+        throw error;
+      }
+      return data as Customer[];
+    },
   });
 
-  const handleSelect = (customer: Customer) => {
-    onSelect(customer);
-    setOpen(false);
+  useEffect(() => {
+    if (initialCustomers) {
+      setSearchResults(initialCustomers);
+    }
+  }, [initialCustomers]);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    if (query === '') {
+      setSearchResults(initialCustomers || []);
+      return;
+    }
+
+    if (initialCustomers) {
+      const results = initialCustomers.filter(
+        (customer) =>
+          customer.full_name?.toLowerCase().includes(query.toLowerCase()) ||
+          customer.email?.toLowerCase().includes(query.toLowerCase()) ||
+          customer.phone_number?.toLowerCase().includes(query.toLowerCase())
+      );
+      setSearchResults(results);
+    }
   };
 
-  const handleCreateCustomer = (customer: Customer) => {
-    onSelect(customer);
-    setShowCreateDialog(false);
+  const handleCustomerSelect = (customer: Customer) => {
+    setSelectedCustomer(customer);
   };
 
-  const allCustomers = data?.pages.flatMap(page => page.customers) ?? [];
+  const handleCustomerCreated = (customer: Customer) => {
+    setSearchResults((prev) => [customer, ...prev]);
+    setSelectedCustomer(customer);
+    toast.success(`Customer ${customer.full_name} created!`);
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-full justify-between"
-            >
-              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-              Search customers...
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[400px] p-0" align="start">
-            <Command>
-              <CommandInput
-                placeholder="Search customers..."
-                value={search}
-                onValueChange={setSearch}
-              />
-              <CommandList>
-                <CommandEmpty>
-                  <div className="p-4 text-center">
-                    <p className="text-sm text-muted-foreground">No customers found</p>
-                    <Button 
-                      variant="outline" 
-                      className="mt-2"
-                      onClick={() => {
-                        setOpen(false);
-                        setShowCreateDialog(true);
-                      }}
-                    >
-                      Create New Customer
-                    </Button>
-                  </div>
-                </CommandEmpty>
-                <CommandGroup>
-                  <ScrollArea className="h-[300px]">
-                    {allCustomers.map((customer) => (
-                      <CommandItem
-                        key={customer.id}
-                        onSelect={() => handleSelect(customer)}
-                        className="p-2"
-                      >
-                        <div>
-                          <div className="font-medium">{customer.full_name}</div>
-                          <div className="text-sm text-muted-foreground">{customer.email}</div>
-                          {customer.phone_number && (
-                            <div className="text-sm text-muted-foreground">
-                              {customer.phone_number}
-                            </div>
-                          )}
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </ScrollArea>
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-        <Button
-          variant="outline"
-          onClick={() => setShowCreateDialog(true)}
-        >
-          Create New
-        </Button>
+    <div>
+      <div className="mb-4">
+        <Label htmlFor="search">Search Customer:</Label>
+        <Input
+          type="text"
+          id="search"
+          placeholder="Enter name, email, or phone"
+          value={searchQuery}
+          onChange={handleSearch}
+        />
       </div>
 
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Customer</DialogTitle>
-          </DialogHeader>
-          <QuickCustomerCreate onCreated={handleCreateCustomer} />
-        </DialogContent>
-      </Dialog>
+      {isLoading ? (
+        <p>Loading customers...</p>
+      ) : error ? (
+        <p className="text-red-500">Error: {error.message}</p>
+      ) : (
+        <div className="mb-4">
+          {searchResults.length > 0 ? (
+            <ul>
+              {searchResults.map((customer) => (
+                <li
+                  key={customer.id}
+                  className={`py-2 px-4 rounded cursor-pointer hover:bg-gray-100 ${
+                    selectedCustomer?.id === customer.id ? 'bg-gray-200' : ''
+                  }`}
+                  onClick={() => handleCustomerSelect(customer)}
+                >
+                  {customer.full_name} ({customer.email})
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No customers found.</p>
+          )}
+        </div>
+      )}
+
+      {selectedCustomer && (
+        <div className="mb-4">
+          <p>
+            <strong>Selected Customer:</strong> {selectedCustomer.full_name} ({selectedCustomer.email})
+          </p>
+        </div>
+      )}
+
+      <QuickCustomerCreate onCustomerCreated={handleCustomerCreated} />
     </div>
   );
-}
+};
+
+export default CustomerSearch;
