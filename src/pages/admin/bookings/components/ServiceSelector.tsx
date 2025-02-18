@@ -117,6 +117,10 @@ export function ServiceSelector({
     }))
   ];
 
+  const handleStylistSelect = (itemId: string, stylistId: string) => {
+    onStylistSelect(itemId, stylistId);
+  };
+
   return (
     <div className="space-y-6">
       <CategoryFilter
@@ -146,7 +150,10 @@ export function ServiceSelector({
               return (
                 <TableRow 
                   key={`${item.type}-${item.id}`}
-                  className={cn(isSelected && "bg-muted")}
+                  className={cn(
+                    "transition-colors",
+                    isSelected && "bg-red-50 hover:bg-red-100"
+                  )}
                 >
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -167,7 +174,7 @@ export function ServiceSelector({
                     {isSelected && (
                       <Select 
                         value={selectedStylists[item.id] || ''} 
-                        onValueChange={(value) => onStylistSelect(item.id, value)}
+                        onValueChange={(value) => handleStylistSelect(item.id, value)}
                       >
                         <SelectTrigger className="w-[180px]">
                           <SelectValue placeholder="Select stylist" />
