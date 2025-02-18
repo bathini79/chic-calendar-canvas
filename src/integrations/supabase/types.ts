@@ -76,11 +76,13 @@ export type Database = {
           appointment_id: string
           created_at: string | null
           employee_id: string
+          end_time: string | null
           id: string
           original_price: number | null
           package_id: string | null
           price_paid: number
           service_id: string | null
+          start_time: string | null
           status: string | null
           updated_at: string | null
         }
@@ -88,11 +90,13 @@ export type Database = {
           appointment_id: string
           created_at?: string | null
           employee_id: string
+          end_time?: string | null
           id?: string
           original_price?: number | null
           package_id?: string | null
           price_paid: number
           service_id?: string | null
+          start_time?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -100,11 +104,13 @@ export type Database = {
           appointment_id?: string
           created_at?: string | null
           employee_id?: string
+          end_time?: string | null
           id?: string
           original_price?: number | null
           package_id?: string | null
           price_paid?: number
           service_id?: string | null
+          start_time?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -146,6 +152,7 @@ export type Database = {
           customized_services: string[] | null
           id: string
           package_id: string | null
+          selling_price: number | null
           service_id: string | null
           status: Database["public"]["Enums"]["cart_item_status"] | null
           updated_at: string
@@ -156,6 +163,7 @@ export type Database = {
           customized_services?: string[] | null
           id?: string
           package_id?: string | null
+          selling_price?: number | null
           service_id?: string | null
           status?: Database["public"]["Enums"]["cart_item_status"] | null
           updated_at?: string
@@ -166,6 +174,7 @@ export type Database = {
           customized_services?: string[] | null
           id?: string
           package_id?: string | null
+          selling_price?: number | null
           service_id?: string | null
           status?: Database["public"]["Enums"]["cart_item_status"] | null
           updated_at?: string
@@ -359,6 +368,7 @@ export type Database = {
       }
       inventory_items: {
         Row: {
+          categories: string[] | null
           created_at: string
           description: string | null
           id: string
@@ -372,6 +382,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          categories?: string[] | null
           created_at?: string
           description?: string | null
           id?: string
@@ -385,6 +396,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          categories?: string[] | null
           created_at?: string
           description?: string | null
           id?: string
@@ -543,6 +555,39 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      package_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          package_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          package_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          package_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_categories_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       package_services: {
         Row: {
