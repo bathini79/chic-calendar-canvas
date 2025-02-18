@@ -65,6 +65,7 @@ export default function AdminBookings() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
+  const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [notes, setNotes] = useState("");
@@ -311,6 +312,29 @@ export default function AdminBookings() {
     }
   };
 
+  const handleServiceSelect = (serviceId: string) => {
+    setSelectedServices(prev => 
+      prev.includes(serviceId) 
+        ? prev.filter(id => id !== serviceId)
+        : [...prev, serviceId]
+    );
+  };
+
+  const handlePackageSelect = (packageId: string) => {
+    setSelectedPackages(prev => 
+      prev.includes(packageId)
+        ? prev.filter(id => id !== packageId)
+        : [...prev, packageId]
+    );
+  };
+
+  const handleStylistSelect = (itemId: string, stylistId: string) => {
+    setSelectedStylists(prev => ({
+      ...prev,
+      [itemId]: stylistId
+    }));
+  };
+
   const { data: services } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -490,6 +514,7 @@ export default function AdminBookings() {
           }`}
         >
           <div className="h-full flex flex-col">
+            {/* Header */}
             <div className="p-6 border-b">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold">New Appointment</h2>
@@ -543,22 +568,12 @@ export default function AdminBookings() {
                 <div className="space-y-6">
                   <h3 className="text-lg font-medium">Select Services</h3>
                   <ServiceSelector
-                    onServiceSelect={(serviceId) => {
-                      setSelectedServices(prev => 
-                        prev.includes(serviceId) 
-                          ? prev.filter(id => id !== serviceId)
-                          : [...prev, serviceId]
-                      );
-                    }}
-                    onPackageSelect={(packageId, services) => {
-                      setSelectedPackages(prev => 
-                        prev.includes(packageId)
-                          ? prev.filter(id => id !== packageId)
-                          : [...prev, packageId]
-                      );
-                    }}
+                    onServiceSelect={handleServiceSelect}
+                    onPackageSelect={handlePackageSelect}
+                    onStylistSelect={handleStylistSelect}
                     selectedServices={selectedServices}
                     selectedPackages={selectedPackages}
+                    selectedStylists={selectedStylists}
                     stylists={employees}
                   />
                 </div>
