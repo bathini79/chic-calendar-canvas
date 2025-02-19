@@ -16,20 +16,10 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import type { Customer } from "./bookings/types";
-import { formatTime, isSameDay } from "./bookings/utils/timeFormatting";
-
-const START_HOUR = 8;
-const END_HOUR = 20;
-const TOTAL_HOURS = END_HOUR - START_HOUR;
-const PIXELS_PER_HOUR = 60;
-
-const hourLabels = Array.from({ length: 12 }, (_, i) => i + START_HOUR);
-
-const initialEvents = [
-  { id: 1, employeeId: 1, title: "Haircut", startHour: 9, duration: 1 },
-  { id: 2, employeeId: 2, title: "Facial", startHour: 9.5, duration: 1.5 },
-  { id: 3, employeeId: 3, title: "Manicure", startHour: 13, duration: 1 },
-];
+import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR } from "./bookings/utils/timeUtils";
+import { getTotalPrice, getTotalDuration, getFinalPrice, getAppointmentStatusColor } from "./bookings/utils/bookingUtils";
+import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
+import { useCalendarState } from "./bookings/hooks/useCalendarState";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -46,7 +36,7 @@ const SCREEN = {
 
 export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
-  const [events, setEvents] = useState(initialEvents);
+  const [events, setEvents] = useState([]);
   const [stats] = useState(initialStats);
   const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 11));
   const [nowPosition, setNowPosition] = useState<number | null>(null);
