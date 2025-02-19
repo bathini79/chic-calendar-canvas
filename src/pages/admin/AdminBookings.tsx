@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -7,20 +8,18 @@ import { StatsPanel } from "./bookings/components/StatsPanel";
 import { CheckoutDialog } from "./bookings/components/CheckoutDialog";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
-import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
-import type { Customer } from "./bookings/types";
-import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { addMinutes } from "date-fns";
+import { format, addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Customer } from "./bookings/types";
+import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
+import { BookingCalendar } from "./bookings/components/BookingCalendar";
+import { formatTime, isSameDay } from "./bookings/utils/timeFormatting";
 
-const START_HOUR = 8; // 8:00 AM
-const END_HOUR = 20; // 8:00 PM
+const START_HOUR = 8;
+const END_HOUR = 20;
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const PIXELS_PER_HOUR = 60;
 
@@ -534,17 +533,31 @@ export default function AdminBookings() {
         
         <CalendarHeader
           currentDate={currentDate}
-          onToday={() => setCurrentDate(new Date())}
-          onPrevious={() => {
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() - 1);
-            setCurrentDate(newDate);
-          }}
-          onNext={() => {
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() + 1);
-            setCurrentDate(newDate);
-          }}
+          onToday={goToday}
+          onPrevious={goPrev}
+          onNext={goNext}
+        />
+
+        <div className="flex-1 overflow-auto">
+          <BookingCalendar
+            employees={employees}
+            appointments={appointments}
+            currentDate={currentDate}
+            START_HOUR={START_HOUR}
+            END_HOUR={END_HOUR}
+            TOTAL_HOURS={TOTAL_HOURS}
+            PIXELS_PER_HOUR={PIXELS_PER_HOUR}
+            nowPosition={nowPosition}
+            handleColumnClick={handleColumnClick}
+            formatTime={formatTime}
+            isSameDay={isSameDay}
+          />
+        </div>
+
+        <AppointmentDetailsDialog
+          appointment={selectedAppointment}
+          open={!!selectedAppointment}
+          onOpenChange={() => setSelectedAppointment(null)}
         />
 
         {showPaymentSection ? (
