@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -22,15 +21,6 @@ const START_HOUR = 8;
 const END_HOUR = 20;
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const PIXELS_PER_HOUR = 60;
-
-function formatTime(time: number) {
-  const hours = Math.floor(time);
-  const minutes = Math.round((time - hours) * 60);
-  const period = hours >= 12 ? "pm" : "am";
-  let displayHour = hours % 12;
-  if (displayHour === 0) displayHour = 12;
-  return `${displayHour}:${minutes.toString().padStart(2, "0")}${period}`;
-}
 
 const hourLabels = Array.from({ length: 12 }, (_, i) => i + START_HOUR);
 
@@ -125,18 +115,8 @@ export default function AdminBookings() {
   function formatCurrentDate(date: Date) {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     ];
     const dayOfWeek = days[date.getDay()];
     const dayOfMonth = date.getDate();
