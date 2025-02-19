@@ -7,20 +7,31 @@ import { StatsPanel } from "./bookings/components/StatsPanel";
 import { CheckoutDialog } from "./bookings/components/CheckoutDialog";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
-import { format, addMinutes } from "date-fns";
+import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
+import type { Customer } from "./bookings/types";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Customer } from "./bookings/types";
-import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
-import { BookingCalendar } from "./bookings/components/BookingCalendar";
-import { formatTime, isSameDay } from "./bookings/utils/timeFormatting";
+import { Input } from "@/components/ui/input";
 
-const START_HOUR = 8;
-const END_HOUR = 20;
+const START_HOUR = 8; // 8:00 AM
+const END_HOUR = 20; // 8:00 PM
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const PIXELS_PER_HOUR = 60;
+
+function formatTime(time: number) {
+  const hours = Math.floor(time);
+  const minutes = Math.round((time - hours) * 60);
+  const period = hours >= 12 ? "pm" : "am";
+  let displayHour = hours % 12;
+  if (displayHour === 0) displayHour = 12;
+  return `${displayHour}:${minutes.toString().padStart(2, "0")}${period}`;
+}
 
 const hourLabels = Array.from({ length: 12 }, (_, i) => i + START_HOUR);
 
@@ -115,8 +126,18 @@ export default function AdminBookings() {
   function formatCurrentDate(date: Date) {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const months = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
     ];
     const dayOfWeek = days[date.getDay()];
     const dayOfMonth = date.getDate();
@@ -513,31 +534,17 @@ export default function AdminBookings() {
         
         <CalendarHeader
           currentDate={currentDate}
-          onToday={goToday}
-          onPrevious={goPrev}
-          onNext={goNext}
-        />
-
-        <div className="flex-1 overflow-auto">
-          <BookingCalendar
-            employees={employees}
-            appointments={appointments}
-            currentDate={currentDate}
-            START_HOUR={START_HOUR}
-            END_HOUR={END_HOUR}
-            TOTAL_HOURS={TOTAL_HOURS}
-            PIXELS_PER_HOUR={PIXELS_PER_HOUR}
-            nowPosition={nowPosition}
-            handleColumnClick={handleColumnClick}
-            formatTime={formatTime}
-            isSameDay={isSameDay}
-          />
-        </div>
-
-        <AppointmentDetailsDialog
-          appointment={selectedAppointment}
-          open={!!selectedAppointment}
-          onOpenChange={() => setSelectedAppointment(null)}
+          onToday={() => setCurrentDate(new Date())}
+          onPrevious={() => {
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() - 1);
+            setCurrentDate(newDate);
+          }}
+          onNext={() => {
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() + 1);
+            setCurrentDate(newDate);
+          }}
         />
 
         {showPaymentSection ? (
