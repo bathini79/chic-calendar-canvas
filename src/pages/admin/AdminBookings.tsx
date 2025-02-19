@@ -7,47 +7,21 @@ import { StatsPanel } from "./bookings/components/StatsPanel";
 import { CheckoutDialog } from "./bookings/components/CheckoutDialog";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
-import {
-  CalendarIcon,
-  ArrowLeftIcon,
-  ArrowRightIcon,
-} from "./bookings/components/Icons";
-import type { Customer } from "./bookings/types";
+import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
+import { PaymentDetails } from "./bookings/components/PaymentDetails";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { addMinutes } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { format, addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogHeader,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import type { Customer } from "./bookings/types";
+import { formatTime, isSameDay } from "./bookings/utils/timeFormatting";
 
-const START_HOUR = 8; // 8:00 AM
-const END_HOUR = 20; // 8:00 PM
+const START_HOUR = 8;
+const END_HOUR = 20;
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const PIXELS_PER_HOUR = 60;
-
-function formatTime(time: number) {
-  const hours = Math.floor(time);
-  const minutes = Math.round((time - hours) * 60);
-  const period = hours >= 12 ? "pm" : "am";
-  let displayHour = hours % 12;
-  if (displayHour === 0) displayHour = 12;
-  return `${displayHour}:${minutes.toString().padStart(2, "0")}${period}`;
-}
 
 const hourLabels = Array.from({ length: 12 }, (_, i) => i + START_HOUR);
 
@@ -69,6 +43,7 @@ const SCREEN = {
   CHECKOUT: "CHECKOUT",
   SUMMARY: "SUMMARY",
 };
+
 export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
   const [events, setEvents] = useState(initialEvents);
@@ -108,6 +83,7 @@ export default function AdminBookings() {
   const [appointmentNotes, setAppointmentNotes] = useState("");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
+
   useEffect(() => {
     const updateNow = () => {
       const now = new Date();
@@ -261,6 +237,14 @@ export default function AdminBookings() {
     });
 
     return totalDuration;
+  };
+
+  const getFinalPrice = () => {
+    const totalPrice = getTotalPrice();
+    if (discountType === 'percentage') {
+      return totalPrice * (1 - (discountValue / 100));
+    }
+    return Math.max(0, totalPrice - (discountType === 'fixed' ? discountValue : 0));
   };
 
   const handleSaveAppointment = async () => {
@@ -511,14 +495,6 @@ export default function AdminBookings() {
     }
   };
 
-  const isSameDay = (date1: Date, date2: Date) => {
-    return (
-      date1.getFullYear() === date2.getFullYear() &&
-      date1.getMonth() === date2.getMonth() &&
-      date1.getDate() === date2.getDate()
-    );
-  };
-
   const renderAppointmentBlock = (appointment: any, booking: any) => {
     const statusColor = getAppointmentStatusColor(appointment.status);
     const duration =
@@ -582,7 +558,7 @@ export default function AdminBookings() {
         {showPaymentSection ? (
           <div className="flex-1 overflow-auto p-6">
             <PaymentDetails
-              paymentCompleted={paymentCompleted}
+              paymentCompleted={checkoutStep === 'completed'}
               selectedServices={selectedServices}
               services={services || []}
               employees={employees}
@@ -598,7 +574,7 @@ export default function AdminBookings() {
               onDiscountTypeChange={setDiscountType}
               onDiscountValueChange={setDiscountValue}
               onNotesChange={setAppointmentNotes}
-              onSave={() => handleCheckoutSave(getFinalPrice)}
+              onSave={handleCheckoutSave}
             />
           </div>
         ) : (
@@ -684,84 +660,11 @@ export default function AdminBookings() {
           </div>
         )}
 
-        <Dialog
+        <AppointmentDetailsDialog
+          appointment={selectedAppointment}
           open={!!selectedAppointment}
           onOpenChange={() => setSelectedAppointment(null)}
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Appointment Details</DialogTitle>
-            </DialogHeader>
-            {selectedAppointment && (
-              <div className="space-y-4 p-4">
-                <div>
-                  <Badge
-                    variant={
-                      selectedAppointment.status === "confirmed"
-                        ? "default"
-                        : selectedAppointment.status === "canceled"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                  >
-                    {selectedAppointment.status.toUpperCase()}
-                  </Badge>
-                </div>
-
-                <div>
-                  <h3 className="font-medium">Customer</h3>
-                  <p>{selectedAppointment.customer?.full_name}</p>
-                  <p className="text-sm text-gray-500">
-                    {selectedAppointment.customer?.email}
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium">Date & Time</h3>
-                  <p>
-                    {format(new Date(selectedAppointment.start_time), "PPpp")}
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium">Services</h3>
-                  <div className="space-y-2">
-                    {selectedAppointment.bookings.map((booking: any) => (
-                      <div key={booking.id} className="border rounded p-2">
-                        <div className="font-medium">
-                          {booking.service?.name || booking.package?.name}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          with {booking.employee?.name}
-                        </div>
-                        <div className="text-sm">
-                          Duration:{" "}
-                          {booking.service?.duration ||
-                            booking.package?.duration}
-                          min
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {selectedAppointment.notes && (
-                  <div>
-                    <h3 className="font-medium">Notes</h3>
-                    <p className="text-gray-600">{selectedAppointment.notes}</p>
-                  </div>
-                )}
-
-                <div>
-                  <h3 className="font-medium">Total</h3>
-                  <p className="text-lg font-semibold">
-                    ${selectedAppointment.total_price}
-                  </p>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        />
 
         {clickedCell && (
           <div
