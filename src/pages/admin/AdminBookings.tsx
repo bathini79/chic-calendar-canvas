@@ -4,21 +4,23 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import { CheckoutDialog } from "./bookings/components/CheckoutDialog";
+import { CustomerSearch } from "./bookings/components/CustomerSearch";
+import { ServiceSelector } from "./bookings/components/ServiceSelector";
+import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
+import type { Customer } from "./bookings/types";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { format, addMinutes } from "date-fns";
-import { PaymentSection } from "./bookings/components/PaymentSection";
-import { CalendarView } from "./bookings/components/CalendarView";
-import { AppointmentForm } from "./bookings/components/AppointmentForm";
-import type { Customer } from "./bookings/types";
+import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 
-const START_HOUR = 8;
-const END_HOUR = 20;
+const START_HOUR = 8; // 8:00 AM
+const END_HOUR = 20; // 8:00 PM
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const PIXELS_PER_HOUR = 60;
 
@@ -521,22 +523,6 @@ export default function AdminBookings() {
     );
   };
 
-  const handleProceedToCheckout = () => {
-    setIsAddAppointmentOpen(false);
-    setShowCheckout(true);
-  };
-
-  const getFinalPrice = () => {
-    const totalPrice = getTotalPrice();
-    return discountType === 'percentage'
-      ? totalPrice * (1 - (discountValue / 100))
-      : Math.max(0, totalPrice - discountValue);
-  };
-
-  const paymentCompleted = () => {
-    setShowPaymentSection(false);
-  };
-
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -544,67 +530,126 @@ export default function AdminBookings() {
           <div className="font-bold text-xl">Define Salon</div>
         </header>
 
-        <StatsPanel stats={initialStats} />
+        <StatsPanel stats={stats} />
         
         <CalendarHeader
           currentDate={currentDate}
-          onToday={goToday}
-          onPrevious={goPrev}
-          onNext={goNext}
+          onToday={() => setCurrentDate(new Date())}
+          onPrevious={() => {
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() - 1);
+            setCurrentDate(newDate);
+          }}
+          onNext={() => {
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() + 1);
+            setCurrentDate(newDate);
+          }}
         />
 
         {showPaymentSection ? (
-          <PaymentSection
-            paymentMethod={paymentMethod}
-            onPaymentMethodChange={setPaymentMethod}
-            discountType={discountType}
-            onDiscountTypeChange={setDiscountType}
-            discountValue={discountValue}
-            onDiscountValueChange={setDiscountValue}
-            notes={appointmentNotes}
-            onNotesChange={setAppointmentNotes}
-            totalPrice={getTotalPrice()}
-            onBack={() => setShowPaymentSection(false)}
-            onSave={handleCheckoutSave}
-          />
+          <div className="flex-1 overflow-auto p-6">
+            <PaymentDetails
+              paymentCompleted={paymentCompleted}
+              selectedServices={selectedServices}
+              services={services || []}
+              employees={employees}
+              selectedStylists={selectedStylists}
+              selectedCustomer={selectedCustomer}
+              paymentMethod={paymentMethod}
+              discountType={discountType}
+              discountValue={discountValue}
+              appointmentNotes={appointmentNotes}
+              getTotalPrice={getTotalPrice}
+              getFinalPrice={getFinalPrice}
+              onPaymentMethodChange={setPaymentMethod}
+              onDiscountTypeChange={setDiscountType}
+              onDiscountValueChange={setDiscountValue}
+              onNotesChange={setAppointmentNotes}
+              onSave={() => handleCheckoutSave(getFinalPrice)}
+            />
+          </div>
         ) : (
-          <CalendarView
-            employees={employees}
-            appointments={appointments}
-            currentDate={currentDate}
-            onColumnClick={handleColumnClick}
-            nowPosition={nowPosition}
-            renderAppointmentBlock={renderAppointmentBlock}
-            hourLabels={hourLabels}
-            START_HOUR={START_HOUR}
-            TOTAL_HOURS={TOTAL_HOURS}
-            PIXELS_PER_HOUR={PIXELS_PER_HOUR}
-            formatTime={formatTime}
-            isSameDay={isSameDay}
-          />
-        )}
+          <div className="flex-1 overflow-auto">
+            <div className="flex">
+              <div className="w-16 border-r" />
+              {employees.map((emp: any) => (
+                <div
+                  key={emp.id}
+                  className="flex-1 border-r flex items-center justify-center p-2"
+                >
+                  <div className="flex flex-col items-center space-y-1">
+                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
+                      {emp.avatar}
+                    </div>
+                    <div className="text-xs font-medium text-gray-700">
+                      {emp.name}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-        <AppointmentForm
-          isOpen={isAddAppointmentOpen}
-          onClose={closeAddAppointment}
-          selectedCustomer={selectedCustomer}
-          onCustomerSelect={(customer) => {
-            setSelectedCustomer(customer);
-            setShowCreateForm(false);
-          }}
-          onCustomerChange={() => setSelectedCustomer(null)}
-          selectedServices={selectedServices}
-          selectedPackages={selectedPackages}
-          selectedStylists={selectedStylists}
-          employees={employees}
-          onServiceSelect={handleServiceSelect}
-          onPackageSelect={handlePackageSelect}
-          onStylistSelect={handleStylistSelect}
-          onSave={handleSaveAppointment}
-          onProceedToCheckout={handleProceedToCheckout}
-          clickedCell={clickedCell}
-          formatTime={formatTime}
-        />
+            <div className="flex">
+              <div className="w-16 border-r">
+                {hourLabels.map((hr) => (
+                  <div
+                    key={hr}
+                    className="h-[60px] flex items-center justify-end pr-1 text-[10px] text-gray-700 font-bold border-b"
+                  >
+                    {formatTime(hr)}
+                  </div>
+                ))}
+              </div>
+
+              {employees.map((emp: any) => (
+                <div
+                  key={emp.id}
+                  className="flex-1 border-r relative"
+                  style={{
+                    minWidth: "150px",
+                    height: TOTAL_HOURS * PIXELS_PER_HOUR,
+                  }}
+                  onClick={(e) => handleColumnClick(e, emp.id)}
+                >
+                  {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      className="absolute left-0 right-0 border-b"
+                      style={{ top: idx * 15 }}
+                    />
+                  ))}
+
+                  {nowPosition !== null && isSameDay(currentDate, new Date()) && (
+                    <div
+                      className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
+                      style={{ top: nowPosition }}
+                    />
+                  )}
+
+                  {appointments.map((appointment) =>
+                    appointment.bookings.map((booking) => {
+                      if (booking.employee?.id !== emp.id) return null;
+
+                      const startTime = new Date(booking.start_time);
+                      const startHour =
+                        startTime.getHours() + startTime.getMinutes() / 60;
+                      const duration =
+                        booking.service?.duration ||
+                        booking.package?.duration ||
+                        60;
+                      const topPositionPx =
+                        (startHour - START_HOUR) * PIXELS_PER_HOUR;
+                      const heightPx = (duration / 60) * PIXELS_PER_HOUR;
+
+                      return renderAppointmentBlock(appointment, booking);
+                    })
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Dialog
           open={!!selectedAppointment}
@@ -684,6 +729,143 @@ export default function AdminBookings() {
             )}
           </DialogContent>
         </Dialog>
+
+        {clickedCell && (
+          <div
+            className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
+            style={{
+              left: clickedCell.x,
+              top: clickedCell.y,
+            }}
+          >
+            <div className="bg-black px-4 py-2 text-sm font-medium text-white">
+              {formatTime(clickedCell.time)}
+            </div>
+            <div
+              className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={openAddAppointment}
+            >
+              <CalendarIcon className="h-4 w-4 text-gray-600" />
+              <span className="text-gray-700">Add Appointment</span>
+            </div>
+          </div>
+        )}
+
+        <div
+          className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
+            isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="h-full flex flex-col">
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold">New Appointment</h2>
+                <button
+                  onClick={closeAddAppointment}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              {clickedCell && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {format(currentDate, "MMMM d, yyyy")} at{" "}
+                  {formatTime(clickedCell.time)}
+                </p>
+              )}
+            </div>
+
+            <div className="flex-1 flex overflow-hidden">
+              <div className="w-[40%] border-r overflow-y-auto p-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-medium">Select Customer</h3>
+                  {!selectedCustomer ? (
+                    <CustomerSearch
+                      onSelect={(customer) => {
+                        setSelectedCustomer(customer);
+                        setShowCreateForm(false);
+                      }}
+                    />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium">
+                            {selectedCustomer.full_name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {selectedCustomer.email}
+                          </p>
+                        </div>
+                        <button
+                          className="text-sm text-gray-600 hover:text-gray-900"
+                          onClick={() => setSelectedCustomer(null)}
+                        >
+                          Change Customer
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="w-[60%] overflow-y-auto p-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-medium">Select Services</h3>
+                  <ServiceSelector
+                    onServiceSelect={handleServiceSelect}
+                    onPackageSelect={handlePackageSelect}
+                    onStylistSelect={handleStylistSelect}
+                    selectedServices={selectedServices}
+                    selectedPackages={selectedPackages}
+                    selectedStylists={selectedStylists}
+                    stylists={employees}
+                  />
+                  <div className="space-y-4">
+                    <label className="text-sm font-medium">Notes</label>
+                    <Input
+                      type="text"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Add notes for this appointment"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={closeAddAppointment}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveAppointment}>
+                      Save Appointment
+                    </Button>
+                    <Button onClick={() => setShowCheckout(true)}>
+                      Proceed to Checkout
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <CheckoutDialog
+          open={showCheckout}
+          onOpenChange={setShowCheckout}
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={(value) => setPaymentMethod(value)}
+          discountType={discountType}
+          onDiscountTypeChange={(value) => setDiscountType(value)}
+          discountValue={discountValue}
+          onDiscountValueChange={setDiscountValue}
+          totalPrice={getTotalPrice()}
+          notes={appointmentNotes}
+          onNotesChange={setAppointmentNotes}
+          onSave={handleCheckoutSave}
+          onCancel={() => {
+            setShowCheckout(false);
+            setCheckoutStep('checkout');
+          }}
+          step={checkoutStep}
+        />
       </div>
     </DndProvider>
   );
