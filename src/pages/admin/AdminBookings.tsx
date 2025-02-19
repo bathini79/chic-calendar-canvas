@@ -19,13 +19,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
-// Configuration
 const START_HOUR = 8; // 8:00 AM
 const END_HOUR = 20; // 8:00 PM
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const PIXELS_PER_HOUR = 60;
 
-// Format a fractional hour as "h:mmam/pm"
 function formatTime(time: number) {
   const hours = Math.floor(time);
   const minutes = Math.round((time - hours) * 60);
@@ -35,10 +33,8 @@ function formatTime(time: number) {
   return `${displayHour}:${minutes.toString().padStart(2, "0")}${period}`;
 }
 
-// For the left column: integer hours only (8..19) => 12 hours
 const hourLabels = Array.from({ length: 12 }, (_, i) => i + START_HOUR);
 
-// Sample events and stats
 const initialEvents = [
   { id: 1, employeeId: 1, title: "Haircut", startHour: 9, duration: 1 },
   { id: 2, employeeId: 2, title: "Facial", startHour: 9.5, duration: 1.5 },
@@ -83,8 +79,9 @@ export default function AdminBookings() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash');
   const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
   const [discountValue, setDiscountValue] = useState<number>(0);
+  const [checkoutStep, setCheckoutStep] = useState<'checkout' | 'payment' | 'completed'>('checkout');
+  const [appointmentNotes, setAppointmentNotes] = useState("");
 
-  // Update now line
   useEffect(() => {
     const updateNow = () => {
       const now = new Date();
@@ -100,7 +97,6 @@ export default function AdminBookings() {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Fetch employees
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
@@ -126,7 +122,6 @@ export default function AdminBookings() {
     fetchEmployees();
   }, []);
 
-  // Format the displayed date as "Tue 11 Feb"
   function formatCurrentDate(date: Date) {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const months = [
@@ -155,7 +150,6 @@ export default function AdminBookings() {
     );
   };
 
-  // Navigation functions
   const goToday = () => setCurrentDate(new Date());
   const goPrev = () => {
     const newDate = new Date(currentDate);
@@ -168,8 +162,7 @@ export default function AdminBookings() {
     setCurrentDate(newDate);
   };
 
-  // Column click handling
-  function handleColumnClick(e: React.MouseEvent, empId: number) {
+  const handleColumnClick = (e: React.MouseEvent, empId: number) => {
     if (e.target !== e.currentTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
@@ -183,7 +176,7 @@ export default function AdminBookings() {
       y: e.pageY - 20,
       date: currentDate,
     });
-  }
+  };
 
   const openAddAppointment = () => {
     if (clickedCell) {
@@ -204,11 +197,9 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(false);
   };
 
-  // Calculate total price
   const getTotalPrice = () => {
     let total = 0;
 
-    // Add service prices
     selectedServices.forEach((serviceId) => {
       const service = services?.find((s) => s.id === serviceId);
       if (service) {
@@ -216,7 +207,6 @@ export default function AdminBookings() {
       }
     });
 
-    // Add package prices
     selectedPackages.forEach((packageId) => {
       const pkg = packages?.find((p) => p.id === packageId);
       if (pkg) {
@@ -227,11 +217,9 @@ export default function AdminBookings() {
     return total;
   };
 
-  // Calculate total duration
   const getTotalDuration = () => {
     let totalDuration = 0;
 
-    // Add service durations
     selectedServices.forEach((serviceId) => {
       const service = services?.find((s) => s.id === serviceId);
       if (service) {
@@ -239,7 +227,6 @@ export default function AdminBookings() {
       }
     });
 
-    // Add package durations
     selectedPackages.forEach((packageId) => {
       const pkg = packages?.find((p) => p.id === packageId);
       if (pkg) {
@@ -256,10 +243,6 @@ export default function AdminBookings() {
       return;
     }
 
-    setShowCheckout(true);
-  };
-
-  const handleFinalSave = async () => {
     try {
       const startDateTime = new Date(`${format(selectedDate!, 'yyyy-MM-dd')} ${selectedTime}`);
       if (isNaN(startDateTime.getTime())) {
@@ -270,29 +253,16 @@ export default function AdminBookings() {
       const totalDuration = getTotalDuration();
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
-      // Calculate final price with discounts
-      let finalPrice = getTotalPrice();
-      if (discountType === 'percentage') {
-        finalPrice = finalPrice * (1 - (discountValue / 100));
-      } else if (discountType === 'fixed') {
-        finalPrice = Math.max(0, finalPrice - discountValue);
-      }
-
-      // 1. Insert into appointments table
       const { data: appointmentData, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
           customer_id: selectedCustomer!.id,
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
-          notes: notes,
           status: 'confirmed',
           number_of_bookings: selectedServices.length + selectedPackages.length,
-          total_price: finalPrice,
-          total_duration: totalDuration,
-          discount_type: discountType,
-          discount_value: discountValue,
-          payment_method: paymentMethod
+          total_price: getTotalPrice(),
+          total_duration: totalDuration
         })
         .select();
 
@@ -305,13 +275,11 @@ export default function AdminBookings() {
       const appointmentId = appointmentData[0].id;
       let currentStartTime = startDateTime;
 
-      // Iterate through all selected items (services and packages) together
       const allSelectedItems = [
         ...selectedServices.map((id) => ({ type: "service", id })),
         ...selectedPackages.map((id) => ({ type: "package", id })),
       ];
 
-      // Sort all selected items by duration (shortest first)
       allSelectedItems.sort((a, b) => {
         let durationA =
           (a.type === "service"
@@ -344,7 +312,6 @@ export default function AdminBookings() {
             end_time: bookingEndTime.toISOString(),
           };
         } else {
-          // item.type === 'package'
           const pkg = packages?.find((p) => p.id === item.id);
           if (!pkg) continue;
           duration = pkg.duration;
@@ -359,7 +326,6 @@ export default function AdminBookings() {
           };
         }
 
-        // Create the booking
         const { error: bookingError } = await supabase
           .from("bookings")
           .insert(bookingData);
@@ -373,16 +339,12 @@ export default function AdminBookings() {
         }
         console.log(`${item.type}  bookingEndTime`, bookingEndTime);
 
-        // Update currentStartTime for next booking correctly, to the previous booking's end time.
         currentStartTime = bookingEndTime;
       }
 
-      toast.success("Appointment created successfully");
-      setShowCheckout(false);
+      toast.success("Appointment saved successfully");
       setIsAddAppointmentOpen(false);
-      toast.success("Appointment created successfully");
       
-      // Reset all states
       setSelectedServices([]);
       setSelectedPackages([]);
       setSelectedDate(undefined);
@@ -394,6 +356,36 @@ export default function AdminBookings() {
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
+    }
+  };
+
+  const handleCheckoutSave = async () => {
+    if (checkoutStep === 'checkout') {
+      setCheckoutStep('payment');
+      return;
+    }
+
+    if (checkoutStep === 'payment') {
+      try {
+        const { error: updateError } = await supabase
+          .from('appointments')
+          .update({
+            status: 'completed',
+            payment_method: paymentMethod,
+            discount_type: discountType,
+            discount_value: discountValue,
+            notes: appointmentNotes
+          })
+          .eq('id', selectedAppointment.id);
+
+        if (updateError) throw updateError;
+
+        setCheckoutStep('completed');
+        toast.success("Payment completed successfully");
+      } catch (error: any) {
+        console.error("Error completing payment:", error);
+        toast.error(error.message || "Failed to complete payment");
+      }
     }
   };
 
@@ -546,7 +538,6 @@ export default function AdminBookings() {
           onNext={goNext}
         />
 
-        {/* Employee Header */}
         <div className="flex border-b bg-white">
           <div className="w-16 border-r" />
           {employees.map((emp: any) => (
@@ -566,10 +557,8 @@ export default function AdminBookings() {
           ))}
         </div>
 
-        {/* Main Schedule Grid */}
         <div className="flex-1 overflow-auto">
           <div className="flex">
-            {/* Hours Column */}
             <div className="w-16 border-r">
               {hourLabels.map((hr) => (
                 <div
@@ -581,7 +570,6 @@ export default function AdminBookings() {
               ))}
             </div>
 
-            {/* Employee Columns */}
             {employees.map((emp: any) => (
               <div
                 key={emp.id}
@@ -592,7 +580,6 @@ export default function AdminBookings() {
                 }}
                 onClick={(e) => handleColumnClick(e, emp.id)}
               >
-                {/* Background Grid */}
                 {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
                   <div
                     key={idx}
@@ -601,7 +588,6 @@ export default function AdminBookings() {
                   />
                 ))}
 
-                {/* Now Line */}
                 {nowPosition !== null && isSameDay(currentDate, new Date()) && (
                   <div
                     className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
@@ -609,7 +595,6 @@ export default function AdminBookings() {
                   />
                 )}
 
-                {/* Appointment Blocks */}
                 {appointments.map((appointment) =>
                   appointment.bookings.map((booking) => {
                     if (booking.employee?.id !== emp.id) return null;
@@ -633,7 +618,6 @@ export default function AdminBookings() {
           </div>
         </div>
 
-        {/* Appointment Details Dialog */}
         <Dialog
           open={!!selectedAppointment}
           onOpenChange={() => setSelectedAppointment(null)}
@@ -713,36 +697,12 @@ export default function AdminBookings() {
           </DialogContent>
         </Dialog>
 
-        {/* Clicked Cell Popup */}
-        {clickedCell && (
-          <div
-            className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
-            style={{
-              left: clickedCell.x,
-              top: clickedCell.y,
-            }}
-          >
-            <div className="bg-black px-4 py-2 text-sm font-medium text-white">
-              {formatTime(clickedCell.time)}
-            </div>
-            <div
-              className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={openAddAppointment}
-            >
-              <CalendarIcon className="h-4 w-4 text-gray-600" />
-              <span className="text-gray-700">Add Appointment</span>
-            </div>
-          </div>
-        )}
-
-        {/* Add Appointment Slide-in */}
         <div
           className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
             isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
           <div className="h-full flex flex-col">
-            {/* Header */}
             <div className="p-6 border-b">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold">New Appointment</h2>
@@ -762,7 +722,6 @@ export default function AdminBookings() {
             </div>
 
             <div className="flex-1 flex overflow-hidden">
-              {/* Customer Selection Panel - 40% */}
               <div className="w-[40%] border-r overflow-y-auto p-6">
                 <div className="space-y-6">
                   <h3 className="text-lg font-medium">Select Customer</h3>
@@ -796,7 +755,6 @@ export default function AdminBookings() {
                 </div>
               </div>
 
-              {/* Service Selection Panel - 60% */}
               <div className="w-[60%] overflow-y-auto p-6">
                 <div className="space-y-6">
                   <h3 className="text-lg font-medium">Select Services</h3>
@@ -825,6 +783,9 @@ export default function AdminBookings() {
                     <Button onClick={handleSaveAppointment}>
                       Save Appointment
                     </Button>
+                    <Button onClick={() => setShowCheckout(true)}>
+                      Proceed to Checkout
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -842,8 +803,14 @@ export default function AdminBookings() {
           discountValue={discountValue}
           onDiscountValueChange={setDiscountValue}
           totalPrice={getTotalPrice()}
-          onSave={handleFinalSave}
-          onCancel={() => setShowCheckout(false)}
+          notes={appointmentNotes}
+          onNotesChange={setAppointmentNotes}
+          onSave={handleCheckoutSave}
+          onCancel={() => {
+            setShowCheckout(false);
+            setCheckoutStep('checkout');
+          }}
+          step={checkoutStep}
         />
       </div>
     </DndProvider>
