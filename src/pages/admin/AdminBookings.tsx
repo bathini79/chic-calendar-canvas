@@ -7,16 +7,32 @@ import { StatsPanel } from "./bookings/components/StatsPanel";
 import { CheckoutDialog } from "./bookings/components/CheckoutDialog";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
-import { CalendarIcon, ArrowLeftIcon, ArrowRightIcon } from "./bookings/components/Icons";
+import {
+  CalendarIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+} from "./bookings/components/Icons";
 import type { Customer } from "./bookings/types";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogHeader,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
 const START_HOUR = 8; // 8:00 AM
@@ -48,6 +64,11 @@ const initialStats = [
   { label: "Today's Revenue", value: 1950 },
 ];
 
+const SCREEN = {
+  SERVICE_SELECTION: "SERVICE_SELECTION",
+  CHECKOUT: "CHECKOUT",
+  SUMMARY: "SUMMARY",
+};
 export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
   const [events, setEvents] = useState(initialEvents);
@@ -76,13 +97,17 @@ export default function AdminBookings() {
   const [notes, setNotes] = useState("");
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash');
-  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "online">("cash");
+  const [discountType, setDiscountType] = useState<
+    "none" | "percentage" | "fixed"
+  >("none");
   const [discountValue, setDiscountValue] = useState<number>(0);
-  const [checkoutStep, setCheckoutStep] = useState<'checkout' | 'payment' | 'completed'>('checkout');
+  const [checkoutStep, setCheckoutStep] = useState<
+    "checkout" | "payment" | "completed"
+  >("checkout");
   const [appointmentNotes, setAppointmentNotes] = useState("");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
-
+  const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   useEffect(() => {
     const updateNow = () => {
       const now = new Date();
@@ -245,25 +270,32 @@ export default function AdminBookings() {
     }
 
     try {
-      const startDateTime = new Date(`${format(selectedDate!, 'yyyy-MM-dd')} ${selectedTime}`);
+      const startDateTime = new Date(
+        `${format(selectedDate!, "yyyy-MM-dd")} ${selectedTime}`
+      );
       if (isNaN(startDateTime.getTime())) {
-        console.error(`Invalid date generated, date: ${format(selectedDate!, 'yyyy-MM-dd')}, time: ${selectedTime}`);
+        console.error(
+          `Invalid date generated, date: ${format(
+            selectedDate!,
+            "yyyy-MM-dd"
+          )}, time: ${selectedTime}`
+        );
         return;
       }
-      
+
       const totalDuration = getTotalDuration();
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
       const { data: appointmentData, error: appointmentError } = await supabase
-        .from('appointments')
+        .from("appointments")
         .insert({
           customer_id: selectedCustomer!.id,
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
-          status: 'confirmed',
+          status: "confirmed",
           number_of_bookings: selectedServices.length + selectedPackages.length,
           total_price: getTotalPrice(),
-          total_duration: totalDuration
+          total_duration: totalDuration,
         })
         .select();
 
@@ -338,21 +370,19 @@ export default function AdminBookings() {
           );
           throw bookingError;
         }
-        console.log(`${item.type}  bookingEndTime`, bookingEndTime);
-
         currentStartTime = bookingEndTime;
       }
 
       toast.success("Appointment saved successfully");
       setIsAddAppointmentOpen(false);
-      
+
       setSelectedServices([]);
       setSelectedPackages([]);
       setSelectedDate(undefined);
       setSelectedTime(undefined);
       setNotes("");
-      setPaymentMethod('cash');
-      setDiscountType('none');
+      setPaymentMethod("cash");
+      setDiscountType("none");
       setDiscountValue(0);
     } catch (error: any) {
       console.error("Error saving appointment:", error);
@@ -361,27 +391,27 @@ export default function AdminBookings() {
   };
 
   const handleCheckoutSave = async () => {
-    if (checkoutStep === 'checkout') {
-      setCheckoutStep('payment');
+    if (checkoutStep === "checkout") {
+      setCheckoutStep("payment");
       return;
     }
 
-    if (checkoutStep === 'payment') {
+    if (checkoutStep === "payment") {
       try {
         const { error: updateError } = await supabase
-          .from('appointments')
+          .from("appointments")
           .update({
-            status: 'completed',
+            status: "completed",
             payment_method: paymentMethod,
             discount_type: discountType,
             discount_value: discountValue,
-            notes: appointmentNotes
+            notes: appointmentNotes,
           })
-          .eq('id', selectedAppointment.id);
+          .eq("id", selectedAppointment.id);
 
         if (updateError) throw updateError;
 
-        setCheckoutStep('completed');
+        setCheckoutStep("completed");
         toast.success("Payment completed successfully");
       } catch (error: any) {
         console.error("Error completing payment:", error);
@@ -491,13 +521,15 @@ export default function AdminBookings() {
 
   const renderAppointmentBlock = (appointment: any, booking: any) => {
     const statusColor = getAppointmentStatusColor(appointment.status);
-    const duration = booking.service?.duration || booking.package?.duration || 60;
-    const startHour = new Date(booking.start_time).getHours() + 
-                   new Date(booking.start_time).getMinutes() / 60;
-    
-    const topPositionPx = ((startHour - START_HOUR) * PIXELS_PER_HOUR);
+    const duration =
+      booking.service?.duration || booking.package?.duration || 60;
+    const startHour =
+      new Date(booking.start_time).getHours() +
+      new Date(booking.start_time).getMinutes() / 60;
+
+    const topPositionPx = (startHour - START_HOUR) * PIXELS_PER_HOUR;
     const heightPx = (duration / 60) * PIXELS_PER_HOUR;
-    
+
     return (
       <div
         key={booking.id}
@@ -531,7 +563,7 @@ export default function AdminBookings() {
         </header>
 
         <StatsPanel stats={stats} />
-        
+
         <CalendarHeader
           currentDate={currentDate}
           onToday={() => setCurrentDate(new Date())}
@@ -620,12 +652,13 @@ export default function AdminBookings() {
                     />
                   ))}
 
-                  {nowPosition !== null && isSameDay(currentDate, new Date()) && (
-                    <div
-                      className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
-                      style={{ top: nowPosition }}
-                    />
-                  )}
+                  {nowPosition !== null &&
+                    isSameDay(currentDate, new Date()) && (
+                      <div
+                        className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
+                        style={{ top: nowPosition }}
+                      />
+                    )}
 
                   {appointments.map((appointment) =>
                     appointment.bookings.map((booking) => {
@@ -812,15 +845,20 @@ export default function AdminBookings() {
               <div className="w-[60%] overflow-y-auto p-6">
                 <div className="space-y-6">
                   <h3 className="text-lg font-medium">Select Services</h3>
-                  <ServiceSelector
-                    onServiceSelect={handleServiceSelect}
-                    onPackageSelect={handlePackageSelect}
-                    onStylistSelect={handleStylistSelect}
-                    selectedServices={selectedServices}
-                    selectedPackages={selectedPackages}
-                    selectedStylists={selectedStylists}
-                    stylists={employees}
-                  />
+                  {currentScreen === SCREEN.SERVICE_SELECTION ? (
+                    <ServiceSelector
+                      onServiceSelect={handleServiceSelect}
+                      onPackageSelect={handlePackageSelect}
+                      onStylistSelect={handleStylistSelect}
+                      selectedServices={selectedServices}
+                      selectedPackages={selectedPackages}
+                      selectedStylists={selectedStylists}
+                      stylists={employees}
+                    />
+                  ) : null}
+
+                  {currentScreen === SCREEN.CHECKOUT ? <p>hello</p> : null}
+
                   <div className="space-y-4">
                     <label className="text-sm font-medium">Notes</label>
                     <Input
@@ -837,7 +875,7 @@ export default function AdminBookings() {
                     <Button onClick={handleSaveAppointment}>
                       Save Appointment
                     </Button>
-                    <Button onClick={() => setShowCheckout(true)}>
+                    <Button onClick={() => setCurrentScreen(SCREEN.CHECKOUT)}>
                       Proceed to Checkout
                     </Button>
                   </div>
@@ -862,7 +900,7 @@ export default function AdminBookings() {
           onSave={handleCheckoutSave}
           onCancel={() => {
             setShowCheckout(false);
-            setCheckoutStep('checkout');
+            setCheckoutStep("checkout");
           }}
           step={checkoutStep}
         />
