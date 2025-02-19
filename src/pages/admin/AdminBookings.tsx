@@ -84,6 +84,7 @@ export default function AdminBookings() {
   const [appointmentNotes, setAppointmentNotes] = useState("");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
+  const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
 
   useEffect(() => {
     const updateNow = () => {
@@ -198,6 +199,17 @@ export default function AdminBookings() {
 
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
+    setSelectedCustomer(null);
+    setSelectedServices([]);
+    setSelectedPackages([]);
+    setSelectedStylists({});
+    setShowPaymentSection(false);
+    setPaymentCompleted(false);
+    setCurrentAppointmentId(null);
+    setPaymentMethod('cash');
+    setDiscountType('none');
+    setDiscountValue(0);
+    setAppointmentNotes('');
   };
 
   const getTotalPrice = () => {
@@ -263,107 +275,54 @@ export default function AdminBookings() {
       
       const totalDuration = getTotalDuration();
       const endDateTime = addMinutes(startDateTime, totalDuration);
+      const totalPrice = getTotalPrice();
 
+      // Create the appointment first
       const { data: appointmentData, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
-          customer_id: selectedCustomer!.id,
+          customer_id: selectedCustomer.id,
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
           status: 'confirmed',
           number_of_bookings: selectedServices.length + selectedPackages.length,
-          total_price: getTotalPrice(),
+          total_price: totalPrice,
+          original_total_price: totalPrice,
           total_duration: totalDuration
         })
-        .select();
+        .select()
+        .single();
 
-      if (appointmentError) {
-        console.error("Error inserting appointment:", appointmentError);
-        toast.error("Failed to create appointment. Please try again.");
-        throw appointmentError;
-      }
+      if (appointmentError) throw appointmentError;
 
-      const appointmentId = appointmentData[0].id;
-      let currentStartTime = startDateTime;
+      const appointmentId = appointmentData.id;
+      setCurrentAppointmentId(appointmentId);
 
-      const allSelectedItems = [
-        ...selectedServices.map((id) => ({ type: "service", id })),
-        ...selectedPackages.map((id) => ({ type: "package", id })),
-      ];
+      // Create bookings for each service
+      for (const serviceId of selectedServices) {
+        const service = services?.find(s => s.id === serviceId);
+        if (!service) continue;
 
-      allSelectedItems.sort((a, b) => {
-        let durationA =
-          (a.type === "service"
-            ? services?.find((s) => s.id === a.id)?.duration
-            : packages?.find((p) => p.id === a.id)?.duration) || 0;
-        let durationB =
-          (b.type === "service"
-            ? services?.find((s) => s.id === b.id)?.duration
-            : packages?.find((p) => p.id === b.id)?.duration) || 0;
-        return durationA - durationB;
-      });
-
-      for (const item of allSelectedItems) {
-        let bookingEndTime: Date;
-        let bookingData;
-        let duration: number;
-
-        if (item.type === "service") {
-          const service = services?.find((s) => s.id === item.id);
-          if (!service) continue;
-          duration = service.duration;
-          bookingEndTime = addMinutes(currentStartTime, service.duration);
-          bookingData = {
-            appointment_id: appointmentId,
-            service_id: service.id,
-            status: "confirmed",
-            price_paid: service.selling_price,
-            employee_id: selectedStylists[service.id],
-            start_time: currentStartTime.toISOString(),
-            end_time: bookingEndTime.toISOString(),
-          };
-        } else {
-          const pkg = packages?.find((p) => p.id === item.id);
-          if (!pkg) continue;
-          duration = pkg.duration;
-          bookingEndTime = addMinutes(currentStartTime, pkg.duration);
-          bookingData = {
-            appointment_id: appointmentId,
-            package_id: pkg.id,
-            status: "confirmed",
-            price_paid: pkg.price,
-            start_time: currentStartTime.toISOString(),
-            end_time: bookingEndTime.toISOString(),
-          };
-        }
+        const bookingStartTime = startDateTime;
+        const bookingEndTime = addMinutes(startDateTime, service.duration);
 
         const { error: bookingError } = await supabase
-          .from("bookings")
-          .insert(bookingData);
+          .from('bookings')
+          .insert({
+            appointment_id: appointmentId,
+            service_id: serviceId,
+            employee_id: selectedStylists[serviceId],
+            start_time: bookingStartTime.toISOString(),
+            end_time: bookingEndTime.toISOString(),
+            price_paid: service.selling_price,
+            status: 'confirmed'
+          });
 
-        if (bookingError) {
-          console.error(`Error inserting ${item.type} booking:`, bookingError);
-          toast.error(
-            `Failed to create ${item.type} booking. Please try again.`
-          );
-          throw bookingError;
-        }
-        console.log(`${item.type}  bookingEndTime`, bookingEndTime);
-
-        currentStartTime = bookingEndTime;
+        if (bookingError) throw bookingError;
       }
 
       toast.success("Appointment saved successfully");
-      setIsAddAppointmentOpen(false);
-      
-      setSelectedServices([]);
-      setSelectedPackages([]);
-      setSelectedDate(undefined);
-      setSelectedTime(undefined);
-      setNotes("");
-      setPaymentMethod('cash');
-      setDiscountType('none');
-      setDiscountValue(0);
+      handleProceedToCheckout();
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
@@ -371,6 +330,10 @@ export default function AdminBookings() {
   };
 
   const handleProceedToCheckout = () => {
+    if (!currentAppointmentId) {
+      toast.error("No appointment found. Please save the appointment first.");
+      return;
+    }
     setShowPaymentSection(true);
   };
 
@@ -439,8 +402,8 @@ export default function AdminBookings() {
   };
 
   const handleCheckoutSave = async () => {
-    if (!selectedAppointment?.id) {
-      toast.error("No appointment selected");
+    if (!currentAppointmentId) {
+      toast.error("No appointment found");
       return;
     }
 
@@ -455,7 +418,7 @@ export default function AdminBookings() {
           notes: appointmentNotes,
           total_price: getFinalPrice()
         })
-        .eq('id', selectedAppointment.id);
+        .eq('id', currentAppointmentId);
 
       if (updateError) throw updateError;
 
@@ -976,49 +939,4 @@ export default function AdminBookings() {
                     </div>
                   ) : (
                     <div className="text-center space-y-6">
-                      <div className="text-green-600 text-2xl font-medium">
-                        Payment Completed Successfully!
-                      </div>
-                      <div className="max-w-md mx-auto p-6 border rounded-lg">
-                        <h3 className="text-lg font-medium mb-4">Transaction Summary</h3>
-                        <div className="space-y-2 text-left">
-                          <p><span className="font-medium">Customer:</span> {selectedCustomer?.full_name}</p>
-                          <p><span className="font-medium">Payment Method:</span> {paymentMethod}</p>
-                          <p><span className="font-medium">Amount Paid:</span> ₹{getFinalPrice()}</p>
-                          <p><span className="font-medium">Status:</span> Completed</p>
-                        </div>
-                      </div>
-                      <Button onClick={closeAddAppointment}>
-                        Close
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <CheckoutDialog
-          open={showCheckout}
-          onOpenChange={setShowCheckout}
-          paymentMethod={paymentMethod}
-          onPaymentMethodChange={(value) => setPaymentMethod(value)}
-          discountType={discountType}
-          onDiscountTypeChange={(value) => setDiscountType(value)}
-          discountValue={discountValue}
-          onDiscountValueChange={setDiscountValue}
-          totalPrice={getTotalPrice()}
-          notes={appointmentNotes}
-          onNotesChange={setAppointmentNotes}
-          onSave={handleCheckoutSave}
-          onCancel={() => {
-            setShowCheckout(false);
-            setCheckoutStep('checkout');
-          }}
-          step={checkoutStep}
-        />
-      </div>
-    </DndProvider>
-  );
-}
+                      <div className="text-green
