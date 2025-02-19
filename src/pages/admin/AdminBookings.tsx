@@ -81,6 +81,7 @@ export default function AdminBookings() {
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [checkoutStep, setCheckoutStep] = useState<'checkout' | 'payment' | 'completed'>('checkout');
   const [appointmentNotes, setAppointmentNotes] = useState("");
+  const [showPaymentSection, setShowPaymentSection] = useState(false);
 
   useEffect(() => {
     const updateNow = () => {
@@ -533,90 +534,122 @@ export default function AdminBookings() {
         
         <CalendarHeader
           currentDate={currentDate}
-          onToday={goToday}
-          onPrevious={goPrev}
-          onNext={goNext}
+          onToday={() => setCurrentDate(new Date())}
+          onPrevious={() => {
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() - 1);
+            setCurrentDate(newDate);
+          }}
+          onNext={() => {
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() + 1);
+            setCurrentDate(newDate);
+          }}
         />
 
-        <div className="flex border-b bg-white">
-          <div className="w-16 border-r" />
-          {employees.map((emp: any) => (
-            <div
-              key={emp.id}
-              className="flex-1 border-r flex items-center justify-center p-2"
-            >
-              <div className="flex flex-col items-center space-y-1">
-                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
-                  {emp.avatar}
-                </div>
-                <div className="text-xs font-medium text-gray-700">
-                  {emp.name}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-auto">
-          <div className="flex">
-            <div className="w-16 border-r">
-              {hourLabels.map((hr) => (
+        {showPaymentSection ? (
+          <div className="flex-1 overflow-auto p-6">
+            <PaymentDetails
+              paymentCompleted={paymentCompleted}
+              selectedServices={selectedServices}
+              services={services || []}
+              employees={employees}
+              selectedStylists={selectedStylists}
+              selectedCustomer={selectedCustomer}
+              paymentMethod={paymentMethod}
+              discountType={discountType}
+              discountValue={discountValue}
+              appointmentNotes={appointmentNotes}
+              getTotalPrice={getTotalPrice}
+              getFinalPrice={getFinalPrice}
+              onPaymentMethodChange={setPaymentMethod}
+              onDiscountTypeChange={setDiscountType}
+              onDiscountValueChange={setDiscountValue}
+              onNotesChange={setAppointmentNotes}
+              onSave={() => handleCheckoutSave(getFinalPrice)}
+            />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto">
+            <div className="flex">
+              <div className="w-16 border-r" />
+              {employees.map((emp: any) => (
                 <div
-                  key={hr}
-                  className="h-[60px] flex items-center justify-end pr-1 text-[10px] text-gray-700 font-bold border-b"
+                  key={emp.id}
+                  className="flex-1 border-r flex items-center justify-center p-2"
                 >
-                  {formatTime(hr)}
+                  <div className="flex flex-col items-center space-y-1">
+                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
+                      {emp.avatar}
+                    </div>
+                    <div className="text-xs font-medium text-gray-700">
+                      {emp.name}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {employees.map((emp: any) => (
-              <div
-                key={emp.id}
-                className="flex-1 border-r relative"
-                style={{
-                  minWidth: "150px",
-                  height: TOTAL_HOURS * PIXELS_PER_HOUR,
-                }}
-                onClick={(e) => handleColumnClick(e, emp.id)}
-              >
-                {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
+            <div className="flex">
+              <div className="w-16 border-r">
+                {hourLabels.map((hr) => (
                   <div
-                    key={idx}
-                    className="absolute left-0 right-0 border-b"
-                    style={{ top: idx * 15 }}
-                  />
+                    key={hr}
+                    className="h-[60px] flex items-center justify-end pr-1 text-[10px] text-gray-700 font-bold border-b"
+                  >
+                    {formatTime(hr)}
+                  </div>
                 ))}
-
-                {nowPosition !== null && isSameDay(currentDate, new Date()) && (
-                  <div
-                    className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
-                    style={{ top: nowPosition }}
-                  />
-                )}
-
-                {appointments.map((appointment) =>
-                  appointment.bookings.map((booking) => {
-                    if (booking.employee?.id !== emp.id) return null;
-
-                    const startTime = new Date(booking.start_time);
-                    const startHour =
-                      startTime.getHours() + startTime.getMinutes() / 60;
-                    const duration =
-                      booking.service?.duration ||
-                      booking.package?.duration ||
-                      60;
-                    const topPositionPx =
-                      (startHour - START_HOUR) * PIXELS_PER_HOUR;
-                    const heightPx = (duration / 60) * PIXELS_PER_HOUR;
-
-                    return renderAppointmentBlock(appointment, booking);
-                  })
-                )}
               </div>
-            ))}
+
+              {employees.map((emp: any) => (
+                <div
+                  key={emp.id}
+                  className="flex-1 border-r relative"
+                  style={{
+                    minWidth: "150px",
+                    height: TOTAL_HOURS * PIXELS_PER_HOUR,
+                  }}
+                  onClick={(e) => handleColumnClick(e, emp.id)}
+                >
+                  {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      className="absolute left-0 right-0 border-b"
+                      style={{ top: idx * 15 }}
+                    />
+                  ))}
+
+                  {nowPosition !== null && isSameDay(currentDate, new Date()) && (
+                    <div
+                      className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
+                      style={{ top: nowPosition }}
+                    />
+                  )}
+
+                  {appointments.map((appointment) =>
+                    appointment.bookings.map((booking) => {
+                      if (booking.employee?.id !== emp.id) return null;
+
+                      const startTime = new Date(booking.start_time);
+                      const startHour =
+                        startTime.getHours() + startTime.getMinutes() / 60;
+                      const duration =
+                        booking.service?.duration ||
+                        booking.package?.duration ||
+                        60;
+                      const topPositionPx =
+                        (startHour - START_HOUR) * PIXELS_PER_HOUR;
+                      const heightPx = (duration / 60) * PIXELS_PER_HOUR;
+
+                      return renderAppointmentBlock(appointment, booking);
+                    })
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <Dialog
           open={!!selectedAppointment}
