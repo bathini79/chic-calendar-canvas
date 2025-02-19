@@ -22,6 +22,7 @@ interface AppointmentFormProps {
   onSave: () => void;
   onProceedToCheckout: () => void;
   clickedCell?: { time: number; date?: Date } | null;
+  formatTime: (time: number) => string;
 }
 
 export function AppointmentForm({
@@ -39,7 +40,8 @@ export function AppointmentForm({
   onStylistSelect,
   onSave,
   onProceedToCheckout,
-  clickedCell
+  clickedCell,
+  formatTime
 }: AppointmentFormProps) {
   return (
     <div

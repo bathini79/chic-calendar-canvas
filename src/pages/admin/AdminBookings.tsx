@@ -603,6 +603,7 @@ export default function AdminBookings() {
           onSave={handleSaveAppointment}
           onProceedToCheckout={handleProceedToCheckout}
           clickedCell={clickedCell}
+          formatTime={formatTime}
         />
 
         <Dialog
