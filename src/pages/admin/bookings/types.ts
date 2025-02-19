@@ -3,10 +3,19 @@ export interface Customer {
   id: string;
   full_name: string | null;
   email: string | null;
-  phone_number: string | null;
   role: 'customer' | 'admin';
   created_at: string;
   updated_at: string;
+}
+
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  avatar?: string;
+  employment_type: 'stylist' | 'admin';
+  status: 'active' | 'inactive';
 }
 
 export interface Service {
@@ -40,6 +49,35 @@ export interface Package {
       duration: number;
     };
   }[];
+}
+
+export interface Appointment {
+  id: string;
+  customer: Customer;
+  status: string;
+  start_time: string;
+  end_time: string;
+  total_price: number;
+  payment_method?: 'cash' | 'online';
+  discount_type?: 'none' | 'percentage' | 'fixed';
+  discount_value?: number;
+  notes?: string;
+  bookings: Booking[];
+}
+
+export interface Booking {
+  id: string;
+  appointment_id: string;
+  service_id?: string;
+  package_id?: string;
+  employee_id: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  price_paid: number;
+  service?: Service;
+  package?: Package;
+  employee: Employee;
 }
 
 export interface CartItem {
