@@ -15,6 +15,7 @@ import { AppointmentForm } from "./bookings/components/AppointmentForm";
 import type { Customer } from "./bookings/types";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const START_HOUR = 8;
 const END_HOUR = 20;

@@ -3,6 +3,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { CustomerSearch } from "./CustomerSearch";
 import { ServiceSelector } from "./ServiceSelector";
+import { format } from "date-fns"; // Add missing import
 import type { Customer } from "../types";
 
 interface AppointmentFormProps {
