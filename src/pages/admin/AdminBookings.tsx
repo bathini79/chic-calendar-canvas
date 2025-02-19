@@ -9,27 +9,20 @@ import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
 import { PaymentDetails } from "./bookings/components/PaymentDetails";
+import { BookingCalendarView } from "./bookings/components/BookingCalendarView";
+import { BookingCellPopover } from "./bookings/components/BookingCellPopover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon } from "lucide-react";
 import { format, addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import type { Customer } from "./bookings/types";
-import { formatTime, isSameDay } from "./bookings/utils/timeFormatting";
+import { getTotalPrice, getTotalDuration, getFinalPrice } from "./bookings/utils/bookingUtils";
 
 const START_HOUR = 8;
 const END_HOUR = 20;
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const PIXELS_PER_HOUR = 60;
-
-const hourLabels = Array.from({ length: 12 }, (_, i) => i + START_HOUR);
-
-const initialEvents = [
-  { id: 1, employeeId: 1, title: "Haircut", startHour: 9, duration: 1 },
-  { id: 2, employeeId: 2, title: "Facial", startHour: 9.5, duration: 1.5 },
-  { id: 3, employeeId: 3, title: "Manicure", startHour: 13, duration: 1 },
-];
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -46,7 +39,7 @@ const SCREEN = {
 
 export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
-  const [events, setEvents] = useState(initialEvents);
+  const [events, setEvents] = useState([]);
   const [stats] = useState(initialStats);
   const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 11));
   const [nowPosition, setNowPosition] = useState<number | null>(null);
@@ -58,28 +51,20 @@ export default function AdminBookings() {
     date?: Date;
   } | null>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
-  );
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
-  const [selectedStylists, setSelectedStylists] = useState<
-    Record<string, string>
-  >({});
+  const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [notes, setNotes] = useState("");
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "online">("cash");
-  const [discountType, setDiscountType] = useState<
-    "none" | "percentage" | "fixed"
-  >("none");
+  const [discountType, setDiscountType] = useState<"none" | "percentage" | "fixed">("none");
   const [discountValue, setDiscountValue] = useState<number>(0);
-  const [checkoutStep, setCheckoutStep] = useState<
-    "checkout" | "payment" | "completed"
-  >("checkout");
+  const [checkoutStep, setCheckoutStep] = useState<"checkout" | "payment" | "completed">("checkout");
   const [appointmentNotes, setAppointmentNotes] = useState("");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
@@ -124,46 +109,6 @@ export default function AdminBookings() {
     fetchEmployees();
   }, []);
 
-  function formatCurrentDate(date: Date) {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const dayOfWeek = days[date.getDay()];
-    const dayOfMonth = date.getDate();
-    const month = months[date.getMonth()];
-    return `${dayOfWeek} ${dayOfMonth} ${month}`;
-  }
-
-  const handleEventUpdate = (eventId: number, changes: any) => {
-    setEvents((prev) =>
-      prev.map((ev) => (ev.id === eventId ? { ...ev, ...changes } : ev))
-    );
-  };
-
-  const goToday = () => setCurrentDate(new Date());
-  const goPrev = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setCurrentDate(newDate);
-  };
-  const goNext = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + 1);
-    setCurrentDate(newDate);
-  };
-
   const handleColumnClick = (e: React.MouseEvent, empId: number) => {
     if (e.target !== e.currentTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -199,54 +144,6 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(false);
   };
 
-  const getTotalPrice = () => {
-    let total = 0;
-
-    selectedServices.forEach((serviceId) => {
-      const service = services?.find((s) => s.id === serviceId);
-      if (service) {
-        total += service.selling_price;
-      }
-    });
-
-    selectedPackages.forEach((packageId) => {
-      const pkg = packages?.find((p) => p.id === packageId);
-      if (pkg) {
-        total += pkg.price;
-      }
-    });
-
-    return total;
-  };
-
-  const getTotalDuration = () => {
-    let totalDuration = 0;
-
-    selectedServices.forEach((serviceId) => {
-      const service = services?.find((s) => s.id === serviceId);
-      if (service) {
-        totalDuration += service.duration;
-      }
-    });
-
-    selectedPackages.forEach((packageId) => {
-      const pkg = packages?.find((p) => p.id === packageId);
-      if (pkg) {
-        totalDuration += pkg.duration;
-      }
-    });
-
-    return totalDuration;
-  };
-
-  const getFinalPrice = () => {
-    const totalPrice = getTotalPrice();
-    if (discountType === 'percentage') {
-      return totalPrice * (1 - (discountValue / 100));
-    }
-    return Math.max(0, totalPrice - (discountType === 'fixed' ? discountValue : 0));
-  };
-
   const handleSaveAppointment = async () => {
     if (!selectedDate || !selectedTime || !selectedCustomer) {
       toast.error("Please select a date, time and customer");
@@ -267,7 +164,7 @@ export default function AdminBookings() {
         return;
       }
 
-      const totalDuration = getTotalDuration();
+      const totalDuration = getTotalDuration(selectedServices, selectedPackages, services, packages);
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
       const { data: appointmentData, error: appointmentError } = await supabase
@@ -278,7 +175,7 @@ export default function AdminBookings() {
           end_time: endDateTime.toISOString(),
           status: "confirmed",
           number_of_bookings: selectedServices.length + selectedPackages.length,
-          total_price: getTotalPrice(),
+          total_price: getTotalPrice(selectedServices, selectedPackages, services, packages),
           total_duration: totalDuration,
         })
         .select();
@@ -374,163 +271,6 @@ export default function AdminBookings() {
     }
   };
 
-  const handleCheckoutSave = async () => {
-    if (checkoutStep === "checkout") {
-      setCheckoutStep("payment");
-      return;
-    }
-
-    if (checkoutStep === "payment") {
-      try {
-        const { error: updateError } = await supabase
-          .from("appointments")
-          .update({
-            status: "completed",
-            payment_method: paymentMethod,
-            discount_type: discountType,
-            discount_value: discountValue,
-            notes: appointmentNotes,
-          })
-          .eq("id", selectedAppointment.id);
-
-        if (updateError) throw updateError;
-
-        setCheckoutStep("completed");
-        toast.success("Payment completed successfully");
-      } catch (error: any) {
-        console.error("Error completing payment:", error);
-        toast.error(error.message || "Failed to complete payment");
-      }
-    }
-  };
-
-  const handleServiceSelect = (serviceId: string) => {
-    setSelectedServices((prev) =>
-      prev.includes(serviceId)
-        ? prev.filter((id) => id !== serviceId)
-        : [...prev, serviceId]
-    );
-  };
-
-  const handlePackageSelect = (packageId: string) => {
-    setSelectedPackages((prev) =>
-      prev.includes(packageId)
-        ? prev.filter((id) => id !== packageId)
-        : [...prev, packageId]
-    );
-  };
-
-  const handleStylistSelect = (itemId: string, stylistId: string) => {
-    setSelectedStylists((prev) => ({
-      ...prev,
-      [itemId]: stylistId,
-    }));
-  };
-
-  const { data: services } = useQuery({
-    queryKey: ["services"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("*")
-        .eq("status", "active");
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: packages } = useQuery({
-    queryKey: ["packages"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("packages")
-        .select("*")
-        .eq("status", "active");
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: appointments = [] } = useQuery({
-    queryKey: ["appointments", format(currentDate, "yyyy-MM-dd")],
-    queryFn: async () => {
-      const startOfDay = new Date(currentDate);
-      startOfDay.setHours(0, 0, 0, 0);
-
-      const endOfDay = new Date(currentDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const { data, error } = await supabase
-        .from("appointments")
-        .select(
-          `
-          *,
-          bookings (
-            *,
-            service:services (*),
-            package:packages (*),
-            employee:employees (*)
-          ),
-          customer:profiles (*)
-        `
-        )
-        .gte("start_time", startOfDay.toISOString())
-        .lte("start_time", endOfDay.toISOString());
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const getAppointmentStatusColor = (status: string) => {
-    switch (status) {
-      case "confirmed":
-        return "bg-green-100 hover:bg-green-200 border-green-300";
-      case "canceled":
-        return "bg-red-100 hover:bg-red-200 border-red-300";
-      default:
-        return "bg-purple-100 hover:bg-purple-200 border-purple-300";
-    }
-  };
-
-  const renderAppointmentBlock = (appointment: any, booking: any) => {
-    const statusColor = getAppointmentStatusColor(appointment.status);
-    const duration =
-      booking.service?.duration || booking.package?.duration || 60;
-    const startHour =
-      new Date(booking.start_time).getHours() +
-      new Date(booking.start_time).getMinutes() / 60;
-
-    const topPositionPx = (startHour - START_HOUR) * PIXELS_PER_HOUR;
-    const heightPx = (duration / 60) * PIXELS_PER_HOUR;
-
-    return (
-      <div
-        key={booking.id}
-        className={`absolute left-2 right-2 rounded border ${statusColor} cursor-pointer z-10 overflow-hidden`}
-        style={{
-          top: `${topPositionPx}px`,
-          height: `${heightPx}px`,
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          setSelectedAppointment(appointment);
-        }}
-      >
-        <div className="p-2 text-xs">
-          <div className="font-medium truncate">
-            {appointment.customer?.full_name}
-          </div>
-          <div className="truncate text-gray-600">
-            {booking.service?.name || booking.package?.name}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -578,86 +318,14 @@ export default function AdminBookings() {
             />
           </div>
         ) : (
-          <div className="flex-1 overflow-auto">
-            <div className="flex">
-              <div className="w-16 border-r" />
-              {employees.map((emp: any) => (
-                <div
-                  key={emp.id}
-                  className="flex-1 border-r flex items-center justify-center p-2"
-                >
-                  <div className="flex flex-col items-center space-y-1">
-                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
-                      {emp.avatar}
-                    </div>
-                    <div className="text-xs font-medium text-gray-700">
-                      {emp.name}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex">
-              <div className="w-16 border-r">
-                {hourLabels.map((hr) => (
-                  <div
-                    key={hr}
-                    className="h-[60px] flex items-center justify-end pr-1 text-[10px] text-gray-700 font-bold border-b"
-                  >
-                    {formatTime(hr)}
-                  </div>
-                ))}
-              </div>
-
-              {employees.map((emp: any) => (
-                <div
-                  key={emp.id}
-                  className="flex-1 border-r relative"
-                  style={{
-                    minWidth: "150px",
-                    height: TOTAL_HOURS * PIXELS_PER_HOUR,
-                  }}
-                  onClick={(e) => handleColumnClick(e, emp.id)}
-                >
-                  {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
-                    <div
-                      key={idx}
-                      className="absolute left-0 right-0 border-b"
-                      style={{ top: idx * 15 }}
-                    />
-                  ))}
-
-                  {nowPosition !== null &&
-                    isSameDay(currentDate, new Date()) && (
-                      <div
-                        className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
-                        style={{ top: nowPosition }}
-                      />
-                    )}
-
-                  {appointments.map((appointment) =>
-                    appointment.bookings.map((booking) => {
-                      if (booking.employee?.id !== emp.id) return null;
-
-                      const startTime = new Date(booking.start_time);
-                      const startHour =
-                        startTime.getHours() + startTime.getMinutes() / 60;
-                      const duration =
-                        booking.service?.duration ||
-                        booking.package?.duration ||
-                        60;
-                      const topPositionPx =
-                        (startHour - START_HOUR) * PIXELS_PER_HOUR;
-                      const heightPx = (duration / 60) * PIXELS_PER_HOUR;
-
-                      return renderAppointmentBlock(appointment, booking);
-                    })
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <BookingCalendarView
+            employees={employees}
+            currentDate={currentDate}
+            appointments={appointments}
+            nowPosition={nowPosition}
+            onColumnClick={handleColumnClick}
+            onAppointmentClick={setSelectedAppointment}
+          />
         )}
 
         <AppointmentDetailsDialog
@@ -667,24 +335,12 @@ export default function AdminBookings() {
         />
 
         {clickedCell && (
-          <div
-            className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
-            style={{
-              left: clickedCell.x,
-              top: clickedCell.y,
-            }}
-          >
-            <div className="bg-black px-4 py-2 text-sm font-medium text-white">
-              {formatTime(clickedCell.time)}
-            </div>
-            <div
-              className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={openAddAppointment}
-            >
-              <CalendarIcon className="h-4 w-4 text-gray-600" />
-              <span className="text-gray-700">Add Appointment</span>
-            </div>
-          </div>
+          <BookingCellPopover
+            x={clickedCell.x}
+            y={clickedCell.y}
+            time={clickedCell.time}
+            onAddAppointment={openAddAppointment}
+          />
         )}
 
         <div
@@ -797,7 +453,7 @@ export default function AdminBookings() {
           onDiscountTypeChange={(value) => setDiscountType(value)}
           discountValue={discountValue}
           onDiscountValueChange={setDiscountValue}
-          totalPrice={getTotalPrice()}
+          totalPrice={getTotalPrice(selectedServices, selectedPackages, services, packages)}
           notes={appointmentNotes}
           onNotesChange={setAppointmentNotes}
           onSave={handleCheckoutSave}
