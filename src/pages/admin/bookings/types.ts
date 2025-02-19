@@ -12,12 +12,41 @@ export interface Customer {
 export interface Service {
   id: string;
   name: string;
-  selling_price: number;
+  description: string | null;
   duration: number;
+  selling_price: number;
+  status: 'active' | 'inactive' | 'archived';
+  services_categories: {
+    categories: {
+      id: string;
+      name: string;
+    };
+  }[];
 }
 
-export interface Employee {
+export interface Package {
   id: string;
   name: string;
-  avatar?: string;
+  description: string | null;
+  price: number;
+  duration: number;
+  is_customizable: boolean;
+  status: 'active' | 'inactive' | 'archived';
+  package_services: {
+    service: {
+      id: string;
+      name: string;
+      selling_price: number;
+      duration: number;
+    };
+  }[];
+}
+
+export interface CartItem {
+  type: 'service' | 'package';
+  id: string;
+  name: string;
+  duration: number;
+  price: number;
+  customized_services?: string[];
 }

@@ -21,7 +21,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return result as unknown as Row[];
+      return (result || []) as Row[];
     },
   });
 
@@ -36,7 +36,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
       if (error) throw error;
       toast.success("Created successfully");
       refetch();
-      return insertedData as unknown as Row;
+      return insertedData as Row;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
@@ -55,7 +55,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
       if (error) throw error;
       toast.success("Updated successfully");
       refetch();
-      return updatedData as unknown as Row;
+      return updatedData as Row;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
