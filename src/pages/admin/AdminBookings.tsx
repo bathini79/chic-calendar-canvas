@@ -17,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 
 const START_HOUR = 8; // 8:00 AM
 const END_HOUR = 20; // 8:00 PM
@@ -267,97 +267,45 @@ export default function AdminBookings() {
         })
         .select();
 
-      if (appointmentError) {
-        console.error("Error inserting appointment:", appointmentError);
-        toast.error("Failed to create appointment. Please try again.");
-        throw appointmentError;
-      }
+      if (appointmentError) throw appointmentError;
 
       const appointmentId = appointmentData[0].id;
-      let currentStartTime = startDateTime;
 
-      const allSelectedItems = [
-        ...selectedServices.map((id) => ({ type: "service", id })),
-        ...selectedPackages.map((id) => ({ type: "package", id })),
-      ];
+      for (const serviceId of selectedServices) {
+        const service = services?.find(s => s.id === serviceId);
+        if (!service) continue;
 
-      allSelectedItems.sort((a, b) => {
-        let durationA =
-          (a.type === "service"
-            ? services?.find((s) => s.id === a.id)?.duration
-            : packages?.find((p) => p.id === a.id)?.duration) || 0;
-        let durationB =
-          (b.type === "service"
-            ? services?.find((s) => s.id === b.id)?.duration
-            : packages?.find((p) => p.id === b.id)?.duration) || 0;
-        return durationA - durationB;
-      });
-
-      for (const item of allSelectedItems) {
-        let bookingEndTime: Date;
-        let bookingData;
-        let duration: number;
-
-        if (item.type === "service") {
-          const service = services?.find((s) => s.id === item.id);
-          if (!service) continue;
-          duration = service.duration;
-          bookingEndTime = addMinutes(currentStartTime, service.duration);
-          bookingData = {
-            appointment_id: appointmentId,
-            service_id: service.id,
-            status: "confirmed",
-            price_paid: service.selling_price,
-            employee_id: selectedStylists[service.id],
-            start_time: currentStartTime.toISOString(),
-            end_time: bookingEndTime.toISOString(),
-          };
-        } else {
-          const pkg = packages?.find((p) => p.id === item.id);
-          if (!pkg) continue;
-          duration = pkg.duration;
-          bookingEndTime = addMinutes(currentStartTime, pkg.duration);
-          bookingData = {
-            appointment_id: appointmentId,
-            package_id: pkg.id,
-            status: "confirmed",
-            price_paid: pkg.price,
-            start_time: currentStartTime.toISOString(),
-            end_time: bookingEndTime.toISOString(),
-          };
-        }
+        const bookingStartTime = startDateTime;
+        const bookingEndTime = addMinutes(startDateTime, service.duration);
 
         const { error: bookingError } = await supabase
-          .from("bookings")
-          .insert(bookingData);
+          .from('bookings')
+          .insert({
+            appointment_id: appointmentId,
+            service_id: serviceId,
+            employee_id: selectedStylists[serviceId],
+            start_time: bookingStartTime.toISOString(),
+            end_time: bookingEndTime.toISOString(),
+            price_paid: service.selling_price,
+            status: 'confirmed'
+          });
 
-        if (bookingError) {
-          console.error(`Error inserting ${item.type} booking:`, bookingError);
-          toast.error(
-            `Failed to create ${item.type} booking. Please try again.`
-          );
-          throw bookingError;
-        }
-        console.log(`${item.type}  bookingEndTime`, bookingEndTime);
-
-        currentStartTime = bookingEndTime;
+        if (bookingError) throw bookingError;
       }
 
       toast.success("Appointment saved successfully");
       setIsAddAppointmentOpen(false);
-      
-      setSelectedServices([]);
-      setSelectedPackages([]);
-      setSelectedDate(undefined);
-      setSelectedTime(undefined);
-      setNotes("");
-      setPaymentMethod('cash');
-      setDiscountType('none');
-      setDiscountValue(0);
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
     }
+  };
+
+  const handleProceedToCheckout = async () => {
+    await handleSaveAppointment();
+    setShowPaymentSection(true);
+    setCheckoutStep('checkout');
+    setShowCheckout(false);
   };
 
   const handleCheckoutSave = async () => {
@@ -549,25 +497,106 @@ export default function AdminBookings() {
 
         {showPaymentSection ? (
           <div className="flex-1 overflow-auto p-6">
-            <PaymentDetails
-              paymentCompleted={paymentCompleted}
-              selectedServices={selectedServices}
-              services={services || []}
-              employees={employees}
-              selectedStylists={selectedStylists}
-              selectedCustomer={selectedCustomer}
-              paymentMethod={paymentMethod}
-              discountType={discountType}
-              discountValue={discountValue}
-              appointmentNotes={appointmentNotes}
-              getTotalPrice={getTotalPrice}
-              getFinalPrice={getFinalPrice}
-              onPaymentMethodChange={setPaymentMethod}
-              onDiscountTypeChange={setDiscountType}
-              onDiscountValueChange={setDiscountValue}
-              onNotesChange={setAppointmentNotes}
-              onSave={() => handleCheckoutSave(getFinalPrice)}
-            />
+            <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
+              <div className="space-y-6">
+                <div className="border-b pb-4">
+                  <h2 className="text-2xl font-semibold">Payment Details</h2>
+                  <p className="text-gray-600">Complete payment for the appointment</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="grid gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Payment Method</label>
+                      <Select 
+                        value={paymentMethod} 
+                        onValueChange={(value: 'cash' | 'online') => setPaymentMethod(value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select payment method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="online">Online</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">Discount Type</label>
+                      <Select 
+                        value={discountType} 
+                        onValueChange={(value: 'none' | 'percentage' | 'fixed') => setDiscountType(value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select discount type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="percentage">Percentage</SelectItem>
+                            <SelectItem value="fixed">Fixed Amount</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {discountType !== 'none' && (
+                      <div>
+                        <label className="text-sm font-medium">
+                          {discountType === 'percentage' ? 'Discount (%)' : 'Discount Amount (₹)'}
+                        </label>
+                        <Input
+                          type="number"
+                          value={discountValue}
+                          onChange={(e) => setDiscountValue(Number(e.target.value))}
+                          min={0}
+                          max={discountType === 'percentage' ? 100 : undefined}
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-sm font-medium">Notes</label>
+                      <Textarea
+                        value={appointmentNotes}
+                        onChange={(e) => setAppointmentNotes(e.target.value)}
+                        placeholder="Add notes for this appointment"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4 mt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Total Price:</span>
+                      <span>₹{getTotalPrice()}</span>
+                    </div>
+                    {discountType !== 'none' && discountValue > 0 && (
+                      <div className="flex justify-between items-center text-green-600">
+                        <span className="font-medium">Discount:</span>
+                        <span>
+                          {discountType === 'percentage' 
+                            ? `${discountValue}%`
+                            : `₹${discountValue}`
+                          }
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setShowPaymentSection(false)}>
+                    Back
+                  </Button>
+                  <Button onClick={() => handleCheckoutSave()}>
+                    Make Payment
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="flex-1 overflow-auto">
@@ -837,7 +866,7 @@ export default function AdminBookings() {
                     <Button onClick={handleSaveAppointment}>
                       Save Appointment
                     </Button>
-                    <Button onClick={() => setShowCheckout(true)}>
+                    <Button onClick={handleProceedToCheckout}>
                       Proceed to Checkout
                     </Button>
                   </div>
