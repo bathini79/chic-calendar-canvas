@@ -220,6 +220,14 @@ export default function AdminBookings() {
     return total;
   };
 
+  const getFinalPrice = () => {
+    const total = getTotalPrice();
+    if (discountType === 'percentage') {
+      return total * (1 - (discountValue / 100));
+    }
+    return Math.max(0, total - discountValue);
+  };
+
   const getTotalDuration = () => {
     let totalDuration = 0;
 
@@ -375,7 +383,8 @@ export default function AdminBookings() {
           payment_method: paymentMethod,
           discount_type: discountType,
           discount_value: discountValue,
-          notes: appointmentNotes
+          notes: appointmentNotes,
+          total_price: getFinalPrice()
         })
         .eq('id', selectedAppointment.id);
 
@@ -410,6 +419,52 @@ export default function AdminBookings() {
       ...prev,
       [itemId]: stylistId,
     }));
+  };
+
+  const onPaymentMethodChange = (value: 'cash' | 'online') => {
+    setPaymentMethod(value);
+  };
+
+  const onDiscountTypeChange = (value: 'none' | 'percentage' | 'fixed') => {
+    setDiscountType(value);
+    setDiscountValue(0);
+  };
+
+  const onDiscountValueChange = (value: number) => {
+    setDiscountValue(value);
+  };
+
+  const onNotesChange = (value: string) => {
+    setAppointmentNotes(value);
+  };
+
+  const handleCheckoutSave = async () => {
+    if (!selectedAppointment?.id) {
+      toast.error("No appointment selected");
+      return;
+    }
+
+    try {
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({
+          status: 'completed',
+          payment_method: paymentMethod,
+          discount_type: discountType,
+          discount_value: discountValue,
+          notes: appointmentNotes,
+          total_price: getFinalPrice()
+        })
+        .eq('id', selectedAppointment.id);
+
+      if (updateError) throw updateError;
+
+      toast.success("Payment completed successfully");
+      setPaymentCompleted(true);
+    } catch (error: any) {
+      console.error("Error completing payment:", error);
+      toast.error(error.message || "Failed to complete payment");
+    }
   };
 
   const { data: services } = useQuery({

@@ -21,7 +21,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return result as Row[];
+      return result as unknown as Row[];
     },
   });
 
@@ -29,14 +29,14 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert([newData as any])
+        .insert([newData])
         .select()
         .single();
 
       if (error) throw error;
       toast.success("Created successfully");
       refetch();
-      return insertedData as Row;
+      return insertedData as unknown as Row;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
@@ -47,15 +47,15 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
-        .update(updateData as any)
-        .eq('id' as any, recordId)
+        .update(updateData)
+        .eq('id', recordId)
         .select()
         .single();
 
       if (error) throw error;
       toast.success("Updated successfully");
       refetch();
-      return updatedData as Row;
+      return updatedData as unknown as Row;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
@@ -67,7 +67,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
       const { error } = await supabase
         .from(tableName)
         .delete()
-        .eq('id' as any, recordId);
+        .eq('id', recordId);
 
       if (error) throw error;
       toast.success("Deleted successfully");
