@@ -16,13 +16,8 @@ import { format, addMinutes } from "date-fns";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
-import type { Customer } from "./bookings/types";
-import { getTotalPrice, getTotalDuration, getFinalPrice } from "./bookings/utils/bookingUtils";
-
-const START_HOUR = 8;
-const END_HOUR = 20;
-const TOTAL_HOURS = END_HOUR - START_HOUR;
-const PIXELS_PER_HOUR = 60;
+import type { Customer, Service, Package, Appointment } from "./bookings/types";
+import { getTotalPrice, getTotalDuration, getFinalPrice, START_HOUR, PIXELS_PER_HOUR } from "./bookings/utils/bookingUtils";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -38,8 +33,7 @@ const SCREEN = {
 };
 
 export default function AdminBookings() {
-  const [employees, setEmployees] = useState([]);
-  const [events, setEvents] = useState([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [stats] = useState(initialStats);
   const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 11));
   const [nowPosition, setNowPosition] = useState<number | null>(null);
@@ -56,10 +50,10 @@ export default function AdminBookings() {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [selectedTime, setSelectedTime] = useState<string | undefined>();
+  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [selectedTime, setSelectedTime] = useState<string>();
   const [notes, setNotes] = useState("");
-  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "online">("cash");
   const [discountType, setDiscountType] = useState<"none" | "percentage" | "fixed">("none");
@@ -68,6 +62,49 @@ export default function AdminBookings() {
   const [appointmentNotes, setAppointmentNotes] = useState("");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
+
+  const { data: services = [] } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data } = await supabase.from('services').select('*');
+      return data || [];
+    }
+  });
+
+  const { data: packages = [] } = useQuery({
+    queryKey: ['packages'],
+    queryFn: async () => {
+      const { data } = await supabase.from('packages').select('*');
+      return data || [];
+    }
+  });
+
+  const { data: appointments = [] } = useQuery({
+    queryKey: ['appointments', currentDate],
+    queryFn: async () => {
+      const start = new Date(currentDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(currentDate);
+      end.setHours(23, 59, 59, 999);
+
+      const { data } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customer:profiles(*),
+          bookings(
+            *,
+            service:services(*),
+            package:packages(*),
+            employee:employees(*)
+          )
+        `)
+        .gte('start_time', start.toISOString())
+        .lte('start_time', end.toISOString());
+
+      return data || [];
+    }
+  });
 
   useEffect(() => {
     const updateNow = () => {
@@ -144,7 +181,30 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(false);
   };
 
-  const handleSaveAppointment = async () => {
+  const handleServiceSelect = (serviceId: string) => {
+    setSelectedServices(prev => 
+      prev.includes(serviceId) 
+        ? prev.filter(id => id !== serviceId)
+        : [...prev, serviceId]
+    );
+  };
+
+  const handlePackageSelect = (packageId: string) => {
+    setSelectedPackages(prev => 
+      prev.includes(packageId)
+        ? prev.filter(id => id !== packageId)
+        : [...prev, packageId]
+    );
+  };
+
+  const handleStylistSelect = (serviceId: string, stylistId: string) => {
+    setSelectedStylists(prev => ({
+      ...prev,
+      [serviceId]: stylistId
+    }));
+  };
+
+  const handleCheckoutSave = async () => {
     if (!selectedDate || !selectedTime || !selectedCustomer) {
       toast.error("Please select a date, time and customer");
       return;
@@ -271,6 +331,18 @@ export default function AdminBookings() {
     }
   };
 
+  const goToday = () => setCurrentDate(new Date());
+  const goPrev = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() - 1);
+    setCurrentDate(newDate);
+  };
+  const goNext = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + 1);
+    setCurrentDate(newDate);
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -282,17 +354,9 @@ export default function AdminBookings() {
 
         <CalendarHeader
           currentDate={currentDate}
-          onToday={() => setCurrentDate(new Date())}
-          onPrevious={() => {
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() - 1);
-            setCurrentDate(newDate);
-          }}
-          onNext={() => {
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() + 1);
-            setCurrentDate(newDate);
-          }}
+          onToday={goToday}
+          onPrevious={goPrev}
+          onNext={goNext}
         />
 
         {showPaymentSection ? (
@@ -300,7 +364,7 @@ export default function AdminBookings() {
             <PaymentDetails
               paymentCompleted={checkoutStep === 'completed'}
               selectedServices={selectedServices}
-              services={services || []}
+              services={services}
               employees={employees}
               selectedStylists={selectedStylists}
               selectedCustomer={selectedCustomer}
@@ -308,8 +372,8 @@ export default function AdminBookings() {
               discountType={discountType}
               discountValue={discountValue}
               appointmentNotes={appointmentNotes}
-              getTotalPrice={getTotalPrice}
-              getFinalPrice={getFinalPrice}
+              getTotalPrice={() => getTotalPrice(selectedServices, selectedPackages, services, packages)}
+              getFinalPrice={() => getFinalPrice(getTotalPrice(selectedServices, selectedPackages, services, packages), discountType, discountValue)}
               onPaymentMethodChange={setPaymentMethod}
               onDiscountTypeChange={setDiscountType}
               onDiscountValueChange={setDiscountValue}
@@ -343,114 +407,13 @@ export default function AdminBookings() {
           />
         )}
 
-        <div
-          className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
-            isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
-          }`}
-        >
-          <div className="h-full flex flex-col">
-            <div className="p-6 border-b">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold">New Appointment</h2>
-                <button
-                  onClick={closeAddAppointment}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
-              {clickedCell && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {format(currentDate, "MMMM d, yyyy")} at{" "}
-                  {formatTime(clickedCell.time)}
-                </p>
-              )}
-            </div>
-
-            <div className="flex-1 flex overflow-hidden">
-              <div className="w-[40%] border-r overflow-y-auto p-6">
-                <div className="space-y-6">
-                  <h3 className="text-lg font-medium">Select Customer</h3>
-                  {!selectedCustomer ? (
-                    <CustomerSearch
-                      onSelect={(customer) => {
-                        setSelectedCustomer(customer);
-                        setShowCreateForm(false);
-                      }}
-                    />
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-medium">
-                            {selectedCustomer.full_name}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            {selectedCustomer.email}
-                          </p>
-                        </div>
-                        <button
-                          className="text-sm text-gray-600 hover:text-gray-900"
-                          onClick={() => setSelectedCustomer(null)}
-                        >
-                          Change Customer
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="w-[60%] overflow-y-auto p-6">
-                <div className="space-y-6">
-                  <h3 className="text-lg font-medium">Select Services</h3>
-                  {currentScreen === SCREEN.SERVICE_SELECTION ? (
-                    <ServiceSelector
-                      onServiceSelect={handleServiceSelect}
-                      onPackageSelect={handlePackageSelect}
-                      onStylistSelect={handleStylistSelect}
-                      selectedServices={selectedServices}
-                      selectedPackages={selectedPackages}
-                      selectedStylists={selectedStylists}
-                      stylists={employees}
-                    />
-                  ) : null}
-
-                  {currentScreen === SCREEN.CHECKOUT ? <p>hello</p> : null}
-
-                  <div className="space-y-4">
-                    <label className="text-sm font-medium">Notes</label>
-                    <Input
-                      type="text"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Add notes for this appointment"
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={closeAddAppointment}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleSaveAppointment}>
-                      Save Appointment
-                    </Button>
-                    <Button onClick={() => setCurrentScreen(SCREEN.CHECKOUT)}>
-                      Proceed to Checkout
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <CheckoutDialog
           open={showCheckout}
           onOpenChange={setShowCheckout}
           paymentMethod={paymentMethod}
-          onPaymentMethodChange={(value) => setPaymentMethod(value)}
+          onPaymentMethodChange={setPaymentMethod}
           discountType={discountType}
-          onDiscountTypeChange={(value) => setDiscountType(value)}
+          onDiscountTypeChange={setDiscountType}
           discountValue={discountValue}
           onDiscountValueChange={setDiscountValue}
           totalPrice={getTotalPrice(selectedServices, selectedPackages, services, packages)}
@@ -463,6 +426,47 @@ export default function AdminBookings() {
           }}
           step={checkoutStep}
         />
+
+        {isAddAppointmentOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+            <div className="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-white">
+              <div className="p-6 border-b">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-semibold">New Appointment</h2>
+                  <button
+                    onClick={closeAddAppointment}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <div className="space-y-6">
+                  <CustomerSearch
+                    onSelect={(customer) => {
+                      setSelectedCustomer(customer);
+                      setShowCreateForm(false);
+                    }}
+                  />
+
+                  {selectedCustomer && (
+                    <ServiceSelector
+                      onServiceSelect={handleServiceSelect}
+                      onPackageSelect={handlePackageSelect}
+                      onStylistSelect={handleStylistSelect}
+                      selectedServices={selectedServices}
+                      selectedPackages={selectedPackages}
+                      selectedStylists={selectedStylists}
+                      stylists={employees}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DndProvider>
   );
