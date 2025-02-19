@@ -697,6 +697,27 @@ export default function AdminBookings() {
           </DialogContent>
         </Dialog>
 
+        {clickedCell && (
+          <div
+            className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
+            style={{
+              left: clickedCell.x,
+              top: clickedCell.y,
+            }}
+          >
+            <div className="bg-black px-4 py-2 text-sm font-medium text-white">
+              {formatTime(clickedCell.time)}
+            </div>
+            <div
+              className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={openAddAppointment}
+            >
+              <CalendarIcon className="h-4 w-4 text-gray-600" />
+              <span className="text-gray-700">Add Appointment</span>
+            </div>
+          </div>
+        )}
+
         <div
           className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
             isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
