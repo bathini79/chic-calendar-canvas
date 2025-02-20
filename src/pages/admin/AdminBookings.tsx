@@ -490,26 +490,7 @@ export default function AdminBookings() {
           onNext={goNext}
         />
 
-        {currentScreen === SCREEN.CHECKOUT ? (
-          <CheckoutSection
-            selectedServices={selectedServices}
-            selectedPackages={selectedPackages}
-            services={services || []}
-            packages={packages || []}
-            discountType={discountType}
-            discountValue={discountValue}
-            paymentMethod={paymentMethod}
-            notes={appointmentNotes}
-            onDiscountTypeChange={setDiscountType}
-            onDiscountValueChange={setDiscountValue}
-            onPaymentMethodChange={setPaymentMethod}
-            onNotesChange={setAppointmentNotes}
-            onPayNow={() => {
-              setShowCheckout(true);
-              setCheckoutStep('checkout');
-            }}
-          />
-        ) : showPaymentSection ? (
+        {showPaymentSection ? (
           <div className="flex-1 overflow-auto p-6">
             <PaymentDetails
               paymentCompleted={checkoutStep === "completed"}
@@ -719,48 +700,54 @@ export default function AdminBookings() {
 
               <div className="w-[60%] overflow-y-auto p-6">
                 <div className="space-y-6">
-                  <h3 className="text-lg font-medium">Select Services</h3>
                   {currentScreen === SCREEN.SERVICE_SELECTION ? (
-                    <> 
-                    <ServiceSelector
-                      onServiceSelect={handleServiceSelect}
-                      onPackageSelect={handlePackageSelect}
-                      onStylistSelect={handleStylistSelect}
-                      selectedServices={selectedServices}
-                      selectedPackages={selectedPackages}
-                      selectedStylists={selectedStylists}
-                      stylists={employees}
-                    />
-                    <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={closeAddAppointment}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleSaveAppointment}>
-                      Save Appointment
-                    </Button>
-                    <Button onClick={() => setCurrentScreen(SCREEN.CHECKOUT)}>
-                      Proceed to Checkout
-                    </Button>
-                  </div>
-                  </>
+                    <>
+                      <h3 className="text-lg font-medium">Select Services</h3>
+                      <ServiceSelector
+                        onServiceSelect={handleServiceSelect}
+                        onPackageSelect={handlePackageSelect}
+                        onStylistSelect={handleStylistSelect}
+                        selectedServices={selectedServices}
+                        selectedPackages={selectedPackages}
+                        selectedStylists={selectedStylists}
+                        stylists={employees}
+                      />
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={closeAddAppointment}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveAppointment}>
+                          Save Appointment
+                        </Button>
+                        <Button
+                          onClick={() => setCurrentScreen(SCREEN.CHECKOUT)}
+                        >
+                          Proceed to Checkout
+                        </Button>
+                      </div>
+                    </>
                   ) : null}
 
                   {currentScreen === SCREEN.CHECKOUT ? (
-                    <p>
-                      {" "}
-                      <div className="space-y-4">
-                        <label className="text-sm font-medium">Notes</label>
-                        <Input
-                          type="text"
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          placeholder="Add notes for this appointment"
-                        />
-                      </div>
-                    </p>
+                    <CheckoutSection
+                      selectedServices={selectedServices}
+                      selectedPackages={selectedPackages}
+                      services={services || []}
+                      packages={packages || []}
+                      discountType={discountType}
+                      discountValue={discountValue}
+                      paymentMethod={paymentMethod}
+                      notes={appointmentNotes}
+                      onDiscountTypeChange={setDiscountType}
+                      onDiscountValueChange={setDiscountValue}
+                      onPaymentMethodChange={setPaymentMethod}
+                      onNotesChange={setAppointmentNotes}
+                      onPayNow={() => {
+                        setShowCheckout(true);
+                        setCheckoutStep("checkout");
+                      }}
+                    />
                   ) : null}
-
-                  
                 </div>
               </div>
             </div>
