@@ -16,9 +16,10 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import type { Customer } from "./bookings/types";
-import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR,hourLabels } from "./bookings/utils/timeUtils";
+import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR, hourLabels } from "./bookings/utils/timeUtils";
 import { getTotalPrice, getTotalDuration, getFinalPrice, getAppointmentStatusColor } from "./bookings/utils/bookingUtils";
 import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
+import { useCalendarState } from "./bookings/hooks/useCalendarState";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -37,8 +38,6 @@ export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
   const [events, setEvents] = useState([]);
   const [stats] = useState(initialStats);
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 11));
-  const [nowPosition, setNowPosition] = useState<number | null>(null);
   const [clickedCell, setClickedCell] = useState<{
     employeeId: number;
     time: number;
@@ -54,6 +53,8 @@ export default function AdminBookings() {
   >("checkout");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
+
+  const { currentDate, setCurrentDate, nowPosition, goToday, goPrev, goNext } = useCalendarState();
 
   const {
     selectedCustomer,
@@ -82,21 +83,6 @@ export default function AdminBookings() {
     setAppointmentNotes,
     resetState,
   } = useAppointmentState();
-
-  useEffect(() => {
-    const updateNow = () => {
-      const now = new Date();
-      const currentHour = now.getHours() + now.getMinutes() / 60;
-      if (currentHour >= START_HOUR && currentHour <= END_HOUR) {
-        setNowPosition((currentHour - START_HOUR) * PIXELS_PER_HOUR);
-      } else {
-        setNowPosition(null);
-      }
-    };
-    updateNow();
-    const intervalId = setInterval(updateNow, 60000);
-    return () => clearInterval(intervalId);
-  }, []);
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -149,18 +135,6 @@ export default function AdminBookings() {
     setEvents((prev) =>
       prev.map((ev) => (ev.id === eventId ? { ...ev, ...changes } : ev))
     );
-  };
-
-  const goToday = () => setCurrentDate(new Date());
-  const goPrev = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setCurrentDate(newDate);
-  };
-  const goNext = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + 1);
-    setCurrentDate(newDate);
   };
 
   const handleColumnClick = (e: React.MouseEvent, empId: number) => {
@@ -481,17 +455,9 @@ export default function AdminBookings() {
 
         <CalendarHeader
           currentDate={currentDate}
-          onToday={() => setCurrentDate(new Date())}
-          onPrevious={() => {
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() - 1);
-            setCurrentDate(newDate);
-          }}
-          onNext={() => {
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() + 1);
-            setCurrentDate(newDate);
-          }}
+          onToday={goToday}
+          onPrevious={goPrev}
+          onNext={goNext}
         />
 
         {showPaymentSection ? (
