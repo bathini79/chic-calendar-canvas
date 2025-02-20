@@ -6,9 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CreditCard, Banknote } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type { Service, Package } from "../types";
 
 interface CheckoutSectionProps {
+  appointmentId: string;
   selectedServices: string[];
   selectedPackages: string[];
   services: Service[];
@@ -21,10 +24,11 @@ interface CheckoutSectionProps {
   onDiscountValueChange: (value: number) => void;
   onPaymentMethodChange: (value: 'cash' | 'online') => void;
   onNotesChange: (value: string) => void;
-  onPayNow: () => void;
+  onPaymentComplete: () => void;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
+  appointmentId,
   selectedServices,
   selectedPackages,
   services,
@@ -37,7 +41,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onDiscountValueChange,
   onPaymentMethodChange,
   onNotesChange,
-  onPayNow,
+  onPaymentComplete,
 }) => {
   const selectedItems = [
     ...selectedServices.map(id => {
@@ -67,6 +71,39 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     ? discountValue 
     : 0;
   const total = subtotal - discountAmount;
+
+  const handlePayment = async () => {
+    try {
+      // Update appointment status and payment details
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .update({
+          status: 'completed',
+          payment_method: paymentMethod,
+          discount_type: discountType,
+          discount_value: discountValue,
+          final_price: total,
+          notes: notes
+        })
+        .eq('id', appointmentId);
+
+      if (appointmentError) throw appointmentError;
+
+      // Update all associated bookings
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({ status: 'completed' })
+        .eq('appointment_id', appointmentId);
+
+      if (bookingsError) throw bookingsError;
+
+      toast.success('Payment completed successfully');
+      onPaymentComplete();
+    } catch (error: any) {
+      console.error('Error completing payment:', error);
+      toast.error(error.message || 'Failed to complete payment');
+    }
+  };
 
   return (
     <div className="flex h-full">
@@ -170,7 +207,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           <Button 
             className="w-full"
             size="lg"
-            onClick={onPayNow}
+            onClick={handlePayment}
           >
             Pay Now
           </Button>
