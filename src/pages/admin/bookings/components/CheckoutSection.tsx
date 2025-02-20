@@ -73,6 +73,11 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const total = subtotal - discountAmount;
 
   const handlePayment = async () => {
+    if (!appointmentId) {
+      toast.error('Invalid appointment ID');
+      return;
+    }
+
     try {
       // Update appointment status and payment details
       const { error: appointmentError } = await supabase
@@ -82,7 +87,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           payment_method: paymentMethod,
           discount_type: discountType,
           discount_value: discountValue,
-          total_price: total, // Changed from final_price to total_price
+          total_price: total,
           notes: notes
         })
         .eq('id', appointmentId);
@@ -208,6 +213,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             className="w-full"
             size="lg"
             onClick={handlePayment}
+            disabled={!appointmentId}
           >
             Pay Now
           </Button>
