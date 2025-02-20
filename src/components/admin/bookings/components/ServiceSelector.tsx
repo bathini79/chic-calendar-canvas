@@ -9,8 +9,6 @@ interface ServiceSelectorProps {
   selectedPackages: string[];
   selectedStylists: Record<string, string>;
   stylists: any[];
-  services: any[];
-  packages: any[];
 }
 
 export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
@@ -20,9 +18,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   selectedServices,
   selectedPackages,
   selectedStylists,
-  stylists,
-  services,
-  packages
+  stylists
 }) => {
   // ... implement component logic
   return (
