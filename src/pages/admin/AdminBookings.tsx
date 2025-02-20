@@ -189,54 +189,6 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(false);
   };
 
-  const getTotalPrice = () => {
-    let total = 0;
-
-    selectedServices.forEach((serviceId) => {
-      const service = services?.find((s) => s.id === serviceId);
-      if (service) {
-        total += service.selling_price;
-      }
-    });
-
-    selectedPackages.forEach((packageId) => {
-      const pkg = packages?.find((p) => p.id === packageId);
-      if (pkg) {
-        total += pkg.price;
-      }
-    });
-
-    return total;
-  };
-
-  const getTotalDuration = () => {
-    let totalDuration = 0;
-
-    selectedServices.forEach((serviceId) => {
-      const service = services?.find((s) => s.id === serviceId);
-      if (service) {
-        totalDuration += service.duration;
-      }
-    });
-
-    selectedPackages.forEach((packageId) => {
-      const pkg = packages?.find((p) => p.id === packageId);
-      if (pkg) {
-        totalDuration += pkg.duration;
-      }
-    });
-
-    return totalDuration;
-  };
-
-  const getFinalPrice = () => {
-    const totalPrice = getTotalPrice();
-    if (discountType === 'percentage') {
-      return totalPrice * (1 - (discountValue / 100));
-    }
-    return Math.max(0, totalPrice - (discountType === 'fixed' ? discountValue : 0));
-  };
-
   const handleSaveAppointment = async () => {
     if (!selectedDate || !selectedTime || !selectedCustomer) {
       toast.error("Please select a date, time and customer");
@@ -257,7 +209,7 @@ export default function AdminBookings() {
         return;
       }
 
-      const totalDuration = getTotalDuration();
+      const totalDuration = getTotalDuration(selectedServices, selectedPackages, services, packages);
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
       const { data: appointmentData, error: appointmentError } = await supabase
@@ -268,7 +220,7 @@ export default function AdminBookings() {
           end_time: endDateTime.toISOString(),
           status: "confirmed",
           number_of_bookings: selectedServices.length + selectedPackages.length,
-          total_price: getTotalPrice(),
+          total_price: getTotalPrice(selectedServices, selectedPackages, services, packages),
           total_duration: totalDuration,
         })
         .select();
@@ -372,6 +324,12 @@ export default function AdminBookings() {
 
     if (checkoutStep === "payment") {
       try {
+        const finalPrice = getFinalPrice(
+          getTotalPrice(selectedServices, selectedPackages, services, packages),
+          discountType,
+          discountValue
+        );
+
         const { error: updateError } = await supabase
           .from("appointments")
           .update({
@@ -379,9 +337,10 @@ export default function AdminBookings() {
             payment_method: paymentMethod,
             discount_type: discountType,
             discount_value: discountValue,
+            final_price: finalPrice,
             notes: appointmentNotes,
           })
-          .eq("id", selectedAppointment.id);
+          .eq("id", selectedAppointment?.id);
 
         if (updateError) throw updateError;
 
@@ -474,17 +433,6 @@ export default function AdminBookings() {
     },
   });
 
-  const getAppointmentStatusColor = (status: string) => {
-    switch (status) {
-      case "confirmed":
-        return "bg-green-100 hover:bg-green-200 border-green-300";
-      case "canceled":
-        return "bg-red-100 hover:bg-red-200 border-red-300";
-      default:
-        return "bg-purple-100 hover:bg-purple-200 border-purple-300";
-    }
-  };
-
   const renderAppointmentBlock = (appointment: any, booking: any) => {
     const statusColor = getAppointmentStatusColor(appointment.status);
     const duration =
@@ -558,8 +506,12 @@ export default function AdminBookings() {
               discountType={discountType}
               discountValue={discountValue}
               appointmentNotes={appointmentNotes}
-              getTotalPrice={getTotalPrice}
-              getFinalPrice={getFinalPrice}
+              getTotalPrice={() => getTotalPrice(selectedServices, selectedPackages, services, packages)}
+              getFinalPrice={() => getFinalPrice(
+                getTotalPrice(selectedServices, selectedPackages, services, packages),
+                discountType,
+                discountValue
+              )}
               onPaymentMethodChange={setPaymentMethod}
               onDiscountTypeChange={setDiscountType}
               onDiscountValueChange={setDiscountValue}
@@ -787,7 +739,7 @@ export default function AdminBookings() {
           onDiscountTypeChange={(value) => setDiscountType(value)}
           discountValue={discountValue}
           onDiscountValueChange={setDiscountValue}
-          totalPrice={getTotalPrice()}
+          totalPrice={getTotalPrice(selectedServices, selectedPackages, services, packages)}
           notes={appointmentNotes}
           onNotesChange={setAppointmentNotes}
           onSave={handleCheckoutSave}
