@@ -16,10 +16,9 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import type { Customer } from "./bookings/types";
-import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR,hourLabels } from "./bookings/utils/timeUtils";
+import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR } from "./bookings/utils/timeUtils";
 import { getTotalPrice, getTotalDuration, getFinalPrice, getAppointmentStatusColor } from "./bookings/utils/bookingUtils";
 import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
-import { useCalendarState } from "./bookings/hooks/useCalendarState";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -48,31 +47,41 @@ export default function AdminBookings() {
     date?: Date;
   } | null>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
-  );
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
-  const [selectedStylists, setSelectedStylists] = useState<
-    Record<string, string>
-  >({});
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [selectedTime, setSelectedTime] = useState<string | undefined>();
-  const [notes, setNotes] = useState("");
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "online">("cash");
-  const [discountType, setDiscountType] = useState<
-    "none" | "percentage" | "fixed"
-  >("none");
-  const [discountValue, setDiscountValue] = useState<number>(0);
   const [checkoutStep, setCheckoutStep] = useState<
     "checkout" | "payment" | "completed"
   >("checkout");
-  const [appointmentNotes, setAppointmentNotes] = useState("");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
+
+  const {
+    selectedCustomer,
+    setSelectedCustomer,
+    showCreateForm,
+    setShowCreateForm,
+    selectedServices,
+    setSelectedServices,
+    selectedPackages,
+    setSelectedPackages,
+    selectedStylists,
+    setSelectedStylists,
+    selectedDate,
+    setSelectedDate,
+    selectedTime,
+    setSelectedTime,
+    notes,
+    setNotes,
+    paymentMethod,
+    setPaymentMethod,
+    discountType,
+    setDiscountType,
+    discountValue,
+    setDiscountValue,
+    appointmentNotes,
+    setAppointmentNotes,
+    resetState,
+  } = useAppointmentState();
 
   useEffect(() => {
     const updateNow = () => {
@@ -209,7 +218,7 @@ export default function AdminBookings() {
         return;
       }
 
-      const totalDuration = getTotalDuration(selectedServices, selectedPackages, services, packages);
+      const totalDuration = getTotalDuration(selectedServices, selectedPackages, services || [], packages || []);
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
       const { data: appointmentData, error: appointmentError } = await supabase
@@ -220,7 +229,7 @@ export default function AdminBookings() {
           end_time: endDateTime.toISOString(),
           status: "confirmed",
           number_of_bookings: selectedServices.length + selectedPackages.length,
-          total_price: getTotalPrice(selectedServices, selectedPackages, services, packages),
+          total_price: getTotalPrice(selectedServices, selectedPackages, services || [], packages || []),
           total_duration: totalDuration,
         })
         .select();
@@ -301,15 +310,7 @@ export default function AdminBookings() {
 
       toast.success("Appointment saved successfully");
       setIsAddAppointmentOpen(false);
-
-      setSelectedServices([]);
-      setSelectedPackages([]);
-      setSelectedDate(undefined);
-      setSelectedTime(undefined);
-      setNotes("");
-      setPaymentMethod("cash");
-      setDiscountType("none");
-      setDiscountValue(0);
+      resetState();
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
@@ -325,7 +326,7 @@ export default function AdminBookings() {
     if (checkoutStep === "payment") {
       try {
         const finalPrice = getFinalPrice(
-          getTotalPrice(selectedServices, selectedPackages, services, packages),
+          getTotalPrice(selectedServices, selectedPackages, services || [], packages || []),
           discountType,
           discountValue
         );
@@ -506,9 +507,9 @@ export default function AdminBookings() {
               discountType={discountType}
               discountValue={discountValue}
               appointmentNotes={appointmentNotes}
-              getTotalPrice={() => getTotalPrice(selectedServices, selectedPackages, services, packages)}
+              getTotalPrice={() => getTotalPrice(selectedServices, selectedPackages, services || [], packages || [])}
               getFinalPrice={() => getFinalPrice(
-                getTotalPrice(selectedServices, selectedPackages, services, packages),
+                getTotalPrice(selectedServices, selectedPackages, services || [], packages || []),
                 discountType,
                 discountValue
               )}
@@ -739,7 +740,7 @@ export default function AdminBookings() {
           onDiscountTypeChange={(value) => setDiscountType(value)}
           discountValue={discountValue}
           onDiscountValueChange={setDiscountValue}
-          totalPrice={getTotalPrice(selectedServices, selectedPackages, services, packages)}
+          totalPrice={getTotalPrice(selectedServices, selectedPackages, services || [], packages || [])}
           notes={appointmentNotes}
           onNotesChange={setAppointmentNotes}
           onSave={handleCheckoutSave}
