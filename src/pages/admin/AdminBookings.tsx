@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import type { Customer } from "./bookings/types";
-import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR } from "./bookings/utils/timeUtils";
+import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR,hourLabels } from "./bookings/utils/timeUtils";
 import { getTotalPrice, getTotalDuration, getFinalPrice, getAppointmentStatusColor } from "./bookings/utils/bookingUtils";
 import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
 
