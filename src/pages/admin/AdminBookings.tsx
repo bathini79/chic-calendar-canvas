@@ -54,12 +54,36 @@ export default function AdminBookings() {
   const { currentDate, setCurrentDate, nowPosition, goToday, goPrev, goNext } = useCalendarState();
   const appointmentState = useAppointmentState();
 
+  const resetState = () => {
+    appointmentState.setSelectedCustomer(null);
+    appointmentState.setSelectedServices([]);
+    appointmentState.setSelectedPackages([]);
+    appointmentState.setSelectedStylists({});
+    appointmentState.setNotes('');
+    appointmentState.setPaymentMethod('cash');
+    appointmentState.setDiscountType('none');
+    appointmentState.setDiscountValue(0);
+    appointmentState.setAppointmentNotes('');
+    setCurrentScreen(SCREEN.SERVICE_SELECTION);
+    setShowCheckout(false);
+    setCheckoutStep('checkout');
+    setIsAddAppointmentOpen(false);
+  };
+
   const { data: services = [] } = useQuery({
     queryKey: ["services"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("services")
-        .select("*")
+        .select(`
+          *,
+          services_categories (
+            categories (
+              id,
+              name
+            )
+          )
+        `)
         .eq("status", "active");
       if (error) throw error;
       return data;
@@ -285,6 +309,11 @@ export default function AdminBookings() {
     }
   };
 
+  const calculateFinalPrice = () => {
+    const totalPrice = getTotalPrice(appointmentState.selectedServices, appointmentState.selectedPackages, services, packages);
+    return getFinalPrice(totalPrice, appointmentState.discountType, appointmentState.discountValue);
+  };
+
   const handleCheckoutSave = async () => {
     if (checkoutStep === "checkout") {
       setCheckoutStep("payment");
@@ -293,16 +322,7 @@ export default function AdminBookings() {
 
     if (checkoutStep === "payment") {
       try {
-        const finalPrice = getFinalPrice(
-          getTotalPrice(
-            appointmentState.selectedServices,
-            appointmentState.selectedPackages,
-            services || [],
-            packages || []
-          ),
-          appointmentState.discountType,
-          appointmentState.discountValue
-        );
+        const finalPrice = calculateFinalPrice();
 
         const { error: updateError } = await supabase
           .from("appointments")
@@ -386,7 +406,7 @@ export default function AdminBookings() {
             discountType={appointmentState.discountType}
             discountValue={appointmentState.discountValue}
             appointmentNotes={appointmentState.appointmentNotes}
-            getTotalPrice={() => getTotalPrice(appointmentState.selectedServices, appointmentState.selectedPackages, services, packages)}
+            getTotalPrice={calculateFinalPrice}
             getFinalPrice={getFinalPrice}
             onPaymentMethodChange={appointmentState.setPaymentMethod}
             onDiscountTypeChange={appointmentState.setDiscountType}
@@ -451,7 +471,7 @@ export default function AdminBookings() {
           onDiscountTypeChange={appointmentState.setDiscountType}
           discountValue={appointmentState.discountValue}
           onDiscountValueChange={appointmentState.setDiscountValue}
-          totalPrice={getTotalPrice(appointmentState.selectedServices, appointmentState.selectedPackages, services, packages)}
+          totalPrice={calculateFinalPrice()}
           notes={appointmentState.appointmentNotes}
           onNotesChange={appointmentState.setAppointmentNotes}
           onSave={handleCheckoutSave}
