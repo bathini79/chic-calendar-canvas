@@ -16,8 +16,21 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import type { Customer } from "./bookings/types";
-import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR, hourLabels } from "./bookings/utils/timeUtils";
-import { getTotalPrice, getTotalDuration, getFinalPrice, getAppointmentStatusColor } from "./bookings/utils/bookingUtils";
+import {
+  formatTime,
+  isSameDay,
+  START_HOUR,
+  END_HOUR,
+  TOTAL_HOURS,
+  PIXELS_PER_HOUR,
+  hourLabels,
+} from "./bookings/utils/timeUtils";
+import {
+  getTotalPrice,
+  getTotalDuration,
+  getFinalPrice,
+  getAppointmentStatusColor,
+} from "./bookings/utils/bookingUtils";
 import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 
@@ -54,7 +67,8 @@ export default function AdminBookings() {
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
 
-  const { currentDate, setCurrentDate, nowPosition, goToday, goPrev, goNext } = useCalendarState();
+  const { currentDate, setCurrentDate, nowPosition, goToday, goPrev, goNext } =
+    useCalendarState();
 
   const {
     selectedCustomer,
@@ -192,7 +206,12 @@ export default function AdminBookings() {
         return;
       }
 
-      const totalDuration = getTotalDuration(selectedServices, selectedPackages, services || [], packages || []);
+      const totalDuration = getTotalDuration(
+        selectedServices,
+        selectedPackages,
+        services || [],
+        packages || []
+      );
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
       const { data: appointmentData, error: appointmentError } = await supabase
@@ -203,7 +222,12 @@ export default function AdminBookings() {
           end_time: endDateTime.toISOString(),
           status: "confirmed",
           number_of_bookings: selectedServices.length + selectedPackages.length,
-          total_price: getTotalPrice(selectedServices, selectedPackages, services || [], packages || []),
+          total_price: getTotalPrice(
+            selectedServices,
+            selectedPackages,
+            services || [],
+            packages || []
+          ),
           total_duration: totalDuration,
         })
         .select();
@@ -300,7 +324,12 @@ export default function AdminBookings() {
     if (checkoutStep === "payment") {
       try {
         const finalPrice = getFinalPrice(
-          getTotalPrice(selectedServices, selectedPackages, services || [], packages || []),
+          getTotalPrice(
+            selectedServices,
+            selectedPackages,
+            services || [],
+            packages || []
+          ),
           discountType,
           discountValue
         );
@@ -463,7 +492,7 @@ export default function AdminBookings() {
         {showPaymentSection ? (
           <div className="flex-1 overflow-auto p-6">
             <PaymentDetails
-              paymentCompleted={checkoutStep === 'completed'}
+              paymentCompleted={checkoutStep === "completed"}
               selectedServices={selectedServices}
               services={services || []}
               employees={employees}
@@ -473,12 +502,26 @@ export default function AdminBookings() {
               discountType={discountType}
               discountValue={discountValue}
               appointmentNotes={appointmentNotes}
-              getTotalPrice={() => getTotalPrice(selectedServices, selectedPackages, services || [], packages || [])}
-              getFinalPrice={() => getFinalPrice(
-                getTotalPrice(selectedServices, selectedPackages, services || [], packages || []),
-                discountType,
-                discountValue
-              )}
+              getTotalPrice={() =>
+                getTotalPrice(
+                  selectedServices,
+                  selectedPackages,
+                  services || [],
+                  packages || []
+                )
+              }
+              getFinalPrice={() =>
+                getFinalPrice(
+                  getTotalPrice(
+                    selectedServices,
+                    selectedPackages,
+                    services || [],
+                    packages || []
+                  ),
+                  discountType,
+                  discountValue
+                )
+              }
               onPaymentMethodChange={setPaymentMethod}
               onDiscountTypeChange={setDiscountType}
               onDiscountValueChange={setDiscountValue}
@@ -658,6 +701,7 @@ export default function AdminBookings() {
                 <div className="space-y-6">
                   <h3 className="text-lg font-medium">Select Services</h3>
                   {currentScreen === SCREEN.SERVICE_SELECTION ? (
+                    <> 
                     <ServiceSelector
                       onServiceSelect={handleServiceSelect}
                       onPackageSelect={handlePackageSelect}
@@ -667,20 +711,7 @@ export default function AdminBookings() {
                       selectedStylists={selectedStylists}
                       stylists={employees}
                     />
-                  ) : null}
-
-                  {currentScreen === SCREEN.CHECKOUT ? <p>hello</p> : null}
-
-                  <div className="space-y-4">
-                    <label className="text-sm font-medium">Notes</label>
-                    <Input
-                      type="text"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Add notes for this appointment"
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2">
+                    <div className="flex justify-end space-x-2">
                     <Button variant="outline" onClick={closeAddAppointment}>
                       Cancel
                     </Button>
@@ -691,6 +722,25 @@ export default function AdminBookings() {
                       Proceed to Checkout
                     </Button>
                   </div>
+                  </>
+                  ) : null}
+
+                  {currentScreen === SCREEN.CHECKOUT ? (
+                    <p>
+                      {" "}
+                      <div className="space-y-4">
+                        <label className="text-sm font-medium">Notes</label>
+                        <Input
+                          type="text"
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          placeholder="Add notes for this appointment"
+                        />
+                      </div>
+                    </p>
+                  ) : null}
+
+                  
                 </div>
               </div>
             </div>
@@ -706,7 +756,12 @@ export default function AdminBookings() {
           onDiscountTypeChange={(value) => setDiscountType(value)}
           discountValue={discountValue}
           onDiscountValueChange={setDiscountValue}
-          totalPrice={getTotalPrice(selectedServices, selectedPackages, services || [], packages || [])}
+          totalPrice={getTotalPrice(
+            selectedServices,
+            selectedPackages,
+            services || [],
+            packages || []
+          )}
           notes={appointmentNotes}
           onNotesChange={setAppointmentNotes}
           onSave={handleCheckoutSave}
