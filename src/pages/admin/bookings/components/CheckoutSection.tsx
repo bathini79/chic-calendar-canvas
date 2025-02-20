@@ -82,7 +82,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           payment_method: paymentMethod,
           discount_type: discountType,
           discount_value: discountValue,
-          final_price: total,
+          total_price: total, // Changed from final_price to total_price
           notes: notes
         })
         .eq('id', appointmentId);
