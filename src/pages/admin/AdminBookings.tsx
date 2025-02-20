@@ -33,6 +33,7 @@ import {
 } from "./bookings/utils/bookingUtils";
 import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
+import { CheckoutSection } from "./bookings/components/CheckoutSection";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -489,7 +490,26 @@ export default function AdminBookings() {
           onNext={goNext}
         />
 
-        {showPaymentSection ? (
+        {currentScreen === SCREEN.CHECKOUT ? (
+          <CheckoutSection
+            selectedServices={selectedServices}
+            selectedPackages={selectedPackages}
+            services={services || []}
+            packages={packages || []}
+            discountType={discountType}
+            discountValue={discountValue}
+            paymentMethod={paymentMethod}
+            notes={appointmentNotes}
+            onDiscountTypeChange={setDiscountType}
+            onDiscountValueChange={setDiscountValue}
+            onPaymentMethodChange={setPaymentMethod}
+            onNotesChange={setAppointmentNotes}
+            onPayNow={() => {
+              setShowCheckout(true);
+              setCheckoutStep('checkout');
+            }}
+          />
+        ) : showPaymentSection ? (
           <div className="flex-1 overflow-auto p-6">
             <PaymentDetails
               paymentCompleted={checkoutStep === "completed"}
