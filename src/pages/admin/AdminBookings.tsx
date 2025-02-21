@@ -67,7 +67,6 @@ export default function AdminBookings() {
   >("checkout");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
-  const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
 
   const { currentDate, setCurrentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -309,10 +308,7 @@ export default function AdminBookings() {
       }
 
       toast.success("Appointment saved successfully");
-      setNewAppointmentId(appointmentId);
       setIsAddAppointmentOpen(false);
-      setShowCheckout(true);
-      setCheckoutStep("checkout");
       resetState();
     } catch (error: any) {
       console.error("Error saving appointment:", error);
@@ -769,32 +765,29 @@ export default function AdminBookings() {
           </div>
         </div>
 
-        {(selectedAppointment?.id || newAppointmentId) && (
-          <CheckoutDialog
-            open={showCheckout}
-            onOpenChange={setShowCheckout}
-            services={services || []}
-            packages={packages || []}
-            selectedServices={selectedServices}
-            selectedPackages={selectedPackages}
-            appointmentId={selectedAppointment?.id || newAppointmentId || ''}
-            step={checkoutStep}
-            paymentMethod={paymentMethod}
-            discountType={discountType}
-            discountValue={discountValue}
-            notes={appointmentNotes}
-            onPaymentMethodChange={setPaymentMethod}
-            onDiscountTypeChange={setDiscountType}
-            onDiscountValueChange={setDiscountValue}
-            onNotesChange={setAppointmentNotes}
-            onSave={handleCheckoutSave}
-            onCancel={() => {
-              setShowCheckout(false);
-              setCheckoutStep("checkout");
-              setNewAppointmentId(null);
-            }}
-          />
-        )}
+        <CheckoutDialog
+          open={showCheckout}
+          onOpenChange={setShowCheckout}
+          services={services || []}
+          packages={packages || []}
+          selectedServices={selectedServices}
+          selectedPackages={selectedPackages}
+          appointmentId={selectedAppointment?.id}
+          step={checkoutStep}
+          paymentMethod={paymentMethod}
+          discountType={discountType}
+          discountValue={discountValue}
+          notes={appointmentNotes}
+          onPaymentMethodChange={setPaymentMethod}
+          onDiscountTypeChange={setDiscountType}
+          onDiscountValueChange={setDiscountValue}
+          onNotesChange={setAppointmentNotes}
+          onSave={handleCheckoutSave}
+          onCancel={() => {
+            setShowCheckout(false);
+            setCheckoutStep("checkout");
+          }}
+        />
       </div>
     </DndProvider>
   );
