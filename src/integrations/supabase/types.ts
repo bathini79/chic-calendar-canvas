@@ -381,6 +381,8 @@ export type Database = {
           quantity: number
           status: string | null
           suggested_order_quantity: number | null
+          supplier_id: string | null
+          unit_of_quantity: string | null
           unit_price: number
           updated_at: string
         }
@@ -395,6 +397,8 @@ export type Database = {
           quantity?: number
           status?: string | null
           suggested_order_quantity?: number | null
+          supplier_id?: string | null
+          unit_of_quantity?: string | null
           unit_price?: number
           updated_at?: string
         }
@@ -409,10 +413,20 @@ export type Database = {
           quantity?: number
           status?: string | null
           suggested_order_quantity?: number | null
+          supplier_id?: string | null
+          unit_of_quantity?: string | null
           unit_price?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_items_categories: {
         Row: {
@@ -484,6 +498,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inventory_units: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       location_hours: {
         Row: {

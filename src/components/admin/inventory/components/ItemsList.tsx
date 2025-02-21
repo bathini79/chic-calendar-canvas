@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import {
@@ -33,9 +32,16 @@ interface InventoryItem {
   status: string;
   categories: string[];
   inventory_items_categories: Array<{ category_id: string }>;
+  supplier_id: string;
+  unit_of_quantity: string;
 }
 
 interface Category {
+  id: string;
+  name: string;
+}
+
+interface Supplier {
   id: string;
   name: string;
 }
@@ -77,6 +83,18 @@ export function ItemsList() {
         ...item,
         categories: item.inventory_items_categories.map(ic => ic.category_id)
       }));
+    },
+  });
+
+  const { data: suppliers } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name');
+      
+      if (error) throw error;
+      return (data || []) as Supplier[];
     },
   });
 
@@ -132,7 +150,9 @@ export function ItemsList() {
               <TableHead>Quantity</TableHead>
               <TableHead>Min. Quantity</TableHead>
               <TableHead>Max. Quantity</TableHead>
+              <TableHead>Unit</TableHead>
               <TableHead>Unit Price</TableHead>
+              <TableHead>Supplier</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -144,12 +164,16 @@ export function ItemsList() {
                 <TableCell className="font-medium">{item.name}</TableCell>
                 <TableCell>
                   <Badge variant={item.quantity <= item.minimum_quantity ? "destructive" : "default"}>
-                    {item.quantity}
+                    {item.quantity} {item.unit_of_quantity}
                   </Badge>
                 </TableCell>
-                <TableCell>{item.minimum_quantity}</TableCell>
-                <TableCell>{item.max_quantity}</TableCell>
+                <TableCell>{item.minimum_quantity} {item.unit_of_quantity}</TableCell>
+                <TableCell>{item.max_quantity} {item.unit_of_quantity}</TableCell>
+                <TableCell>{item.unit_of_quantity}</TableCell>
                 <TableCell>${Number(item.unit_price).toFixed(2)}</TableCell>
+                <TableCell>
+                  {suppliers?.find(s => s.id === item.supplier_id)?.name || '-'}
+                </TableCell>
                 <TableCell>
                   {categories
                     ?.filter(cat => item?.categories?.includes(cat.id))

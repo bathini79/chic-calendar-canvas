@@ -10,6 +10,8 @@ export const itemSchema = z.object({
   unit_price: z.number().min(0, "Unit price must be 0 or greater"),
   categories: z.array(z.string()).default([]),
   status: z.enum(["active", "inactive"]).default("active"),
+  supplier_id: z.string().uuid().optional(),
+  unit_of_quantity: z.string().min(1, "Unit of quantity is required"),
 });
 
 export type ItemFormValues = z.infer<typeof itemSchema>;
