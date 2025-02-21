@@ -2,19 +2,27 @@ import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
+import { format, addMinutes } from "date-fns";
+import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
 import { PaymentDetails } from "./bookings/components/PaymentDetails";
-import { Button } from "@/components/ui/button";
-import { CalendarIcon } from "lucide-react";
-import { format, addMinutes } from "date-fns";
-import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { CheckoutSection } from "./bookings/components/CheckoutSection";
+import { SummaryView } from "./bookings/components/SummaryView";
 import { Input } from "@/components/ui/input";
-import type { Customer } from "./bookings/types";
+import { CalendarIcon, CheckCircle2, Clock } from "lucide-react";
+import type { Customer, Service, Package } from "./bookings/types";
 import {
   formatTime,
   isSameDay,
@@ -32,8 +40,6 @@ import {
 } from "./bookings/utils/bookingUtils";
 import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
-import { CheckoutSection } from "./bookings/components/CheckoutSection";
-import { SummaryView } from "./bookings/components/SummaryView";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -515,9 +521,60 @@ export default function AdminBookings() {
   };
 
   const handleAppointmentClick = (appointment: any) => {
+    const isCompletedOrInProgress = 
+      appointment.status === "completed" || 
+      appointment.status === "in_progress";
+
     setSelectedAppointment(appointment);
-    setShowCheckout(true);
-    setCheckoutStep("checkout");
+    
+    if (isCompletedOrInProgress) {
+      // For completed or in-progress appointments, show them in the add appointment sheet
+      setIsAddAppointmentOpen(true);
+      
+      // Pre-populate the form with the appointment data
+      setSelectedCustomer(appointment.customer);
+      
+      // Set selected services and packages
+      const selectedServiceIds = appointment.bookings
+        .filter((b: any) => b.service_id)
+        .map((b: any) => b.service_id);
+      const selectedPackageIds = appointment.bookings
+        .filter((b: any) => b.package_id)
+        .map((b: any) => b.package_id);
+      
+      setSelectedServices(selectedServiceIds);
+      setSelectedPackages(selectedPackageIds);
+      
+      // Set selected stylists
+      const stylistsMap: Record<string, string> = {};
+      appointment.bookings.forEach((booking: any) => {
+        if (booking.service_id) {
+          stylistsMap[booking.service_id] = booking.employee_id;
+        }
+        if (booking.package_id) {
+          stylistsMap[booking.package_id] = booking.employee_id;
+        }
+      });
+      setSelectedStylists(stylistsMap);
+      
+      // Set appointment date and time
+      setSelectedDate(new Date(appointment.start_time));
+      setSelectedTime(format(new Date(appointment.start_time), 'HH:mm'));
+      
+      // Set payment related fields
+      setPaymentMethod(appointment.payment_method || 'cash');
+      setDiscountType(appointment.discount_type || 'none');
+      setDiscountValue(appointment.discount_value || 0);
+      setAppointmentNotes(appointment.notes || '');
+    } else {
+      // For other statuses, show the details dialog
+      setSelectedAppointment(appointment);
+    }
+  };
+
+  const handleProceedToCheckout = () => {
+    setIsAddAppointmentOpen(false);
+    setCurrentScreen(SCREEN.CHECKOUT);
   };
 
   return (
@@ -694,9 +751,34 @@ export default function AdminBookings() {
           <div className="h-full flex flex-col">
             <div className="p-6 border-b">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold">New Appointment</h2>
+                <div>
+                  <h2 className="text-2xl font-semibold">
+                    {selectedAppointment ? "Booking Details" : "New Appointment"}
+                  </h2>
+                  {selectedAppointment && (
+                    <div className="flex items-center space-x-2 mt-2">
+                      {selectedAppointment.status === "completed" ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <Clock className="h-5 w-5 text-blue-600" />
+                      )}
+                      <span className={`font-medium ${
+                        selectedAppointment.status === "completed" 
+                          ? "text-green-600" 
+                          : "text-blue-600"
+                      } capitalize`}>
+                        {selectedAppointment.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <button
-                  onClick={closeAddAppointment}
+                  onClick={() => {
+                    setIsAddAppointmentOpen(false);
+                    if (selectedAppointment) {
+                      resetState();
+                    }
+                  }}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   ✕
@@ -746,7 +828,34 @@ export default function AdminBookings() {
 
               <div className="w-[60%] overflow-y-auto p-6">
                 <div className="space-y-6">
-                  {currentScreen === SCREEN.SERVICE_SELECTION ? (
+                  {selectedAppointment ? (
+                    <div className="space-y-6">
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="font-medium mb-1">Services</h3>
+                          <div className="space-y-2">
+                            {selectedAppointment.bookings.map((booking: any) => (
+                              <div key={booking.id} className="border rounded p-2">
+                                <div className="font-medium">
+                                  {booking.service?.name || booking.package?.name}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  with {booking.employee?.name}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          className="w-full mt-4" 
+                          onClick={handleProceedToCheckout}
+                        >
+                          Proceed to Checkout
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
                     <>
                       <h3 className="text-lg font-medium">Select Services</h3>
                       <ServiceSelector
@@ -770,51 +879,6 @@ export default function AdminBookings() {
                         </Button>
                       </div>
                     </>
-                  ) : null}
-
-                  {currentScreen === SCREEN.CHECKOUT && (newAppointmentId || selectedAppointment?.id) && (
-                    <CheckoutSection
-                      appointmentId={newAppointmentId || selectedAppointment?.id}
-                      selectedServices={selectedServices}
-                      selectedPackages={selectedPackages}
-                      services={services || []}
-                      packages={packages || []}
-                      discountType={discountType}
-                      discountValue={discountValue}
-                      paymentMethod={paymentMethod}
-                      notes={appointmentNotes}
-                      onDiscountTypeChange={setDiscountType}
-                      onDiscountValueChange={setDiscountValue}
-                      onPaymentMethodChange={setPaymentMethod}
-                      onNotesChange={setAppointmentNotes}
-                      onPaymentComplete={() => {
-                        setCurrentScreen(SCREEN.SUMMARY);
-                        setNewAppointmentId(null);
-                        resetState();
-                      }}
-                    />
-                  )}
-
-                  {currentScreen === SCREEN.SUMMARY && (
-                    <div className="p-6">
-                      <h3 className="text-xl font-semibold mb-6">Appointment Summary</h3>
-                      <SummaryView
-                        appointmentId={newAppointmentId || selectedAppointment?.id || ''}
-                        selectedItems={calculateSelectedItems()}
-                        subtotal={calculateTotals().subtotal}
-                        discountAmount={calculateTotals().discountAmount}
-                        total={calculateTotals().total}
-                        paymentMethod={paymentMethod}
-                        discountType={discountType}
-                        discountValue={discountValue}
-                        completedAt={new Date().toISOString()}
-                      />
-                      <div className="mt-6 flex justify-end">
-                        <Button onClick={() => setCurrentScreen(SCREEN.SERVICE_SELECTION)}>
-                          Create New Appointment
-                        </Button>
-                      </div>
-                    </div>
                   )}
                 </div>
               </div>

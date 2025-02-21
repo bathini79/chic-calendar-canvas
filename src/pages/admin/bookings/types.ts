@@ -3,6 +3,7 @@ export interface Customer {
   full_name: string | null;
   email: string | null;
   role: 'customer' | 'admin';
+  phone_number?: string;
   created_at: string;
   updated_at: string;
 }
