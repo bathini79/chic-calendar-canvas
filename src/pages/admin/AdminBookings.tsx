@@ -757,26 +757,25 @@ export default function AdminBookings() {
         <CheckoutDialog
           open={showCheckout}
           onOpenChange={setShowCheckout}
+          services={services || []}
+          packages={packages || []}
+          selectedServices={selectedServices}
+          selectedPackages={selectedPackages}
+          appointmentId={selectedAppointment?.id}
+          step={checkoutStep}
           paymentMethod={paymentMethod}
-          onPaymentMethodChange={(value) => setPaymentMethod(value)}
           discountType={discountType}
-          onDiscountTypeChange={(value) => setDiscountType(value)}
           discountValue={discountValue}
-          onDiscountValueChange={setDiscountValue}
-          totalPrice={getTotalPrice(
-            selectedServices,
-            selectedPackages,
-            services || [],
-            packages || []
-          )}
           notes={appointmentNotes}
+          onPaymentMethodChange={setPaymentMethod}
+          onDiscountTypeChange={setDiscountType}
+          onDiscountValueChange={setDiscountValue}
           onNotesChange={setAppointmentNotes}
           onSave={handleCheckoutSave}
           onCancel={() => {
             setShowCheckout(false);
             setCheckoutStep("checkout");
           }}
-          step={checkoutStep}
         />
       </div>
     </DndProvider>
