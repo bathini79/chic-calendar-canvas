@@ -1,7 +1,9 @@
+
 export interface Customer {
   id: string;
   full_name: string | null;
   email: string | null;
+  phone_number?: string | null;
   role: 'customer' | 'admin';
   created_at: string;
   updated_at: string;
@@ -66,15 +68,21 @@ export interface Package {
 export interface Appointment {
   id: string;
   customer: Customer;
-  status: string;
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress';
   start_time: string;
   end_time: string;
   total_price: number;
-  payment_method?: 'cash' | 'online';
-  discount_type?: 'none' | 'percentage' | 'fixed';
-  discount_value?: number;
+  payment_method: 'cash' | 'online' | null;
+  discount_type: 'none' | 'percentage' | 'fixed';
+  discount_value: number;
   notes?: string;
   bookings: Booking[];
+  customer_id: string;
+  number_of_bookings: number;
+  total_duration: number;
+  original_total_price?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Booking {
@@ -85,8 +93,9 @@ export interface Booking {
   employee_id: string;
   start_time: string;
   end_time: string;
-  status: string;
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress';
   price_paid: number;
+  original_price?: number;
   service?: Service;
   package?: Package;
   employee: Employee;
