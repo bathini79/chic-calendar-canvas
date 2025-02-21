@@ -317,6 +317,11 @@ export default function AdminBookings() {
   };
 
   const handleCheckoutSave = async () => {
+    if (!selectedAppointment?.id) {
+      toast.error("No appointment selected for checkout");
+      return;
+    }
+
     if (checkoutStep === "checkout") {
       setCheckoutStep("payment");
       return;
@@ -345,7 +350,7 @@ export default function AdminBookings() {
             final_price: finalPrice,
             notes: appointmentNotes,
           })
-          .eq("id", selectedAppointment?.id);
+          .eq("id", selectedAppointment.id);
 
         if (updateError) throw updateError;
 
@@ -472,6 +477,12 @@ export default function AdminBookings() {
         </div>
       </div>
     );
+  };
+
+  const handleAppointmentClick = (appointment: any) => {
+    setSelectedAppointment(appointment);
+    setShowCheckout(true);
+    setCheckoutStep("checkout");
   };
 
   return (
