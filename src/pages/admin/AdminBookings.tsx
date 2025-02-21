@@ -33,6 +33,7 @@ import {
 import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import { CheckoutSection } from "./bookings/components/CheckoutSection";
+import { SummaryView } from "./bookings/components/SummaryView";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -45,7 +46,7 @@ const SCREEN = {
   SERVICE_SELECTION: "SERVICE_SELECTION",
   CHECKOUT: "CHECKOUT",
   SUMMARY: "SUMMARY",
-};
+} as const;
 
 export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
@@ -749,11 +750,33 @@ export default function AdminBookings() {
                       onPaymentMethodChange={setPaymentMethod}
                       onNotesChange={setAppointmentNotes}
                       onPaymentComplete={() => {
-                        setCurrentScreen(SCREEN.SERVICE_SELECTION);
+                        setCurrentScreen(SCREEN.SUMMARY);
                         setNewAppointmentId(null);
                         resetState();
                       }}
                     />
+                  )}
+
+                  {currentScreen === SCREEN.SUMMARY && (
+                    <div className="p-6">
+                      <h3 className="text-xl font-semibold mb-6">Appointment Summary</h3>
+                      <SummaryView
+                        appointmentId={newAppointmentId || selectedAppointment?.id}
+                        selectedItems={selectedItems}
+                        subtotal={subtotal}
+                        discountAmount={discountAmount}
+                        total={total}
+                        paymentMethod={paymentMethod}
+                        discountType={discountType}
+                        discountValue={discountValue}
+                        completedAt={new Date().toISOString()}
+                      />
+                      <div className="mt-6 flex justify-end">
+                        <Button onClick={() => setCurrentScreen(SCREEN.SERVICE_SELECTION)}>
+                          Create New Appointment
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
