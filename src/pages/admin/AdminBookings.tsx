@@ -48,6 +48,8 @@ const SCREEN = {
   SUMMARY: "SUMMARY",
 } as const;
 
+type ScreenType = typeof SCREEN[keyof typeof SCREEN];
+
 export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
   const [events, setEvents] = useState([]);
@@ -66,7 +68,7 @@ export default function AdminBookings() {
     "checkout" | "payment" | "completed"
   >("checkout");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
+  const [currentScreen, setCurrentScreen] = useState<ScreenType>(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
 
   const { currentDate, setCurrentDate, nowPosition, goToday, goPrev, goNext } =
@@ -440,6 +442,42 @@ export default function AdminBookings() {
     },
   });
 
+  const calculateSelectedItems = () => {
+    return [
+      ...selectedServices.map(id => {
+        const service = services?.find(s => s.id === id);
+        return service ? { 
+          id,
+          name: service.name,
+          price: service.selling_price,
+          type: 'service' as const
+        } : null;
+      }),
+      ...selectedPackages.map(id => {
+        const pkg = packages?.find(p => p.id === id);
+        return pkg ? {
+          id,
+          name: pkg.name,
+          price: pkg.price,
+          type: 'package' as const
+        } : null;
+      })
+    ].filter(Boolean);
+  };
+
+  const calculateTotals = () => {
+    const items = calculateSelectedItems();
+    const subtotal = items.reduce((sum, item) => sum + (item?.price || 0), 0);
+    const discountAmount = discountType === 'percentage' 
+      ? (subtotal * discountValue) / 100 
+      : discountType === 'fixed' 
+      ? discountValue 
+      : 0;
+    const total = subtotal - discountAmount;
+
+    return { items, subtotal, discountAmount, total };
+  };
+
   const renderAppointmentBlock = (appointment: any, booking: any) => {
     const statusColor = getAppointmentStatusColor(appointment.status);
     const duration =
@@ -761,11 +799,8 @@ export default function AdminBookings() {
                     <div className="p-6">
                       <h3 className="text-xl font-semibold mb-6">Appointment Summary</h3>
                       <SummaryView
-                        appointmentId={newAppointmentId || selectedAppointment?.id}
-                        selectedItems={selectedItems}
-                        subtotal={subtotal}
-                        discountAmount={discountAmount}
-                        total={total}
+                        appointmentId={newAppointmentId || selectedAppointment?.id || ''}
+                        {...calculateTotals()}
                         paymentMethod={paymentMethod}
                         discountType={discountType}
                         discountValue={discountValue}
