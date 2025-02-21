@@ -4,7 +4,6 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
-import { CheckoutDialog } from "./bookings/components/CheckoutDialog";
 import { CustomerSearch } from "./bookings/components/CustomerSearch";
 import { ServiceSelector } from "./bookings/components/ServiceSelector";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
@@ -764,30 +763,6 @@ export default function AdminBookings() {
             </div>
           </div>
         </div>
-
-        <CheckoutDialog
-          open={showCheckout}
-          onOpenChange={setShowCheckout}
-          services={services || []}
-          packages={packages || []}
-          selectedServices={selectedServices}
-          selectedPackages={selectedPackages}
-          appointmentId={selectedAppointment?.id}
-          step={checkoutStep}
-          paymentMethod={paymentMethod}
-          discountType={discountType}
-          discountValue={discountValue}
-          notes={appointmentNotes}
-          onPaymentMethodChange={setPaymentMethod}
-          onDiscountTypeChange={setDiscountType}
-          onDiscountValueChange={setDiscountValue}
-          onNotesChange={setAppointmentNotes}
-          onSave={handleCheckoutSave}
-          onCancel={() => {
-            setShowCheckout(false);
-            setCheckoutStep("checkout");
-          }}
-        />
       </div>
     </DndProvider>
   );
