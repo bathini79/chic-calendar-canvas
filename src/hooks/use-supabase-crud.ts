@@ -2,8 +2,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Database } from "@/integrations/supabase/types";
 
-export function useSupabaseCrud<T extends string>(tableName: T) {
+type TableName = keyof Database['public']['Tables']
+
+export function useSupabaseCrud<T extends TableName>(tableName: T) {
+  type TableDefinition = Database['public']['Tables'][T]
+  type Row = TableDefinition['Row']
+  type Insert = TableDefinition['Insert']
+  type Update = TableDefinition['Update']
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [tableName],
     queryFn: async () => {
@@ -12,11 +20,11 @@ export function useSupabaseCrud<T extends string>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return result as any[];
+      return result as Row[];
     },
   });
 
-  const create = async (newData: any) => {
+  const create = async (newData: Insert) => {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
@@ -27,14 +35,14 @@ export function useSupabaseCrud<T extends string>(tableName: T) {
       if (error) throw error;
       toast.success("Created successfully");
       refetch();
-      return insertedData;
+      return insertedData as Row;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
     }
   };
 
-  const update = async (recordId: string, updateData: any) => {
+  const update = async (recordId: string, updateData: Update) => {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
@@ -46,7 +54,7 @@ export function useSupabaseCrud<T extends string>(tableName: T) {
       if (error) throw error;
       toast.success("Updated successfully");
       refetch();
-      return updatedData;
+      return updatedData as Row;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
