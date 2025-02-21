@@ -330,7 +330,7 @@ export default function AdminBookings() {
             appointment_id: appointmentId,
             package_id: pkg.id,
             status: "confirmed",
-            price_paid: pkg.price,
+1            price_paid: pkg.price,
             start_time: currentStartTime.toISOString(),
             end_time: bookingEndTime.toISOString(),
           };
@@ -427,7 +427,6 @@ export default function AdminBookings() {
               package_id: pkg.id,
               status: 'confirmed',
               price_paid: pkg.price,
-              employee_id: selectedStylists[pkg.id],
               start_time: startDateTime.toISOString(),
               end_time: bookingEndTime.toISOString(),
             };
@@ -637,7 +636,7 @@ export default function AdminBookings() {
         }}
         onClick={(e) => {
           e.stopPropagation();
-          setSelectedAppointment(appointment);
+          handleAppointmentClick(appointment);
         }}
       >
         <div className="p-2 text-xs">
@@ -781,7 +780,12 @@ export default function AdminBookings() {
         <AppointmentDetailsDialog
           appointment={selectedAppointment}
           open={!!selectedAppointment}
-          onOpenChange={() => setSelectedAppointment(null)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedAppointment(null);
+          }}
+          onEdit={() => {
+            setIsAddAppointmentOpen(true);
+          }}
         />
 
         {clickedCell && (

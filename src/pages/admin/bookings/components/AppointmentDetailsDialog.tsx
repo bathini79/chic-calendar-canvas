@@ -7,18 +7,24 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
+import type { Appointment } from '../types';
 
 interface AppointmentDetailsDialogProps {
-  appointment: any;
+  appointment: Appointment | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEdit?: () => void;
 }
 
 export function AppointmentDetailsDialog({
   appointment,
   open,
   onOpenChange,
+  onEdit
 }: AppointmentDetailsDialogProps) {
   if (!appointment) return null;
 
@@ -29,7 +35,7 @@ export function AppointmentDetailsDialog({
           <DialogTitle>Appointment Details</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 p-4">
-          <div>
+          <div className="flex justify-between items-center">
             <Badge
               variant={
                 appointment.status === "confirmed"
@@ -41,6 +47,9 @@ export function AppointmentDetailsDialog({
             >
               {appointment.status.toUpperCase()}
             </Badge>
+            <span className="text-sm text-gray-500">
+              #{appointment.id.slice(0, 8)}
+            </span>
           </div>
 
           <div>
@@ -49,19 +58,25 @@ export function AppointmentDetailsDialog({
             <p className="text-sm text-gray-500">
               {appointment.customer?.email}
             </p>
+            {appointment.customer?.phone_number && (
+              <p className="text-sm text-gray-500">
+                {appointment.customer.phone_number}
+              </p>
+            )}
           </div>
 
           <div>
             <h3 className="font-medium">Date & Time</h3>
             <p>
-              {format(new Date(appointment.start_time), "PPpp")}
+              {format(new Date(appointment.start_time), "PPpp")} - {' '}
+              {format(new Date(appointment.end_time), "p")}
             </p>
           </div>
 
           <div>
-            <h3 className="font-medium">Services</h3>
+            <h3 className="font-medium">Services & Staff</h3>
             <div className="space-y-2">
-              {appointment.bookings.map((booking: any) => (
+              {appointment.bookings.map((booking) => (
                 <div key={booking.id} className="border rounded p-2">
                   <div className="font-medium">
                     {booking.service?.name || booking.package?.name}
@@ -70,10 +85,10 @@ export function AppointmentDetailsDialog({
                     with {booking.employee?.name}
                   </div>
                   <div className="text-sm">
-                    Duration:{" "}
-                    {booking.service?.duration ||
-                      booking.package?.duration}
-                    min
+                    Duration: {booking.service?.duration || booking.package?.duration} min
+                  </div>
+                  <div className="text-sm">
+                    Price: ${booking.price_paid}
                   </div>
                 </div>
               ))}
@@ -87,13 +102,38 @@ export function AppointmentDetailsDialog({
             </div>
           )}
 
-          <div>
-            <h3 className="font-medium">Total</h3>
-            <p className="text-lg font-semibold">
-              ${appointment.total_price}
-            </p>
+          <div className="space-y-1">
+            <h3 className="font-medium">Payment Details</h3>
+            <div className="text-sm">
+              <div className="flex justify-between">
+                <span>Payment Method:</span>
+                <span className="capitalize">{appointment.payment_method || 'Not set'}</span>
+              </div>
+              {appointment.discount_type !== 'none' && (
+                <div className="flex justify-between text-green-600">
+                  <span>Discount:</span>
+                  <span>
+                    {appointment.discount_type === 'percentage' 
+                      ? `${appointment.discount_value}%`
+                      : `$${appointment.discount_value}`
+                    }
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between font-medium">
+                <span>Total:</span>
+                <span>${appointment.total_price}</span>
+              </div>
+            </div>
           </div>
         </div>
+
+        <DialogFooter>
+          <Button onClick={onEdit} className="w-full">
+            <Pencil className="w-4 h-4 mr-2" />
+            Edit Appointment
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
