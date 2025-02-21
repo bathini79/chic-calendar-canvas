@@ -208,36 +208,6 @@ export default function AdminBookings() {
         .single();
 
       if (appointmentError) throw appointmentError;
-
-      setSelectedCustomer(appointmentData.customer);
-
-      const services: string[] = [];
-      const packages: string[] = [];
-      const stylists: Record<string, string> = {};
-
-      appointmentData.bookings.forEach((booking: any) => {
-        if (booking.service_id) {
-          services.push(booking.service_id);
-          stylists[booking.service_id] = booking.employee_id;
-        }
-        if (booking.package_id) {
-          packages.push(booking.package_id);
-          stylists[booking.package_id] = booking.employee_id;
-        }
-      });
-
-      setSelectedServices(services);
-      setSelectedPackages(packages);
-      setSelectedStylists(stylists);
-
-      setSelectedDate(new Date(appointmentData.start_time));
-      setSelectedTime(format(new Date(appointmentData.start_time), 'HH:mm'));
-      setPaymentMethod(appointmentData.payment_method || 'cash');
-      setDiscountType(appointmentData.discount_type || 'none');
-      setDiscountValue(appointmentData.discount_value || 0);
-      setAppointmentNotes(appointmentData.notes || '');
-
-      setIsAddAppointmentOpen(true);
       setSelectedAppointment(appointmentData);
     } catch (error) {
       console.error('Error fetching appointment details:', error);
@@ -777,11 +747,16 @@ export default function AdminBookings() {
             </div>
           </div>
         )}
-
+        
         <AppointmentDetailsDialog
           appointment={selectedAppointment}
           open={!!selectedAppointment}
-          onOpenChange={() => setSelectedAppointment(null)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedAppointment(null);
+          }}
+          onEdit={() => {
+            setIsAddAppointmentOpen(true);
+          }}
         />
 
         {clickedCell && (
