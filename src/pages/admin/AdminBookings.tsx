@@ -34,6 +34,7 @@ import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import { CheckoutSection } from "./bookings/components/CheckoutSection";
 import { SummaryView } from "./bookings/components/SummaryView";
+import { BookingSidebar } from "./bookings/components/BookingSidebar";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -70,6 +71,7 @@ export default function AdminBookings() {
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<ScreenType>(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const { currentDate, setCurrentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -190,17 +192,10 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(false);
   };
 
-  const handleProceedToCheckout = async () => {
-    try {
-      const appointmentId = await handleSaveAppointment();
-      if (appointmentId) {
-        setNewAppointmentId(appointmentId);
-        setCurrentScreen(SCREEN.CHECKOUT);
-      }
-    } catch (error) {
-      console.error("Error proceeding to checkout:", error);
-      toast.error("Failed to proceed to checkout. Please try again.");
-    }
+  const handleProceedToCheckout = () => {
+    setShowSidebar(false);
+    setShowCheckout(true);
+    setCheckoutStep("checkout");
   };
 
   const handleSaveAppointment = async (): Promise<string | null> => {
@@ -515,9 +510,18 @@ export default function AdminBookings() {
   };
 
   const handleAppointmentClick = (appointment: any) => {
-    setSelectedAppointment(appointment);
-    setShowCheckout(true);
-    setCheckoutStep("checkout");
+    const isCompletedOrInProgress = 
+      appointment.status === "completed" || 
+      appointment.status === "in_progress";
+
+    if (isCompletedOrInProgress) {
+      setSelectedAppointment(appointment);
+      setShowSidebar(true);
+    } else {
+      setSelectedAppointment(appointment);
+      setShowCheckout(true);
+      setCheckoutStep("checkout");
+    }
   };
 
   return (
@@ -685,6 +689,13 @@ export default function AdminBookings() {
             </div>
           </div>
         )}
+
+        <BookingSidebar
+          appointment={selectedAppointment}
+          open={showSidebar}
+          onOpenChange={setShowSidebar}
+          onProceedToCheckout={handleProceedToCheckout}
+        />
 
         <div
           className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${

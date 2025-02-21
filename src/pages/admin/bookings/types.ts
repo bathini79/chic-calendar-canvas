@@ -24,12 +24,6 @@ export interface Service {
   duration: number;
   selling_price: number;
   status: 'active' | 'inactive' | 'archived';
-  services_categories: {
-    categories: {
-      id: string;
-      name: string;
-    };
-  }[];
   category_id: string;
   gender: string;
   image_urls: string[];
@@ -46,14 +40,6 @@ export interface Package {
   duration: number;
   is_customizable: boolean;
   status: 'active' | 'inactive' | 'archived';
-  package_services: {
-    service: {
-      id: string;
-      name: string;
-      selling_price: number;
-      duration: number;
-    };
-  }[];
   categories: string[];
   customizable_services: string[];
   discount_type: string;
