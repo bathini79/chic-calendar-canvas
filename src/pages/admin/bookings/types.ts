@@ -1,4 +1,3 @@
-
 export interface Customer {
   id: string;
   full_name: string | null;
@@ -31,6 +30,12 @@ export interface Service {
       name: string;
     };
   }[];
+  category_id: string;
+  gender: string;
+  image_urls: string[];
+  original_price: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Package {
@@ -49,6 +54,13 @@ export interface Package {
       duration: number;
     };
   }[];
+  categories: string[];
+  customizable_services: string[];
+  discount_type: string;
+  discount_value: number;
+  image_urls: string[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Appointment {

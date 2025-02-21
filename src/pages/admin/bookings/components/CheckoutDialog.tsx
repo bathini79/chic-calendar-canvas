@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { PaymentDetails } from "./PaymentDetails";
 import { CheckoutSection } from "./CheckoutSection";
+import type { Service, Package } from "../types";
 
 interface CheckoutDialogProps {
   open: boolean;
@@ -12,7 +13,7 @@ interface CheckoutDialogProps {
   packages: Package[];
   selectedServices: string[];
   selectedPackages: string[];
-  appointmentId: string; // Add this prop
+  appointmentId?: string;
   step: "checkout" | "payment" | "completed";
   paymentMethod: 'cash' | 'online';
   discountType: 'none' | 'percentage' | 'fixed';
@@ -46,6 +47,11 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
   onSave,
   onCancel,
 }) => {
+  if (!appointmentId) {
+    console.error("No appointment ID provided to CheckoutDialog");
+    return null;
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0">
@@ -73,13 +79,20 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
             paymentCompleted={false}
             selectedServices={selectedServices}
             services={services}
+            employees={[]}
+            selectedStylists={{}}
+            selectedCustomer={null}
+            paymentMethod={paymentMethod}
             discountType={discountType}
             discountValue={discountValue}
-            paymentMethod={paymentMethod}
+            appointmentNotes={notes}
             onPaymentMethodChange={onPaymentMethodChange}
             onDiscountTypeChange={onDiscountTypeChange}
             onDiscountValueChange={onDiscountValueChange}
+            onNotesChange={onNotesChange}
             onSave={onSave}
+            getTotalPrice={() => 0}
+            getFinalPrice={() => 0}
           />
         )}
 
