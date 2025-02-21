@@ -190,16 +190,58 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(false);
   };
 
-  const handleProceedToCheckout = async () => {
+  const handleAppointmentClick = async (appointment: any) => {
     try {
-      const appointmentId = await handleSaveAppointment();
-      if (appointmentId) {
-        setNewAppointmentId(appointmentId);
-        setCurrentScreen(SCREEN.CHECKOUT);
-      }
+      const { data: appointmentData, error: appointmentError } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customer:profiles(*),
+          bookings (
+            *,
+            service:services(*),
+            package:packages(*),
+            employee:employees(*)
+          )
+        `)
+        .eq('id', appointment.id)
+        .single();
+
+      if (appointmentError) throw appointmentError;
+
+      setSelectedCustomer(appointmentData.customer);
+
+      const services: string[] = [];
+      const packages: string[] = [];
+      const stylists: Record<string, string> = {};
+
+      appointmentData.bookings.forEach((booking: any) => {
+        if (booking.service_id) {
+          services.push(booking.service_id);
+          stylists[booking.service_id] = booking.employee_id;
+        }
+        if (booking.package_id) {
+          packages.push(booking.package_id);
+          stylists[booking.package_id] = booking.employee_id;
+        }
+      });
+
+      setSelectedServices(services);
+      setSelectedPackages(packages);
+      setSelectedStylists(stylists);
+
+      setSelectedDate(new Date(appointmentData.start_time));
+      setSelectedTime(format(new Date(appointmentData.start_time), 'HH:mm'));
+      setPaymentMethod(appointmentData.payment_method || 'cash');
+      setDiscountType(appointmentData.discount_type || 'none');
+      setDiscountValue(appointmentData.discount_value || 0);
+      setAppointmentNotes(appointmentData.notes || '');
+
+      setIsAddAppointmentOpen(true);
+      setSelectedAppointment(appointmentData);
     } catch (error) {
-      console.error("Error proceeding to checkout:", error);
-      toast.error("Failed to proceed to checkout. Please try again.");
+      console.error('Error fetching appointment details:', error);
+      toast.error('Failed to load appointment details');
     }
   };
 
@@ -514,12 +556,6 @@ export default function AdminBookings() {
     );
   };
 
-  const handleAppointmentClick = (appointment: any) => {
-    setSelectedAppointment(appointment);
-    setShowCheckout(true);
-    setCheckoutStep("checkout");
-  };
-
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -636,22 +672,9 @@ export default function AdminBookings() {
                     )}
 
                   {appointments.map((appointment) =>
-                    appointment.bookings.map((booking) => {
-                      if (booking.employee?.id !== emp.id) return null;
-
-                      const startTime = new Date(booking.start_time);
-                      const startHour =
-                        startTime.getHours() + startTime.getMinutes() / 60;
-                      const duration =
-                        booking.service?.duration ||
-                        booking.package?.duration ||
-                        60;
-                      const topPositionPx =
-                        (startHour - START_HOUR) * PIXELS_PER_HOUR;
-                      const heightPx = (duration / 60) * PIXELS_PER_HOUR;
-
-                      return renderAppointmentBlock(appointment, booking);
-                    })
+                    appointment.bookings.map((booking) =>
+                      renderAppointmentBlock(appointment, booking)
+                    )
                   )}
                 </div>
               ))}

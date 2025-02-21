@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
