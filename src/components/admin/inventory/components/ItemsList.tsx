@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import {
@@ -11,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ItemDialog } from "../ItemDialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Search, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
@@ -20,7 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import debounce from "lodash/debounce";
 
 interface InventoryItem {
   id: string;
@@ -29,7 +33,7 @@ interface InventoryItem {
   minimum_quantity: number;
   max_quantity: number;
   unit_price: number;
-  status: string;
+  status: "active" | "inactive";
   categories: string[];
   inventory_items_categories: Array<{ category_id: string }>;
   supplier_id: string;
@@ -50,7 +54,11 @@ export function ItemsList() {
   const { remove } = useSupabaseCrud('inventory_items');
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [displayItems, setDisplayItems] = useState<InventoryItem[]>([]);
+  const [editingStatus, setEditingStatus] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Query for categories
   const { data: categories } = useQuery({
@@ -62,14 +70,15 @@ export function ItemsList() {
         .order('name');
       
       if (error) throw error;
-      return (data || []) as Category[];
+      return data as Category[];
     },
   });
+
   // Query for items with categories
   const { data: items, refetch } = useQuery({
-    queryKey: ['inventory_items'],
+    queryKey: ['inventory_items', selectedCategory, selectedStatus, searchQuery],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('inventory_items')
         .select(`
           *,
@@ -77,6 +86,16 @@ export function ItemsList() {
             category_id
           )
         `);
+
+      if (selectedStatus !== "all") {
+        query = query.eq('status', selectedStatus);
+      }
+
+      if (searchQuery) {
+        query = query.ilike('name', `%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
       
       if (error) throw error;
       return (data || []).map((item: InventoryItem) => ({
@@ -94,7 +113,7 @@ export function ItemsList() {
         .select('id, name');
       
       if (error) throw error;
-      return (data || []) as Supplier[];
+      return data as Supplier[];
     },
   });
 
@@ -119,9 +138,34 @@ export function ItemsList() {
     }
   };
 
+  const handleStatusChange = async (itemId: string, newStatus: "active" | "inactive") => {
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ status: newStatus })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      await queryClient.invalidateQueries({ queryKey: ['inventory_items'] });
+      toast.success(`Status updated to ${newStatus}`);
+      setEditingStatus(null);
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const debouncedSearch = debounce((value: string) => {
+    setSearchQuery(value);
+  }, 300);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    debouncedSearch(e.target.value);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap gap-4 items-center">
         <div className="w-[200px]">
           <Select
             value={selectedCategory}
@@ -139,6 +183,33 @@ export function ItemsList() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="w-[200px]">
+          <Select
+            value={selectedStatus}
+            onValueChange={setSelectedStatus}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex-1 max-w-sm">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <Input
+              className="pl-10"
+              placeholder="Search items..."
+              onChange={handleSearchChange}
+            />
+          </div>
         </div>
       </div>
 
@@ -184,9 +255,38 @@ export function ItemsList() {
                     ))}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={item.status === 'active' ? "default" : "secondary"}>
-                    {item.status}
-                  </Badge>
+                  {editingStatus === item.id ? (
+                    <div className="flex items-center gap-2">
+                      <Select
+                        defaultValue={item.status}
+                        onValueChange={(value: "active" | "inactive") => handleStatusChange(item.id, value)}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setEditingStatus(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Badge
+                      variant={item.status === 'active' ? "default" : "secondary"}
+                      className="cursor-pointer"
+                      onClick={() => setEditingStatus(item.id)}
+                    >
+                      {item.status}
+                    </Badge>
+                  )}
                 </TableCell>
                 <TableCell className="text-right space-x-2">
                   <Button 
