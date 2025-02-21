@@ -800,7 +800,10 @@ export default function AdminBookings() {
                       <h3 className="text-xl font-semibold mb-6">Appointment Summary</h3>
                       <SummaryView
                         appointmentId={newAppointmentId || selectedAppointment?.id || ''}
-                        {...calculateTotals()}
+                        selectedItems={calculateSelectedItems()}
+                        subtotal={calculateTotals().subtotal}
+                        discountAmount={calculateTotals().discountAmount}
+                        total={calculateTotals().total}
                         paymentMethod={paymentMethod}
                         discountType={discountType}
                         discountValue={discountValue}

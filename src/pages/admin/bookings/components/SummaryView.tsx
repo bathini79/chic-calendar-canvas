@@ -16,8 +16,8 @@ interface SummaryViewProps {
   subtotal: number;
   discountAmount: number;
   total: number;
-  paymentMethod: string;
-  discountType: string;
+  paymentMethod: 'cash' | 'online';
+  discountType: 'none' | 'percentage' | 'fixed';
   discountValue: number;
   completedAt: string;
 }
