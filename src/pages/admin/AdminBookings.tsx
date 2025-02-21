@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import { useAppointmentActions } from "./bookings/hooks/useAppointmentActions";
-import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR } from "./bookings/utils/timeUtils";
+import { formatTime, isSameDay, START_HOUR, END_HOUR, TOTAL_HOURS, PIXELS_PER_HOUR,hourLabels } from "./bookings/utils/timeUtils";
 import { getTotalPrice, getTotalDuration, getFinalPrice, getAppointmentStatusColor } from "./bookings/utils/bookingUtils";
 import { CheckoutSection } from "./bookings/components/CheckoutSection";
 import { SummaryView } from "./bookings/components/SummaryView";
