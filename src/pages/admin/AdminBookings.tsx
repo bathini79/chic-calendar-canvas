@@ -357,6 +357,102 @@ export default function AdminBookings() {
     }
   };
 
+  const handleProceedToCheckout = async () => {
+    try {
+      let appointmentId = selectedAppointment?.id;
+
+      if (appointmentId) {
+        const startDateTime = new Date(
+          `${format(selectedDate!, 'yyyy-MM-dd')} ${selectedTime}`
+        );
+        const totalDuration = getTotalDuration(
+          selectedServices,
+          selectedPackages,
+          services || [],
+          packages || []
+        );
+        const endDateTime = addMinutes(startDateTime, totalDuration);
+
+        const { error: updateError } = await supabase
+          .from('appointments')
+          .update({
+            customer_id: selectedCustomer!.id,
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString(),
+            status: 'confirmed',
+            number_of_bookings: selectedServices.length + selectedPackages.length,
+            total_price: getTotalPrice(
+              selectedServices,
+              selectedPackages,
+              services || [],
+              packages || []
+            ),
+            total_duration: totalDuration,
+          })
+          .eq('id', appointmentId);
+
+        if (updateError) throw updateError;
+
+        const allSelectedItems = [
+          ...selectedServices.map(id => ({ type: 'service' as const, id })),
+          ...selectedPackages.map(id => ({ type: 'package' as const, id }))
+        ];
+
+        for (const item of allSelectedItems) {
+          const startDateTime = new Date(
+            `${format(selectedDate!, 'yyyy-MM-dd')} ${selectedTime}`
+          );
+          let bookingEndTime: Date;
+          let bookingData: any;
+
+          if (item.type === 'service') {
+            const service = services?.find(s => s.id === item.id);
+            if (!service) continue;
+            bookingEndTime = addMinutes(startDateTime, service.duration);
+            bookingData = {
+              appointment_id: appointmentId,
+              service_id: service.id,
+              status: 'confirmed',
+              price_paid: service.selling_price,
+              employee_id: selectedStylists[service.id],
+              start_time: startDateTime.toISOString(),
+              end_time: bookingEndTime.toISOString(),
+            };
+          } else {
+            const pkg = packages?.find(p => p.id === item.id);
+            if (!pkg) continue;
+            bookingEndTime = addMinutes(startDateTime, pkg.duration || 0);
+            bookingData = {
+              appointment_id: appointmentId,
+              package_id: pkg.id,
+              status: 'confirmed',
+              price_paid: pkg.price,
+              employee_id: selectedStylists[pkg.id],
+              start_time: startDateTime.toISOString(),
+              end_time: bookingEndTime.toISOString(),
+            };
+          }
+
+          const { error: bookingError } = await supabase
+            .from('bookings')
+            .upsert(bookingData);
+
+          if (bookingError) throw bookingError;
+        }
+      } else {
+        appointmentId = await handleSaveAppointment();
+      }
+
+      if (appointmentId) {
+        setNewAppointmentId(appointmentId);
+        setCurrentScreen(SCREEN.CHECKOUT);
+      }
+    } catch (error) {
+      console.error('Error proceeding to checkout:', error);
+      toast.error('Failed to proceed to checkout. Please try again.');
+    }
+  };
+
   const handleCheckoutSave = async () => {
     if (!selectedAppointment?.id) {
       toast.error("No appointment selected for checkout");

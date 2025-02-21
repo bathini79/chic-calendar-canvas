@@ -2,9 +2,12 @@ export interface Customer {
   id: string;
   full_name: string | null;
   email: string | null;
-  role: 'customer' | 'admin';
+  phone_number?: string | null;
+  role: 'customer' | 'admin' | 'employee' | 'superadmin';
   created_at: string;
   updated_at: string;
+  admin_created?: boolean;
+  phone_verified?: boolean;
 }
 
 export interface Employee {
