@@ -66,6 +66,7 @@ export default function AdminBookings() {
   >("checkout");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
+  const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
 
   const { currentDate, setCurrentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -186,10 +187,23 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(false);
   };
 
-  const handleSaveAppointment = async () => {
+  const handleProceedToCheckout = async () => {
+    try {
+      const appointmentId = await handleSaveAppointment();
+      if (appointmentId) {
+        setNewAppointmentId(appointmentId);
+        setCurrentScreen(SCREEN.CHECKOUT);
+      }
+    } catch (error) {
+      console.error("Error proceeding to checkout:", error);
+      toast.error("Failed to proceed to checkout. Please try again.");
+    }
+  };
+
+  const handleSaveAppointment = async (): Promise<string | null> => {
     if (!selectedDate || !selectedTime || !selectedCustomer) {
       toast.error("Please select a date, time and customer");
-      return;
+      return null;
     }
 
     try {
@@ -203,7 +217,7 @@ export default function AdminBookings() {
             "yyyy-MM-dd"
           )}, time: ${selectedTime}`
         );
-        return;
+        return null;
       }
 
       const totalDuration = getTotalDuration(
@@ -246,27 +260,13 @@ export default function AdminBookings() {
         ...selectedPackages.map((id) => ({ type: "package", id })),
       ];
 
-      allSelectedItems.sort((a, b) => {
-        let durationA =
-          (a.type === "service"
-            ? services?.find((s) => s.id === a.id)?.duration
-            : packages?.find((p) => p.id === a.id)?.duration) || 0;
-        let durationB =
-          (b.type === "service"
-            ? services?.find((s) => s.id === b.id)?.duration
-            : packages?.find((p) => p.id === b.id)?.duration) || 0;
-        return durationA - durationB;
-      });
-
       for (const item of allSelectedItems) {
         let bookingEndTime: Date;
         let bookingData;
-        let duration: number;
 
         if (item.type === "service") {
           const service = services?.find((s) => s.id === item.id);
           if (!service) continue;
-          duration = service.duration;
           bookingEndTime = addMinutes(currentStartTime, service.duration);
           bookingData = {
             appointment_id: appointmentId,
@@ -280,7 +280,6 @@ export default function AdminBookings() {
         } else {
           const pkg = packages?.find((p) => p.id === item.id);
           if (!pkg) continue;
-          duration = pkg.duration;
           bookingEndTime = addMinutes(currentStartTime, pkg.duration);
           bookingData = {
             appointment_id: appointmentId,
@@ -298,20 +297,18 @@ export default function AdminBookings() {
 
         if (bookingError) {
           console.error(`Error inserting ${item.type} booking:`, bookingError);
-          toast.error(
-            `Failed to create ${item.type} booking. Please try again.`
-          );
+          toast.error(`Failed to create ${item.type} booking. Please try again.`);
           throw bookingError;
         }
         currentStartTime = bookingEndTime;
       }
 
       toast.success("Appointment saved successfully");
-      setIsAddAppointmentOpen(false);
-      resetState();
+      return appointmentId;
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
+      return null;
     }
   };
 
@@ -729,17 +726,16 @@ export default function AdminBookings() {
                         <Button onClick={handleSaveAppointment}>
                           Save Appointment
                         </Button>
-                        <Button
-                          onClick={() => setCurrentScreen(SCREEN.CHECKOUT)}
-                        >
+                        <Button onClick={handleProceedToCheckout}>
                           Proceed to Checkout
                         </Button>
                       </div>
                     </>
                   ) : null}
 
-                  {currentScreen === SCREEN.CHECKOUT ? (
+                  {currentScreen === SCREEN.CHECKOUT && (newAppointmentId || selectedAppointment?.id) && (
                     <CheckoutSection
+                      appointmentId={newAppointmentId || selectedAppointment?.id}
                       selectedServices={selectedServices}
                       selectedPackages={selectedPackages}
                       services={services || []}
@@ -752,12 +748,13 @@ export default function AdminBookings() {
                       onDiscountValueChange={setDiscountValue}
                       onPaymentMethodChange={setPaymentMethod}
                       onNotesChange={setAppointmentNotes}
-                      onPayNow={() => {
-                        setShowCheckout(true);
-                        setCheckoutStep("checkout");
+                      onPaymentComplete={() => {
+                        setCurrentScreen(SCREEN.SERVICE_SELECTION);
+                        setNewAppointmentId(null);
+                        resetState();
                       }}
                     />
-                  ) : null}
+                  )}
                 </div>
               </div>
             </div>
