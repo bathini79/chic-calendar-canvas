@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Customer } from '../types';
+import { Customer } from '../../../../pages/admin/bookings/types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { QuickCustomerCreate } from './QuickCustomerCreate';
+import { QuickCustomerCreate } from '../../../../pages/admin/bookings/components/QuickCustomerCreate';
 
 interface CustomerSearchProps {
   onSelect: (customer: Customer) => void;
