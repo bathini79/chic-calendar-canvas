@@ -20,24 +20,25 @@ serve(async (req) => {
     // Initialize Supabase client with service role key
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Create the user
-    const { data: authData, error: createUserError } = await supabase.auth.admin.createUser({
+    // Create the user using signUp
+    const { data: { user }, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      email_confirm: true,
-      user_metadata: {
-        full_name,
-        phone_number
+      options: {
+        data: {
+          full_name,
+          phone_number
+        }
       }
     })
 
-    if (createUserError) {
-      console.error('Error creating user:', createUserError)
+    if (signUpError || !user) {
+      console.error('Error signing up user:', signUpError)
       return new Response(
-        JSON.stringify({ error: createUserError.message }),
+        JSON.stringify({ error: signUpError?.message || 'Failed to create user' }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -45,17 +46,27 @@ serve(async (req) => {
       )
     }
 
-    // Get the profile data that was created by the trigger
+    // Insert the profile data
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('*')
-      .eq('id', authData.user.id)
+      .insert([
+        { 
+          id: user.id,
+          full_name,
+          phone_number,
+          email,
+          role: 'customer'
+        }
+      ])
+      .select()
       .single()
 
     if (profileError) {
-      console.error('Error fetching profile:', profileError)
+      console.error('Error creating profile:', profileError)
+      // Clean up: delete the auth user if profile creation fails
+      await supabase.auth.admin.deleteUser(user.id)
       return new Response(
-        JSON.stringify({ error: 'Error fetching profile data' }),
+        JSON.stringify({ error: 'Failed to create user profile' }),
         {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -63,12 +74,12 @@ serve(async (req) => {
       )
     }
 
-    // Return success response with profile data
+    // Return success response
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         data: {
           ...profileData,
-          email: authData.user.email
+          email: user.email
         }
       }),
       {
