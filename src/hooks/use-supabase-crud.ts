@@ -5,13 +5,11 @@ import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
 
 type TableName = keyof Database['public']['Tables']
+type Row<T extends TableName> = Database['public']['Tables'][T]['Row']
+type Insert<T extends TableName> = Database['public']['Tables'][T]['Insert']
+type Update<T extends TableName> = Database['public']['Tables'][T]['Update']
 
 export function useSupabaseCrud<T extends TableName>(tableName: T) {
-  type TableDefinition = Database['public']['Tables'][T]
-  type Row = TableDefinition['Row']
-  type Insert = TableDefinition['Insert']
-  type Update = TableDefinition['Update']
-
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [tableName],
     queryFn: async () => {
@@ -20,33 +18,33 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
         .select('*');
 
       if (error) throw error;
-      return result as Row[];
+      return result as Row<T>[];
     },
   });
 
-  const create = async (newData: Insert) => {
+  const create = async (newData: Insert<T>): Promise<Row<T>> => {
     try {
       const { data: insertedData, error } = await supabase
         .from(tableName)
-        .insert([newData])
+        .insert([newData as any])
         .select()
         .single();
 
       if (error) throw error;
       toast.success("Created successfully");
       refetch();
-      return insertedData as Row;
+      return insertedData as Row<T>;
     } catch (error: any) {
       toast.error(error.message);
       throw error;
     }
   };
 
-  const update = async (recordId: string, updateData: Update) => {
+  const update = async (recordId: string, updateData: Update<T>): Promise<Row<T>> => {
     try {
       const { data: updatedData, error } = await supabase
         .from(tableName)
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', recordId)
         .select()
         .single();
@@ -54,7 +52,7 @@ export function useSupabaseCrud<T extends TableName>(tableName: T) {
       if (error) throw error;
       toast.success("Updated successfully");
       refetch();
-      return updatedData as Row;
+      return updatedData as Row<T>;
     } catch (error: any) {
       toast.error(error.message);
       throw error;

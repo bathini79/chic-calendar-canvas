@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import {
@@ -12,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ItemDialog } from "../ItemDialog";
-import { Trash2, Search, Check, X } from "lucide-react";
+import { Trash2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
@@ -25,20 +24,11 @@ import { Input } from "@/components/ui/input";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import debounce from "lodash/debounce";
+import { Database } from "@/integrations/supabase/types";
 
-interface InventoryItem {
-  id: string;
-  name: string;
-  quantity: number;
-  minimum_quantity: number;
-  max_quantity: number;
-  unit_price: number;
-  status: "active" | "inactive";
-  categories: string[];
+type InventoryItem = Database['public']['Tables']['inventory_items']['Row'] & {
   inventory_items_categories: Array<{ category_id: string }>;
-  supplier_id: string;
-  unit_of_quantity: string;
-}
+};
 
 interface Category {
   id: string;
