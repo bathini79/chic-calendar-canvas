@@ -1259,6 +1259,10 @@ export type Database = {
           bookings: Json
         }[]
       }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       appointment_status:
