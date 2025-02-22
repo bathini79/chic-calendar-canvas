@@ -48,7 +48,7 @@ const SCREEN = {
   SUMMARY: "SUMMARY",
 } as const;
 
-type ScreenType = typeof SCREEN[keyof typeof SCREEN];
+type ScreenType = (typeof SCREEN)[keyof typeof SCREEN];
 
 export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
@@ -68,7 +68,9 @@ export default function AdminBookings() {
     "checkout" | "payment" | "completed"
   >("checkout");
   const [showPaymentSection, setShowPaymentSection] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<ScreenType>(SCREEN.SERVICE_SELECTION);
+  const [currentScreen, setCurrentScreen] = useState<ScreenType>(
+    SCREEN.SERVICE_SELECTION
+  );
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
 
   const { currentDate, setCurrentDate, nowPosition, goToday, goPrev, goNext } =
@@ -300,7 +302,9 @@ export default function AdminBookings() {
 
         if (bookingError) {
           console.error(`Error inserting ${item.type} booking:`, bookingError);
-          toast.error(`Failed to create ${item.type} booking. Please try again.`);
+          toast.error(
+            `Failed to create ${item.type} booking. Please try again.`
+          );
           throw bookingError;
         }
         currentStartTime = bookingEndTime;
@@ -444,35 +448,40 @@ export default function AdminBookings() {
 
   const calculateSelectedItems = () => {
     return [
-      ...selectedServices.map(id => {
-        const service = services?.find(s => s.id === id);
-        return service ? { 
-          id,
-          name: service.name,
-          price: service.selling_price,
-          type: 'service' as const
-        } : null;
+      ...selectedServices.map((id) => {
+        const service = services?.find((s) => s.id === id);
+        return service
+          ? {
+              id,
+              name: service.name,
+              price: service.selling_price,
+              type: "service" as const,
+            }
+          : null;
       }),
-      ...selectedPackages.map(id => {
-        const pkg = packages?.find(p => p.id === id);
-        return pkg ? {
-          id,
-          name: pkg.name,
-          price: pkg.price,
-          type: 'package' as const
-        } : null;
-      })
+      ...selectedPackages.map((id) => {
+        const pkg = packages?.find((p) => p.id === id);
+        return pkg
+          ? {
+              id,
+              name: pkg.name,
+              price: pkg.price,
+              type: "package" as const,
+            }
+          : null;
+      }),
     ].filter(Boolean);
   };
 
   const calculateTotals = () => {
     const items = calculateSelectedItems();
     const subtotal = items.reduce((sum, item) => sum + (item?.price || 0), 0);
-    const discountAmount = discountType === 'percentage' 
-      ? (subtotal * discountValue) / 100 
-      : discountType === 'fixed' 
-      ? discountValue 
-      : 0;
+    const discountAmount =
+      discountType === "percentage"
+        ? (subtotal * discountValue) / 100
+        : discountType === "fixed"
+        ? discountValue
+        : 0;
     const total = subtotal - discountAmount;
 
     return { items, subtotal, discountAmount, total };
@@ -747,59 +756,80 @@ export default function AdminBookings() {
               <div className="w-[60%] overflow-y-auto p-6">
                 <div className="space-y-6">
                   {currentScreen === SCREEN.SERVICE_SELECTION ? (
-                    <>
-                      <h3 className="text-lg font-medium">Select Services</h3>
-                      <ServiceSelector
-                        onServiceSelect={handleServiceSelect}
-                        onPackageSelect={handlePackageSelect}
-                        onStylistSelect={handleStylistSelect}
+                    <div className="flex flex-col h-full bg-white shadow-lg rounded-lg p-6 max-w-3xl w-full">
+                      {/* Header */}
+                      <h3 className="text-2xl font-bold mb-4">
+                        Select Services
+                      </h3>
+
+                      {/* Scrollable Service List */}
+                      <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4 bg-gray-50">
+                        <ServiceSelector
+                          onServiceSelect={handleServiceSelect}
+                          onPackageSelect={handlePackageSelect}
+                          onStylistSelect={handleStylistSelect}
+                          selectedServices={selectedServices}
+                          selectedPackages={selectedPackages}
+                          selectedStylists={selectedStylists}
+                          stylists={employees}
+                        />
+                      </div>
+
+                      {/* Footer Buttons */}
+                      <div className="border-t border-gray-200 p-4 flex justify-between items-center mt-4">
+                    
+                        <div className="space-x-2">
+                          <Button
+                            variant="outline"
+                            onClick={handleSaveAppointment}
+                          >
+                            Save Appointment
+                          </Button>
+                          <Button
+                            className="bg-black text-white px-4 py-2 rounded-md"
+                            onClick={handleProceedToCheckout}
+                          >
+                            Checkout
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  {currentScreen === SCREEN.CHECKOUT &&
+                    (newAppointmentId || selectedAppointment?.id) && (
+                      <CheckoutSection
+                        appointmentId={
+                          newAppointmentId || selectedAppointment?.id
+                        }
                         selectedServices={selectedServices}
                         selectedPackages={selectedPackages}
-                        selectedStylists={selectedStylists}
-                        stylists={employees}
+                        services={services || []}
+                        packages={packages || []}
+                        discountType={discountType}
+                        discountValue={discountValue}
+                        paymentMethod={paymentMethod}
+                        notes={appointmentNotes}
+                        onDiscountTypeChange={setDiscountType}
+                        onDiscountValueChange={setDiscountValue}
+                        onPaymentMethodChange={setPaymentMethod}
+                        onNotesChange={setAppointmentNotes}
+                        onPaymentComplete={() => {
+                          setCurrentScreen(SCREEN.SUMMARY);
+                          setNewAppointmentId(null);
+                          resetState();
+                        }}
                       />
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={closeAddAppointment}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleSaveAppointment}>
-                          Save Appointment
-                        </Button>
-                        <Button onClick={handleProceedToCheckout}>
-                          Proceed to Checkout
-                        </Button>
-                      </div>
-                    </>
-                  ) : null}
-
-                  {currentScreen === SCREEN.CHECKOUT && (newAppointmentId || selectedAppointment?.id) && (
-                    <CheckoutSection
-                      appointmentId={newAppointmentId || selectedAppointment?.id}
-                      selectedServices={selectedServices}
-                      selectedPackages={selectedPackages}
-                      services={services || []}
-                      packages={packages || []}
-                      discountType={discountType}
-                      discountValue={discountValue}
-                      paymentMethod={paymentMethod}
-                      notes={appointmentNotes}
-                      onDiscountTypeChange={setDiscountType}
-                      onDiscountValueChange={setDiscountValue}
-                      onPaymentMethodChange={setPaymentMethod}
-                      onNotesChange={setAppointmentNotes}
-                      onPaymentComplete={() => {
-                        setCurrentScreen(SCREEN.SUMMARY);
-                        setNewAppointmentId(null);
-                        resetState();
-                      }}
-                    />
-                  )}
+                    )}
 
                   {currentScreen === SCREEN.SUMMARY && (
                     <div className="p-6">
-                      <h3 className="text-xl font-semibold mb-6">Appointment Summary</h3>
+                      <h3 className="text-xl font-semibold mb-6">
+                        Appointment Summary
+                      </h3>
                       <SummaryView
-                        appointmentId={newAppointmentId || selectedAppointment?.id || ''}
+                        appointmentId={
+                          newAppointmentId || selectedAppointment?.id || ""
+                        }
                         selectedItems={calculateSelectedItems()}
                         subtotal={calculateTotals().subtotal}
                         discountAmount={calculateTotals().discountAmount}
@@ -810,7 +840,11 @@ export default function AdminBookings() {
                         completedAt={new Date().toISOString()}
                       />
                       <div className="mt-6 flex justify-end">
-                        <Button onClick={() => setCurrentScreen(SCREEN.SERVICE_SELECTION)}>
+                        <Button
+                          onClick={() =>
+                            setCurrentScreen(SCREEN.SERVICE_SELECTION)
+                          }
+                        >
                           Create New Appointment
                         </Button>
                       </div>
