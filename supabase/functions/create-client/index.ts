@@ -1,81 +1,98 @@
 
+import { serve } from "https://deno.fresh.dev/std@v9.6.1/http/server.ts"
 import { createClient } from '@supabase/supabase-js'
-import { serve } from 'https://deno.fresh.dev/std@v9.6.1/http/server.ts'
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey)
-
-interface RequestBody {
-  email: string
-  full_name: string
-  phone_number?: string
-  password: string
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
-  try {
-    const { email, full_name, phone_number, password } = await req.json() as RequestBody
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
 
-    // Create user with service role client
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+  try {
+    // Initialize Supabase client with service role key
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+
+    // Parse the request body
+    const { email, password, full_name, phone_number } = await req.json()
+
+    // Create the user
+    const { data: userData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: {
-        full_name,
-      }
+      user_metadata: { full_name, phone_number }
     })
 
-    if (authError) {
+    if (createUserError) {
+      console.error('Error creating user:', createUserError)
       return new Response(
-        JSON.stringify({ error: authError.message }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          error: createUserError.message 
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       )
     }
 
-    if (!authData.user) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to create user' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Update phone number if provided
-    if (phone_number) {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ phone_number })
-        .eq('id', authData.user.id)
-
-      if (updateError) {
-        console.error('Error updating phone number:', updateError)
-      }
-    }
-
-    // Fetch the created profile
-    const { data: profileData, error: profileError } = await supabase
+    // Get the profile data
+    const { data: profileData, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('*')
-      .eq('id', authData.user.id)
+      .eq('id', userData.user.id)
       .single()
 
     if (profileError) {
+      console.error('Error fetching profile:', profileError)
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch profile' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          error: 'Error fetching profile data'
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       )
     }
 
+    // Return the success response
     return new Response(
-      JSON.stringify({ data: profileData }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        data: {
+          ...profileData,
+          email: userData.user.email,
+        }
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     )
+
   } catch (error) {
+    console.error('Error in create-client function:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error: 'Internal server error'
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     )
   }
 })
