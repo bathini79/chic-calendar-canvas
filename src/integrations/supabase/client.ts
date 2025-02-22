@@ -4,8 +4,10 @@ import type { Database } from './types';
 
 const SUPABASE_URL = "https://oygmfedzibzxojqirgxo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95Z21mZWR6aWJ6eG9qcWlyZ3hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MzkxMDAsImV4cCI6MjA1MjQxNTEwMH0.GvilcxBVF6u9oQRqIQaj-j-e8NXfl0ct45U1Z5NYVag";
-
+const SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95Z21mZWR6aWJ6eG9qcWlyZ3hvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjgzOTEwMCwiZXhwIjoyMDUyNDE1MTAwfQ.-nNntyuFs1sxf7tFvoK-y99HChmdaMm6n8TPvTAReTI"
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+export const adminSupabase = createClient<Database>(SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY)

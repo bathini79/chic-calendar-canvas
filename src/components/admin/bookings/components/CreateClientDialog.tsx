@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { adminSupabase } from "@/integrations/supabase/client";
 import { Customer } from "@/pages/admin/bookings/types";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,54 +41,25 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
   });
 
   const onSubmit = async (data: CreateClientFormData) => {
-    try {
       // Generate a random strong password for the new user
       const password = generateStrongPassword();
-
-      // Get the current session
-      const session = await supabase.auth.getSession();
-      if (!session.data.session?.access_token) {
-        toast.error("Authentication error");
-        return;
-      }
-
-      // Call the edge function to create the user
-      const response = await fetch('/functions/v1/create-client', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.data.session.access_token}`
-        },
-        body: JSON.stringify({
-          ...data,
-          password,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to create client' }));
-        toast.error(errorData.error || 'Failed to create client');
-        return;
-      }
-
-      const result = await response.json();
-      
-      if (!result.data) {
-        toast.error("Invalid server response");
-        return;
-      }
-
-      toast.success("Client created successfully");
-      
-      // Send welcome email with temporary password (you should implement this)
-      // await sendWelcomeEmail(data.email, password);
-
-      onSuccess(result.data as Customer);
+        const { data:resultData, error } = await adminSupabase.auth.admin.createUser({
+            email: data.email,
+            password,
+            user_metadata: {
+                full_name: data.full_name,
+                phone_number: 'data.phone_number',
+                role: 'customer'
+            }})
+            console.log(resultData)
+    
+        if (error) {
+      toast.error("Failed to create client: " + resultData.error);
+          } else {
+    toast.success("Client created successfully");      
+      onSuccess(data as Customer);
       form.reset();
       onClose();
-    } catch (error: any) {
-      console.error("Error creating client:", error);
-      toast.error(error.message || "Failed to create client");
     }
   };
 

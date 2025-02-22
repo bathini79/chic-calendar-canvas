@@ -1,9 +1,0 @@
-
-project_id = "oygmfedzibzxojqirgxo"
-
-[api]
-enabled = true
-url = "https://oygmfedzibzxojqirgxo.supabase.co/functions/v1"
-
-[functions.send-po-email]
-verify_jwt = true
