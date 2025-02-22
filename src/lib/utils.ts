@@ -21,3 +21,12 @@ export function cn(...inputs: ClassValue[]) {
 export function formatPrice(price: number): string {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(price);
 }
+
+export function generateStrongPassword(length: number = 12): string {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
+}
