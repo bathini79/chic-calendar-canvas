@@ -8,54 +8,57 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Parse the request body
     const { email, password, full_name, phone_number } = await req.json()
-
-    // Initialize Supabase client with service role key
-    const supabase = createClient(
+    
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     )
 
-    // Create the user using signUp
-    const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+    // Create the user with admin API
+    const { data: { user }, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          full_name,
-          phone_number
-        }
+      email_confirm: true,
+      user_metadata: {
+        full_name,
+        phone_number,
+        role: 'customer'
       }
     })
 
-    if (signUpError || !user) {
-      console.error('Error signing up user:', signUpError)
+    if (createUserError || !user) {
+      console.error('Error creating user:', createUserError)
       return new Response(
-        JSON.stringify({ error: signUpError?.message || 'Failed to create user' }),
-        {
-          status: 400,
+        JSON.stringify({ error: createUserError?.message || 'Failed to create user' }),
+        { 
+          status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
     }
 
-    // Insert the profile data
-    const { data: profileData, error: profileError } = await supabase
+    // Insert into profiles table
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert([
-        { 
+        {
           id: user.id,
+          email,
           full_name,
           phone_number,
-          email,
-          role: 'customer'
+          role: 'customer',
         }
       ])
       .select()
@@ -63,26 +66,25 @@ serve(async (req) => {
 
     if (profileError) {
       console.error('Error creating profile:', profileError)
-      // Clean up: delete the auth user if profile creation fails
-      await supabase.auth.admin.deleteUser(user.id)
+      // Clean up: delete the created user if profile creation fails
+      await supabaseAdmin.auth.admin.deleteUser(user.id)
       return new Response(
         JSON.stringify({ error: 'Failed to create user profile' }),
-        {
+        { 
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
     }
 
-    // Return success response
     return new Response(
       JSON.stringify({
         data: {
-          ...profileData,
+          ...profile,
           email: user.email
         }
       }),
-      {
+      { 
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
@@ -92,7 +94,7 @@ serve(async (req) => {
     console.error('Error in create-client function:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      {
+      { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
