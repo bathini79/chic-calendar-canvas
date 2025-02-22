@@ -45,12 +45,19 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       // Generate a random strong password for the new user
       const password = generateStrongPassword();
 
+      // Get the current session
+      const session = await supabase.auth.getSession();
+      if (!session.data.session?.access_token) {
+        toast.error("Authentication error");
+        return;
+      }
+
       // Call the edge function to create the user
       const response = await fetch('/functions/v1/create-client', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          'Authorization': `Bearer ${session.data.session.access_token}`
         },
         body: JSON.stringify({
           ...data,
@@ -58,14 +65,16 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         }),
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        if (result.error.includes("already exists")) {
-          toast.error("A user with this email already exists");
-        } else {
-          toast.error("Failed to create client: " + result.error);
-        }
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create client' }));
+        toast.error(errorData.error || 'Failed to create client');
+        return;
+      }
+
+      const result = await response.json();
+      
+      if (!result.data) {
+        toast.error("Invalid server response");
         return;
       }
 
@@ -79,7 +88,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       onClose();
     } catch (error: any) {
       console.error("Error creating client:", error);
-      toast.error("Failed to create client");
+      toast.error(error.message || "Failed to create client");
     }
   };
 
