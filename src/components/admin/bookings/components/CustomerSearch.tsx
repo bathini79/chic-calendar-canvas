@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { Customer } from '../../../../pages/admin/bookings/types';
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Search } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { QuickCustomerCreate } from '../../../../pages/admin/bookings/components/QuickCustomerCreate';
+import { Customer } from '@/pages/admin/bookings/types';
 
 interface CustomerSearchProps {
   onSelect: (customer: Customer) => void;
@@ -15,10 +14,9 @@ interface CustomerSearchProps {
 
 export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Customer[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
 
-  const { data: initialCustomers, isLoading, error } = useQuery({
+  const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -26,99 +24,62 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
         .select('*')
         .eq('role', 'customer');
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       return data as Customer[];
-    },
+    }
   });
 
   useEffect(() => {
-    if (initialCustomers) {
-      setSearchResults(initialCustomers);
-    }
-  }, [initialCustomers]);
-
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-
-    if (query === '') {
-      setSearchResults(initialCustomers || []);
-      return;
-    }
-
-    if (initialCustomers) {
-      const results = initialCustomers.filter(
-        (customer) =>
-          customer.full_name?.toLowerCase().includes(query.toLowerCase()) ||
-          customer.email?.toLowerCase().includes(query.toLowerCase()) ||
-          customer.phone_number?.toLowerCase().includes(query.toLowerCase())
+    if (customers) {
+      const filtered = customers.filter(customer => 
+        customer.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        customer.phone_number?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setSearchResults(results);
+      setFilteredCustomers(filtered);
     }
-  };
-
-  const handleCustomerSelect = (customer: Customer) => {
-    setSelectedCustomer(customer);
-    onSelect(customer);
-  };
-
-  const handleCustomerCreated = (customer: Customer) => {
-    setSearchResults((prev) => [customer, ...prev]);
-    setSelectedCustomer(customer);
-    onSelect(customer);
-    toast.success(`Customer ${customer.full_name} created!`);
-  };
+  }, [searchQuery, customers]);
 
   return (
-    <div>
-      <div className="mb-4">
-        <Label htmlFor="search">Search Customer:</Label>
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
         <Input
           type="text"
-          id="search"
-          placeholder="Enter name, email, or phone"
+          placeholder="Search client or leave empty"
           value={searchQuery}
-          onChange={handleSearch}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
         />
       </div>
-
-      {isLoading ? (
-        <p>Loading customers...</p>
-      ) : error ? (
-        <p className="text-red-500">Error: {error.message}</p>
-      ) : (
-        <div className="mb-4">
-          {searchResults.length > 0 ? (
-            <ul>
-              {searchResults.map((customer) => (
-                <li
-                  key={customer.id}
-                  className={`py-2 px-4 rounded cursor-pointer hover:bg-gray-100 ${
-                    selectedCustomer?.id === customer.id ? 'bg-gray-200' : ''
-                  }`}
-                  onClick={() => handleCustomerSelect(customer)}
-                >
-                  {customer.full_name} ({customer.email})
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No customers found.</p>
-          )}
-        </div>
-      )}
-
-      {selectedCustomer && (
-        <div className="mb-4">
-          <p>
-            <strong>Selected Customer:</strong> {selectedCustomer.full_name} ({selectedCustomer.email})
-          </p>
-        </div>
-      )}
-
-      <QuickCustomerCreate onCustomerCreated={handleCustomerCreated} />
+      <div className="space-y-2">
+        {isLoading ? (
+          <p className="text-sm text-gray-500">Loading customers...</p>
+        ) : (
+          filteredCustomers.map((customer) => (
+            <Button
+              key={customer.id}
+              variant="ghost"
+              className="w-full justify-start text-left p-2 h-auto hover:bg-gray-50"
+              onClick={() => onSelect(customer)}
+            >
+              <div className="flex items-center gap-3">
+                <Avatar className="bg-primary/10">
+                  <AvatarFallback>
+                    {customer.full_name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="font-medium">{customer.full_name}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {customer.email}
+                  </div>
+                </div>
+              </div>
+            </Button>
+          ))
+        )}
+      </div>
     </div>
   );
 };
