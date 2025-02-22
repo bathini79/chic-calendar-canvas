@@ -1,9 +1,10 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { CustomerSearch } from "./CustomerSearch";
 import { Customer } from "@/pages/admin/bookings/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { CreateClientDialog } from "./CreateClientDialog";
 
 interface SelectCustomerProps {
   selectedCustomer: Customer | null;
@@ -16,6 +17,8 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
   setSelectedCustomer,
   setShowCreateForm,
 }) => {
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
   return (
     <div className="w-full h-full overflow-hidden flex flex-col">
       <div className="p-6 border-b">
@@ -32,7 +35,7 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
               <Button
                 variant="ghost"
                 className="w-full justify-start text-left p-2 h-auto hover:bg-gray-50"
-                onClick={() => setShowCreateForm(true)}
+                onClick={() => setIsCreateDialogOpen(true)}
               >
                 <div className="flex items-center gap-3">
                   <Avatar className="bg-primary/10 h-10 w-10">
@@ -70,6 +73,15 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
           </div>
         )}
       </div>
+
+      <CreateClientDialog
+        open={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onSuccess={(customer) => {
+          setSelectedCustomer(customer);
+          setShowCreateForm(false);
+        }}
+      />
     </div>
   );
 };

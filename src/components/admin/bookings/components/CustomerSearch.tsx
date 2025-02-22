@@ -66,7 +66,7 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
               <div className="flex items-center gap-3">
                 <Avatar className="bg-primary/10">
                   <AvatarFallback>
-                    {customer.full_name.charAt(0).toUpperCase()}
+                    {customer.full_name?.charAt(0).toUpperCase() || '?'}
                   </AvatarFallback>
                 </Avatar>
                 <div>
