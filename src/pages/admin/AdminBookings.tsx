@@ -64,9 +64,9 @@ export default function AdminBookings() {
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
-    const { data: services } = useActiveServices();
-    const { data: packages } = useActivePackages();
-    const { data: appointments = [] } = useAppointmentsByDate(currentDate);
+  const { data: services } = useActiveServices();
+  const { data: packages } = useActivePackages();
+  const { data: appointments = [] } = useAppointmentsByDate(currentDate);
   const {
     selectedCustomer,
     setSelectedCustomer,
@@ -103,7 +103,7 @@ export default function AdminBookings() {
     selectedStylists,
     getTotalDuration,
     getTotalPrice,
-});
+  });
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -148,7 +148,6 @@ export default function AdminBookings() {
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
   };
-
 
   const handleProceedToCheckout = async () => {
     try {
@@ -226,6 +225,7 @@ export default function AdminBookings() {
 
     return { items, subtotal, discountAmount, total };
   };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -302,22 +302,20 @@ export default function AdminBookings() {
             </div>
 
             <div className="flex-1 flex overflow-hidden">
-              <SelectCustomer
-                selectedCustomer={selectedCustomer}
-                setSelectedCustomer={setSelectedCustomer}
-                setShowCreateForm={setShowCreateForm}
-              />
-              <div className="w-[60%] overflow-y-auto p-6">
-                <div className="space-y-6">
-                  {currentScreen === SCREEN.SERVICE_SELECTION ? (
-                    <div className="flex flex-col h-full bg-white shadow-lg rounded-lg p-6 max-w-3xl w-full">
-                      {/* Header */}
-                      <h3 className="text-2xl font-bold mb-4">
-                        Select Services
-                      </h3>
-
-                      {/* Scrollable Service List */}
-                      <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4 bg-gray-50">
+              <div className="w-[30%] border-r">
+                <SelectCustomer
+                  selectedCustomer={selectedCustomer}
+                  setSelectedCustomer={setSelectedCustomer}
+                  setShowCreateForm={setShowCreateForm}
+                />
+              </div>
+              
+              <div className="w-[70%] flex flex-col h-full">
+                <div className="flex-1 overflow-y-auto p-6">
+                  {currentScreen === SCREEN.SERVICE_SELECTION && (
+                    <div className="h-full flex flex-col">
+                      <div className="flex-1 min-h-0">
+                        <h3 className="text-lg font-semibold mb-4">Select Services</h3>
                         <ServiceSelector
                           onServiceSelect={handleServiceSelect}
                           onPackageSelect={handlePackageSelect}
@@ -328,51 +326,46 @@ export default function AdminBookings() {
                           stylists={employees}
                         />
                       </div>
-
-                      {/* Footer Buttons */}
-                      <div className="border-t border-gray-200 p-4 flex justify-between items-center mt-4">
-                        <div className="space-x-2">
-                          <Button
-                            variant="outline"
-                            onClick={handleSaveAppointment}
-                          >
-                            Save Appointment
-                          </Button>
-                          <Button
-                            className="bg-black text-white px-4 py-2 rounded-md"
-                            onClick={handleProceedToCheckout}
-                          >
-                            Checkout
-                          </Button>
-                        </div>
+                      
+                      <div className="mt-6 flex justify-end gap-4 border-t pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={handleSaveAppointment}
+                        >
+                          Save Appointment
+                        </Button>
+                        <Button
+                          className="bg-black text-white"
+                          onClick={handleProceedToCheckout}
+                        >
+                          Checkout
+                        </Button>
                       </div>
                     </div>
-                  ) : null}
-                  {currentScreen === SCREEN.CHECKOUT &&
-                    (newAppointmentId || selectedAppointment?.id) && (
-                      <CheckoutSection
-                        appointmentId={
-                          newAppointmentId || selectedAppointment?.id
-                        }
-                        selectedServices={selectedServices}
-                        selectedPackages={selectedPackages}
-                        services={services || []}
-                        packages={packages || []}
-                        discountType={discountType}
-                        discountValue={discountValue}
-                        paymentMethod={paymentMethod}
-                        notes={appointmentNotes}
-                        onDiscountTypeChange={setDiscountType}
-                        onDiscountValueChange={setDiscountValue}
-                        onPaymentMethodChange={setPaymentMethod}
-                        onNotesChange={setAppointmentNotes}
-                        onPaymentComplete={() => {
-                          setCurrentScreen(SCREEN.SUMMARY);
-                          setNewAppointmentId(null);
-                          resetState();
-                        }}
-                      />
-                    )}
+                  )}
+
+                  {currentScreen === SCREEN.CHECKOUT && (
+                    <CheckoutSection
+                      appointmentId={newAppointmentId || selectedAppointment?.id}
+                      selectedServices={selectedServices}
+                      selectedPackages={selectedPackages}
+                      services={services || []}
+                      packages={packages || []}
+                      discountType={discountType}
+                      discountValue={discountValue}
+                      paymentMethod={paymentMethod}
+                      notes={appointmentNotes}
+                      onDiscountTypeChange={setDiscountType}
+                      onDiscountValueChange={setDiscountValue}
+                      onPaymentMethodChange={setPaymentMethod}
+                      onNotesChange={setAppointmentNotes}
+                      onPaymentComplete={() => {
+                        setCurrentScreen(SCREEN.SUMMARY);
+                        setNewAppointmentId(null);
+                        resetState();
+                      }}
+                    />
+                  )}
 
                   {currentScreen === SCREEN.SUMMARY && (
                     <div className="p-6">
@@ -380,9 +373,7 @@ export default function AdminBookings() {
                         Appointment Summary
                       </h3>
                       <SummaryView
-                        appointmentId={
-                          newAppointmentId || selectedAppointment?.id || ""
-                        }
+                        appointmentId={newAppointmentId || selectedAppointment?.id || ""}
                         selectedItems={calculateSelectedItems()}
                         subtotal={calculateTotals().subtotal}
                         discountAmount={calculateTotals().discountAmount}
@@ -393,11 +384,7 @@ export default function AdminBookings() {
                         completedAt={new Date().toISOString()}
                       />
                       <div className="mt-6 flex justify-end">
-                        <Button
-                          onClick={() =>
-                            setCurrentScreen(SCREEN.SERVICE_SELECTION)
-                          }
-                        >
+                        <Button onClick={() => setCurrentScreen(SCREEN.SERVICE_SELECTION)}>
                           Create New Appointment
                         </Button>
                       </div>
