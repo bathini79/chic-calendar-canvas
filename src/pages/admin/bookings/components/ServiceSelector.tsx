@@ -129,7 +129,7 @@ export function ServiceSelector({
         onCategorySelect={setSelectedCategory}
       />
 
-      <ScrollArea className="h-[400px] border rounded-md">
+      <ScrollArea className=" border rounded-md">
         <Table>
           <TableHeader>
             <TableRow>
