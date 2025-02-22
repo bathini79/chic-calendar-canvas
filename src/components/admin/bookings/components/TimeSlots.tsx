@@ -1,3 +1,4 @@
+
 import { getAppointmentStatusColor } from "@/pages/admin/bookings/utils/bookingUtils";
 import {
   START_HOUR,
@@ -13,7 +14,6 @@ interface Employee {
 }
 
 interface Appointment {
-  // Define the structure of your appointment object here
   bookings: Booking[];
 }
 
@@ -21,7 +21,16 @@ interface Booking {
   employee?: {
     id: string;
   };
-  // Define the structure of your booking object here
+  start_time: string;
+  duration?: number;
+  service?: {
+    duration: number;
+    name: string;
+  };
+  package?: {
+    duration: number;
+    name: string;
+  };
 }
 
 interface TimeSlotProps {
@@ -60,7 +69,7 @@ const TimeSlots: React.FC<TimeSlotProps> = ({
   setClickedCell,
   currentDate,
 }) => {
-  const handleColumnClick = (e: React.MouseEvent, empId: number) => {
+  const handleColumnClick = (e: React.MouseEvent, empId: string) => {
     if (e.target !== e.currentTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
@@ -75,13 +84,13 @@ const TimeSlots: React.FC<TimeSlotProps> = ({
       date: currentDate,
     });
   };
-  const renderAppointmentBlock = (appointment: any, booking: any) => {
+
+  const renderAppointmentBlock = (appointment: Appointment, booking: Booking) => {
     const statusColor = getAppointmentStatusColor(appointment.status);
     const duration =
       booking.service?.duration || booking.package?.duration || 60;
-    const startHour =
-      new Date(booking.start_time).getHours() +
-      new Date(booking.start_time).getMinutes() / 60;
+    const startTime = new Date(booking.start_time);
+    const startHour = startTime.getHours() + startTime.getMinutes() / 60;
 
     const topPositionPx = (startHour - START_HOUR) * PIXELS_PER_HOUR;
     const heightPx = (duration / 60) * PIXELS_PER_HOUR;
@@ -110,6 +119,7 @@ const TimeSlots: React.FC<TimeSlotProps> = ({
       </div>
     );
   };
+
   return (
     <div className="flex-1 overflow-auto">
       <div className="flex">
