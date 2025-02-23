@@ -85,7 +85,7 @@ export type Database = {
             foreignKeyName: "appointments_refunded_by_fkey"
             columns: ["refunded_by"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
         ]
@@ -177,7 +177,7 @@ export type Database = {
             foreignKeyName: "bookings_refunded_by_fkey"
             columns: ["refunded_by"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
           {
