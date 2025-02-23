@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -126,19 +127,16 @@ export function ServiceSelector({
     // Get base services from the package
     const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
 
-    // Update customized services first
+    // Update customized services
     setCustomizedServices(prev => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
         ? currentServices.filter(id => id !== serviceId)
         : [...currentServices, serviceId];
 
-      // Update package services with both base and custom services
-      // Important: We call onPackageSelect AFTER updating customizedServices
-      // to ensure the package stays selected
-      const allServices = [...baseServices, ...newServices];
-      if (allServices.length > 0) {
-        onPackageSelect(packageId, allServices);
+      // Call onPackageSelect with both base and custom services
+      if (selectedPackages.includes(packageId)) {
+        onPackageSelect(packageId, [...baseServices, ...newServices]);
       }
 
       return {
@@ -171,7 +169,7 @@ export function ServiceSelector({
       });
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
-      // Selecting package - add with base services
+      // Selecting package - add with base services and any existing customizations
       setExpandedPackages(prev => [...prev, pkg.id]);
       onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
     }
@@ -200,11 +198,10 @@ export function ServiceSelector({
             {allItems.map((item) => {
               const isService = item.type === 'service';
               const isPackage = item.type === 'package';
-              // Changed this line to ensure packages stay expanded when selected or manually expanded
               const isExpanded = isPackage && (selectedPackages.includes(item.id) || expandedPackages.includes(item.id));
               const isSelected = isService 
                 ? selectedServices.includes(item.id)
-                : isExpanded;
+                : selectedPackages.includes(item.id);
 
               return (
                 <React.Fragment key={`${item.type}-${item.id}`}>
@@ -235,6 +232,7 @@ export function ServiceSelector({
                       ${isService ? item.selling_price : calculatePackagePrice(item)}
                     </TableCell>
                     <TableCell>
+                      {/* Only show stylist selector for selected individual services */}
                       {isService && isSelected && (
                         <Select 
                           value={selectedStylists[item.id] || ''} 
@@ -292,6 +290,7 @@ export function ServiceSelector({
                                 <span className="text-sm font-medium">
                                   ${ps.service.selling_price}
                                 </span>
+                                {/* Always show stylist selector for package services */}
                                 <Select 
                                   value={selectedStylists[ps.service.id] || ''} 
                                   onValueChange={(value) => onStylistSelect(ps.service.id, value)}
@@ -334,6 +333,7 @@ export function ServiceSelector({
                                     <span className="text-sm font-medium">
                                       +${service.selling_price}
                                     </span>
+                                    {/* Show stylist selector only for selected customized services */}
                                     {customizedServices[item.id]?.includes(service.id) && (
                                       <Select 
                                         value={selectedStylists[service.id] || ''} 
