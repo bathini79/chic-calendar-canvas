@@ -35,7 +35,7 @@ export const useAppointmentsByDate = (currentDate: Date) => {
                 name,
                 email,
                 phone,
-                avatar,
+                photo_url,
                 employment_type,
                 status
               )
