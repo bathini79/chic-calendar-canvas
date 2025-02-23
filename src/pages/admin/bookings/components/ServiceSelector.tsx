@@ -1,5 +1,4 @@
 import React from 'react';
-import { type Employee, type ServiceSelectorProps } from '../types';
 import { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -27,13 +26,28 @@ type Stylist = {
   status: 'active' | 'inactive';
 };
 
+interface ServiceSelectorProps {
+  selectedServices: string[];
+  selectedPackages: string[];
+  selectedStylists: Record<string, string>;
+  stylists: Employee[];
+  onServiceSelect: (serviceId: string) => void;
+  onPackageSelect: (packageId: string) => void;
+  onStylistSelect: (itemId: string, stylistId: string) => void;
+  onCustomPackage?: (packageId: string, serviceId: string) => void;
+  customizedServices?: Record<string, string[]>;
+}
+
 export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
+  onServiceSelect,
+  onPackageSelect,
+  onStylistSelect,
   selectedServices,
   selectedPackages,
   selectedStylists,
+  stylists,
   onCustomPackage,
-  customizedServices,
-  stylists
+  customizedServices = {},
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
