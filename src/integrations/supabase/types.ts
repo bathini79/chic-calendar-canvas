@@ -22,6 +22,9 @@ export type Database = {
           number_of_bookings: number | null
           original_total_price: number | null
           payment_method: string | null
+          refund_notes: string | null
+          refund_reason: string | null
+          refunded_by: string | null
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"] | null
           total_duration: number | null
@@ -40,6 +43,9 @@ export type Database = {
           number_of_bookings?: number | null
           original_total_price?: number | null
           payment_method?: string | null
+          refund_notes?: string | null
+          refund_reason?: string | null
+          refunded_by?: string | null
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           total_duration?: number | null
@@ -58,6 +64,9 @@ export type Database = {
           number_of_bookings?: number | null
           original_total_price?: number | null
           payment_method?: string | null
+          refund_notes?: string | null
+          refund_reason?: string | null
+          refunded_by?: string | null
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           total_duration?: number | null
@@ -68,6 +77,13 @@ export type Database = {
           {
             foreignKeyName: "appointments_customer_id_fkey"
             columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_refunded_by_fkey"
+            columns: ["refunded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -84,6 +100,12 @@ export type Database = {
           original_price: number | null
           package_id: string | null
           price_paid: number
+          refund_notes: string | null
+          refund_reason:
+            | Database["public"]["Enums"]["refund_reason_type"]
+            | null
+          refunded_at: string | null
+          refunded_by: string | null
           service_id: string | null
           start_time: string | null
           status: string | null
@@ -98,6 +120,12 @@ export type Database = {
           original_price?: number | null
           package_id?: string | null
           price_paid: number
+          refund_notes?: string | null
+          refund_reason?:
+            | Database["public"]["Enums"]["refund_reason_type"]
+            | null
+          refunded_at?: string | null
+          refunded_by?: string | null
           service_id?: string | null
           start_time?: string | null
           status?: string | null
@@ -112,6 +140,12 @@ export type Database = {
           original_price?: number | null
           package_id?: string | null
           price_paid?: number
+          refund_notes?: string | null
+          refund_reason?:
+            | Database["public"]["Enums"]["refund_reason_type"]
+            | null
+          refunded_at?: string | null
+          refunded_by?: string | null
           service_id?: string | null
           start_time?: string | null
           status?: string | null
@@ -137,6 +171,13 @@ export type Database = {
             columns: ["package_id"]
             isOneToOne: false
             referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_refunded_by_fkey"
+            columns: ["refunded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1323,6 +1364,13 @@ export type Database = {
       employee_status: "active" | "inactive"
       employee_type: "stylist" | "operations"
       location_status: "active" | "inactive"
+      refund_reason_type:
+        | "customer_dissatisfaction"
+        | "service_quality_issue"
+        | "scheduling_error"
+        | "health_concern"
+        | "price_dispute"
+        | "other"
       service_status: "active" | "inactive" | "archived"
       shift_status: "pending" | "approved" | "declined"
       user_role: "customer" | "employee" | "admin" | "superadmin"

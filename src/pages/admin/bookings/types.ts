@@ -1,9 +1,10 @@
+
 export interface Customer {
   id: string;
   full_name: string | null;
   email: string | null;
   phone_number?: string | null;
-  role: 'customer' | 'admin';
+  role: 'customer' | 'admin' | 'employee' | 'superadmin';
   created_at: string;
   updated_at: string;
 }
@@ -92,7 +93,7 @@ export interface Booking {
   service?: Service;
   package?: Package;
   employee: Employee;
-  refund_reason?: string;
+  refund_reason?: 'customer_dissatisfaction' | 'service_quality_issue' | 'scheduling_error' | 'health_concern' | 'price_dispute' | 'other';
   refund_notes?: string;
   refunded_by?: string;
   refunded_at?: string;

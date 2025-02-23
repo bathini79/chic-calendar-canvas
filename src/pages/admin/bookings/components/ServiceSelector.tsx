@@ -27,15 +27,15 @@ type Stylist = {
 };
 
 interface ServiceSelectorProps {
+  selectedServices: string[];
+  selectedPackages: string[];
+  selectedStylists: Record<string, string>;
+  stylists: Employee[];
   onServiceSelect: (serviceId: string) => void;
   onPackageSelect: (packageId: string) => void;
   onStylistSelect: (itemId: string, stylistId: string) => void;
-  selectedServices: string[];
-  selectedPackages: string[];
-  selectedStylists: { [key: string]: string };
-  stylists: any[];
   onCustomPackage?: (packageId: string, serviceId: string) => void;
-  customizedServices?: { [key: string]: string[] };
+  customizedServices?: Record<string, string[]>;
 }
 
 export const ServiceSelector: React.FC<ServiceSelectorProps> = ({

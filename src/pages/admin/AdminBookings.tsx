@@ -42,7 +42,7 @@ export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
   const [stats] = useState(initialStats);
   const [clickedCell, setClickedCell] = useState<{
-    employeeId: number;
+    employeeId: string;
     time: number;
     x: number;
     y: number;
@@ -146,6 +146,10 @@ export default function AdminBookings() {
 
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
+  };
+
+  const handleCellClick = (cell: { employeeId: string; time: number; x: number; y: number; date: Date }) => {
+    setClickedCell(cell);
   };
 
   const handleProceedToCheckout = async () => {
@@ -279,7 +283,7 @@ export default function AdminBookings() {
           isSameDay={isSameDay}
           appointments={appointments}
           setSelectedAppointment={setSelectedAppointment}
-          setClickedCell={setClickedCell}
+          setClickedCell={handleCellClick}
         />
         <AppointmentDetailsDialog
           appointment={selectedAppointment}
