@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,10 +54,9 @@ interface SummaryViewProps {
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
-  selectedItems: initialSelectedItems,
-  subtotal: initialSubtotal,
-  discountAmount: initialDiscountAmount,
-  total: initialTotal,
+  subtotal,
+  discountAmount,
+  total,
   paymentMethod,
   discountType,
   discountValue,
@@ -70,42 +68,11 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [note, setNote] = useState('');
   const [refundItems, setRefundItems] = useState<{[key: string]: boolean}>({});
   const [appointmentDetails, setAppointmentDetails] = useState<Appointment | null>(null);
-  const [selectedItems, setSelectedItems] = useState(initialSelectedItems);
-  const { fetchAppointmentDetails, updateAppointmentStatus } = useAppointmentActions();
+  const { fetchAppointmentDetails, updateAppointmentStatus, selectedItems } = useAppointmentActions();
 
   useEffect(() => {
     loadAppointmentDetails();
   }, [appointmentId]);
-
-  useEffect(() => {
-    if (appointmentDetails) {
-      const items = appointmentDetails.bookings.map(booking => {
-        if (booking.service) {
-          return {
-            id: booking.service.id,
-            name: booking.service.name,
-            price: booking.price_paid,
-            type: 'service' as const,
-            employee: booking.employee,
-            duration: booking.service.duration
-          };
-        }
-        if (booking.package) {
-          return {
-            id: booking.package.id,
-            name: booking.package.name,
-            price: booking.price_paid,
-            type: 'package' as const,
-            employee: booking.employee,
-            duration: booking.package.duration
-          };
-        }
-        return null;
-      }).filter((item): item is NonNullable<typeof item> => item !== null);
-
-      setSelectedItems(items);
-    }
-  }, [appointmentDetails]);
 
   const loadAppointmentDetails = async () => {
     const details = await fetchAppointmentDetails(appointmentId);
@@ -248,7 +215,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             </div>
           </div>
 
-          {/* Customer Details */}
           <div className="p-4 bg-gray-50 rounded-lg">
             <h4 className="text-lg font-semibold">
               {appointmentDetails.customer?.full_name || 'No name provided'}
@@ -256,7 +222,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             <p className="text-gray-600">{appointmentDetails.customer?.email || 'No email provided'}</p>
           </div>
 
-          {/* Sale Details */}
           <div>
             <h4 className="font-medium mb-2">Sale #{appointmentId.slice(0, 8)}</h4>
             <p className="text-sm text-gray-500 mb-4">
@@ -278,11 +243,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             ))}
           </div>
 
-          {/* Totals */}
           <div className="space-y-2 pt-4 border-t">
             <div className="flex justify-between text-sm">
               <span>Subtotal</span>
-              <span>₹{appointmentDetails.total_price.toFixed(2)}</span>
+              <span>₹{subtotal.toFixed(2)}</span>
             </div>
             {appointmentDetails.discount_type !== 'none' && (
               <div className="flex justify-between text-sm text-green-600">
@@ -292,16 +256,15 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                     '₹' + appointmentDetails.discount_value
                   })
                 </span>
-                <span>-₹{((appointmentDetails.original_total_price || 0) - appointmentDetails.total_price).toFixed(2)}</span>
+                <span>-₹{((appointmentDetails.original_total_price || 0) - total).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-bold pt-2">
               <span>Total</span>
-              <span>₹{appointmentDetails.total_price.toFixed(2)}</span>
+              <span>₹{total.toFixed(2)}</span>
             </div>
           </div>
 
-          {/* Payment Info */}
           <div className="pt-4 border-t">
             <div className="flex justify-between text-sm">
               <span>Paid with {appointmentDetails.payment_method === 'cash' ? 'Cash' : 'Online'}</span>
@@ -311,7 +274,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 ) : (
                   <CreditCard className="h-4 w-4 mr-1" />
                 )}
-                ₹{appointmentDetails.total_price.toFixed(2)}
+                ₹{total.toFixed(2)}
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-1">
@@ -321,7 +284,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
         </CardContent>
       </Card>
 
-      {/* Void Sale Dialog */}
       <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
         <DialogContent>
           <DialogHeader>
@@ -341,7 +303,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Refund Sale Dialog */}
       <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -382,7 +343,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Add Note Dialog */}
       <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
         <DialogContent>
           <DialogHeader>

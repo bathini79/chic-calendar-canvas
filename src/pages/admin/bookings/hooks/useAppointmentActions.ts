@@ -4,8 +4,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Appointment, Booking } from '../types';
 
+interface SelectedItem {
+  id: string;
+  name: string;
+  price: number;
+  type: 'service' | 'package';
+  employee?: {
+    id: string;
+    name: string;
+  };
+  duration?: number;
+}
+
 export function useAppointmentActions() {
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
 
   const fetchAppointmentDetails = async (appointmentId: string) => {
     try {
@@ -26,6 +39,36 @@ export function useAppointmentActions() {
         .single();
 
       if (error) throw error;
+
+      if (data) {
+        // Map bookings to selected items
+        const items = data.bookings.map(booking => {
+          if (booking.service) {
+            return {
+              id: booking.service.id,
+              name: booking.service.name,
+              price: booking.price_paid,
+              type: 'service' as const,
+              employee: booking.employee,
+              duration: booking.service.duration
+            };
+          }
+          if (booking.package) {
+            return {
+              id: booking.package.id,
+              name: booking.package.name,
+              price: booking.price_paid,
+              type: 'package' as const,
+              employee: booking.employee,
+              duration: booking.package.duration
+            };
+          }
+          return null;
+        }).filter((item): item is NonNullable<typeof item> => item !== null);
+
+        setSelectedItems(items);
+      }
+
       return data as Appointment;
     } catch (error: any) {
       console.error('Error fetching appointment:', error);
@@ -73,6 +116,7 @@ export function useAppointmentActions() {
 
   return {
     isLoading,
+    selectedItems,
     fetchAppointmentDetails,
     updateAppointmentStatus,
   };

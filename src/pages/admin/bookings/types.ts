@@ -84,7 +84,7 @@ export interface Booking {
   employee_id: string;
   start_time: string;
   end_time: string;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress';
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded';
   price_paid: number;
   original_price?: number;
   service?: Service;
