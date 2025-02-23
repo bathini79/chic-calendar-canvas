@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { cn } from "@/lib/utils";
+import { Package, Service } from '../types';
 
 type Stylist = {
   id: string;
@@ -88,7 +90,7 @@ export function ServiceSelector({
         .eq('status', 'active');
       
       if (error) throw error;
-      return data;
+      return data as Package[];
     },
   });
 
@@ -123,8 +125,8 @@ export function ServiceSelector({
     const pkg = packages?.find(p => p.id === packageId);
     if (!pkg) return;
 
-    const baseServices = pkg.package_services?.map((ps: any) => ps.service.id) || [];
-
+    const baseServices = pkg.package_services.map(ps => ps.service.id);
+    
     setCustomizedServices(prev => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
@@ -132,7 +134,8 @@ export function ServiceSelector({
         : [...currentServices, serviceId];
 
       const customServices = newServices.filter(id => !baseServices.includes(id));
-      
+
+      // Only update parent if the package is already selected
       if (selectedPackages.includes(packageId)) {
         onPackageSelect(packageId, baseServices, customServices);
       }
@@ -144,21 +147,13 @@ export function ServiceSelector({
     });
   };
 
-  const calculatePackagePrice = (pkg: any) => {
-    const basePrice = pkg.price || 0;
-    const customServices = customizedServices[pkg.id] || [];
-    const additionalPrice = customServices.reduce((sum, serviceId) => {
-      const service = services?.find(s => s.id === serviceId);
-      return sum + (service?.selling_price || 0);
-    }, 0);
-    return basePrice + additionalPrice;
-  };
-
-  const handlePackageSelect = (pkg: any) => {
-    const baseServices = pkg.package_services?.map((ps: any) => ps.service.id) || [];
+  const handlePackageSelect = (pkg: Package) => {
+    const baseServices = pkg.package_services.map(ps => ps.service.id);
     const currentCustomServices = customizedServices[pkg.id] || [];
+    const customServices = currentCustomServices.filter(id => !baseServices.includes(id));
 
     if (selectedPackages.includes(pkg.id)) {
+      // Deselecting package
       onPackageSelect(pkg.id, [], []);
       setCustomizedServices(prev => {
         const { [pkg.id]: _, ...rest } = prev;
@@ -166,10 +161,20 @@ export function ServiceSelector({
       });
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
+      // Selecting package - include both base and custom services
       setExpandedPackages(prev => [...prev, pkg.id]);
-      const customServices = currentCustomServices.filter(id => !baseServices.includes(id));
       onPackageSelect(pkg.id, baseServices, customServices);
     }
+  };
+
+  const calculatePackagePrice = (pkg: Package) => {
+    const basePrice = pkg.price || 0;
+    const customServices = customizedServices[pkg.id] || [];
+    const additionalPrice = customServices.reduce((sum, serviceId) => {
+      const service = services?.find(s => s.id === serviceId);
+      return sum + (service?.selling_price || 0);
+    }, 0);
+    return basePrice + additionalPrice;
   };
 
   return (
@@ -198,7 +203,7 @@ export function ServiceSelector({
               const isExpanded = isPackage && (selectedPackages.includes(item.id) || expandedPackages.includes(item.id));
               const isSelected = isService 
                 ? selectedServices.includes(item.id)
-                : isExpanded;
+                : selectedPackages.includes(item.id);
 
               return (
                 <React.Fragment key={`${item.type}-${item.id}`}>
@@ -221,15 +226,15 @@ export function ServiceSelector({
                     </TableCell>
                     <TableCell>
                       {isService ? item.duration : 
-                        item.package_services?.reduce((sum: number, ps: any) => 
+                        (item as Package).package_services?.reduce((sum, ps) => 
                           sum + (ps.service?.duration || 0), 0)
                       } min
                     </TableCell>
                     <TableCell>
-                      ${isService ? item.selling_price : calculatePackagePrice(item)}
+                      ${isService ? item.selling_price : calculatePackagePrice(item as Package)}
                     </TableCell>
                     <TableCell>
-                      {isService && isSelected && (
+                      {(isService || (isPackage && isSelected)) && (
                         <Select 
                           value={selectedStylists[item.id] || ''} 
                           onValueChange={(value) => onStylistSelect(item.id, value)}
@@ -253,7 +258,7 @@ export function ServiceSelector({
                         size="sm"
                         onClick={() => {
                           if (isPackage) {
-                            handlePackageSelect(item);
+                            handlePackageSelect(item as Package);
                           } else {
                             onServiceSelect(item.id);
                           }
@@ -271,7 +276,7 @@ export function ServiceSelector({
                     <TableRow>
                       <TableCell colSpan={5} className="bg-slate-50">
                         <div className="pl-8 pr-4 py-2 space-y-2">
-                          {item.package_services?.map((ps: any) => (
+                          {(item as Package).package_services?.map((ps) => (
                             <div
                               key={ps.service.id}
                               className="flex items-center justify-between py-2 border-b last:border-0"
@@ -304,11 +309,11 @@ export function ServiceSelector({
                               </div>
                             </div>
                           ))}
-                          {item.is_customizable && (
+                          {(item as Package).is_customizable && (
                             <div className="pt-4 space-y-4">
                               <h4 className="font-medium text-sm">Additional Services</h4>
                               {services?.filter(service => 
-                                item.customizable_services.includes(service.id)
+                                (item as Package).customizable_services.includes(service.id)
                               ).map(service => (
                                 <div
                                   key={service.id}
