@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +9,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ClipboardList, Percent, FileEdit, Package, EllipsisVertical } from "lucide-react";
+import { 
+  MoreVertical, 
+  IndianRupee, 
+  Percent, 
+  Clock, 
+  User,
+  Mail
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Service, Package as PackageType } from "../types";
@@ -19,6 +25,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 interface CheckoutSectionProps {
   appointmentId: string;
@@ -63,6 +77,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 id,
                 name: service.name,
                 price: service.selling_price,
+                duration: service.duration,
                 type: "service" as const,
               }
             : null;
@@ -74,6 +89,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 id,
                 name: pkg.name,
                 price: pkg.price,
+                duration: pkg.duration,
                 type: "package" as const,
               }
             : null;
@@ -86,6 +102,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     () => selectedItems.reduce((sum, item) => sum + (item?.price || 0), 0),
     [selectedItems]
   );
+
+  const totalDuration = useMemo(
+    () => selectedItems.reduce((sum, item) => sum + (item?.duration || 0), 0),
+    [selectedItems]
+  );
+
   const discountAmount = useMemo(
     () =>
       discountType === "percentage"
@@ -95,6 +117,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         : 0,
     [discountType, discountValue, subtotal]
   );
+
   const total = useMemo(
     () => subtotal - discountAmount,
     [subtotal, discountAmount]
@@ -136,92 +159,40 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
-  const handleClearDiscount = () => {
-    onDiscountTypeChange("none");
-    onDiscountValueChange(0);
-  };
-
   return (
-    <div className="flex w-full h-full pb-8">
-      <div className="w-3/4 p-4 bg-gray-50 border-r flex flex-col h-full">
-        {/* Combined Items List and Calculation Section */}
-        <div className="overflow-y-auto flex-grow">
-          <div className="space-y-4">
-            {/* Title */}
-            <div className="flex items-center">
-              <ClipboardList className="mr-2 h-5 w-5 inline-block align-text-bottom" />
-              <h2 className="text-lg font-semibold">Checkout Summary</h2>
-            </div>
-            {/* Items */}
-            <div className="pt-6 space-y-4">
-              {selectedItems.map(
-                (item) =>
-                  item && (
-                    <div
-                      key={`${item.type}-${item.id}`}
-                      className="flex justify-between items-center"
-                    >
-                      <div className="flex items-center">
-                        {item.type === "package" ? (
-                          <Package className="mr-2 h-4 w-4 text-blue-500" />
-                        ) : (
-                          <FileEdit className="mr-2 h-4 w-4 text-green-500" />
-                        )}
-                        <span className="text-sm">{item.name}</span>
-                      </div>
-                      <span className="font-medium">₹{item.price}</span>
-                    </div>
-                  )
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Subtotal, Discount, Total */}
-        <div className=" border-t mt-4">
-          <div className="flex justify-between text-sm">
-            <span>Subtotal</span>
-            <span>₹{subtotal}</span>
-          </div>
-          {discountType !== "none" && (
-            <div className="flex justify-between text-sm text-green-600 flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <Percent className="h-4 w-4" />
-                Discount
+    <div className="flex w-full h-full">
+      <div className="w-full max-w-2xl mx-auto p-6">
+        <Card className="mb-6">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Avatar className="h-12 w-12 bg-primary/10">
+                  <AvatarFallback>JD</AvatarFallback>
+                </Avatar>
+                <div>
+                  <CardTitle className="text-lg">Jane Doe</CardTitle>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Mail className="mr-2 h-4 w-4" />
+                    jane@example.com
+                  </div>
+                </div>
               </div>
-              <span className="flex items-center gap-2">
-                -₹{discountAmount}
-                <button onClick={handleClearDiscount} className="text-red-500 hover:text-red-700 text-xs">
-                  (Clear)
-                </button>
-              </span>
-            </div>
-          )}
-          <div className="flex justify-between text-lg font-bold mt-2">
-            <span>Total</span>
-            <span>₹{total}</span>
-          </div>
-        </div>
-        {/* Payment section */}
-        <div className="flex flex-col justify-end mt-4">
-          <div className="flex gap-4 ">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button className="w-[20%]" variant="outline" size="lg">
-                  <EllipsisVertical className="h-5 w-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Discount</h3>
-                  <div className="flex gap-4 items-center">
-                    <div className="w-1/2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Discount</h3>
+                    <div className="flex gap-4">
                       <Select
                         value={discountType}
                         onValueChange={onDiscountTypeChange}
                       >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select discount type" />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Discount type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">No Discount</SelectItem>
@@ -229,46 +200,110 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           <SelectItem value="fixed">Fixed Amount</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                    {discountType !== "none" && (
-                      <div className="w-1/2">
+                      {discountType !== "none" && (
                         <Input
                           type="number"
                           placeholder={
                             discountType === "percentage"
-                              ? "Enter percentage"
+                              ? "Enter %"
                               : "Enter amount"
                           }
                           value={discountValue}
                           onChange={(e) =>
                             onDiscountValueChange(Number(e.target.value))
                           }
-                          min={0}
-                          max={discountType === "percentage" ? 100 : undefined}
+                          className="w-24"
                         />
-                      </div>
-                    )}
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Notes</h3>
+                      <Textarea
+                        placeholder="Add appointment notes..."
+                        value={notes}
+                        onChange={(e) => onNotesChange(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
                   </div>
-                  <h3 className="font-semibold">Notes</h3>
-                  <Textarea
-                    placeholder="Add any notes about this sale..."
-                    value={notes}
-                    onChange={(e) => onNotesChange(e.target.value)}
-                    rows={4}
-                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {selectedItems.map((item) => (
+                item && (
+                  <div
+                    key={`${item.type}-${item.id}`}
+                    className="flex items-center justify-between py-2"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-medium">{item.name}</p>
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Clock className="mr-2 h-4 w-4" />
+                        {item.duration} min
+                      </div>
+                    </div>
+                    <p className="font-medium">
+                      <IndianRupee className="inline h-3 w-3" />
+                      {item.price}
+                    </p>
+                  </div>
+                )
+              ))}
+
+              <Separator className="my-4" />
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Subtotal</span>
+                  <span>₹{subtotal}</span>
                 </div>
-              </PopoverContent>
-            </Popover>
-            <Button
-              className="w-full p-4"
-              size="lg"
-              onClick={handlePayment}
-              disabled={!appointmentId}
-            >
-              Complete Payment
-            </Button>
-          </div>
-        </div>
+                {discountType !== "none" && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span className="flex items-center">
+                      <Percent className="mr-2 h-4 w-4" />
+                      Discount
+                      {discountType === "percentage" && ` (${discountValue}%)`}
+                    </span>
+                    <span>-₹{discountAmount}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total</span>
+                  <span>₹{total}</span>
+                </div>
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Payment Method</h4>
+                  <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={handlePayment}
+                  disabled={!appointmentId}
+                >
+                  Complete Payment
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
