@@ -28,7 +28,6 @@ export function useAppointmentActions() {
         .select(`
           *,
           customer:profiles!appointments_customer_id_fkey(*),
-          refunded_by_user:profiles!appointments_refunded_by_fkey(*),
           bookings (
             *,
             service:services(*),
@@ -41,44 +40,74 @@ export function useAppointmentActions() {
 
       if (error) throw error;
 
-      if (data) {
-        // Map bookings to selected items
-        const items = data.bookings.map(booking => {
-          if (booking.service) {
-            return {
-              id: booking.service.id,
-              name: booking.service.name,
-              price: booking.price_paid,
-              type: 'service' as const,
-              employee: booking.employee,
-              duration: booking.service.duration
-            };
-          }
-          if (booking.package) {
-            return {
-              id: booking.package.id,
-              name: booking.package.name,
-              price: booking.price_paid,
-              type: 'package' as const,
-              employee: booking.employee,
-              duration: booking.package.duration
-            };
-          }
-          return null;
-        }).filter((item): item is NonNullable<typeof item> => item !== null);
-
-        setSelectedItems(items);
-      }
-
-      return {
-        ...data,
-        customer: data.customer,
-        refunded_by_user: data.refunded_by_user
-      } as Appointment;
+      return data as Appointment;
     } catch (error: any) {
       console.error('Error fetching appointment:', error);
       toast.error('Failed to load appointment details');
       return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const processRefund = async (
+    appointmentId: string,
+    bookingIds: string[],
+    refundData: {
+      reason: string;
+      notes?: string;
+      refundedBy: string;
+    }
+  ) => {
+    try {
+      setIsLoading(true);
+
+      // First update the bookings
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'refunded',
+          refund_reason: refundData.reason,
+          refund_notes: refundData.notes,
+          refunded_by: refundData.refundedBy,
+          refunded_at: new Date().toISOString()
+        })
+        .in('id', bookingIds);
+
+      if (bookingsError) throw bookingsError;
+
+      // Get all bookings for this appointment to determine if it's a full or partial refund
+      const { data: allBookings, error: countError } = await supabase
+        .from('bookings')
+        .select('id, status')
+        .eq('appointment_id', appointmentId);
+
+      if (countError) throw countError;
+
+      // Check if all bookings are now refunded
+      const isFullRefund = allBookings?.every(booking => 
+        booking.status === 'refunded' || bookingIds.includes(booking.id)
+      );
+
+      // Update the appointment status
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .update({
+          status: isFullRefund ? 'refunded' : 'partially_refunded',
+          refunded_by: refundData.refundedBy,
+          refund_reason: refundData.reason,
+          refund_notes: refundData.notes
+        })
+        .eq('id', appointmentId);
+
+      if (appointmentError) throw appointmentError;
+
+      toast.success('Refund processed successfully');
+      return true;
+    } catch (error: any) {
+      console.error('Error processing refund:', error);
+      toast.error(error.message || 'Failed to process refund');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -124,5 +153,6 @@ export function useAppointmentActions() {
     selectedItems,
     fetchAppointmentDetails,
     updateAppointmentStatus,
+    processRefund
   };
 }

@@ -60,7 +60,7 @@ export interface Appointment {
   id: string;
   customer_id: string;
   customer?: Customer;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded';
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded';
   start_time: string;
   end_time: string;
   total_price: number;
