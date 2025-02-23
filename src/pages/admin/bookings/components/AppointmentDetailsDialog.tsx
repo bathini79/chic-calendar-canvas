@@ -138,7 +138,7 @@ export function AppointmentDetailsDialog({
                   <span>
                     {appointment.discount_type === 'percentage' 
                       ? `${appointment.discount_value}%`
-                      : `$${appointment.discount_value}`
+                      : `₹{appointment.discount_value}`
                     }
                   </span>
                 </div>

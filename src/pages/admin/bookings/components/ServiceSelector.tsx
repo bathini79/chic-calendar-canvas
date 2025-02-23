@@ -200,7 +200,7 @@ export function ServiceSelector({
                       } min
                     </TableCell>
                     <TableCell>
-                      ${isService ? item.selling_price : calculatePackagePrice(item)}
+                    ₹{isService ? item.selling_price : calculatePackagePrice(item)}
                     </TableCell>
                     <TableCell>
                       {/* Only show stylist selector for selected individual services */}
@@ -259,7 +259,7 @@ export function ServiceSelector({
                               </div>
                               <div className="flex items-center gap-4">
                                 <span className="text-sm font-medium">
-                                  ${ps.service.selling_price}
+                                ₹{ps.service.selling_price}
                                 </span>
                                 {/* Always show stylist selector for package services */}
                                 <Select 
@@ -302,7 +302,7 @@ export function ServiceSelector({
                                   </div>
                                   <div className="flex items-center gap-4">
                                     <span className="text-sm font-medium">
-                                      +${service.selling_price}
+                                      +₹{service.selling_price}
                                     </span>
                                     {/* Show stylist selector only for selected customized services */}
                                     {customizedServices[item.id]?.includes(service.id) && (

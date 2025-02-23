@@ -21,7 +21,7 @@ export function StatsPanel({ stats }: StatsPanelProps) {
           <div className="text-gray-500 text-sm">{stat.label}</div>
           <div className="text-xl font-bold">
             {stat.label === "Today's Revenue"
-              ? `$${stat.value}`
+              ? `₹{stat.value}`
               : stat.value}
           </div>
         </div>
