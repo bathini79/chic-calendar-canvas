@@ -27,7 +27,7 @@ type Stylist = {
 
 interface ServiceSelectorProps {
   onServiceSelect: (serviceId: string) => void;
-  onPackageSelect: (packageId: string, baseServices: string[], customServices: string[]) => void;
+  onPackageSelect: (packageId: string, services: string[]) => void;
   onStylistSelect: (itemId: string, stylistId: string) => void;
   selectedServices: string[];
   selectedPackages: string[];
@@ -126,17 +126,20 @@ export function ServiceSelector({
     // Get base services from the package
     const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
 
-    // Update customized services
+    // Update customized services first
     setCustomizedServices(prev => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
         ? currentServices.filter(id => id !== serviceId)
         : [...currentServices, serviceId];
 
-      // Update package with both base services and customizations
-      // Only include customized services that aren't already in base services
-      const customServices = newServices.filter(id => !baseServices.includes(id));
-      onPackageSelect(packageId, baseServices, customServices);
+      // Update package services with both base and custom services
+      // Important: We call onPackageSelect AFTER updating customizedServices
+      // to ensure the package stays selected
+      const allServices = [...baseServices, ...newServices];
+      if (allServices.length > 0) {
+        onPackageSelect(packageId, allServices);
+      }
 
       return {
         ...prev,
@@ -161,7 +164,7 @@ export function ServiceSelector({
 
     if (selectedPackages.includes(pkg.id)) {
       // Deselecting package - clear everything
-      onPackageSelect(pkg.id, [], []);
+      onPackageSelect(pkg.id, []);
       setCustomizedServices(prev => {
         const { [pkg.id]: _, ...rest } = prev;
         return rest;
@@ -170,9 +173,7 @@ export function ServiceSelector({
     } else {
       // Selecting package - add with base services
       setExpandedPackages(prev => [...prev, pkg.id]);
-      // Only include customized services that aren't already in base services
-      const customServices = currentCustomServices.filter(id => !baseServices.includes(id));
-      onPackageSelect(pkg.id, baseServices, customServices);
+      onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
     }
   };
 

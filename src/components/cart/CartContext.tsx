@@ -114,7 +114,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         .from('cart_items')
         .update({ 
           status: 'pending',
-          customized_services: options?.customized_services || []
+          customized_services: options?.customized_services 
         })
         .eq('id', existingItem.id);
 
@@ -131,7 +131,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             package_id: packageId,
             status: 'pending',
             customer_id: session.session.user.id,
-            customized_services: options?.customized_services || []
+            customized_services: options?.customized_services
           },
         ]);
 
