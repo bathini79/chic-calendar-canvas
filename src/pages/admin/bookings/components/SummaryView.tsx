@@ -120,6 +120,59 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
+  const handleVoidSale = async () => {
+    if (!appointmentDetails) return;
+
+    try {
+      const bookingIds = appointmentDetails.bookings.map(booking => booking.id);
+      
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({ status: 'voided' })
+        .in('id', bookingIds);
+
+      if (bookingsError) throw bookingsError;
+
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .update({ status: 'voided' })
+        .eq('id', appointmentId);
+
+      if (appointmentError) throw appointmentError;
+
+      await loadAppointmentDetails();
+      setShowVoidDialog(false);
+      toast.success('Sale voided successfully');
+    } catch (error: any) {
+      console.error("Error voiding sale:", error);
+      toast.error("Failed to void sale");
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!note.trim()) {
+      toast.error("Please enter a note");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ notes: note })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      await loadAppointmentDetails();
+      setShowAddNoteDialog(false);
+      setNote('');
+      toast.success('Note added successfully');
+    } catch (error: any) {
+      console.error("Error adding note:", error);
+      toast.error("Failed to add note");
+    }
+  };
+
   const handleRefundSale = async () => {
     if (!appointmentDetails || !refundedBy) {
       toast.error("Please select who processed the refund");
@@ -189,7 +242,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             <div>
               <div className="inline-flex items-center px-2.5 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">
                 <CheckCircle2 className="h-4 w-4 mr-1" />
-                {appointmentDetails.status === 'completed' ? 'Completed' : appointmentDetails.status}
+                {appointmentDetails?.status === 'completed' ? 'Completed' : appointmentDetails?.status}
               </div>
               <div className="text-sm text-gray-500">
                 {format(new Date(completedAt), 'EEE dd MMM yyyy')}
