@@ -32,7 +32,7 @@ export function useAppointmentActions() {
             *,
             service:services(*),
             package:packages(*),
-            employee:employees(*)
+            employee:employees!bookings_employee_id_fkey(*)
           )
         `)
         .eq('id', appointmentId)
