@@ -61,7 +61,6 @@ interface SummaryViewProps {
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
-  selectedItems,
 }) => {
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
@@ -74,7 +73,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [refundedBy, setRefundedBy] = useState('');
   const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const { fetchAppointmentDetails, updateAppointmentStatus } = useAppointmentActions();
+  const { fetchAppointmentDetails, updateAppointmentStatus, processRefund } = useAppointmentActions();
 
   useEffect(() => {
     loadAppointmentDetails();
@@ -82,14 +81,16 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   }, [appointmentId]);
 
   useEffect(() => {
-    if (selectAll) {
-      const allItemIds = selectedItems.reduce((acc, item) => {
-        acc[item.id] = true;
-        return acc;
-      }, {} as {[key: string]: boolean});
-      setRefundItems(allItemIds);
+    if (selectAll && appointmentDetails) {
+      const nonRefundedBookings = appointmentDetails.bookings
+        .filter(booking => booking.status !== 'refunded')
+        .reduce((acc, booking) => {
+          acc[booking.id] = true;
+          return acc;
+        }, {} as {[key: string]: boolean});
+      setRefundItems(nonRefundedBookings);
     }
-  }, [selectAll, selectedItems]);
+  }, [selectAll, appointmentDetails]);
 
   const fetchEmployees = async () => {
     try {
@@ -109,6 +110,41 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     const details = await fetchAppointmentDetails(appointmentId);
     if (details) {
       setAppointmentDetails(details);
+    }
+  };
+
+  const handleRefundSale = async () => {
+    if (!appointmentDetails || !refundedBy) {
+      toast.error("Please select who processed the refund");
+      return;
+    }
+
+    try {
+      const selectedBookingIds = Object.entries(refundItems)
+        .filter(([_, isSelected]) => isSelected)
+        .map(([id]) => id);
+
+      if (selectedBookingIds.length === 0) {
+        toast.error("Please select at least one item to refund");
+        return;
+      }
+
+      const refundData: RefundData = {
+        reason: refundReason,
+        notes: refundNotes,
+        refundedBy: refundedBy
+      };
+
+      const success = await processRefund(appointmentId, selectedBookingIds, refundData);
+
+      if (success) {
+        await loadAppointmentDetails();
+        setShowRefundDialog(false);
+        toast.success('Refund processed successfully');
+      }
+    } catch (error: any) {
+      console.error("Error refunding sale:", error);
+      toast.error("Failed to process refund");
     }
   };
 
@@ -165,67 +201,14 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
-  const handleRefundSale = async () => {
-    if (!appointmentDetails || !refundedBy) {
-      toast.error("Please select who processed the refund");
-      return;
-    }
-
-    try {
-      const selectedItemIds = Object.entries(refundItems)
-        .filter(([_, isSelected]) => isSelected)
-        .map(([id]) => id);
-
-      if (selectedItemIds.length === 0) {
-        toast.error("Please select at least one item to refund");
-        return;
-      }
-
-      const bookingIds = appointmentDetails.bookings
-        .filter(booking => {
-          const itemId = booking.service_id || booking.package_id;
-          return itemId && selectedItemIds.includes(itemId);
-        })
-        .map(booking => booking.id);
-
-      const { error: bookingsError } = await supabase
-        .from('bookings')
-        .update({
-          status: 'refunded',
-          refund_reason: refundReason,
-          refund_notes: refundNotes,
-          refunded_by: refundedBy,
-          refunded_at: new Date().toISOString()
-        })
-        .in('id', bookingIds);
-
-      if (bookingsError) throw bookingsError;
-
-      const { error: appointmentError } = await supabase
-        .from('appointments')
-        .update({
-          status: 'refunded',
-          refunded_by: refundedBy,
-          refund_reason: refundReason,
-          refund_notes: refundNotes
-        })
-        .eq('id', appointmentId);
-
-      if (appointmentError) throw appointmentError;
-
-      await loadAppointmentDetails();
-      setShowRefundDialog(false);
-      toast.success('Refund processed successfully');
-    } catch (error: any) {
-      console.error("Error refunding sale:", error);
-      toast.error("Failed to process refund");
-    }
-  };
-
   if (!appointmentDetails) {
     return <div>Loading...</div>;
   }
-console.log("appointmentDetails",appointmentDetails)
+
+  const nonRefundedBookings = appointmentDetails.bookings.filter(
+    booking => booking.status !== 'refunded'
+  );
+
   return (
     <>
       <Card className="bg-white">
@@ -302,18 +285,23 @@ console.log("appointmentDetails",appointmentDetails)
               {format(new Date(appointmentDetails?.end_time), 'EEE dd MMM yyyy')}
             </p>
 
-            {appointmentDetails?.bookings.map((item) => (
-              <div key={item.id} className="py-2 flex justify-between items-start border-b">
-                <div className="flex-1">
-                  <p className="font-medium">{item.service.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {format(new Date(item.start_time), 'h:mma, dd MMM yyyy')}
-                    {item.employee && ` • Stylist: ${item.employee.name}`}
-                  </p>
+            {nonRefundedBookings.map((booking) => {
+              const itemName = booking.service?.name || booking.package?.name;
+              const itemPrice = booking.price_paid;
+              
+              return (
+                <div key={booking.id} className="py-2 flex justify-between items-start border-b">
+                  <div className="flex-1">
+                    <p className="font-medium">{itemName}</p>
+                    <p className="text-sm text-gray-500">
+                      {format(new Date(booking.start_time), 'h:mma, dd MMM yyyy')}
+                      {booking.employee && ` • Stylist: ${booking.employee.name}`}
+                    </p>
+                  </div>
+                  <p className="text-right text-gray-900">₹{itemPrice.toFixed(2)}</p>
                 </div>
-                <p className="text-right text-gray-900">₹{item.price_paid.toFixed(2)}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="space-y-2 pt-4 border-t">
@@ -399,28 +387,33 @@ console.log("appointmentDetails",appointmentDetails)
             </div>
 
             <div className="max-h-48 overflow-y-auto space-y-2">
-              {selectedItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-2 border-b">
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-500">₹{item.price.toFixed(2)}</p>
-                    {item.employee && (
-                      <p className="text-sm text-gray-500">Stylist: {item.employee.name}</p>
-                    )}
+              {nonRefundedBookings.map((booking) => {
+                const itemName = booking.service?.name || booking.package?.name;
+                const itemPrice = booking.price_paid;
+                
+                return (
+                  <div key={booking.id} className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <p className="font-medium">{itemName}</p>
+                      <p className="text-sm text-gray-500">₹{itemPrice.toFixed(2)}</p>
+                      {booking.employee && (
+                        <p className="text-sm text-gray-500">Stylist: {booking.employee.name}</p>
+                      )}
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={refundItems[booking.id] || false}
+                      onChange={(e) => 
+                        setRefundItems({
+                          ...refundItems,
+                          [booking.id]: e.target.checked
+                        })
+                      }
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={refundItems[item.id] || false}
-                    onChange={(e) => 
-                      setRefundItems({
-                        ...refundItems,
-                        [item.id]: e.target.checked
-                      })
-                    }
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="space-y-4">
