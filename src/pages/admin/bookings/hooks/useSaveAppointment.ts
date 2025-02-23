@@ -1,21 +1,21 @@
+
 import { useState, useCallback } from 'react';
 import { format, addMinutes } from 'date-fns';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
-
-// ... other imports and types
+import { Customer, Service, Package } from '../types';
 
 interface UseSaveAppointmentProps {
   selectedDate: Date | null;
   selectedTime: string | null;
-  selectedCustomer: any | null; // Replace 'any' with your Customer type
+  selectedCustomer: Customer | null;
   selectedServices: string[];
   selectedPackages: string[];
-  services: any[] | null; // Replace 'any' with your Service type
-  packages: any[] | null; // Replace 'any' with your Package type
+  services: Service[] | undefined;
+  packages: Package[] | undefined;
   selectedStylists: Record<string, string>;
-  getTotalDuration: (selectedServices: string[], selectedPackages: string[], services: any[], packages: any[]) => number; // Adjust parameter types if necessary
-  getTotalPrice: (selectedServices: string[], selectedPackages: string[], services: any[], packages: any[]) => number; // Adjust parameter types if necessary
+  getTotalDuration: (selectedServices: string[], selectedPackages: string[], services: Service[], packages: Package[]) => number;
+  getTotalPrice: (selectedServices: string[], selectedPackages: string[], services: Service[], packages: Package[]) => number;
 }
 
 const useSaveAppointment = ({
@@ -66,6 +66,7 @@ const useSaveAppointment = ({
       );
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
+      // Create the appointment
       const { data: appointmentData, error: appointmentError } = await supabase
         .from("appointments")
         .insert({
@@ -82,61 +83,68 @@ const useSaveAppointment = ({
           ),
           total_duration: totalDuration,
         })
-        .select();
+        .select()
+        .single();
 
       if (appointmentError) {
         console.error("Error inserting appointment:", appointmentError);
-        toast.error("Failed to create appointment. Please try again.");
+        toast.error("Failed to create appointment");
         throw appointmentError;
       }
 
-      const appointmentId = appointmentData[0].id;
+      const appointmentId = appointmentData.id;
       let currentStartTime = startDateTime;
 
-      const allSelectedItems = [
-        ...selectedServices.map((id) => ({ type: "service", id })),
-        ...selectedPackages.map((id) => ({ type: "package", id })),
-      ];
+      // Create bookings for services
+      for (const serviceId of selectedServices) {
+        const service = services?.find(s => s.id === serviceId);
+        if (!service) continue;
 
-      for (const item of allSelectedItems) {
-        let bookingEndTime: Date;
-        let bookingData = {};
-        if (item.type === "service") {
-          const service = services?.find((s) => s.id === item.id);
-          if (!service) continue;
-          bookingEndTime = addMinutes(currentStartTime, service.duration);
-          bookingData = {
-            appointment_id: appointmentId,
-            service_id: service.id,
-            status: "confirmed",
-            price_paid: service.selling_price,
-            employee_id: selectedStylists[service.id],
-            start_time: currentStartTime.toISOString(),
-            end_time: bookingEndTime.toISOString(),
-          };
-        } else {
-          const pkg = packages?.find((p) => p.id === item.id);
-          if (!pkg) continue;
-          bookingEndTime = addMinutes(currentStartTime, pkg.duration);
-          bookingData = {
-            appointment_id: appointmentId,
-            package_id: pkg.id,
-            status: "confirmed",
-            price_paid: pkg.price,
-            start_time: currentStartTime.toISOString(),
-            end_time: bookingEndTime.toISOString(),
-          };
-        }
+        const bookingEndTime = addMinutes(currentStartTime, service.duration);
         const { error: bookingError } = await supabase
           .from("bookings")
-          .insert(bookingData);
+          .insert({
+            appointment_id: appointmentId,
+            service_id: serviceId,
+            employee_id: selectedStylists[serviceId],
+            start_time: currentStartTime.toISOString(),
+            end_time: bookingEndTime.toISOString(),
+            status: "confirmed",
+            price_paid: service.selling_price,
+          });
+
         if (bookingError) {
-          console.error(`Error inserting ${item.type} booking:`, bookingError);
-          toast.error(
-            `Failed to create ${item.type} booking. Please try again.`
-          );
+          console.error("Error inserting service booking:", bookingError);
           throw bookingError;
         }
+
+        currentStartTime = bookingEndTime;
+      }
+
+      // Create bookings for packages
+      for (const packageId of selectedPackages) {
+        const pkg = packages?.find(p => p.id === packageId);
+        if (!pkg) continue;
+
+        // Create one booking for the package
+        const bookingEndTime = addMinutes(currentStartTime, pkg.duration);
+        const { error: bookingError } = await supabase
+          .from("bookings")
+          .insert({
+            appointment_id: appointmentId,
+            package_id: packageId,
+            employee_id: selectedStylists[packageId],
+            start_time: currentStartTime.toISOString(),
+            end_time: bookingEndTime.toISOString(),
+            status: "confirmed",
+            price_paid: pkg.price,
+          });
+
+        if (bookingError) {
+          console.error("Error inserting package booking:", bookingError);
+          throw bookingError;
+        }
+
         currentStartTime = bookingEndTime;
       }
 
@@ -146,11 +154,11 @@ const useSaveAppointment = ({
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
-      setSaveError(error.message || "Failed to save appointment")
+      setSaveError(error.message || "Failed to save appointment");
       setIsSaving(false);
       return null;
     }
-  }, [selectedDate, selectedTime, selectedCustomer, selectedServices, selectedPackages, services, packages, selectedStylists, getTotalDuration, getTotalPrice]); // Dependency array
+  }, [selectedDate, selectedTime, selectedCustomer, selectedServices, selectedPackages, services, packages, selectedStylists, getTotalDuration, getTotalPrice]);
 
   return { handleSaveAppointment, isSaving, saveError };
 };

@@ -41,25 +41,32 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
   });
 
   const onSubmit = async (data: CreateClientFormData) => {
+    try {
       // Generate a random strong password for the new user
       const password = generateStrongPassword();
-        const { data:resultData, error } = await adminSupabase.auth.admin.createUser({
-            email: data.email,
-            password,
-            user_metadata: {
-                full_name: data.full_name,
-                phone_number: 'data.phone_number',
-                role: 'customer'
-            }})
-            console.log(resultData)
-    
-        if (error) {
-      toast.error("Failed to create client: " + resultData.error);
-          } else {
-    toast.success("Client created successfully");      
-      onSuccess(data as Customer);
-      form.reset();
-      onClose();
+      const { data: resultData, error: authError } = await adminSupabase.auth.admin.createUser({
+        email: data.email,
+        password,
+        user_metadata: {
+          full_name: data.full_name,
+          phone_number: data.phone_number,
+          role: 'customer'
+        }
+      });
+
+      if (authError) {
+        toast.error("Failed to create client: " + authError.message);
+        return;
+      }
+
+      if (resultData.user) {
+        toast.success("Client created successfully");
+        onSuccess(data as Customer);
+        form.reset();
+        onClose();
+      }
+    } catch (error: any) {
+      toast.error("Failed to create client: " + error.message);
     }
   };
 
@@ -125,4 +132,4 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       </DialogContent>
     </Dialog>
   );
-};
+}

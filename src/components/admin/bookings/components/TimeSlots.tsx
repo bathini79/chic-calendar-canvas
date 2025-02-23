@@ -6,34 +6,9 @@ import {
   hourLabels,
 } from "@/pages/admin/bookings/utils/timeUtils";
 import React from "react";
+import { Appointment, Booking, Employee } from "@/pages/admin/bookings/types";
 
-interface Employee {
-  id: string;
-  avatar: string;
-  name: string;
-}
-
-interface Appointment {
-  bookings: Booking[];
-}
-
-interface Booking {
-  employee?: {
-    id: string;
-  };
-  start_time: string;
-  duration?: number;
-  service?: {
-    duration: number;
-    name: string;
-  };
-  package?: {
-    duration: number;
-    name: string;
-  };
-}
-
-interface TimeSlotProps {
+interface TimeSlotsProps {
   employees: Employee[];
   hourLabels: number[];
   formatTime: (hr: number) => string;
@@ -58,7 +33,7 @@ interface TimeSlotProps {
   }) => void;
 }
 
-const TimeSlots: React.FC<TimeSlotProps> = ({
+const TimeSlots: React.FC<TimeSlotsProps> = ({
   employees,
   formatTime,
   TOTAL_HOURS,
@@ -86,9 +61,10 @@ const TimeSlots: React.FC<TimeSlotProps> = ({
   };
 
   const renderAppointmentBlock = (appointment: Appointment, booking: Booking) => {
-    const statusColor = getAppointmentStatusColor(appointment.status);
-    const duration =
-      booking.service?.duration || booking.package?.duration || 60;
+    if (!booking.id) return null;
+    
+    const statusColor = getAppointmentStatusColor(appointment.status || 'pending');
+    const duration = booking.service?.duration || booking.package?.duration || 60;
     const startTime = new Date(booking.start_time);
     const startHour = startTime.getHours() + startTime.getMinutes() / 60;
 
@@ -110,10 +86,10 @@ const TimeSlots: React.FC<TimeSlotProps> = ({
       >
         <div className="p-2 text-xs">
           <div className="font-medium truncate">
-            {appointment.customer?.full_name}
+            {appointment.customer?.full_name || 'No name'}
           </div>
           <div className="truncate text-gray-600">
-            {booking.service?.name || booking.package?.name}
+            {booking.service?.name || booking.package?.name || 'Unnamed service'}
           </div>
         </div>
       </div>
