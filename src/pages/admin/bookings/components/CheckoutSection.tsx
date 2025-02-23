@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,11 +108,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedItems]
   );
 
-  const totalDuration = useMemo(
-    () => selectedItems.reduce((sum, item) => sum + (item?.duration || 0), 0),
-    [selectedItems]
-  );
-
   const discountAmount = useMemo(
     () =>
       discountType === "percentage"
@@ -167,6 +163,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     <div className="h-full w-full bg-gray-50 p-6">
       <Card className="h-full">
         <CardContent className="p-6 h-full flex flex-col">
+          <h2 className="text-xl font-semibold mb-6">Checkout Summary</h2>
           <div className="flex-1 space-y-6">
             {/* Services List */}
             <div className="space-y-4">
@@ -179,16 +176,18 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     <div className="space-y-2">
                       <p className="text-lg font-semibold tracking-tight">{item.name}</p>
                       <div className="space-y-1">
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <Clock className="mr-2 h-4 w-4" />
-                          {item.duration} min {item.time && `at ${item.time}`}
-                        </div>
-                        {item.stylist && (
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <User className="mr-2 h-4 w-4" />
-                            {item.stylist}
+                        <div className="flex flex-col text-sm text-muted-foreground gap-1">
+                          <div className="flex items-center">
+                            <Clock className="mr-2 h-4 w-4" />
+                            {item.time} • {item.duration} mins
                           </div>
-                        )}
+                          {item.stylist && (
+                            <div className="flex items-center">
+                              <User className="mr-2 h-4 w-4" />
+                              {item.stylist}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <p className="font-semibold text-lg">
