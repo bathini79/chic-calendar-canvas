@@ -55,10 +55,10 @@ interface SummaryViewProps {
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
-  selectedItems,
-  subtotal,
-  discountAmount,
-  total,
+  selectedItems: initialSelectedItems,
+  subtotal: initialSubtotal,
+  discountAmount: initialDiscountAmount,
+  total: initialTotal,
   paymentMethod,
   discountType,
   discountValue,
@@ -66,16 +66,46 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 }) => {
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
   const [note, setNote] = useState('');
   const [refundItems, setRefundItems] = useState<{[key: string]: boolean}>({});
   const [appointmentDetails, setAppointmentDetails] = useState<Appointment | null>(null);
+  const [selectedItems, setSelectedItems] = useState(initialSelectedItems);
   const { fetchAppointmentDetails, updateAppointmentStatus } = useAppointmentActions();
 
   useEffect(() => {
     loadAppointmentDetails();
   }, [appointmentId]);
+
+  useEffect(() => {
+    if (appointmentDetails) {
+      const items = appointmentDetails.bookings.map(booking => {
+        if (booking.service) {
+          return {
+            id: booking.service.id,
+            name: booking.service.name,
+            price: booking.price_paid,
+            type: 'service' as const,
+            employee: booking.employee,
+            duration: booking.service.duration
+          };
+        }
+        if (booking.package) {
+          return {
+            id: booking.package.id,
+            name: booking.package.name,
+            price: booking.price_paid,
+            type: 'package' as const,
+            employee: booking.employee,
+            duration: booking.package.duration
+          };
+        }
+        return null;
+      }).filter((item): item is NonNullable<typeof item> => item !== null);
+
+      setSelectedItems(items);
+    }
+  }, [appointmentDetails]);
 
   const loadAppointmentDetails = async () => {
     const details = await fetchAppointmentDetails(appointmentId);
@@ -238,7 +268,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 <div className="flex-1">
                   <p className="font-medium">{item.name}</p>
                   <p className="text-sm text-gray-500">
-                    {format(new Date(completedAt), 'h:mma, dd MMM yyyy')}
+                    {format(new Date(completedAt), 'h:mma, dd MMM yyyy')} • 
+                    {item.duration && ` ${Math.floor(item.duration / 60)}h${item.duration % 60}m`} •
+                    {item.employee?.name}
                   </p>
                 </div>
                 <p className="text-right text-gray-900">₹{item.price.toFixed(2)}</p>
@@ -250,33 +282,36 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           <div className="space-y-2 pt-4 border-t">
             <div className="flex justify-between text-sm">
               <span>Subtotal</span>
-              <span>₹{subtotal.toFixed(2)}</span>
+              <span>₹{appointmentDetails.total_price.toFixed(2)}</span>
             </div>
-            {discountType !== 'none' && (
+            {appointmentDetails.discount_type !== 'none' && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>
-                  Discount ({discountType === 'percentage' ? `${discountValue}%` : '₹' + discountValue})
+                  Discount ({appointmentDetails.discount_type === 'percentage' ? 
+                    `${appointmentDetails.discount_value}%` : 
+                    '₹' + appointmentDetails.discount_value
+                  })
                 </span>
-                <span>-₹{discountAmount.toFixed(2)}</span>
+                <span>-₹{((appointmentDetails.original_total_price || 0) - appointmentDetails.total_price).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-bold pt-2">
               <span>Total</span>
-              <span>₹{total.toFixed(2)}</span>
+              <span>₹{appointmentDetails.total_price.toFixed(2)}</span>
             </div>
           </div>
 
           {/* Payment Info */}
           <div className="pt-4 border-t">
             <div className="flex justify-between text-sm">
-              <span>Paid with {paymentMethod === 'cash' ? 'Cash' : 'Online'}</span>
+              <span>Paid with {appointmentDetails.payment_method === 'cash' ? 'Cash' : 'Online'}</span>
               <div className="flex items-center">
-                {paymentMethod === 'cash' ? (
+                {appointmentDetails.payment_method === 'cash' ? (
                   <Banknote className="h-4 w-4 mr-1" />
                 ) : (
                   <CreditCard className="h-4 w-4 mr-1" />
                 )}
-                ₹{total.toFixed(2)}
+                ₹{appointmentDetails.total_price.toFixed(2)}
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-1">
