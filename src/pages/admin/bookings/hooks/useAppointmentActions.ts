@@ -2,23 +2,10 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, Booking, RefundData } from '../types';
-
-interface SelectedItem {
-  id: string;
-  name: string;
-  price: number;
-  type: 'service' | 'package';
-  employee?: {
-    id: string;
-    name: string;
-  };
-  duration?: number;
-}
+import { Appointment, RefundData } from '../types';
 
 export function useAppointmentActions() {
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
 
   const fetchAppointmentDetails = async (appointmentId: string) => {
     try {
@@ -36,49 +23,11 @@ export function useAppointmentActions() {
           )
         `)
         .eq('id', appointmentId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (data) {
-        // Map bookings to selected items
-        const items = data.bookings
-          .filter(booking => booking.status !== 'refunded') // Only show non-refunded items
-          .map(booking => {
-            if (booking.service) {
-              return {
-                id: booking.service.id,
-                name: booking.service.name,
-                price: booking.price_paid,
-                type: 'service' as const,
-                employee: booking.employee ? {
-                  id: booking.employee.id,
-                  name: booking.employee.name
-                } : undefined,
-                duration: booking.service.duration
-              };
-            }
-            if (booking.package) {
-              return {
-                id: booking.package.id,
-                name: booking.package.name,
-                price: booking.price_paid,
-                type: 'package' as const,
-                employee: booking.employee ? {
-                  id: booking.employee.id,
-                  name: booking.employee.name
-                } : undefined,
-                duration: booking.package.duration
-              };
-            }
-            return null;
-          })
-          .filter((item): item is NonNullable<typeof item> => item !== null);
-
-        setSelectedItems(items);
-      }
-
-      return data as Appointment;
+      return data as Appointment | null;
     } catch (error: any) {
       console.error('Error fetching appointment:', error);
       toast.error('Failed to load appointment details');
@@ -127,7 +76,7 @@ export function useAppointmentActions() {
       const { error: appointmentError } = await supabase
         .from('appointments')
         .update({
-          status: isFullRefund ? 'refunded' : 'partially_refunded',
+          status: isFullRefund ? 'refunded' : 'completed',
           refunded_by: refundData.refundedBy,
           refund_reason: refundData.reason,
           refund_notes: refundData.notes
@@ -135,9 +84,6 @@ export function useAppointmentActions() {
         .eq('id', appointmentId);
 
       if (appointmentError) throw appointmentError;
-
-      // Refresh the selected items after refund
-      await fetchAppointmentDetails(appointmentId);
 
       toast.success('Refund processed successfully');
       return true;
@@ -152,7 +98,7 @@ export function useAppointmentActions() {
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: Appointment['status'],
+    status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded',
     bookingIds: string[]
   ) => {
     try {
@@ -187,7 +133,6 @@ export function useAppointmentActions() {
 
   return {
     isLoading,
-    selectedItems,
     fetchAppointmentDetails,
     updateAppointmentStatus,
     processRefund
