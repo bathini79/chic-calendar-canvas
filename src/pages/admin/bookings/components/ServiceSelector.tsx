@@ -145,6 +145,16 @@ export function ServiceSelector({
     });
   };
 
+  const calculatePackagePrice = (pkg: any) => {
+    const basePrice = pkg.price || 0;
+    const customServices = customizedServices[pkg.id] || [];
+    const additionalPrice = customServices.reduce((sum, serviceId) => {
+      const service = services?.find(s => s.id === serviceId);
+      return sum + (service?.selling_price || 0);
+    }, 0);
+    return basePrice + additionalPrice;
+  };
+
   const handlePackageSelect = (pkg: any) => {
     const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
     const currentCustomServices = customizedServices[pkg.id] || [];
