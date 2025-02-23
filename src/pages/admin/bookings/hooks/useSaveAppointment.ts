@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { format, addMinutes } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,7 +50,9 @@ const useSaveAppointment = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const handleSaveAppointment = useCallback(async (): Promise<string | null> => {
+  const handleSaveAppointment = useCallback(async (): Promise<
+    string | null
+  > => {
     setIsSaving(true);
     setSaveError(null);
 
@@ -91,12 +92,13 @@ const useSaveAppointment = ({
       );
 
       // Calculate final price after discount
-      const discountAmount = discountType === "percentage"
-        ? (totalPrice * discountValue) / 100
-        : discountType === "fixed"
-        ? discountValue
-        : 0;
-      
+      const discountAmount =
+        discountType === "percentage"
+          ? (totalPrice * discountValue) / 100
+          : discountType === "fixed"
+            ? discountValue
+            : 0;
+
       const finalPrice = totalPrice - discountAmount;
 
       // Create the appointment
@@ -114,7 +116,7 @@ const useSaveAppointment = ({
           discount_type: discountType,
           discount_value: discountValue,
           payment_method: paymentMethod,
-          notes: notes
+          notes: notes,
         })
         .select()
         .single();
@@ -126,7 +128,7 @@ const useSaveAppointment = ({
       }
 
       const appointmentId = appointmentData.id;
-
+      let currentStartTime = startDateTime;
       // Create bookings for individual services
       for (const serviceId of selectedServices) {
         const service = services?.find((s) => s.id === serviceId);
@@ -139,17 +141,18 @@ const useSaveAppointment = ({
           return null;
         }
 
-        const bookingEndTime = addMinutes(startDateTime, service.duration);
+        const bookingEndTime = addMinutes(currentStartTime, service.duration);
         const { error: bookingError } = await supabase.from("bookings").insert({
           appointment_id: appointmentId,
           service_id: serviceId,
           employee_id: stylistId,
-          start_time: startDateTime.toISOString(),
+          start_time: currentStartTime.toISOString(),
           end_time: bookingEndTime.toISOString(),
           status: "confirmed",
           price_paid: service.selling_price,
-          original_price: service.original_price
+          original_price: service.original_price,
         });
+        currentStartTime = bookingEndTime
 
         if (bookingError) {
           console.error("Error inserting service booking:", bookingError);
@@ -162,31 +165,58 @@ const useSaveAppointment = ({
         const pkg = packages?.find((p) => p.id === packageId);
         if (!pkg) continue;
 
-        const stylistId = selectedStylists[packageId];
-        if (!stylistId) {
-          toast.error(`Please select a stylist for ${pkg.name}`);
-          setIsSaving(false);
-          return null;
+        const packageServices =
+          pkg.package_services?.map((ps) => ps.service.id) || [];
+
+        // Get all selected services for this package
+
+        const selectedPackageServices = new Set([
+          ...packageServices,
+
+          ...(pkg.is_customizable
+            ? pkg.customizable_services?.filter(
+              (serviceId) => selectedStylists[serviceId]
+            ) || []
+            : []),
+        ]);
+        for (const serviceId of selectedPackageServices) {
+          const service = services?.find((s) => s.id === serviceId);
+
+          if (!service) continue;
+
+          const stylistId = selectedStylists[serviceId];
+
+          if (!stylistId) {
+            toast.error(`Please select a stylist for ${service.name}`);
+
+            setIsSaving(false);
+
+            return null;
+          }
+          const bookingEndTime = addMinutes(currentStartTime, service.duration);
+          const { error: bookingError } = await supabase
+            .from("bookings")
+            .insert({
+              appointment_id: appointmentId,
+              service_id: serviceId,
+              package_id: packageId,
+              employee_id: stylistId,
+              start_time: currentStartTime.toISOString(),
+              end_time: bookingEndTime.toISOString(),
+              status: "confirmed",
+              price_paid: service.selling_price,
+            });
+
+          if (bookingError) {
+            console.error("Error inserting package booking:", bookingError);
+            throw bookingError;
+          }
+          currentStartTime = bookingEndTime;
         }
 
-        const { error: bookingError } = await supabase.from("bookings").insert({
-          appointment_id: appointmentId,
-          package_id: packageId,
-          employee_id: stylistId,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          status: "confirmed",
-          price_paid: pkg.price,
-        });
-
-        if (bookingError) {
-          console.error("Error inserting package booking:", bookingError);
-          throw bookingError;
-        }
+        setIsSaving(false);
+        return appointmentId;
       }
-
-      setIsSaving(false);
-      return appointmentId;
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
