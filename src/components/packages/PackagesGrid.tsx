@@ -1,16 +1,11 @@
 
 import React from "react";
-import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, PenSquare, ChevronDown, ChevronUp, User } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Package, PenSquare } from "lucide-react";
 
 interface PackagesGridProps {
   searchQuery: string;
@@ -18,11 +13,10 @@ interface PackagesGridProps {
 }
 
 export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
-  const [openPackages, setOpenPackages] = React.useState<string[]>([]);
-
   const { data: packages, isLoading } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
+      // First fetch packages with their services
       const { data: packagesData, error: packagesError } = await supabase
         .from('packages')
         .select(`
@@ -30,9 +24,7 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
           package_services (
             service:services (
               id,
-              name,
-              duration,
-              selling_price
+              name
             )
           )
         `)
@@ -63,14 +55,6 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
     },
   });
 
-  const togglePackage = (packageId: string) => {
-    setOpenPackages(current =>
-      current.includes(packageId)
-        ? current.filter(id => id !== packageId)
-        : [...current, packageId]
-    );
-  };
-
   const filteredPackages = packages?.filter(pkg =>
     pkg.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -81,96 +65,57 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {filteredPackages?.map((pkg) => {
-        const isOpen = openPackages.includes(pkg.id);
-        const totalDuration = pkg.package_services.reduce(
-          (sum: number, ps: any) => sum + (ps.service?.duration || 0),
-          0
-        );
-
-        return (
-          <Card key={pkg.id} className="flex flex-col">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  <h3 className="font-semibold">{pkg.name}</h3>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onEdit(pkg)}
-                >
-                  <PenSquare className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1 space-y-4">
-              {pkg.description && (
-                <p className="text-sm text-muted-foreground">{pkg.description}</p>
-              )}
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-1">
-                  {pkg.package_categories?.map((pc: any) => (
-                    <Badge key={pc.categories?.id} variant="secondary">
-                      {pc.categories?.name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span>{totalDuration} min</span>
-                <span className="font-medium">₹{pkg.price}</span>
+      {filteredPackages?.map((pkg) => (
+        <Card key={pkg.id} className="flex flex-col">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                <h3 className="font-semibold">{pkg.name}</h3>
               </div>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="w-full"
-                onClick={() => togglePackage(pkg.id)}
+                onClick={() => onEdit(pkg)}
               >
-                {isOpen ? (
-                  <>
-                    Hide Services
-                    <ChevronUp className="ml-2 h-4 w-4" />
-                  </>
-                ) : (
-                  <>
-                    Show Services
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </>
-                )}
+                <PenSquare className="h-4 w-4" />
               </Button>
-              <Collapsible open={isOpen}>
-                <CollapsibleContent className="space-y-2">
-                  {pkg.package_services.map((ps: any) => (
-                    <div
-                      key={ps.service.id}
-                      className="flex items-center justify-between p-2 bg-muted rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">{ps.service.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {ps.service.duration} min • ₹{ps.service.selling_price}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            </CardContent>
-            <CardFooter>
-              <div className="flex items-center text-sm text-muted-foreground">
-                <span className="font-medium">
-                  Status: {pkg.status}
-                </span>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 space-y-4">
+            {pkg.description && (
+              <p className="text-sm text-muted-foreground">{pkg.description}</p>
+            )}
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1">
+                {pkg.package_categories.map((pc: any) => (
+                  <Badge key={pc.categories?.id} variant="secondary">
+                    {pc.categories?.name}
+                  </Badge>
+                ))}
               </div>
-            </CardFooter>
-          </Card>
-        );
-      })}
+              <div className="flex flex-wrap gap-1">
+                {pkg.package_services.map((ps: any) => (
+                  <Badge key={ps.service.id} variant="outline">
+                    {ps.service.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span>{pkg.duration} min</span>
+              <span className="font-medium">₹{pkg.price}</span>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <span className="font-medium">
+                Status: {pkg.status}
+              </span>
+            </div>
+          </CardFooter>
+        </Card>
+      ))}
     </div>
   );
 }

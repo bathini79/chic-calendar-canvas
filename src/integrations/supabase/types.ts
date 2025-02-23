@@ -1224,26 +1224,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      delete_claim: {
-        Args: {
-          uid: string
-          claim: string
-        }
-        Returns: string
-      }
-      get_claim: {
-        Args: {
-          uid: string
-          claim: string
-        }
-        Returns: Json
-      }
-      get_claims: {
-        Args: {
-          uid: string
-        }
-        Returns: Json
-      }
       get_customer_appointments: {
         Args: {
           customer_id_param: string
@@ -1279,31 +1259,9 @@ export type Database = {
           bookings: Json
         }[]
       }
-      get_my_claim: {
-        Args: {
-          claim: string
-        }
-        Returns: Json
-      }
-      get_my_claims: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
-      }
-      is_claims_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      set_claim: {
-        Args: {
-          uid: string
-          claim: string
-          value: Json
-        }
-        Returns: string
       }
     }
     Enums: {
