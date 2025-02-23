@@ -27,7 +27,8 @@ export function useAppointmentActions() {
         .from('appointments')
         .select(`
           *,
-          customer:profiles(*),
+          customer:profiles!appointments_customer_id_fkey(*),
+          refunded_by_user:profiles!appointments_refunded_by_fkey(*),
           bookings (
             *,
             service:services(*),
@@ -69,7 +70,11 @@ export function useAppointmentActions() {
         setSelectedItems(items);
       }
 
-      return data as Appointment;
+      return {
+        ...data,
+        customer: data.customer,
+        refunded_by_user: data.refunded_by_user
+      } as Appointment;
     } catch (error: any) {
       console.error('Error fetching appointment:', error);
       toast.error('Failed to load appointment details');
@@ -81,7 +86,7 @@ export function useAppointmentActions() {
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded',
+    status: Appointment['status'],
     bookingIds: string[]
   ) => {
     try {

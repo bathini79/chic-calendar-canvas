@@ -1354,6 +1354,8 @@ export type Database = {
         | "canceled"
         | "completed"
         | "inprogress"
+        | "voided"
+        | "refunded"
       booking_status:
         | "pending"
         | "confirmed"
