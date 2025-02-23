@@ -1,3 +1,4 @@
+
 export interface Customer {
   id: string;
   full_name: string | null;
@@ -59,7 +60,7 @@ export interface Appointment {
   id: string;
   customer_id: string;
   customer?: Customer;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress';
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded';
   start_time: string;
   end_time: string;
   total_price: number;

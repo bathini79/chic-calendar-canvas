@@ -1,22 +1,26 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   CheckCircle2, 
   ClipboardList, 
   CreditCard, 
-  Banknote, 
+  Banknote,
   MoreVertical,
-  AlertCircle,
-  XCircle,
-  RotateCcw
+  PencilLine,
+  FileText,
+  Mail,
+  Printer,
+  Download,
+  Ban
 } from "lucide-react";
 import { format } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -28,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SummaryViewProps {
   appointmentId: string;
@@ -57,31 +62,77 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   discountValue,
   completedAt,
 }) => {
-  const [showVoidDialog, setShowVoidDialog] = React.useState(false);
-  const [showRefundDialog, setShowRefundDialog] = React.useState(false);
-  const [confirmationStep, setConfirmationStep] = React.useState<1 | 2>(1);
+  const [showVoidDialog, setShowVoidDialog] = useState(false);
+  const [showRefundDialog, setShowRefundDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
+  const [note, setNote] = useState('');
+  const [refundItems, setRefundItems] = useState<{[key: string]: boolean}>({});
 
   const handleVoidSale = async () => {
     try {
-      // Here you would implement the void sale logic
-      // For now, we'll just show a success message
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'voided' })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      // Update related bookings
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({ status: 'voided' })
+        .eq('appointment_id', appointmentId);
+
+      if (bookingsError) throw bookingsError;
+
       toast.success("Sale voided successfully");
       setShowVoidDialog(false);
-      setConfirmationStep(1);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error voiding sale:", error);
       toast.error("Failed to void sale");
     }
   };
 
   const handleRefundSale = async () => {
     try {
-      // Here you would implement the refund logic
-      // For now, we'll just show a success message
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'refunded' })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      // Update related bookings
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({ status: 'refunded' })
+        .eq('appointment_id', appointmentId);
+
+      if (bookingsError) throw bookingsError;
+
       toast.success("Sale refunded successfully");
       setShowRefundDialog(false);
-      setConfirmationStep(1);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error refunding sale:", error);
       toast.error("Failed to refund sale");
+    }
+  };
+
+  const handleAddNote = async () => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ notes: note })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      toast.success("Note added successfully");
+      setShowAddNoteDialog(false);
+      setNote('');
+    } catch (error: any) {
+      toast.error("Failed to add note");
     }
   };
 
@@ -90,96 +141,126 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       <Card className="bg-white">
         <CardContent className="p-6 space-y-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 text-green-600">
-              <CheckCircle2 className="h-6 w-6" />
-              <h3 className="text-lg font-semibold">Payment Completed</h3>
+            <div>
+              <div className="inline-flex items-center px-2.5 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                Completed
+              </div>
+              <div className="text-sm text-gray-500">
+                {format(new Date(completedAt), 'EEE dd MMM yyyy')} • bathini nipun
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="text-sm text-gray-500">
-                {format(new Date(completedAt), 'dd MMM yyyy, hh:mm a')}
-              </div>
+              <Button variant="outline" className="bg-black text-white">
+                Rebook
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem 
-                    className="text-destructive"
-                    onClick={() => setShowVoidDialog(true)}
-                  >
-                    <XCircle className="mr-2 h-4 w-4" />
-                    Void Sale
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onSelect={() => setShowRefundDialog(true)}>
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Refund sale
                   </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <PencilLine className="mr-2 h-4 w-4" />
+                    Edit sale details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setShowAddNoteDialog(true)}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Add a note
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    <Mail className="mr-2 h-4 w-4" />
+                    Email
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={() => setShowRefundDialog(true)}
+                    className="text-red-600"
+                    onSelect={() => setShowVoidDialog(true)}
                   >
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Refund Sale
+                    <Ban className="mr-2 h-4 w-4" />
+                    Void sale
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>Transaction ID</span>
-              <span className="font-mono">{appointmentId}</span>
-            </div>
+          {/* Customer Details */}
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <h4 className="text-lg font-semibold">Jack Doe</h4>
+            <p className="text-gray-600">jack@example.com</p>
+          </div>
 
-            <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Items</h4>
-              {selectedItems.map((item) => (
-                <div key={`${item.type}-${item.id}`} className="flex justify-between text-sm py-1">
-                  <span>
-                    {item.name}
-                    <span className="ml-2 text-gray-500 text-xs">
-                      ({item.type})
-                    </span>
-                  </span>
-                  <span>₹{item.price}</span>
+          {/* Sale Details */}
+          <div>
+            <h4 className="font-medium mb-2">Sale #{appointmentId.slice(0, 8)}</h4>
+            <p className="text-sm text-gray-500 mb-4">
+              {format(new Date(completedAt), 'EEE dd MMM yyyy')}
+            </p>
+
+            {selectedItems.map((item) => (
+              <div key={item.id} className="py-2 flex justify-between items-start">
+                <div className="flex-1">
+                  <p className="font-medium">{item.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {format(new Date(completedAt), 'h:mma, dd MMM yyyy')} • 1h 15min • bathini nipun
+                  </p>
                 </div>
-              ))}
-            </div>
-
-            <div className="border-t pt-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
-                <span>₹{subtotal}</span>
+                <p className="text-right">₹{item.price}</p>
               </div>
-              {discountType !== 'none' && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>
-                    Discount ({discountType === 'percentage' ? `${discountValue}%` : '₹' + discountValue})
-                  </span>
-                  <span>-₹{discountAmount}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-lg font-bold pt-2">
-                <span>Total Paid</span>
-                <span>₹{total}</span>
-              </div>
-            </div>
+            ))}
+          </div>
 
-            <div className="border-t pt-4">
-              <div className="flex justify-between text-sm">
-                <span>Payment Method</span>
-                <span className="flex items-center">
-                  {paymentMethod === 'cash' ? <Banknote className="h-4 w-4 mr-1" /> : <CreditCard className="h-4 w-4 mr-1" />}
-                  {paymentMethod === 'cash' ? 'Cash' : 'Online'}
+          {/* Totals */}
+          <div className="space-y-2 pt-4 border-t">
+            <div className="flex justify-between text-sm">
+              <span>Subtotal</span>
+              <span>₹{subtotal}</span>
+            </div>
+            {discountType !== 'none' && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>
+                  Discount ({discountType === 'percentage' ? `${discountValue}%` : '₹' + discountValue})
                 </span>
+                <span>-₹{discountAmount}</span>
               </div>
+            )}
+            <div className="flex justify-between text-lg font-bold pt-2">
+              <span>Total</span>
+              <span>₹{total}</span>
             </div>
           </div>
 
-          <div className="pt-6">
-            <Button className="w-full" variant="outline" onClick={() => window.print()}>
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Print Receipt
-            </Button>
+          {/* Payment Info */}
+          <div className="pt-4 border-t">
+            <div className="flex justify-between text-sm">
+              <span>Paid with {paymentMethod === 'cash' ? 'Cash' : 'Online'}</span>
+              <div className="flex items-center">
+                {paymentMethod === 'cash' ? (
+                  <Banknote className="h-4 w-4 mr-1" />
+                ) : (
+                  <CreditCard className="h-4 w-4 mr-1" />
+                )}
+                ₹{total}
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              {format(new Date(completedAt), "EEE dd MMM yyyy 'at' h:mma")}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -188,39 +269,17 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              {confirmationStep === 1 ? "Void Sale" : "Confirm Void Sale"}
-            </DialogTitle>
+            <DialogTitle>Void Sale</DialogTitle>
             <DialogDescription>
-              {confirmationStep === 1 ? (
-                "Are you sure you want to void this sale? This action cannot be undone."
-              ) : (
-                "Please confirm once again that you want to void this sale. This is your final confirmation."
-              )}
+              Are you sure you want to void this sale? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowVoidDialog(false);
-                setConfirmationStep(1);
-              }}
-            >
+            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (confirmationStep === 1) {
-                  setConfirmationStep(2);
-                } else {
-                  handleVoidSale();
-                }
-              }}
-            >
-              {confirmationStep === 1 ? "Continue" : "Confirm Void"}
+            <Button variant="destructive" onClick={handleVoidSale}>
+              Void Sale
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -228,41 +287,63 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
       {/* Refund Sale Dialog */}
       <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              {confirmationStep === 1 ? "Refund Sale" : "Confirm Refund"}
-            </DialogTitle>
+            <DialogTitle>Refund Sale</DialogTitle>
             <DialogDescription>
-              {confirmationStep === 1 ? (
-                "Are you sure you want to refund this sale? This action cannot be undone."
-              ) : (
-                "Please confirm once again that you want to refund this sale. This is your final confirmation."
-              )}
+              Select the items you want to refund
             </DialogDescription>
           </DialogHeader>
+          <div className="py-4">
+            {selectedItems.map((item) => (
+              <div key={item.id} className="flex items-center justify-between py-2">
+                <div>
+                  <p className="font-medium">{item.name}</p>
+                  <p className="text-sm text-gray-500">₹{item.price}</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={refundItems[item.id] || false}
+                  onChange={(e) => 
+                    setRefundItems({
+                      ...refundItems,
+                      [item.id]: e.target.checked
+                    })
+                  }
+                  className="h-4 w-4"
+                />
+              </div>
+            ))}
+          </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowRefundDialog(false);
-                setConfirmationStep(1);
-              }}
-            >
+            <Button variant="outline" onClick={() => setShowRefundDialog(false)}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (confirmationStep === 1) {
-                  setConfirmationStep(2);
-                } else {
-                  handleRefundSale();
-                }
-              }}
-            >
-              {confirmationStep === 1 ? "Continue" : "Confirm Refund"}
+            <Button variant="destructive" onClick={handleRefundSale}>
+              Process Refund
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Note Dialog */}
+      <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a Note</DialogTitle>
+          </DialogHeader>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="w-full h-32 p-2 border rounded"
+            placeholder="Enter your note here..."
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddNoteDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddNote}>
+              Save Note
             </Button>
           </DialogFooter>
         </DialogContent>
