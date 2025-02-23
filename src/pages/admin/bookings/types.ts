@@ -56,11 +56,15 @@ export interface Package {
   }>;
 }
 
+export interface AppointmentStatus {
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded';
+}
+
 export interface Appointment {
   id: string;
   customer_id: string;
   customer?: Customer;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded';
+  status: AppointmentStatus['status'];
   start_time: string;
   end_time: string;
   total_price: number;
@@ -114,4 +118,24 @@ export interface RefundData {
   reason: 'customer_dissatisfaction' | 'service_quality_issue' | 'scheduling_error' | 'health_concern' | 'price_dispute' | 'other';
   notes?: string;
   refundedBy: string;
+}
+
+export interface SummaryViewProps {
+  appointmentId: string;
+  selectedItems: Array<{
+    id: string;
+    name: string;
+    price: number;
+    type: 'service' | 'package';
+    employee?: {
+      id: string;
+      name: string;
+    };
+  }>;
+  subtotal: number;
+  discountAmount: number;
+  total: number;
+  paymentMethod: 'cash' | 'online';
+  discountType: 'none' | 'percentage' | 'fixed';
+  discountValue: number;
 }
