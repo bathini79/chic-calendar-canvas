@@ -96,8 +96,8 @@ const useSaveAppointment = ({
         discountType === "percentage"
           ? (totalPrice * discountValue) / 100
           : discountType === "fixed"
-            ? discountValue
-            : 0;
+          ? discountValue
+          : 0;
 
       const finalPrice = totalPrice - discountAmount;
 
@@ -152,7 +152,7 @@ const useSaveAppointment = ({
           price_paid: service.selling_price,
           original_price: service.original_price,
         });
-        currentStartTime = bookingEndTime
+        currentStartTime = bookingEndTime;
 
         if (bookingError) {
           console.error("Error inserting service booking:", bookingError);
@@ -175,8 +175,8 @@ const useSaveAppointment = ({
 
           ...(pkg.is_customizable
             ? pkg.customizable_services?.filter(
-              (serviceId) => selectedStylists[serviceId]
-            ) || []
+                (serviceId) => selectedStylists[serviceId]
+              ) || []
             : []),
         ]);
         for (const serviceId of selectedPackageServices) {
@@ -213,10 +213,10 @@ const useSaveAppointment = ({
           }
           currentStartTime = bookingEndTime;
         }
-
-        setIsSaving(false);
-        return appointmentId;
       }
+
+      setIsSaving(false);
+      return appointmentId;
     } catch (error: any) {
       console.error("Error saving appointment:", error);
       toast.error(error.message || "Failed to save appointment");
