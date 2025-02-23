@@ -250,10 +250,11 @@ export default function AdminBookings() {
   };
 
   const handlePaymentComplete = (appointmentId: string) => {
+    console.log("Payment completed, appointment ID:", appointmentId);
     setNewAppointmentId(appointmentId);
     setCurrentScreen(SCREEN.SUMMARY);
     resetState();
-    setIsAddAppointmentOpen(false);
+    setIsAddAppointmentOpen(true);
   };
 
   return (
@@ -422,6 +423,7 @@ export default function AdminBookings() {
                         onClick={() => {
                           setCurrentScreen(SCREEN.SERVICE_SELECTION);
                           setNewAppointmentId(null);
+                          resetState();
                         }}
                       >
                         Create New Appointment
