@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +29,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { format, addMinutes } from 'date-fns';
 
 interface CheckoutSectionProps {
   appointmentId: string;
@@ -68,11 +68,34 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   selectedStylists,
   selectedTimeSlots,
 }) => {
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`;
+    }
+    return `${minutes}m`;
+  };
+
+  const formatTimeSlot = (timeString: string) => {
+    try {
+      const baseDate = new Date();
+      const [hours, minutes] = timeString.split(':').map(Number);
+      baseDate.setHours(hours, minutes);
+      return format(baseDate, 'hh:mm a');
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return timeString;
+    }
+  };
+
   const selectedItems = useMemo(
     () =>
       [
         ...selectedServices.map((id) => {
           const service = services.find((s) => s.id === id);
+          const stylist = selectedStylists[id];
+          const timeSlot = selectedTimeSlots[id] || selectedTimeSlots[appointmentId];
           return service
             ? {
                 id,
@@ -80,27 +103,31 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 price: service.selling_price,
                 duration: service.duration,
                 type: "service" as const,
-                stylist: selectedStylists[id],
-                time: selectedTimeSlots?.[id],
+                stylist,
+                time: timeSlot ? formatTimeSlot(timeSlot) : undefined,
+                formattedDuration: formatDuration(service.duration),
               }
             : null;
         }),
         ...selectedPackages.map((id) => {
           const pkg = packages.find((p) => p.id === id);
+          const stylist = selectedStylists[id];
+          const timeSlot = selectedTimeSlots[id] || selectedTimeSlots[appointmentId];
           return pkg
             ? {
                 id,
                 name: pkg.name,
                 price: pkg.price,
-                duration: pkg.duration,
+                duration: pkg.duration || 0,
                 type: "package" as const,
-                stylist: selectedStylists[id],
-                time: selectedTimeSlots?.[id],
+                stylist,
+                time: timeSlot ? formatTimeSlot(timeSlot) : undefined,
+                formattedDuration: formatDuration(pkg.duration || 0),
               }
             : null;
         }),
       ].filter(Boolean),
-    [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots]
+    [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots, appointmentId]
   );
 
   const subtotal = useMemo(
@@ -165,7 +192,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         <CardContent className="p-6 h-full flex flex-col">
           <h2 className="text-xl font-semibold mb-6">Checkout Summary</h2>
           <div className="flex-1 space-y-6">
-            {/* Services List */}
             <div className="space-y-4">
               {selectedItems.map((item) => (
                 item && (
@@ -179,7 +205,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                         <div className="flex flex-col text-sm text-muted-foreground gap-1">
                           <div className="flex items-center">
                             <Clock className="mr-2 h-4 w-4" />
-                            {item.time} • {item.duration} mins
+                            {item.time && (
+                              <span>{item.time} • {item.formattedDuration}</span>
+                            )}
+                            {!item.time && (
+                              <span>{item.formattedDuration}</span>
+                            )}
                           </div>
                           {item.stylist && (
                             <div className="flex items-center">
@@ -201,7 +232,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
 
             <Separator />
 
-            {/* Pricing Summary */}
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
@@ -224,7 +254,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             </div>
           </div>
 
-          {/* Bottom Section */}
           <div className="pt-6 space-y-4">
             <div>
               <h4 className="text-sm font-medium mb-2">Payment Method</h4>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -377,7 +376,7 @@ export default function AdminBookings() {
                       resetState();
                     }}
                     selectedStylists={selectedStylists}
-                    selectedTimeSlots={selectedTime ? { [newAppointmentId || '']: selectedTime } : {}}
+                    selectedTimeSlots={{ [newAppointmentId || selectedAppointment?.id || '']: selectedTime }}
                   />
                 )}
 
