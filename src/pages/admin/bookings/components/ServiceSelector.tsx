@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +48,6 @@ export function ServiceSelector({
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
   const [customizedServices, setCustomizedServices] = useState<Record<string, string[]>>({});
 
-  // Query for categories
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
@@ -63,7 +61,6 @@ export function ServiceSelector({
     },
   });
 
-  // Query for all services
   const { data: services } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -77,7 +74,6 @@ export function ServiceSelector({
     },
   });
 
-  // Query for packages with their services
   const { data: packages } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
@@ -96,7 +92,6 @@ export function ServiceSelector({
     },
   });
 
-  // Filter items based on selected category
   const filteredServices = selectedCategory
     ? services?.filter(service => 
         service.services_categories.some(sc => sc.categories.id === selectedCategory)
@@ -113,7 +108,6 @@ export function ServiceSelector({
       )
     : packages;
 
-  // Combine and sort items to show packages first
   const allItems = [
     ...(filteredPackages || []).map(pkg => ({
       type: 'package' as const,
@@ -126,23 +120,20 @@ export function ServiceSelector({
   ];
 
   const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
+    const pkg = packages?.find(p => p.id === packageId);
+    if (!pkg) return;
+
+    const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
+    
     setCustomizedServices(prev => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
         ? currentServices.filter(id => id !== serviceId)
         : [...currentServices, serviceId];
       
-      const updatedServices = { ...prev, [packageId]: newServices };
+      onPackageSelect(packageId, [...baseServices, ...newServices]);
       
-      // Find the package and its base services
-      const pkg = packages?.find(p => p.id === packageId);
-      if (pkg) {
-        const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
-        // Update package selection with both base and custom services
-        onPackageSelect(packageId, [...baseServices, ...newServices]);
-      }
-      
-      return updatedServices;
+      return { ...prev, [packageId]: newServices };
     });
   };
 
@@ -158,7 +149,6 @@ export function ServiceSelector({
 
   const handlePackageSelect = (pkg: any) => {
     if (selectedPackages.includes(pkg.id)) {
-      // If deselecting, remove package and clear customizations
       onPackageSelect(pkg.id, []);
       setCustomizedServices(prev => {
         const { [pkg.id]: _, ...rest } = prev;
@@ -166,12 +156,10 @@ export function ServiceSelector({
       });
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
-      // If selecting, expand the package and add it with base services
       setExpandedPackages(prev => [...prev, pkg.id]);
-      const packageServices = pkg.package_services.map((ps: any) => ps.service.id);
-      // Include any previously customized services if they exist
-      const customServices = customizedServices[pkg.id] || [];
-      onPackageSelect(pkg.id, [...packageServices, ...customServices]);
+      const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
+      const existingCustomServices = customizedServices[pkg.id] || [];
+      onPackageSelect(pkg.id, [...baseServices, ...existingCustomServices]);
     }
   };
 
