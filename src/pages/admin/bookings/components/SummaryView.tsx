@@ -188,13 +188,13 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   return (
     <>
       <div className="space-y-6">
-        {allTransactions.map((transaction) => {
+        {allTransactions.map((transaction, index) => {
           const isRefund = transaction.transaction_type === 'refund';
           
           return (
-            <Card key={transaction.id} className={`bg-white ${isRefund ? 'border-red-200' : ''}`}>
-              <CardContent className="p-6 space-y-6">
-                <div className="flex items-center justify-between border-b pb-4">
+            <Card key={transaction.id} className={`bg-white h-full ${isRefund ? 'border-red-200' : ''}`}>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center justify-between border-b pb-2">
                   <div className="flex-1">
                     <div className={`inline-flex items-center px-2.5 py-1 rounded ${
                       isRefund ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
@@ -202,13 +202,13 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                       {isRefund ? (
                         <>
                           <Ban className="h-4 w-4 mr-1" />
-                          Refund #{transaction.id.slice(0, 8)}
+                          Refund #{transaction.id.slice(0, 6)}
                         </>
                       ) : (
                         <>
                           <CheckCircle2 className="h-4 w-4 mr-1" />
-                          Sale #{transaction.id.slice(0, 8)}
-                        </>
+                          Sale #{transaction.id.slice(0, 6)}
+                       </>
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -268,13 +268,13 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="text-lg font-semibold">
+                  <h4 className="text-base font-semibold">
                     {transaction.customer?.full_name || 'No name provided'}
                   </h4>
                   <p className="text-gray-600">{transaction.customer?.email || 'No email provided'}</p>
                 </div>
 
-                <div>
+                <div className="overflow-y-auto">
                   <h4 className="font-medium mb-4">{isRefund ? 'Refunded Items' : 'Items'}</h4>
                   {transaction.bookings.map((booking) => {
                     const itemName = booking.service?.name || booking.package?.name;
@@ -282,9 +282,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                     return (
                       <div key={booking.id} className="py-2 flex justify-between items-start border-b">
                         <div className="flex-1">
-                          <p className="font-medium">{itemName}</p>
-                          <p className="text-sm text-gray-500">
-                            {format(new Date(booking.start_time), 'h:mma')}
+                          <p className="font-medium text-sm line-clamp-1">{itemName}</p>
+                          <p className="text-xs text-gray-500">
+                            {format(new Date(booking.start_time), 'h:mma')}{' '}
                             {booking.employee && ` • ${booking.employee.name}`}
                           </p>
                         </div>
@@ -296,9 +296,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                   })}
                 </div>
 
-                <div className="space-y-2 pt-4 border-t">
+                <div className="space-y-1 pt-2 border-t">
                   {transaction.discount_type !== 'none' && transaction.discount_value > 0 && (
-                    <div className="flex justify-between text-sm text-green-600">
+                    <div className="flex justify-between text-xs text-green-600">
                       <span>
                         Discount ({transaction.discount_type === 'percentage' ? 
                           `${transaction.discount_value}%` : 
@@ -317,8 +317,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 </div>
 
                 <div className="pt-4 border-t">
-                  <div className="flex justify-between text-sm">
-                    <span>
+                  <div className="flex justify-between text-xs">
+                    <span className="capitalize">
                       Paid with {transaction.payment_method === 'cash' ? 'Cash' : 'Online'}
                     </span>
                     <div className="flex items-center">
@@ -333,10 +333,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 </div>
 
                 {isRefund && (
-                  <div className="space-y-3 pt-4 border-t">
+                  <div className="space-y-2 pt-4 border-t">
                     {transaction.refund_reason && (
                       <div>
-                        <p className="font-medium text-sm">Reason:</p>
+                        <p className="font-medium text-xs">Reason:</p>
                         <p className="text-gray-600">{formatRefundReason(transaction.refund_reason)}</p>
                       </div>
                     )}
@@ -395,7 +395,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               </div>
             </div>
 
-            <div className="max-h-48 overflow-y-auto space-y-2">
+            <div className="max-h-36 overflow-y-auto space-y-1">
               {transactionDetails.originalSale.bookings.filter(
                 booking => booking.status !== 'refunded'
               ).map((booking) => {
