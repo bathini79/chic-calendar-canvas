@@ -123,19 +123,20 @@ export function ServiceSelector({
     const pkg = packages?.find(p => p.id === packageId);
     if (!pkg) return;
 
-    const baseServices = pkg.package_services?.map((ps: any) => ps.service.id) || [];
+    // Get base services from the package
+    const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
 
+    // Update customized services
     setCustomizedServices(prev => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
         ? currentServices.filter(id => id !== serviceId)
         : [...currentServices, serviceId];
 
+      // Update package with both base services and customizations
+      // Only include customized services that aren't already in base services
       const customServices = newServices.filter(id => !baseServices.includes(id));
-      
-      if (selectedPackages.includes(packageId)) {
-        onPackageSelect(packageId, baseServices, customServices);
-      }
+      onPackageSelect(packageId, baseServices, customServices);
 
       return {
         ...prev,
@@ -155,10 +156,11 @@ export function ServiceSelector({
   };
 
   const handlePackageSelect = (pkg: any) => {
-    const baseServices = pkg.package_services?.map((ps: any) => ps.service.id) || [];
+    const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
     const currentCustomServices = customizedServices[pkg.id] || [];
 
     if (selectedPackages.includes(pkg.id)) {
+      // Deselecting package - clear everything
       onPackageSelect(pkg.id, [], []);
       setCustomizedServices(prev => {
         const { [pkg.id]: _, ...rest } = prev;
@@ -166,7 +168,9 @@ export function ServiceSelector({
       });
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
+      // Selecting package - add with base services
       setExpandedPackages(prev => [...prev, pkg.id]);
+      // Only include customized services that aren't already in base services
       const customServices = currentCustomServices.filter(id => !baseServices.includes(id));
       onPackageSelect(pkg.id, baseServices, customServices);
     }
@@ -195,6 +199,7 @@ export function ServiceSelector({
             {allItems.map((item) => {
               const isService = item.type === 'service';
               const isPackage = item.type === 'package';
+              // Changed this line to ensure packages stay expanded when selected or manually expanded
               const isExpanded = isPackage && (selectedPackages.includes(item.id) || expandedPackages.includes(item.id));
               const isSelected = isService 
                 ? selectedServices.includes(item.id)

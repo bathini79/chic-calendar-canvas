@@ -43,16 +43,7 @@ export interface Package {
   is_customizable: boolean;
   status: 'active' | 'inactive' | 'archived';
   categories: string[];
-  package_services: Array<{
-    service: {
-      id: string;
-      name: string;
-      duration: number;
-      selling_price: number;
-    };
-  }>;
   customizable_services: string[];
-  customized_services?: string[];
   discount_type: string;
   discount_value: number;
   image_urls: string[];
