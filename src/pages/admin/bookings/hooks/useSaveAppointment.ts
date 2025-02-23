@@ -133,18 +133,14 @@ const useSaveAppointment = ({
         const pkg = packages?.find(p => p.id === packageId);
         if (!pkg) continue;
 
-        // Get all services associated with this package
-        const packageServiceIds = new Set(services?.filter(s => {
-          // Check if service is a base service in the package
-          const isBaseService = pkg.package_services?.some(ps => ps.service_id === s.id);
-          // Check if service is a selected customizable service
-          const isSelectedCustomService = pkg.customizable_services?.includes(s.id) && 
-                                       selectedStylists[s.id]; // Only include if stylist is selected
-          return isBaseService || isSelectedCustomService;
-        }).map(s => s.id));
+        // Include all selected services for this package (both base and additional)
+        const selectedServiceIds = new Set([
+          ...(pkg.base_services || []),          // Base services
+          ...(pkg.additional_services || [])      // Selected additional services
+        ].filter(serviceId => selectedStylists[serviceId])); // Only include services with assigned stylists
 
-        // Create bookings for all services in the package
-        for (const serviceId of packageServiceIds) {
+        // Create bookings for all selected services in the package
+        for (const serviceId of selectedServiceIds) {
           const service = services?.find(s => s.id === serviceId);
           if (!service) continue;
 
