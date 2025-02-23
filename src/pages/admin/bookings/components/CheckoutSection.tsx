@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +48,7 @@ interface CheckoutSectionProps {
   onDiscountValueChange: (value: number) => void;
   onPaymentMethodChange: (value: "cash" | "online") => void;
   onNotesChange: (value: string) => void;
-  onPaymentComplete: () => void;
+  onPaymentComplete: (appointmentId: string) => void;
   selectedStylists: { [key: string]: string };
   selectedTimeSlots: { [key: string]: string };
   onSaveAppointment: () => Promise<string | null>;
@@ -178,7 +177,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       }
 
       toast.success("Payment completed successfully");
-      onPaymentComplete();
+      onPaymentComplete(savedAppointmentId);
     } catch (error: any) {
       console.error("Error completing payment:", error);
       toast.error(error.message || "Failed to complete payment");

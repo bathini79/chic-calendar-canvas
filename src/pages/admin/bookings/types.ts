@@ -1,4 +1,3 @@
-
 export interface Customer {
   id: string;
   full_name: string | null;
@@ -49,6 +48,11 @@ export interface Package {
   image_urls: string[];
   created_at: string;
   updated_at: string;
+  package_services?: Array<{
+    service: {
+      id: string;
+    };
+  }>;
 }
 
 export interface Appointment {

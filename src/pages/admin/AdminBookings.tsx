@@ -249,6 +249,13 @@ export default function AdminBookings() {
     setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
+  const handlePaymentComplete = (appointmentId: string) => {
+    setNewAppointmentId(appointmentId);
+    setCurrentScreen(SCREEN.SUMMARY);
+    resetState();
+    setIsAddAppointmentOpen(false);
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -349,7 +356,7 @@ export default function AdminBookings() {
                         selectedPackages={selectedPackages}
                         selectedStylists={selectedStylists}
                         stylists={employees}
-                        onCustomPackage = {handleCustomServiceToggle}
+                        onCustomPackage={handleCustomServiceToggle}
                         customizedServices={customizedServices}
                       />
                     </div>
@@ -384,10 +391,7 @@ export default function AdminBookings() {
                     onDiscountValueChange={setDiscountValue}
                     onPaymentMethodChange={setPaymentMethod}
                     onNotesChange={setAppointmentNotes}
-                    onPaymentComplete={() => {
-                      setCurrentScreen(SCREEN.SUMMARY);
-                      resetState();
-                    }}
+                    onPaymentComplete={handlePaymentComplete}
                     selectedStylists={selectedStylists}
                     selectedTimeSlots={{ [selectedAppointment?.id || '']: selectedTime }}
                     onSaveAppointment={handleSaveAppointment}
@@ -397,15 +401,13 @@ export default function AdminBookings() {
                   />
                 )}
 
-                {currentScreen === SCREEN.SUMMARY && (
+                {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
                   <div className="p-6">
                     <h3 className="text-xl font-semibold mb-6">
                       Appointment Summary
                     </h3>
                     <SummaryView
-                      appointmentId={
-                        newAppointmentId || selectedAppointment?.id || ""
-                      }
+                      appointmentId={newAppointmentId}
                       selectedItems={calculateSelectedItems()}
                       subtotal={calculateTotals().subtotal}
                       discountAmount={calculateTotals().discountAmount}
@@ -417,9 +419,10 @@ export default function AdminBookings() {
                     />
                     <div className="mt-6 flex justify-end">
                       <Button
-                        onClick={() =>
-                          setCurrentScreen(SCREEN.SERVICE_SELECTION)
-                        }
+                        onClick={() => {
+                          setCurrentScreen(SCREEN.SERVICE_SELECTION);
+                          setNewAppointmentId(null);
+                        }}
                       >
                         Create New Appointment
                       </Button>

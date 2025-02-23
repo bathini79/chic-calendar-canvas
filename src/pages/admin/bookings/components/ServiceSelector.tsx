@@ -1,5 +1,5 @@
-
-import React, { useState } from "react";
+import React from 'react';
+import { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,27 +28,30 @@ type Stylist = {
 
 interface ServiceSelectorProps {
   onServiceSelect: (serviceId: string) => void;
-  onPackageSelect: (packageId: string, services: string[]) => void;
+  onPackageSelect: (packageId: string) => void;
   onStylistSelect: (itemId: string, stylistId: string) => void;
   selectedServices: string[];
   selectedPackages: string[];
-  selectedStylists: Record<string, string>;
-  stylists: Stylist[];
+  selectedStylists: { [key: string]: string };
+  stylists: any[];
+  onCustomPackage?: (packageId: string, serviceId: string) => void;
+  customizedServices?: { [key: string]: string[] };
 }
 
-export function ServiceSelector({
+export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   onServiceSelect,
   onPackageSelect,
   onStylistSelect,
-  selectedServices = [],
-  selectedPackages = [],
-  selectedStylists = {},
-  stylists = [],
+  selectedServices,
+  selectedPackages,
+  selectedStylists,
+  stylists,
   onCustomPackage,
-  customizedServices
-}: ServiceSelectorProps) {
+  customizedServices = {},
+}) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
+
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
@@ -135,12 +138,9 @@ export function ServiceSelector({
     const currentCustomServices = customizedServices[pkg.id] || [];
 
     if (selectedPackages.includes(pkg.id)) {
-      // Deselecting package - clear everything
-      onPackageSelect(pkg.id, []);
-      onCustomPackage(pkg.id, "")
+      onPackageSelect(pkg.id);
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
-      // Selecting package - add with base services and any existing customizations
       setExpandedPackages(prev => [...prev, pkg.id]);
       onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
     }
@@ -203,7 +203,6 @@ export function ServiceSelector({
                     ₹{isService ? item.selling_price : calculatePackagePrice(item)}
                     </TableCell>
                     <TableCell>
-                      {/* Only show stylist selector for selected individual services */}
                       {isService && isSelected && (
                         <Select 
                           value={selectedStylists[item.id] || ''} 
@@ -261,7 +260,6 @@ export function ServiceSelector({
                                 <span className="text-sm font-medium">
                                 ₹{ps.service.selling_price}
                                 </span>
-                                {/* Always show stylist selector for package services */}
                                 <Select 
                                   value={selectedStylists[ps.service.id] || ''} 
                                   onValueChange={(value) => onStylistSelect(ps.service.id, value)}
@@ -304,7 +302,6 @@ export function ServiceSelector({
                                     <span className="text-sm font-medium">
                                       +₹{service.selling_price}
                                     </span>
-                                    {/* Show stylist selector only for selected customized services */}
                                     {customizedServices[item.id]?.includes(service.id) && (
                                       <Select 
                                         value={selectedStylists[service.id] || ''} 
@@ -339,4 +336,4 @@ export function ServiceSelector({
       </ScrollArea>
     </div>
   );
-}
+};
