@@ -20,6 +20,7 @@ export type Database = {
           location: string | null
           notes: string | null
           number_of_bookings: number | null
+          original_appointment_id: string | null
           original_total_price: number | null
           payment_method: string | null
           refund_notes: string | null
@@ -29,6 +30,7 @@ export type Database = {
           status: Database["public"]["Enums"]["appointment_status"] | null
           total_duration: number | null
           total_price: number
+          transaction_type: string | null
           updated_at: string | null
         }
         Insert: {
@@ -41,6 +43,7 @@ export type Database = {
           location?: string | null
           notes?: string | null
           number_of_bookings?: number | null
+          original_appointment_id?: string | null
           original_total_price?: number | null
           payment_method?: string | null
           refund_notes?: string | null
@@ -50,6 +53,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["appointment_status"] | null
           total_duration?: number | null
           total_price: number
+          transaction_type?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -62,6 +66,7 @@ export type Database = {
           location?: string | null
           notes?: string | null
           number_of_bookings?: number | null
+          original_appointment_id?: string | null
           original_total_price?: number | null
           payment_method?: string | null
           refund_notes?: string | null
@@ -71,6 +76,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["appointment_status"] | null
           total_duration?: number | null
           total_price?: number
+          transaction_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -79,6 +85,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_original_appointment_id_fkey"
+            columns: ["original_appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
           {

@@ -96,7 +96,36 @@ export function useAppointmentActions() {
     try {
       setIsLoading(true);
 
-      // First update the bookings
+      // First get the original appointment details
+      const { data: originalAppointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('id', appointmentId)
+        .single();
+
+      if (appointmentError) throw appointmentError;
+
+      // Create a refund transaction
+      const { data: refundAppointment, error: refundError } = await supabase
+        .from('appointments')
+        .insert({
+          customer_id: originalAppointment.customer_id,
+          status: 'refunded',
+          transaction_type: 'refund',
+          original_appointment_id: appointmentId,
+          refunded_by: refundData.refundedBy,
+          refund_reason: refundData.reason,
+          refund_notes: refundData.notes,
+          total_price: 0, // Will be updated after processing bookings
+          start_time: originalAppointment.start_time,
+          end_time: originalAppointment.end_time
+        })
+        .select()
+        .single();
+
+      if (refundError) throw refundError;
+
+      // Update the original bookings
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({
@@ -113,7 +142,7 @@ export function useAppointmentActions() {
       // Get all bookings for this appointment to determine if it's a full or partial refund
       const { data: allBookings, error: countError } = await supabase
         .from('bookings')
-        .select('id, status')
+        .select('id, status, price_paid')
         .eq('appointment_id', appointmentId);
 
       if (countError) throw countError;
@@ -123,18 +152,30 @@ export function useAppointmentActions() {
         booking.status === 'refunded' || bookingIds.includes(booking.id)
       );
 
-      // Update the appointment status
-      const { error: appointmentError } = await supabase
+      // Calculate total refund amount
+      const refundAmount = allBookings
+        ?.filter(booking => bookingIds.includes(booking.id))
+        .reduce((total, booking) => total + (booking.price_paid || 0), 0) || 0;
+
+      // Update the refund appointment with the total amount
+      const { error: updateRefundError } = await supabase
         .from('appointments')
         .update({
-          status: isFullRefund ? 'refunded' : 'partially_refunded',
-          refunded_by: refundData.refundedBy,
-          refund_reason: refundData.reason,
-          refund_notes: refundData.notes
+          total_price: -refundAmount // Negative amount to indicate refund
+        })
+        .eq('id', refundAppointment.id);
+
+      if (updateRefundError) throw updateRefundError;
+
+      // Update the original appointment status
+      const { error: originalAppointmentError } = await supabase
+        .from('appointments')
+        .update({
+          status: isFullRefund ? 'refunded' : 'partially_refunded'
         })
         .eq('id', appointmentId);
 
-      if (appointmentError) throw appointmentError;
+      if (originalAppointmentError) throw originalAppointmentError;
 
       // Refresh the selected items after refund
       await fetchAppointmentDetails(appointmentId);
