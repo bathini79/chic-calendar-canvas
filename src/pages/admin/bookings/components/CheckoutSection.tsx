@@ -330,7 +330,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 className="flex-1" 
                 size="lg"
                 onClick={handlePayment}
-                disabled={!appointmentId}
               >
                 Complete Payment
               </Button>
