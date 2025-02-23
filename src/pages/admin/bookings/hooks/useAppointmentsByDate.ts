@@ -67,10 +67,6 @@ export const useAppointmentsByDate = (currentDate: Date) => {
         }
 
         return data as Appointment[];
-      },
-      refetchInterval: 30000, // Refetch every 30 seconds
-      initialData: [], // Provide empty array as initial data
-      retry: 2, // Retry failed requests twice
-      staleTime: 1000 * 60, // Consider data stale after 1 minute
+      }
     });
 };
