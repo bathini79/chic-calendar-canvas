@@ -170,7 +170,6 @@ export default function AdminBookings() {
   const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
     const pkg = packages?.find((p) => p.id === packageId);
     if (!pkg) return;
-    // Update customized services
     setCustomizedServices((prev) => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
@@ -236,6 +235,18 @@ export default function AdminBookings() {
     const total = subtotal - discountAmount;
 
     return { items, subtotal, discountAmount, total };
+  };
+
+  const handleRemoveService = (serviceId: string) => {
+    setSelectedServices(prev => prev.filter(id => id !== serviceId));
+  };
+
+  const handleRemovePackage = (packageId: string) => {
+    setSelectedPackages(prev => prev.filter(id => id !== packageId));
+  };
+
+  const handleBackToServices = () => {
+    setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
   return (
@@ -380,6 +391,9 @@ export default function AdminBookings() {
                     selectedStylists={selectedStylists}
                     selectedTimeSlots={{ [selectedAppointment?.id || '']: selectedTime }}
                     onSaveAppointment={handleSaveAppointment}
+                    onRemoveService={handleRemoveService}
+                    onRemovePackage={handleRemovePackage}
+                    onBackToServices={handleBackToServices}
                   />
                 )}
 
