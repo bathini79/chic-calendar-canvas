@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -127,22 +126,20 @@ export function ServiceSelector({
     // Get base services from the package
     const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
 
-    // If package is not selected, select it first
-    if (!selectedPackages.includes(packageId)) {
-      // Add package to selected packages with base services
-      onPackageSelect(packageId, baseServices);
-      setExpandedPackages(prev => [...prev, packageId]);
-    }
-
-    // Then update customized services
+    // Update customized services first
     setCustomizedServices(prev => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
         ? currentServices.filter(id => id !== serviceId)
         : [...currentServices, serviceId];
 
-      // Always update package services to include both base and custom services
-      onPackageSelect(packageId, [...baseServices, ...newServices]);
+      // Update package services with both base and custom services
+      // Important: We call onPackageSelect AFTER updating customizedServices
+      // to ensure the package stays selected
+      const allServices = [...baseServices, ...newServices];
+      if (allServices.length > 0) {
+        onPackageSelect(packageId, allServices);
+      }
 
       return {
         ...prev,
