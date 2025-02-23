@@ -17,11 +17,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { cn } from "@/lib/utils";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
 type Stylist = {
   id: string;
@@ -99,14 +94,6 @@ export function ServiceSelector({
     },
   });
 
-  const togglePackageExpansion = (packageId: string) => {
-    setExpandedPackages(current =>
-      current.includes(packageId)
-        ? current.filter(id => id !== packageId)
-        : [...current, packageId]
-    );
-  };
-
   // Filter items based on selected category
   const filteredServices = selectedCategory
     ? services?.filter(service => 
@@ -138,7 +125,14 @@ export function ServiceSelector({
 
   const handlePackageSelect = (pkg: any) => {
     const packageServices = pkg.package_services.map((ps: any) => ps.service.id);
-    onPackageSelect(pkg.id, packageServices);
+    if (selectedPackages.includes(pkg.id)) {
+      // If deselecting, just remove the package
+      onPackageSelect(pkg.id, []);
+    } else {
+      // If selecting, expand the package and add it
+      setExpandedPackages(prev => [...prev, pkg.id]);
+      onPackageSelect(pkg.id, packageServices);
+    }
   };
 
   return (
@@ -154,7 +148,6 @@ export function ServiceSelector({
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Price</TableHead>
               <TableHead className="w-[200px]">Stylist</TableHead>
@@ -168,7 +161,7 @@ export function ServiceSelector({
               const isSelected = isService 
                 ? selectedServices.includes(item.id)
                 : selectedPackages.includes(item.id);
-              const isExpanded = expandedPackages.includes(item.id);
+              const isExpanded = isPackage && (isSelected || expandedPackages.includes(item.id));
 
               return (
                 <React.Fragment key={`${item.type}-${item.id}`}>
@@ -180,23 +173,14 @@ export function ServiceSelector({
                   >
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {isPackage && <PackageIcon className="h-4 w-4" />}
-                        <span className="font-medium">{item.name}</span>
                         {isPackage && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => togglePackageExpansion(item.id)}
-                          >
-                            {isExpanded ? '▼' : '▶'}
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <PackageIcon className="h-4 w-4" />
+                            <Badge variant="default">Package</Badge>
+                          </div>
                         )}
+                        <span className="font-medium">{item.name}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={isPackage ? 'default' : 'outline'}>
-                        {isPackage ? 'Package' : 'Service'}
-                      </Badge>
                     </TableCell>
                     <TableCell>
                       {isService ? item.duration : 
@@ -246,29 +230,34 @@ export function ServiceSelector({
                       </Button>
                     </TableCell>
                   </TableRow>
-                  {isPackage && (
+                  {isPackage && isExpanded && (
                     <TableRow>
-                      <TableCell colSpan={6} className="p-0">
-                        <Collapsible open={isExpanded}>
-                          <CollapsibleContent className="pl-8 pr-4 py-2">
-                            {item.package_services?.map((ps: any) => (
-                              <div
-                                key={ps.service.id}
-                                className="flex items-center justify-between py-2"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm">{ps.service.name}</span>
-                                  <span className="text-sm text-muted-foreground">
-                                    ({ps.service.duration} min)
-                                  </span>
-                                </div>
-                                <span className="text-sm">
-                                  ${ps.service.selling_price}
+                      <TableCell colSpan={5} className="bg-slate-50">
+                        <div className="pl-8 pr-4 py-2 space-y-2">
+                          {item.package_services?.map((ps: any) => (
+                            <div
+                              key={ps.service.id}
+                              className="flex items-center justify-between py-2 border-b last:border-0"
+                            >
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm font-medium">{ps.service.name}</span>
+                                <span className="text-sm text-muted-foreground">
+                                  ({ps.service.duration} min)
                                 </span>
                               </div>
-                            ))}
-                          </CollapsibleContent>
-                        </Collapsible>
+                              <span className="text-sm font-medium">
+                                ${ps.service.selling_price}
+                              </span>
+                            </div>
+                          ))}
+                          {item.is_customizable && (
+                            <div className="pt-2">
+                              <p className="text-sm text-muted-foreground">
+                                This package can be customized with additional services
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   )}
