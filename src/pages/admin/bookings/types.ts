@@ -64,7 +64,7 @@ export interface Appointment {
   start_time: string;
   end_time: string;
   total_price: number;
-  payment_method?: 'cash' | 'online';
+  payment_method: 'cash' | 'online';
   discount_type?: 'none' | 'percentage' | 'fixed';
   discount_value?: number;
   notes?: string;
@@ -77,6 +77,8 @@ export interface Appointment {
   refund_reason?: string;
   refunded_by?: string;
   refund_notes?: string;
+  transaction_type: 'sale' | 'refund';
+  original_appointment_id?: string;
 }
 
 export interface Booking {
@@ -85,6 +87,7 @@ export interface Booking {
   service_id?: string;
   package_id?: string;
   employee_id: string;
+  employee: Employee;
   start_time: string;
   end_time: string;
   status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded';
@@ -92,7 +95,6 @@ export interface Booking {
   original_price?: number;
   service?: Service;
   package?: Package;
-  employee: Employee;
   refund_reason?: 'customer_dissatisfaction' | 'service_quality_issue' | 'scheduling_error' | 'health_concern' | 'price_dispute' | 'other';
   refund_notes?: string;
   refunded_by?: string;

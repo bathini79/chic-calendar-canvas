@@ -3,7 +3,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   CheckCircle2, 
-  ClipboardList, 
   CreditCard, 
   Banknote,
   MoreVertical,
@@ -73,24 +72,29 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [refundedBy, setRefundedBy] = useState('');
   const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [relatedRefunds, setRelatedRefunds] = useState<Appointment[]>([]);
   const { fetchAppointmentDetails, updateAppointmentStatus, processRefund } = useAppointmentActions();
 
   useEffect(() => {
     loadAppointmentDetails();
     fetchEmployees();
+    loadRelatedRefunds();
   }, [appointmentId]);
 
-  useEffect(() => {
-    if (selectAll && appointmentDetails) {
-      const nonRefundedBookings = appointmentDetails.bookings
-        .filter(booking => booking.status !== 'refunded')
-        .reduce((acc, booking) => {
-          acc[booking.id] = true;
-          return acc;
-        }, {} as {[key: string]: boolean});
-      setRefundItems(nonRefundedBookings);
+  const loadRelatedRefunds = async () => {
+    try {
+      const { data: refunds, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('original_appointment_id', appointmentId)
+        .eq('transaction_type', 'refund');
+
+      if (error) throw error;
+      setRelatedRefunds(refunds || []);
+    } catch (error) {
+      console.error('Error loading refunds:', error);
     }
-  }, [selectAll, appointmentDetails]);
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -211,139 +215,180 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
   return (
     <>
-      <Card className="bg-white">
-        <CardContent className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
+      <div className="space-y-6">
+        <Card className="bg-white">
+          <CardContent className="p-6 space-y-6">
+            <div className="flex items-center justify-between border-b pb-4">
+              <div className="flex-1">
+                <div className="inline-flex items-center px-2.5 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  {appointmentDetails?.status === 'completed' ? 'Completed' : appointmentDetails?.status}
+                </div>
+                <div className="text-sm text-gray-500">
+                  {appointmentDetails && format(new Date(appointmentDetails.end_time), 'EEE dd MMM yyyy')}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" className="bg-black text-white">
+                  Rebook
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onSelect={() => setShowRefundDialog(true)}>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Refund sale
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <PencilLine className="mr-2 h-4 w-4" />
+                      Edit sale details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setShowAddNoteDialog(true)}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Add a note
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <Mail className="mr-2 h-4 w-4" />
+                      Email
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Printer className="mr-2 h-4 w-4" />
+                      Print
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-red-600"
+                      onSelect={() => setShowVoidDialog(true)}
+                    >
+                      <Ban className="mr-2 h-4 w-4" />
+                      Void sale
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <h4 className="text-lg font-semibold">
+                {appointmentDetails.customer?.full_name || 'No name provided'}
+              </h4>
+              <p className="text-gray-600">{appointmentDetails.customer?.email || 'No email provided'}</p>
+            </div>
+
             <div>
-              <div className="inline-flex items-center px-2.5 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                {appointmentDetails?.status === 'completed' ? 'Completed' : appointmentDetails?.status}
+              <h4 className="font-medium mb-2">Sale #{appointmentId.slice(0, 8)}</h4>
+              <p className="text-sm text-gray-500 mb-4">
+                {appointmentDetails && format(new Date(appointmentDetails.end_time), 'EEE dd MMM yyyy')}
+              </p>
+
+              {appointmentDetails?.bookings.map((booking) => {
+                const itemName = booking.service?.name || booking.package?.name;
+                const itemPrice = booking.price_paid;
+                
+                if (booking.status === 'refunded') return null;
+
+                return (
+                  <div key={booking.id} className="py-2 flex justify-between items-start border-b">
+                    <div className="flex-1">
+                      <p className="font-medium">{itemName}</p>
+                      <p className="text-sm text-gray-500">
+                        {format(new Date(booking.start_time), 'h:mma, dd MMM yyyy')}
+                        {booking.employee && ` • Stylist: ${booking.employee.name}`}
+                      </p>
+                    </div>
+                    <p className="text-right text-gray-900">₹{itemPrice.toFixed(2)}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="space-y-2 pt-4 border-t">
+              <div className="flex justify-between text-sm">
+                <span>Subtotal</span>
+                <span>₹{appointmentDetails?.original_total_price?.toFixed(2)}</span>
               </div>
-              <div className="text-sm text-gray-500">
-                {format(new Date(appointmentDetails?.end_time), 'EEE dd MMM yyyy')}
+              {appointmentDetails?.discount_type !== 'none' && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>
+                    Discount ({appointmentDetails?.discount_type === 'percentage' ? 
+                      `${appointmentDetails?.discount_value}%` : 
+                      '₹' + appointmentDetails?.discount_value
+                    })
+                  </span>
+                  <span>-₹{appointmentDetails?.discount_value.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-lg font-bold pt-2">
+                <span>Total</span>
+                <span>₹{appointmentDetails?.total_price.toFixed(2)}</span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" className="bg-black text-white">
-                Rebook
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onSelect={() => setShowRefundDialog(true)}>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Refund sale
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <PencilLine className="mr-2 h-4 w-4" />
-                    Edit sale details
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setShowAddNoteDialog(true)}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Add a note
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Mail className="mr-2 h-4 w-4" />
-                    Email
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Printer className="mr-2 h-4 w-4" />
-                    Print
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-red-600"
-                    onSelect={() => setShowVoidDialog(true)}
-                  >
-                    <Ban className="mr-2 h-4 w-4" />
-                    Void sale
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+
+            <div className="pt-4 border-t">
+              <div className="flex justify-between text-sm">
+                <span>Paid with {appointmentDetails?.payment_method === 'cash' ? 'Cash' : 'Online'}</span>
+                <div className="flex items-center">
+                  {appointmentDetails?.payment_method === 'cash' ? (
+                    <Banknote className="h-4 w-4 mr-1" />
+                  ) : (
+                    <CreditCard className="h-4 w-4 mr-1" />
+                  )}
+                  ₹{appointmentDetails?.total_price.toFixed(2)}
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                {appointmentDetails && format(new Date(appointmentDetails.end_time), "EEE dd MMM yyyy 'at' h:mma")}
+              </p>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="text-lg font-semibold">
-              {appointmentDetails.customer?.full_name || 'No name provided'}
-            </h4>
-            <p className="text-gray-600">{appointmentDetails.customer?.email || 'No email provided'}</p>
-          </div>
-
-          <div>
-            <h4 className="font-medium mb-2">Sale #{appointmentId.slice(0, 8)}</h4>
-            <p className="text-sm text-gray-500 mb-4">
-              {format(new Date(appointmentDetails?.end_time), 'EEE dd MMM yyyy')}
-            </p>
-
-            {nonRefundedBookings.map((booking) => {
-              const itemName = booking.service?.name || booking.package?.name;
-              const itemPrice = booking.price_paid;
-              
-              return (
-                <div key={booking.id} className="py-2 flex justify-between items-start border-b">
-                  <div className="flex-1">
-                    <p className="font-medium">{itemName}</p>
-                    <p className="text-sm text-gray-500">
-                      {format(new Date(booking.start_time), 'h:mma, dd MMM yyyy')}
-                      {booking.employee && ` • Stylist: ${booking.employee.name}`}
+        {relatedRefunds.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Related Refunds</h3>
+            {relatedRefunds.map((refund) => (
+              <Card key={refund.id} className="bg-white border-red-200">
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="inline-flex items-center px-2.5 py-1 rounded bg-red-100 text-red-700 text-sm font-medium mb-2">
+                        Refund
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        {format(new Date(refund.created_at), 'dd MMM yyyy')}
+                      </p>
+                    </div>
+                    <p className="text-lg font-semibold text-red-600">
+                      -₹{Math.abs(refund.total_price).toFixed(2)}
                     </p>
                   </div>
-                  <p className="text-right text-gray-900">₹{itemPrice.toFixed(2)}</p>
-                </div>
-              );
-            })}
+                  {refund.refund_reason && (
+                    <div className="text-sm">
+                      <p className="font-medium">Reason:</p>
+                      <p className="text-gray-600">{refund.refund_reason}</p>
+                    </div>
+                  )}
+                  {refund.refund_notes && (
+                    <div className="text-sm">
+                      <p className="font-medium">Notes:</p>
+                      <p className="text-gray-600">{refund.refund_notes}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
-
-          <div className="space-y-2 pt-4 border-t">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span>₹{appointmentDetails.original_total_price.toFixed(2)}</span>
-            </div>
-            {appointmentDetails.discount_type !== 'none' && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>
-                  Discount ({appointmentDetails.discount_type === 'percentage' ? 
-                    `${appointmentDetails.discount_value}%` : 
-                    '₹' + appointmentDetails.discount_value
-                  })
-                </span>
-                <span>-₹{appointmentDetails?.discount_value.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-lg font-bold pt-2">
-              <span>Total</span>
-              <span>₹{appointmentDetails?.total_price.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <div className="flex justify-between text-sm">
-              <span>Paid with {appointmentDetails.payment_method === 'cash' ? 'Cash' : 'Online'}</span>
-              <div className="flex items-center">
-                {appointmentDetails.payment_method === 'cash' ? (
-                  <Banknote className="h-4 w-4 mr-1" />
-                ) : (
-                  <CreditCard className="h-4 w-4 mr-1" />
-                )}
-                ₹{appointmentDetails?.total_price.toFixed(2)}
-              </div>
-            </div>
-            <p className="text-sm text-gray-500 mt-1">
-              {format(new Date(appointmentDetails?.end_time), "EEE dd MMM yyyy 'at' h:mma")}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
       <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
         <DialogContent>
