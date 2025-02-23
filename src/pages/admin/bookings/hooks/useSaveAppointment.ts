@@ -95,7 +95,7 @@ const useSaveAppointment = ({
       const appointmentId = appointmentData.id;
       let currentStartTime = startDateTime;
 
-      // Create bookings for individual services
+      // Create bookings for services
       for (const serviceId of selectedServices) {
         const service = services?.find(s => s.id === serviceId);
         if (!service) continue;
@@ -121,91 +121,31 @@ const useSaveAppointment = ({
         currentStartTime = bookingEndTime;
       }
 
-      // Create bookings for packages and their services
+      // Create bookings for packages
       for (const packageId of selectedPackages) {
         const pkg = packages?.find(p => p.id === packageId);
         if (!pkg) continue;
 
-        // Get package base services
-        const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
-        
-        // Calculate total duration and price for the package
-        let packageDuration = pkg.duration;
-        let packagePrice = pkg.price;
-
-        // Create one booking for the package itself
-        const packageEndTime = addMinutes(currentStartTime, packageDuration);
-        const { error: packageBookingError } = await supabase
+        // Create one booking for the package
+        const bookingEndTime = addMinutes(currentStartTime, pkg.duration);
+        const { error: bookingError } = await supabase
           .from("bookings")
           .insert({
             appointment_id: appointmentId,
             package_id: packageId,
             employee_id: selectedStylists[packageId],
             start_time: currentStartTime.toISOString(),
-            end_time: packageEndTime.toISOString(),
+            end_time: bookingEndTime.toISOString(),
             status: "confirmed",
-            price_paid: packagePrice,
+            price_paid: pkg.price,
           });
 
-        if (packageBookingError) {
-          console.error("Error inserting package booking:", packageBookingError);
-          throw packageBookingError;
+        if (bookingError) {
+          console.error("Error inserting package booking:", bookingError);
+          throw bookingError;
         }
 
-        // Create bookings for each service in the package
-        for (const serviceId of baseServices) {
-          const service = services?.find(s => s.id === serviceId);
-          if (!service) continue;
-
-          const serviceEndTime = addMinutes(currentStartTime, service.duration);
-          const { error: serviceBookingError } = await supabase
-            .from("bookings")
-            .insert({
-              appointment_id: appointmentId,
-              service_id: serviceId,
-              package_id: packageId, // Link to the package
-              employee_id: selectedStylists[serviceId] || selectedStylists[packageId],
-              start_time: currentStartTime.toISOString(),
-              end_time: serviceEndTime.toISOString(),
-              status: "confirmed",
-              price_paid: 0, // Price is already included in the package booking
-            });
-
-          if (serviceBookingError) {
-            console.error("Error inserting package service booking:", serviceBookingError);
-            throw serviceBookingError;
-          }
-
-          currentStartTime = serviceEndTime;
-        }
-
-        // Handle customized services if present
-        const customizedServices = pkg.customized_services || [];
-        for (const serviceId of customizedServices) {
-          const service = services?.find(s => s.id === serviceId);
-          if (!service) continue;
-
-          const serviceEndTime = addMinutes(currentStartTime, service.duration);
-          const { error: customServiceBookingError } = await supabase
-            .from("bookings")
-            .insert({
-              appointment_id: appointmentId,
-              service_id: serviceId,
-              package_id: packageId, // Link to the package
-              employee_id: selectedStylists[serviceId] || selectedStylists[packageId],
-              start_time: currentStartTime.toISOString(),
-              end_time: serviceEndTime.toISOString(),
-              status: "confirmed",
-              price_paid: service.selling_price, // Additional service price
-            });
-
-          if (customServiceBookingError) {
-            console.error("Error inserting customized service booking:", customServiceBookingError);
-            throw customServiceBookingError;
-          }
-
-          currentStartTime = serviceEndTime;
-        }
+        currentStartTime = bookingEndTime;
       }
 
       toast.success("Appointment saved successfully");
