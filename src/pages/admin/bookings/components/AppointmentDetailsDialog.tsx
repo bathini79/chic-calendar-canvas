@@ -98,8 +98,8 @@ export function AppointmentDetailsDialog({
 
     if (success) {
       onUpdated?.();
+      setShowConfirmDialog(false);
     }
-    setShowConfirmDialog(false);
   };
 
   const appointmentDate = new Date(appointment.start_time);
@@ -153,6 +153,7 @@ export function AppointmentDetailsDialog({
               <Select 
                 value={appointment.status} 
                 onValueChange={handleStatusChange}
+                disabled={isLoading}
               >
                 <SelectTrigger className="w-[140px]">
                   <SelectValue />
@@ -281,7 +282,10 @@ export function AppointmentDetailsDialog({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleStatusConfirm}>
+            <AlertDialogAction 
+              onClick={handleStatusConfirm}
+              disabled={isLoading}
+            >
               {selectedMessage?.action}
             </AlertDialogAction>
           </AlertDialogFooter>
