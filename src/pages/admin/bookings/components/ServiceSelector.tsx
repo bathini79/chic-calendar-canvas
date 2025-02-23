@@ -4,6 +4,7 @@ import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -46,6 +47,7 @@ export function ServiceSelector({
 }: ServiceSelectorProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
+  const [customizedServices, setCustomizedServices] = useState<Record<string, string[]>>({});
 
   // Query for categories
   const { data: categories } = useQuery({
@@ -61,7 +63,7 @@ export function ServiceSelector({
     },
   });
 
-  // Query for services
+  // Query for all services
   const { data: services } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -123,14 +125,49 @@ export function ServiceSelector({
     }))
   ];
 
+  const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
+    setCustomizedServices(prev => {
+      const currentServices = prev[packageId] || [];
+      const newServices = currentServices.includes(serviceId)
+        ? currentServices.filter(id => id !== serviceId)
+        : [...currentServices, serviceId];
+      
+      const updatedServices = { ...prev, [packageId]: newServices };
+      
+      // Update package selection with new customized services
+      const pkg = packages?.find(p => p.id === packageId);
+      if (pkg) {
+        const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
+        onPackageSelect(packageId, [...baseServices, ...newServices]);
+      }
+      
+      return updatedServices;
+    });
+  };
+
+  const calculatePackagePrice = (pkg: any) => {
+    const basePrice = pkg.price || 0;
+    const customServices = customizedServices[pkg.id] || [];
+    const additionalPrice = customServices.reduce((sum, serviceId) => {
+      const service = services?.find(s => s.id === serviceId);
+      return sum + (service?.selling_price || 0);
+    }, 0);
+    return basePrice + additionalPrice;
+  };
+
   const handlePackageSelect = (pkg: any) => {
-    const packageServices = pkg.package_services.map((ps: any) => ps.service.id);
     if (selectedPackages.includes(pkg.id)) {
-      // If deselecting, just remove the package
+      // If deselecting, remove package and clear customizations
       onPackageSelect(pkg.id, []);
+      setCustomizedServices(prev => {
+        const { [pkg.id]: _, ...rest } = prev;
+        return rest;
+      });
+      setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
       // If selecting, expand the package and add it
       setExpandedPackages(prev => [...prev, pkg.id]);
+      const packageServices = pkg.package_services.map((ps: any) => ps.service.id);
       onPackageSelect(pkg.id, packageServices);
     }
   };
@@ -189,10 +226,10 @@ export function ServiceSelector({
                       } min
                     </TableCell>
                     <TableCell>
-                      ${isService ? item.selling_price : item.price}
+                      ${isService ? item.selling_price : calculatePackagePrice(item)}
                     </TableCell>
                     <TableCell>
-                      {isSelected && (
+                      {isService && isSelected && (
                         <Select 
                           value={selectedStylists[item.id] || ''} 
                           onValueChange={(value) => onStylistSelect(item.id, value)}
@@ -245,16 +282,72 @@ export function ServiceSelector({
                                   ({ps.service.duration} min)
                                 </span>
                               </div>
-                              <span className="text-sm font-medium">
-                                ${ps.service.selling_price}
-                              </span>
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm font-medium">
+                                  ${ps.service.selling_price}
+                                </span>
+                                <Select 
+                                  value={selectedStylists[ps.service.id] || ''} 
+                                  onValueChange={(value) => onStylistSelect(ps.service.id, value)}
+                                >
+                                  <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Select stylist" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {stylists.map((stylist) => (
+                                      <SelectItem key={stylist.id} value={stylist.id}>
+                                        {stylist.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
                           ))}
                           {item.is_customizable && (
-                            <div className="pt-2">
-                              <p className="text-sm text-muted-foreground">
-                                This package can be customized with additional services
-                              </p>
+                            <div className="pt-4 space-y-4">
+                              <h4 className="font-medium text-sm">Additional Services</h4>
+                              {services?.filter(service => 
+                                item.customizable_services.includes(service.id)
+                              ).map(service => (
+                                <div
+                                  key={service.id}
+                                  className="flex items-center justify-between py-2"
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <Checkbox
+                                      checked={customizedServices[item.id]?.includes(service.id)}
+                                      onCheckedChange={() => handleCustomServiceToggle(item.id, service.id)}
+                                    />
+                                    <span className="text-sm font-medium">{service.name}</span>
+                                    <span className="text-sm text-muted-foreground">
+                                      ({service.duration} min)
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                    <span className="text-sm font-medium">
+                                      +${service.selling_price}
+                                    </span>
+                                    {customizedServices[item.id]?.includes(service.id) && (
+                                      <Select 
+                                        value={selectedStylists[service.id] || ''} 
+                                        onValueChange={(value) => onStylistSelect(service.id, value)}
+                                      >
+                                        <SelectTrigger className="w-[180px]">
+                                          <SelectValue placeholder="Select stylist" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {stylists.map((stylist) => (
+                                            <SelectItem key={stylist.id} value={stylist.id}>
+                                              {stylist.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
