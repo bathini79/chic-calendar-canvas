@@ -16,9 +16,8 @@ import {
   Clock,
   User
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { Service, Package as PackageType } from "../types";
+import type { Service, Package } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -29,14 +28,15 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { format, addMinutes } from 'date-fns';
+import { format } from 'date-fns';
 
 interface CheckoutSectionProps {
-  appointmentId: string;
+  appointmentId?: string;
+  selectedCustomer: { id: string } | null;
   selectedServices: string[];
   selectedPackages: string[];
   services: Service[];
-  packages: PackageType[];
+  packages: Package[];
   discountType: "none" | "percentage" | "fixed";
   discountValue: number;
   paymentMethod: "cash" | "online";
@@ -48,10 +48,12 @@ interface CheckoutSectionProps {
   onPaymentComplete: () => void;
   selectedStylists: { [key: string]: string };
   selectedTimeSlots: { [key: string]: string };
+  onSaveAppointment: () => Promise<string | null>;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   appointmentId,
+  selectedCustomer,
   selectedServices,
   selectedPackages,
   services,
@@ -67,6 +69,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onPaymentComplete,
   selectedStylists,
   selectedTimeSlots,
+  onSaveAppointment
 }) => {
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -95,7 +98,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         ...selectedServices.map((id) => {
           const service = services.find((s) => s.id === id);
           const stylist = selectedStylists[id];
-          const timeSlot = selectedTimeSlots[id] || selectedTimeSlots[appointmentId];
+          const timeSlot = selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''];
           return service
             ? {
                 id,
@@ -112,7 +115,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         ...selectedPackages.map((id) => {
           const pkg = packages.find((p) => p.id === id);
           const stylist = selectedStylists[id];
-          const timeSlot = selectedTimeSlots[id] || selectedTimeSlots[appointmentId];
+          const timeSlot = selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''];
           return pkg
             ? {
                 id,
@@ -152,87 +155,16 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
 
   const handlePayment = async () => {
     try {
-      let appointmentId = appointmentId;
+      if (!selectedCustomer) {
+        toast.error("Please select a customer");
+        return;
+      }
 
-      // If no appointment exists, create it now
-      if (!appointmentId) {
-        const { data: appointmentData, error: createError } = await supabase
-          .from("appointments")
-          .insert({
-            customer_id: selectedStylists[Object.keys(selectedStylists)[0]], // Assuming the first stylist is the customer
-            start_time: new Date().toISOString(), // Placeholder, adjust as needed
-            end_time: new Date().toISOString(), // Placeholder, adjust as needed
-            status: "completed",
-            payment_method: paymentMethod,
-            discount_type: discountType,
-            discount_value: discountValue,
-            total_price: total,
-            notes: notes,
-            number_of_bookings: selectedServices.length + selectedPackages.length,
-          })
-          .select()
-          .single();
-
-        if (createError) throw createError;
-        appointmentId = appointmentData.id;
-
-        // Create bookings for services
-        for (const serviceId of selectedServices) {
-          const service = services.find(s => s.id === serviceId);
-          if (!service) continue;
-
-          const { error: bookingError } = await supabase
-            .from("bookings")
-            .insert({
-              appointment_id: appointmentId,
-              service_id: serviceId,
-              employee_id: selectedStylists[serviceId],
-              status: "completed",
-              price_paid: service.selling_price,
-            });
-
-          if (bookingError) throw bookingError;
-        }
-
-        // Create bookings for packages
-        for (const packageId of selectedPackages) {
-          const pkg = packages.find(p => p.id === packageId);
-          if (!pkg) continue;
-
-          const { error: bookingError } = await supabase
-            .from("bookings")
-            .insert({
-              appointment_id: appointmentId,
-              package_id: packageId,
-              employee_id: selectedStylists[packageId],
-              status: "completed",
-              price_paid: pkg.price,
-            });
-
-          if (bookingError) throw bookingError;
-        }
-      } else {
-        // If appointment exists, just update it
-        const { error: updateError } = await supabase
-          .from("appointments")
-          .update({
-            status: "completed",
-            payment_method: paymentMethod,
-            discount_type: discountType,
-            discount_value: discountValue,
-            total_price: total,
-            notes: notes,
-          })
-          .eq("id", appointmentId);
-
-        if (updateError) throw updateError;
-
-        const { error: bookingsError } = await supabase
-          .from("bookings")
-          .update({ status: "completed" })
-          .eq("appointment_id", appointmentId);
-
-        if (bookingsError) throw bookingsError;
+      const savedAppointmentId = await onSaveAppointment();
+      
+      if (!savedAppointmentId) {
+        toast.error("Failed to complete payment");
+        return;
       }
 
       toast.success("Payment completed successfully");

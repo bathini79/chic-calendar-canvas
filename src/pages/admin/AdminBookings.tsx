@@ -146,12 +146,15 @@ export default function AdminBookings() {
   };
 
   const handleProceedToCheckout = async () => {
-    try {
-      setCurrentScreen(SCREEN.CHECKOUT);
-    } catch (error) {
-      console.error("Error proceeding to checkout:", error);
-      toast.error("Failed to proceed to checkout. Please try again.");
+    if (!selectedCustomer) {
+      toast.error("Please select a customer");
+      return;
     }
+    if (selectedServices.length === 0 && selectedPackages.length === 0) {
+      toast.error("Please select at least one service or package");
+      return;
+    }
+    setCurrentScreen(SCREEN.CHECKOUT);
   };
 
   const handleServiceSelect = (serviceId: string) => {
@@ -354,6 +357,7 @@ export default function AdminBookings() {
                 {currentScreen === SCREEN.CHECKOUT && (
                   <CheckoutSection
                     appointmentId={selectedAppointment?.id}
+                    selectedCustomer={selectedCustomer}
                     selectedServices={selectedServices}
                     selectedPackages={selectedPackages}
                     services={services || []}
@@ -372,6 +376,7 @@ export default function AdminBookings() {
                     }}
                     selectedStylists={selectedStylists}
                     selectedTimeSlots={{ [selectedAppointment?.id || '']: selectedTime }}
+                    onSaveAppointment={handleSaveAppointment}
                   />
                 )}
 
