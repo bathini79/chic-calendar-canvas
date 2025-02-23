@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +13,8 @@ import {
   MoreVertical, 
   IndianRupee, 
   Percent, 
-  Clock
+  Clock,
+  User
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -45,6 +45,8 @@ interface CheckoutSectionProps {
   onPaymentMethodChange: (value: "cash" | "online") => void;
   onNotesChange: (value: string) => void;
   onPaymentComplete: () => void;
+  selectedStylists: { [key: string]: string };
+  selectedTimeSlots: { [key: string]: string };
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -62,6 +64,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onPaymentMethodChange,
   onNotesChange,
   onPaymentComplete,
+  selectedStylists,
+  selectedTimeSlots,
 }) => {
   const selectedItems = useMemo(
     () =>
@@ -75,6 +79,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 price: service.selling_price,
                 duration: service.duration,
                 type: "service" as const,
+                stylist: selectedStylists[id],
+                time: selectedTimeSlots?.[id],
               }
             : null;
         }),
@@ -87,11 +93,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 price: pkg.price,
                 duration: pkg.duration,
                 type: "package" as const,
+                stylist: selectedStylists[id],
+                time: selectedTimeSlots?.[id],
               }
             : null;
         }),
       ].filter(Boolean),
-    [selectedServices, selectedPackages, services, packages]
+    [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots]
   );
 
   const subtotal = useMemo(
@@ -166,17 +174,25 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 item && (
                   <div
                     key={`${item.type}-${item.id}`}
-                    className="flex items-center justify-between py-3 border-b border-gray-100"
+                    className="flex items-center justify-between py-4 border-b border-gray-100"
                   >
-                    <div className="space-y-1">
-                      <p className="font-medium text-base">{item.name}</p>
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Clock className="mr-2 h-4 w-4" />
-                        {item.duration} min
+                    <div className="space-y-2">
+                      <p className="text-lg font-semibold tracking-tight">{item.name}</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Clock className="mr-2 h-4 w-4" />
+                          {item.duration} min {item.time && `at ${item.time}`}
+                        </div>
+                        {item.stylist && (
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <User className="mr-2 h-4 w-4" />
+                            {item.stylist}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <p className="font-medium text-base">
-                      <IndianRupee className="inline h-3 w-3" />
+                    <p className="font-semibold text-lg">
+                      <IndianRupee className="inline h-4 w-4" />
                       {item.price}
                     </p>
                   </div>
