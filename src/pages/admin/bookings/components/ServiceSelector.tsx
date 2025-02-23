@@ -127,22 +127,22 @@ export function ServiceSelector({
     // Get base services from the package
     const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
 
-    // Only proceed if the package is selected
+    // If package is not selected, select it first
     if (!selectedPackages.includes(packageId)) {
-      handlePackageSelect(pkg);
+      // Add package to selected packages with base services
+      onPackageSelect(packageId, baseServices);
+      setExpandedPackages(prev => [...prev, packageId]);
     }
 
-    // Update customized services
+    // Then update customized services
     setCustomizedServices(prev => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
         ? currentServices.filter(id => id !== serviceId)
         : [...currentServices, serviceId];
 
-      // Important: Update package services only after the package is selected
-      if (selectedPackages.includes(packageId)) {
-        onPackageSelect(packageId, [...baseServices, ...newServices]);
-      }
+      // Always update package services to include both base and custom services
+      onPackageSelect(packageId, [...baseServices, ...newServices]);
 
       return {
         ...prev,
@@ -166,7 +166,7 @@ export function ServiceSelector({
     const currentCustomServices = customizedServices[pkg.id] || [];
 
     if (selectedPackages.includes(pkg.id)) {
-      // Deselecting package
+      // Deselecting package - clear everything
       onPackageSelect(pkg.id, []);
       setCustomizedServices(prev => {
         const { [pkg.id]: _, ...rest } = prev;
@@ -174,7 +174,7 @@ export function ServiceSelector({
       });
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
-      // Selecting package
+      // Selecting package - add with base services
       setExpandedPackages(prev => [...prev, pkg.id]);
       onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
     }
