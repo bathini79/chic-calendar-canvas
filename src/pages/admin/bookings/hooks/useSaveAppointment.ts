@@ -95,7 +95,7 @@ const useSaveAppointment = ({
       const appointmentId = appointmentData.id;
       let currentStartTime = startDateTime;
 
-      // Create bookings for services
+      // Create bookings for individual services
       for (const serviceId of selectedServices) {
         const service = services?.find(s => s.id === serviceId);
         if (!service) continue;
@@ -121,31 +121,79 @@ const useSaveAppointment = ({
         currentStartTime = bookingEndTime;
       }
 
-      // Create bookings for packages
+      // Create bookings for packages and their services
       for (const packageId of selectedPackages) {
         const pkg = packages?.find(p => p.id === packageId);
         if (!pkg) continue;
 
-        // Create one booking for the package
-        const bookingEndTime = addMinutes(currentStartTime, pkg.duration);
-        const { error: bookingError } = await supabase
-          .from("bookings")
-          .insert({
-            appointment_id: appointmentId,
-            package_id: packageId,
-            employee_id: selectedStylists[packageId],
-            start_time: currentStartTime.toISOString(),
-            end_time: bookingEndTime.toISOString(),
-            status: "confirmed",
-            price_paid: pkg.price,
-          });
+        // Get package base services
+        const baseServices = pkg.package_services.map(ps => ({
+          ...ps.service,
+          employee_id: selectedStylists[ps.service.id]
+        }));
 
-        if (bookingError) {
-          console.error("Error inserting package booking:", bookingError);
-          throw bookingError;
+        // Create bookings for each service in the package
+        for (const service of baseServices) {
+          if (!service.employee_id) {
+            toast.error(`Please select a stylist for ${service.name}`);
+            setIsSaving(false);
+            return null;
+          }
+
+          const bookingEndTime = addMinutes(currentStartTime, service.duration);
+          const { error: bookingError } = await supabase
+            .from("bookings")
+            .insert({
+              appointment_id: appointmentId,
+              service_id: service.id,
+              package_id: packageId,
+              employee_id: service.employee_id,
+              start_time: currentStartTime.toISOString(),
+              end_time: bookingEndTime.toISOString(),
+              status: "confirmed",
+              price_paid: service.selling_price,
+            });
+
+          if (bookingError) {
+            console.error("Error inserting package service booking:", bookingError);
+            throw bookingError;
+          }
+
+          currentStartTime = bookingEndTime;
         }
 
-        currentStartTime = bookingEndTime;
+        // If package has customizable services, add those as well
+        if (pkg.customizable_services && pkg.customizable_services.length > 0) {
+          const selectedCustomServices = pkg.customizable_services.filter(
+            serviceId => selectedStylists[serviceId]
+          );
+
+          for (const serviceId of selectedCustomServices) {
+            const service = services?.find(s => s.id === serviceId);
+            if (!service) continue;
+
+            const bookingEndTime = addMinutes(currentStartTime, service.duration);
+            const { error: bookingError } = await supabase
+              .from("bookings")
+              .insert({
+                appointment_id: appointmentId,
+                service_id: serviceId,
+                package_id: packageId,
+                employee_id: selectedStylists[serviceId],
+                start_time: currentStartTime.toISOString(),
+                end_time: bookingEndTime.toISOString(),
+                status: "confirmed",
+                price_paid: service.selling_price,
+              });
+
+            if (bookingError) {
+              console.error("Error inserting customized service booking:", bookingError);
+              throw bookingError;
+            }
+
+            currentStartTime = bookingEndTime;
+          }
+        }
       }
 
       toast.success("Appointment saved successfully");
