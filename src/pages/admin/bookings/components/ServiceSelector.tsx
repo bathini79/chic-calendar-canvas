@@ -17,6 +17,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { cn } from "@/lib/utils";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 type Stylist = {
   id: string;
@@ -45,6 +50,7 @@ export function ServiceSelector({
   stylists = []
 }: ServiceSelectorProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
 
   // Query for categories
   const { data: categories } = useQuery({
@@ -74,19 +80,32 @@ export function ServiceSelector({
     },
   });
 
-  // Query for packages
+  // Query for packages with their services
   const { data: packages } = useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('packages')
-        .select('*, package_services(service:services(*))')
+        .select(`
+          *,
+          package_services(
+            service:services(*)
+          )
+        `)
         .eq('status', 'active');
       
       if (error) throw error;
       return data;
     },
   });
+
+  const togglePackageExpansion = (packageId: string) => {
+    setExpandedPackages(current =>
+      current.includes(packageId)
+        ? current.filter(id => id !== packageId)
+        : [...current, packageId]
+    );
+  };
 
   // Filter items based on selected category
   const filteredServices = selectedCategory
@@ -117,8 +136,9 @@ export function ServiceSelector({
     }))
   ];
 
-  const handleStylistSelect = (itemId: string, stylistId: string) => {
-    onStylistSelect(itemId, stylistId);
+  const handlePackageSelect = (pkg: any) => {
+    const packageServices = pkg.package_services.map((ps: any) => ps.service.id);
+    onPackageSelect(pkg.id, packageServices);
   };
 
   return (
@@ -129,7 +149,7 @@ export function ServiceSelector({
         onCategorySelect={setSelectedCategory}
       />
 
-      <ScrollArea className=" border rounded-md">
+      <ScrollArea className="border rounded-md">
         <Table>
           <TableHeader>
             <TableRow>
@@ -143,72 +163,116 @@ export function ServiceSelector({
           </TableHeader>
           <TableBody>
             {allItems.map((item) => {
-              const isSelected = item.type === 'package' 
-                ? selectedPackages.includes(item.id)
-                : selectedServices.includes(item.id);
+              const isService = item.type === 'service';
+              const isPackage = item.type === 'package';
+              const isSelected = isService 
+                ? selectedServices.includes(item.id)
+                : selectedPackages.includes(item.id);
+              const isExpanded = expandedPackages.includes(item.id);
 
               return (
-                <TableRow 
-                  key={`${item.type}-${item.id}`}
-                  className={cn(
-                    "transition-colors",
-                    isSelected && "bg-red-50 hover:bg-red-100"
-                  )}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {item.type === 'package' && <PackageIcon className="h-4 w-4" />}
-                      <span className="font-medium">{item.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={item.type === 'package' ? 'default' : 'outline'}>
-                      {item.type === 'package' ? 'Package' : 'Service'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{item.duration} min</TableCell>
-                  <TableCell>
-                    ${item.type === 'package' ? item.price : item.selling_price}
-                  </TableCell>
-                  <TableCell>
-                    {isSelected && (
-                      <Select 
-                        value={selectedStylists[item.id] || ''} 
-                        onValueChange={(value) => handleStylistSelect(item.id, value)}
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Select stylist" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {stylists.map((stylist) => (
-                            <SelectItem key={stylist.id} value={stylist.id}>
-                              {stylist.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                <React.Fragment key={`${item.type}-${item.id}`}>
+                  <TableRow 
+                    className={cn(
+                      "transition-colors",
+                      isSelected && "bg-red-50 hover:bg-red-100"
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (item.type === 'package') {
-                          onPackageSelect(item.id, []);
-                        } else {
-                          onServiceSelect(item.id);
-                        }
-                      }}
-                    >
-                      {isSelected ? (
-                        <Minus className="h-4 w-4 text-destructive" />
-                      ) : (
-                        <Plus className="h-4 w-4" />
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {isPackage && <PackageIcon className="h-4 w-4" />}
+                        <span className="font-medium">{item.name}</span>
+                        {isPackage && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => togglePackageExpansion(item.id)}
+                          >
+                            {isExpanded ? '▼' : '▶'}
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={isPackage ? 'default' : 'outline'}>
+                        {isPackage ? 'Package' : 'Service'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {isService ? item.duration : 
+                        item.package_services?.reduce((sum: number, ps: any) => 
+                          sum + (ps.service?.duration || 0), 0)
+                      } min
+                    </TableCell>
+                    <TableCell>
+                      ${isService ? item.selling_price : item.price}
+                    </TableCell>
+                    <TableCell>
+                      {isSelected && (
+                        <Select 
+                          value={selectedStylists[item.id] || ''} 
+                          onValueChange={(value) => onStylistSelect(item.id, value)}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Select stylist" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {stylists.map((stylist) => (
+                              <SelectItem key={stylist.id} value={stylist.id}>
+                                {stylist.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       )}
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (isPackage) {
+                            handlePackageSelect(item);
+                          } else {
+                            onServiceSelect(item.id);
+                          }
+                        }}
+                      >
+                        {isSelected ? (
+                          <Minus className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Plus className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {isPackage && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="p-0">
+                        <Collapsible open={isExpanded}>
+                          <CollapsibleContent className="pl-8 pr-4 py-2">
+                            {item.package_services?.map((ps: any) => (
+                              <div
+                                key={ps.service.id}
+                                className="flex items-center justify-between py-2"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">{ps.service.name}</span>
+                                  <span className="text-sm text-muted-foreground">
+                                    ({ps.service.duration} min)
+                                  </span>
+                                </div>
+                                <span className="text-sm">
+                                  ${ps.service.selling_price}
+                                </span>
+                              </div>
+                            ))}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               );
             })}
           </TableBody>
