@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,9 +33,10 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentActions } from '../hooks/useAppointmentActions';
-import type { Appointment, RefundData, RefundItem } from '../types';
+import type { Appointment, RefundData } from '../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 interface SummaryViewProps {
@@ -57,19 +57,11 @@ interface SummaryViewProps {
   paymentMethod: 'cash' | 'online';
   discountType: 'none' | 'percentage' | 'fixed';
   discountValue: number;
-  completedAt: string;
 }
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
   selectedItems,
-  subtotal,
-  discountAmount,
-  total,
-  paymentMethod,
-  discountType,
-  discountValue,
-  completedAt,
 }) => {
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
@@ -82,7 +74,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [refundedBy, setRefundedBy] = useState('');
   const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const { fetchAppointmentDetails } = useAppointmentActions();
+  const { fetchAppointmentDetails, updateAppointmentStatus } = useAppointmentActions();
 
   useEffect(() => {
     loadAppointmentDetails();
@@ -90,18 +82,14 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   }, [appointmentId]);
 
   useEffect(() => {
-    if (selectAll && appointmentDetails) {
-      const allItems = {} as {[key: string]: boolean};
-      appointmentDetails.bookings.forEach(booking => {
-        // Only allow selecting items that haven't been refunded yet
-        if (booking.status !== 'refunded') {
-          if (booking.service_id) allItems[booking.service_id] = true;
-          if (booking.package_id) allItems[booking.package_id] = true;
-        }
-      });
-      setRefundItems(allItems);
+    if (selectAll) {
+      const allItemIds = selectedItems.reduce((acc, item) => {
+        acc[item.id] = true;
+        return acc;
+      }, {} as {[key: string]: boolean});
+      setRefundItems(allItemIds);
     }
-  }, [selectAll, appointmentDetails]);
+  }, [selectAll, selectedItems]);
 
   const fetchEmployees = async () => {
     try {
@@ -121,105 +109,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     const details = await fetchAppointmentDetails(appointmentId);
     if (details) {
       setAppointmentDetails(details);
-    }
-  };
-
-  const getRefundableItems = (): RefundItem[] => {
-    if (!appointmentDetails) return [];
-
-    return appointmentDetails.bookings
-      .filter(booking => booking.status !== 'refunded') // Only show non-refunded items
-      .map(booking => ({
-        id: booking.service_id || booking.package_id || '',
-        booking_id: booking.id,
-        price: booking.price_paid,
-        type: booking.service_id ? 'service' : 'package',
-        name: booking.service?.name || booking.package?.name || '',
-        employee: booking.employee ? {
-          id: booking.employee.id,
-          name: booking.employee.name
-        } : undefined
-      }))
-      .filter(item => item.id); // Filter out any items without an ID
-  };
-
-  const handleRefundSale = async () => {
-    if (!appointmentDetails || !refundedBy) {
-      toast.error("Please select who processed the refund");
-      return;
-    }
-
-    try {
-      const selectedItemIds = Object.entries(refundItems)
-        .filter(([_, isSelected]) => isSelected)
-        .map(([id]) => id);
-
-      if (selectedItemIds.length === 0) {
-        toast.error("Please select at least one item to refund");
-        return;
-      }
-
-      // Get all bookings that need to be refunded
-      const bookingsToRefund = appointmentDetails.bookings.filter(booking => {
-        const itemId = booking.service_id || booking.package_id;
-        return itemId && selectedItemIds.includes(itemId);
-      });
-
-      // If refunding a package, include all its associated service bookings
-      const packageBookings = bookingsToRefund.filter(b => b.package_id);
-      const additionalServiceBookings = appointmentDetails.bookings.filter(
-        booking => packageBookings.some(pb => 
-          pb.package_id === booking.package_id && 
-          !bookingsToRefund.some(b => b.id === booking.id)
-        )
-      );
-
-      const allBookingsToRefund = [...bookingsToRefund, ...additionalServiceBookings];
-      const bookingIds = allBookingsToRefund.map(b => b.id);
-
-      // Calculate total refund amount
-      const refundAmount = allBookingsToRefund.reduce((sum, booking) => sum + booking.price_paid, 0);
-
-      // Update bookings with refund details
-      const { error: bookingsError } = await supabase
-        .from('bookings')
-        .update({
-          status: 'refunded',
-          refund_reason: refundReason,
-          refund_notes: refundNotes,
-          refunded_by: refundedBy,
-          refunded_at: new Date().toISOString()
-        })
-        .in('id', bookingIds);
-
-      if (bookingsError) throw bookingsError;
-
-      // Check if all bookings are being refunded
-      const remainingBookings = appointmentDetails.bookings.filter(
-        booking => !bookingIds.includes(booking.id)
-      );
-
-      // Update appointment status if all items are refunded
-      const newAppointmentStatus = remainingBookings.length === 0 ? 'refunded' : 'partial_refund';
-      
-      const { error: appointmentError } = await supabase
-        .from('appointments')
-        .update({
-          status: newAppointmentStatus,
-          refunded_by: refundedBy,
-          refund_reason: refundReason,
-          refund_notes: refundNotes
-        })
-        .eq('id', appointmentId);
-
-      if (appointmentError) throw appointmentError;
-
-      await loadAppointmentDetails();
-      setShowRefundDialog(false);
-      toast.success(`Refund of ₹${refundAmount.toFixed(2)} processed successfully`);
-    } catch (error: any) {
-      console.error("Error refunding sale:", error);
-      toast.error("Failed to process refund");
     }
   };
 
@@ -276,8 +165,67 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
-  const refundableItems = getRefundableItems();
+  const handleRefundSale = async () => {
+    if (!appointmentDetails || !refundedBy) {
+      toast.error("Please select who processed the refund");
+      return;
+    }
 
+    try {
+      const selectedItemIds = Object.entries(refundItems)
+        .filter(([_, isSelected]) => isSelected)
+        .map(([id]) => id);
+
+      if (selectedItemIds.length === 0) {
+        toast.error("Please select at least one item to refund");
+        return;
+      }
+
+      const bookingIds = appointmentDetails.bookings
+        .filter(booking => {
+          const itemId = booking.service_id || booking.package_id;
+          return itemId && selectedItemIds.includes(itemId);
+        })
+        .map(booking => booking.id);
+
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'refunded',
+          refund_reason: refundReason,
+          refund_notes: refundNotes,
+          refunded_by: refundedBy,
+          refunded_at: new Date().toISOString()
+        })
+        .in('id', bookingIds);
+
+      if (bookingsError) throw bookingsError;
+
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .update({
+          status: 'refunded',
+          refunded_by: refundedBy,
+          refund_reason: refundReason,
+          refund_notes: refundNotes
+        })
+        .eq('id', appointmentId);
+
+      if (appointmentError) throw appointmentError;
+
+      await loadAppointmentDetails();
+      setShowRefundDialog(false);
+      toast.success('Refund processed successfully');
+    } catch (error: any) {
+      console.error("Error refunding sale:", error);
+      toast.error("Failed to process refund");
+    }
+  };
+
+  if (!appointmentDetails) {
+    return <div>Loading...</div>;
+  }
+console.log("appointmentDetails",appointmentDetails)
   return (
     <>
       <Card className="bg-white">
@@ -289,7 +237,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 {appointmentDetails?.status === 'completed' ? 'Completed' : appointmentDetails?.status}
               </div>
               <div className="text-sm text-gray-500">
-                {format(new Date(completedAt), 'EEE dd MMM yyyy')}
+                {format(new Date(appointmentDetails?.end_time), 'EEE dd MMM yyyy')}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -343,28 +291,23 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
           <div className="p-4 bg-gray-50 rounded-lg">
             <h4 className="text-lg font-semibold">
-              {appointmentDetails?.customer?.full_name || 'No name provided'}
+              {appointmentDetails.customer?.full_name || 'No name provided'}
             </h4>
-            <p className="text-gray-600">{appointmentDetails?.customer?.email || 'No email provided'}</p>
+            <p className="text-gray-600">{appointmentDetails.customer?.email || 'No email provided'}</p>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">Sale #{appointmentId.slice(0, 8)}</h4>
             <p className="text-sm text-gray-500 mb-4">
-              {format(new Date(completedAt), 'EEE dd MMM yyyy')}
+              {format(new Date(appointmentDetails?.end_time), 'EEE dd MMM yyyy')}
             </p>
 
             {appointmentDetails?.bookings.map((item) => (
               <div key={item.id} className="py-2 flex justify-between items-start border-b">
                 <div className="flex-1">
-                  <p className="font-medium">
-                    {item.service?.name || item.package?.name}
-                    {item.status === 'refunded' && (
-                      <span className="ml-2 text-red-500 text-sm">(Refunded)</span>
-                    )}
-                  </p>
+                  <p className="font-medium">{item.service.name}</p>
                   <p className="text-sm text-gray-500">
-                    {format(new Date(completedAt), 'h:mma, dd MMM yyyy')}
+                    {format(new Date(item.start_time), 'h:mma, dd MMM yyyy')}
                     {item.employee && ` • Stylist: ${item.employee.name}`}
                   </p>
                 </div>
@@ -376,40 +319,62 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           <div className="space-y-2 pt-4 border-t">
             <div className="flex justify-between text-sm">
               <span>Subtotal</span>
-              <span>₹{subtotal.toFixed(2)}</span>
+              <span>₹{appointmentDetails.original_total_price.toFixed(2)}</span>
             </div>
-            {discountType !== 'none' && (
+            {appointmentDetails.discount_type !== 'none' && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>
-                  Discount ({discountType === 'percentage' ? 
-                    `${discountValue}%` : 
-                    '₹' + discountValue
+                  Discount ({appointmentDetails.discount_type === 'percentage' ? 
+                    `${appointmentDetails.discount_value}%` : 
+                    '₹' + appointmentDetails.discount_value
                   })
                 </span>
-                <span>-₹{discountAmount.toFixed(2)}</span>
+                <span>-₹{appointmentDetails?.discount_value.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-bold pt-2">
               <span>Total</span>
-              <span>₹{total.toFixed(2)}</span>
+              <span>₹{appointmentDetails?.total_price.toFixed(2)}</span>
             </div>
           </div>
 
           <div className="pt-4 border-t">
             <div className="flex justify-between text-sm">
-              <span>Paid with {paymentMethod === 'cash' ? 'Cash' : 'Online'}</span>
+              <span>Paid with {appointmentDetails.payment_method === 'cash' ? 'Cash' : 'Online'}</span>
               <div className="flex items-center">
-                {paymentMethod === 'cash' ? (
+                {appointmentDetails.payment_method === 'cash' ? (
                   <Banknote className="h-4 w-4 mr-1" />
                 ) : (
                   <CreditCard className="h-4 w-4 mr-1" />
                 )}
-                ₹{total.toFixed(2)}
+                ₹{appointmentDetails?.total_price.toFixed(2)}
               </div>
             </div>
+            <p className="text-sm text-gray-500 mt-1">
+              {format(new Date(appointmentDetails?.end_time), "EEE dd MMM yyyy 'at' h:mma")}
+            </p>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void Sale</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to void this sale? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleVoidSale}>
+              Void Sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
         <DialogContent className="max-w-md">
@@ -434,7 +399,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             </div>
 
             <div className="max-h-48 overflow-y-auto space-y-2">
-              {refundableItems.map((item) => (
+              {selectedItems.map((item) => (
                 <div key={item.id} className="flex items-center justify-between py-2 border-b">
                   <div>
                     <p className="font-medium">{item.name}</p>
@@ -522,34 +487,15 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Void Sale</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to void this sale? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleVoidSale}>
-              Void Sale
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add a Note</DialogTitle>
           </DialogHeader>
-          <Textarea
+          <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="min-h-[100px]"
+            className="w-full h-32 p-2 border rounded"
             placeholder="Enter your note here..."
           />
           <DialogFooter>
