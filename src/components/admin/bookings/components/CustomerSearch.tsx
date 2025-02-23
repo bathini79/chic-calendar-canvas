@@ -56,7 +56,7 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
         {isLoading ? (
           <p className="text-sm text-gray-500">Loading customers...</p>
         ) : (
-          filteredCustomers.map((customer) => (
+          filteredCustomers.slice(5).map((customer) => (
             <Button
               key={customer.id}
               variant="ghost"
