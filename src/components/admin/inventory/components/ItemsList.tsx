@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ItemDialog } from "../ItemDialog";
-import { Trash2, Search } from "lucide-react";
+import { Trash2, Search, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Select,

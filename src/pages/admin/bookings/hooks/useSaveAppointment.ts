@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from "react";
 import { format, addMinutes } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,14 +39,11 @@ const useSaveAppointment = ({
   selectedStylists,
   getTotalDuration,
   getTotalPrice,
-  customizedServices,
 }: UseSaveAppointmentProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const handleSaveAppointment = useCallback(async (): Promise<
-    string | null
-  > => {
+  const handleSaveAppointment = useCallback(async (): Promise<string | null> => {
     setIsSaving(true);
     setSaveError(null);
 
@@ -106,6 +104,7 @@ const useSaveAppointment = ({
 
       const appointmentId = appointmentData.id;
       let currentStartTime = startDateTime;
+
       // Create bookings for individual services
       for (const serviceId of selectedServices) {
         const service = services?.find((s) => s.id === serviceId);
@@ -142,15 +141,21 @@ const useSaveAppointment = ({
         const pkg = packages?.find((p) => p.id === packageId);
         if (!pkg) continue;
 
-       const packageServiceIds = new Set<string>();
-        const baseServices = pkg.package_services.map((ps) => ps.service.id);
-        packageServiceIds.add(...baseServices);
-        packageServiceIds.add(...(customizedServices?.[pkg?.id] || []));
+        // Get all package services
+        const packageServices = pkg.package_services?.map(ps => ps.service.id) || [];
+        // Get all selected services for this package
+        const selectedPackageServices = new Set([
+          ...packageServices,
+          ...(pkg.is_customizable ? pkg.customizable_services?.filter(serviceId => 
+            selectedStylists[serviceId]
+          ) || [] : [])
+        ]);
 
         // Create bookings for all services in the package
-        for (const serviceId of packageServiceIds) {
-          const service = services?.find(s => s.id === serviceId);
+        for (const serviceId of selectedPackageServices) {
+          const service = services?.find((s) => s.id === serviceId);
           if (!service) continue;
+
           const stylistId = selectedStylists[serviceId];
           if (!stylistId) {
             toast.error(`Please select a stylist for ${service.name}`);
@@ -171,13 +176,16 @@ const useSaveAppointment = ({
               status: "confirmed",
               price_paid: service.selling_price,
             });
+
           if (bookingError) {
             console.error("Error inserting package service booking:", bookingError);
             throw bookingError;
           }
+
           currentStartTime = bookingEndTime;
         }
       }
+
       toast.success("Appointment saved successfully");
       setIsSaving(false);
       return appointmentId;
