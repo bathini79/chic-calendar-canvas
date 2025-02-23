@@ -33,12 +33,11 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentActions } from '../hooks/useAppointmentActions';
-import type { Appointment } from '../types';
+import type { Appointment, RefundData } from '../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { RefundData } from '../types';
 
 interface SummaryViewProps {
   appointmentId: string;
@@ -47,6 +46,10 @@ interface SummaryViewProps {
     name: string;
     price: number;
     type: 'service' | 'package';
+    employee?: {
+      id: string;
+      name: string;
+    };
   }>;
   subtotal: number;
   discountAmount: number;
@@ -59,6 +62,7 @@ interface SummaryViewProps {
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
+  selectedItems,
   subtotal,
   discountAmount,
   total,
@@ -75,19 +79,15 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [appointmentDetails, setAppointmentDetails] = useState<Appointment | null>(null);
   const [refundReason, setRefundReason] = useState<RefundData['reason']>('customer_dissatisfaction');
   const [refundNotes, setRefundNotes] = useState('');
+  const [refundedBy, setRefundedBy] = useState('');
+  const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const { fetchAppointmentDetails, updateAppointmentStatus, selectedItems } = useAppointmentActions();
+  const { fetchAppointmentDetails, updateAppointmentStatus } = useAppointmentActions();
 
   useEffect(() => {
     loadAppointmentDetails();
+    fetchEmployees();
   }, [appointmentId]);
-
-  const loadAppointmentDetails = async () => {
-    const details = await fetchAppointmentDetails(appointmentId);
-    if (details) {
-      setAppointmentDetails(details);
-    }
-  };
 
   useEffect(() => {
     if (selectAll) {
@@ -99,25 +99,32 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   }, [selectAll, selectedItems]);
 
-  const handleVoidSale = async () => {
-    if (!appointmentDetails) return;
-    
+  const fetchEmployees = async () => {
     try {
-      const bookingIds = appointmentDetails.bookings.map(booking => booking.id);
-      const success = await updateAppointmentStatus(appointmentId, 'voided', bookingIds);
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id, name')
+        .eq('status', 'active');
 
-      if (success) {
-        await loadAppointmentDetails();
-        setShowVoidDialog(false);
-      }
-    } catch (error: any) {
-      console.error("Error voiding sale:", error);
-      toast.error("Failed to void sale");
+      if (error) throw error;
+      setEmployees(data || []);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    }
+  };
+
+  const loadAppointmentDetails = async () => {
+    const details = await fetchAppointmentDetails(appointmentId);
+    if (details) {
+      setAppointmentDetails(details);
     }
   };
 
   const handleRefundSale = async () => {
-    if (!appointmentDetails) return;
+    if (!appointmentDetails || !refundedBy) {
+      toast.error("Please select who processed the refund");
+      return;
+    }
 
     try {
       const selectedItemIds = Object.entries(refundItems)
@@ -142,41 +149,31 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           status: 'refunded',
           refund_reason: refundReason,
           refund_notes: refundNotes,
-          refunded_by: appointmentDetails.customer_id,
+          refunded_by: refundedBy,
           refunded_at: new Date().toISOString()
         })
         .in('id', bookingIds);
 
       if (bookingsError) throw bookingsError;
 
-      const success = await updateAppointmentStatus(appointmentId, 'refunded', bookingIds);
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .update({
+          status: 'refunded',
+          refunded_by: refundedBy,
+          refund_reason: refundReason,
+          refund_notes: refundNotes
+        })
+        .eq('id', appointmentId);
 
-      if (success) {
-        await loadAppointmentDetails();
-        setShowRefundDialog(false);
-        toast.success('Refund processed successfully');
-      }
+      if (appointmentError) throw appointmentError;
+
+      await loadAppointmentDetails();
+      setShowRefundDialog(false);
+      toast.success('Refund processed successfully');
     } catch (error: any) {
       console.error("Error refunding sale:", error);
       toast.error("Failed to process refund");
-    }
-  };
-
-  const handleAddNote = async () => {
-    try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ notes: note })
-        .eq('id', appointmentId);
-
-      if (error) throw error;
-
-      toast.success("Note added successfully");
-      await loadAppointmentDetails();
-      setShowAddNoteDialog(false);
-      setNote('');
-    } catch (error: any) {
-      toast.error("Failed to add note");
     }
   };
 
@@ -265,9 +262,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 <div className="flex-1">
                   <p className="font-medium">{item.name}</p>
                   <p className="text-sm text-gray-500">
-                    {format(new Date(completedAt), 'h:mma, dd MMM yyyy')} • 
-                    {item.duration && ` ${Math.floor(item.duration / 60)}h${item.duration % 60}m`} •
-                    {item.employee?.name}
+                    {format(new Date(completedAt), 'h:mma, dd MMM yyyy')}
+                    {item.employee && ` • Stylist: ${item.employee.name}`}
                   </p>
                 </div>
                 <p className="text-right text-gray-900">₹{item.price.toFixed(2)}</p>
@@ -280,15 +276,15 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               <span>Subtotal</span>
               <span>₹{subtotal.toFixed(2)}</span>
             </div>
-            {appointmentDetails.discount_type !== 'none' && (
+            {discountType !== 'none' && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>
-                  Discount ({appointmentDetails.discount_type === 'percentage' ? 
-                    `${appointmentDetails.discount_value}%` : 
-                    '₹' + appointmentDetails.discount_value
+                  Discount ({discountType === 'percentage' ? 
+                    `${discountValue}%` : 
+                    '₹' + discountValue
                   })
                 </span>
-                <span>-₹{((appointmentDetails.original_total_price || 0) - total).toFixed(2)}</span>
+                <span>-₹{discountAmount.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-bold pt-2">
@@ -363,6 +359,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                   <div>
                     <p className="font-medium">{item.name}</p>
                     <p className="text-sm text-gray-500">₹{item.price.toFixed(2)}</p>
+                    {item.employee && (
+                      <p className="text-sm text-gray-500">Stylist: {item.employee.name}</p>
+                    )}
                   </div>
                   <input
                     type="checkbox"
@@ -380,6 +379,25 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             </div>
 
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Processed By</Label>
+                <Select
+                  value={refundedBy}
+                  onValueChange={setRefundedBy}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select employee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label>Refund Reason</Label>
                 <Select
