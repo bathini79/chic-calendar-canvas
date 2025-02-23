@@ -113,3 +113,15 @@ export interface RefundData {
   notes?: string;
   refundedBy: string;
 }
+
+export interface RefundItem {
+  id: string;
+  booking_id: string;
+  price: number;
+  type: 'service' | 'package';
+  name: string;
+  employee?: {
+    id: string;
+    name: string;
+  };
+}
