@@ -134,10 +134,11 @@ export function ServiceSelector({
       
       const updatedServices = { ...prev, [packageId]: newServices };
       
-      // Update package selection with new customized services
+      // Find the package and its base services
       const pkg = packages?.find(p => p.id === packageId);
       if (pkg) {
         const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
+        // Update package selection with both base and custom services
         onPackageSelect(packageId, [...baseServices, ...newServices]);
       }
       
@@ -165,10 +166,12 @@ export function ServiceSelector({
       });
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
-      // If selecting, expand the package and add it
+      // If selecting, expand the package and add it with base services
       setExpandedPackages(prev => [...prev, pkg.id]);
       const packageServices = pkg.package_services.map((ps: any) => ps.service.id);
-      onPackageSelect(pkg.id, packageServices);
+      // Include any previously customized services if they exist
+      const customServices = customizedServices[pkg.id] || [];
+      onPackageSelect(pkg.id, [...packageServices, ...customServices]);
     }
   };
 
