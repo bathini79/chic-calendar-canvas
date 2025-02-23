@@ -200,11 +200,11 @@ export function ServiceSelector({
             {allItems.map((item) => {
               const isService = item.type === 'service';
               const isPackage = item.type === 'package';
-              const isSelected = isService 
-                ? selectedServices.includes(item.id)
-                : selectedPackages.includes(item.id);
               // Changed this line to ensure packages stay expanded when selected or manually expanded
               const isExpanded = isPackage && (selectedPackages.includes(item.id) || expandedPackages.includes(item.id));
+              const isSelected = isService 
+                ? selectedServices.includes(item.id)
+                : isExpanded;
 
               return (
                 <React.Fragment key={`${item.type}-${item.id}`}>
