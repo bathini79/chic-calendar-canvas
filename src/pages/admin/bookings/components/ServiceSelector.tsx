@@ -47,7 +47,6 @@ export function ServiceSelector({
 }: ServiceSelectorProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
-  const [customizedServices, setCustomizedServices] = useState<Record<string, string[]>>({});
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
@@ -120,59 +119,35 @@ export function ServiceSelector({
     }))
   ];
 
-  const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
-    const pkg = packages?.find(p => p.id === packageId);
-    if (!pkg) return;
-
-    // Get base services from the package
-    const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
-
-    // Update customized services
-    setCustomizedServices(prev => {
-      const currentServices = prev[packageId] || [];
-      const newServices = currentServices.includes(serviceId)
-        ? currentServices.filter(id => id !== serviceId)
-        : [...currentServices, serviceId];
-
-      // Call onPackageSelect with both base and custom services
-      if (selectedPackages.includes(packageId)) {
-        onPackageSelect(packageId, [...baseServices, ...newServices]);
-      }
-
-      return {
-        ...prev,
-        [packageId]: newServices
-      };
-    });
-  };
-
-  const calculatePackagePrice = (pkg: any) => {
-    const basePrice = pkg.price || 0;
-    const customServices = customizedServices[pkg.id] || [];
-    const additionalPrice = customServices.reduce((sum, serviceId) => {
-      const service = services?.find(s => s.id === serviceId);
-      return sum + (service?.selling_price || 0);
-    }, 0);
-    return basePrice + additionalPrice;
-  };
-
   const handlePackageSelect = (pkg: any) => {
     const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
-    const currentCustomServices = customizedServices[pkg.id] || [];
 
     if (selectedPackages.includes(pkg.id)) {
       // Deselecting package - clear everything
       onPackageSelect(pkg.id, []);
-      setCustomizedServices(prev => {
-        const { [pkg.id]: _, ...rest } = prev;
-        return rest;
-      });
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
-      // Selecting package - add with base services and any existing customizations
+      // Selecting package - add base services
       setExpandedPackages(prev => [...prev, pkg.id]);
-      onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
+      onPackageSelect(pkg.id, baseServices);
     }
+  };
+
+  const handleServiceToggle = (packageId: string, serviceId: string) => {
+    const pkg = packages?.find(p => p.id === packageId);
+    if (!pkg) return;
+
+    // Get current package services
+    const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
+    
+    // If the service is being unchecked, filter it out from the services array
+    // If it's being checked, add it to the services array
+    const updatedServices = selectedStylists[serviceId] 
+      ? baseServices.filter(id => id !== serviceId)
+      : [...baseServices, serviceId];
+
+    // Update the package with the new services
+    onPackageSelect(packageId, updatedServices);
   };
 
   return (
@@ -229,7 +204,7 @@ export function ServiceSelector({
                       } min
                     </TableCell>
                     <TableCell>
-                      ${isService ? item.selling_price : calculatePackagePrice(item)}
+                      ${isService ? item.selling_price : item.price}
                     </TableCell>
                     <TableCell>
                       {/* Only show stylist selector for selected individual services */}
@@ -275,6 +250,7 @@ export function ServiceSelector({
                     <TableRow>
                       <TableCell colSpan={5} className="bg-slate-50">
                         <div className="pl-8 pr-4 py-2 space-y-2">
+                          {/* Base services */}
                           {item.package_services?.map((ps: any) => (
                             <div
                               key={ps.service.id}
@@ -290,10 +266,12 @@ export function ServiceSelector({
                                 <span className="text-sm font-medium">
                                   ${ps.service.selling_price}
                                 </span>
-                                {/* Always show stylist selector for package services */}
                                 <Select 
                                   value={selectedStylists[ps.service.id] || ''} 
-                                  onValueChange={(value) => onStylistSelect(ps.service.id, value)}
+                                  onValueChange={(value) => {
+                                    onStylistSelect(ps.service.id, value);
+                                    handleServiceToggle(item.id, ps.service.id);
+                                  }}
                                 >
                                   <SelectTrigger className="w-[180px]">
                                     <SelectValue placeholder="Select stylist" />
@@ -309,7 +287,9 @@ export function ServiceSelector({
                               </div>
                             </div>
                           ))}
-                          {item.is_customizable && (
+                          
+                          {/* Additional services section */}
+                          {item.is_customizable && item.customizable_services && (
                             <div className="pt-4 space-y-4">
                               <h4 className="font-medium text-sm">Additional Services</h4>
                               {services?.filter(service => 
@@ -321,8 +301,14 @@ export function ServiceSelector({
                                 >
                                   <div className="flex items-center gap-4">
                                     <Checkbox
-                                      checked={customizedServices[item.id]?.includes(service.id)}
-                                      onCheckedChange={() => handleCustomServiceToggle(item.id, service.id)}
+                                      checked={selectedStylists[service.id] !== undefined}
+                                      onCheckedChange={(checked) => {
+                                        if (!checked) {
+                                          // Remove stylist when unchecking
+                                          onStylistSelect(service.id, '');
+                                        }
+                                        handleServiceToggle(item.id, service.id);
+                                      }}
                                     />
                                     <span className="text-sm font-medium">{service.name}</span>
                                     <span className="text-sm text-muted-foreground">
@@ -333,11 +319,15 @@ export function ServiceSelector({
                                     <span className="text-sm font-medium">
                                       +${service.selling_price}
                                     </span>
-                                    {/* Show stylist selector only for selected customized services */}
-                                    {customizedServices[item.id]?.includes(service.id) && (
+                                    {selectedStylists[service.id] !== undefined && (
                                       <Select 
                                         value={selectedStylists[service.id] || ''} 
-                                        onValueChange={(value) => onStylistSelect(service.id, value)}
+                                        onValueChange={(value) => {
+                                          onStylistSelect(service.id, value);
+                                          if (value) {
+                                            handleServiceToggle(item.id, service.id);
+                                          }
+                                        }}
                                       >
                                         <SelectTrigger className="w-[180px]">
                                           <SelectValue placeholder="Select stylist" />
