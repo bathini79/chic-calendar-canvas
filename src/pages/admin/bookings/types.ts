@@ -56,15 +56,9 @@ export interface Package {
   }>;
 }
 
-export interface AppointmentStatus {
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded';
-}
-
-export interface Appointment {
+export interface AppointmentBase {
   id: string;
   customer_id: string;
-  customer?: Customer;
-  status: AppointmentStatus['status'];
   start_time: string;
   end_time: string;
   total_price: number;
@@ -75,9 +69,14 @@ export interface Appointment {
   number_of_bookings: number;
   original_total_price?: number;
   total_duration: number;
-  bookings: Booking[];
   created_at: string;
   updated_at: string;
+}
+
+export interface Appointment extends AppointmentBase {
+  customer?: Customer;
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded';
+  bookings: Booking[];
   refund_reason?: string;
   refunded_by?: string;
   refund_notes?: string;
@@ -118,6 +117,15 @@ export interface RefundData {
   reason: 'customer_dissatisfaction' | 'service_quality_issue' | 'scheduling_error' | 'health_concern' | 'price_dispute' | 'other';
   notes?: string;
   refundedBy: string;
+}
+
+export interface ServiceSelectorProps {
+  selectedServices: string[];
+  selectedPackages: string[];
+  selectedStylists: Record<string, string>;
+  onCustomPackage: (packageId: string, serviceId: string) => void;
+  customizedServices: Record<string, string[]>;
+  stylists: Employee[];
 }
 
 export interface SummaryViewProps {

@@ -69,7 +69,10 @@ export function useAppointmentActions() {
       // First get the original appointment details
       const { data: originalAppointment, error: appointmentError } = await supabase
         .from('appointments')
-        .select('*')
+        .select(`
+          *,
+          bookings (*)
+        `)
         .eq('id', appointmentId)
         .single();
 
@@ -121,10 +124,11 @@ export function useAppointmentActions() {
       if (updateBookingsError) throw updateBookingsError;
 
       // Update original appointment status
+      const isFullRefund = bookingIds.length === originalAppointment.bookings?.length;
       const { error: updateStatusError } = await supabase
         .from('appointments')
         .update({
-          status: bookingIds.length === originalAppointment.bookings?.length ? 'refunded' : 'partially_refunded'
+          status: isFullRefund ? 'refunded' : 'partially_refunded'
         })
         .eq('id', appointmentId);
 
