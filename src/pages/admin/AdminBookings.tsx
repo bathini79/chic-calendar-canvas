@@ -98,7 +98,10 @@ export default function AdminBookings() {
     selectedStylists,
     getTotalDuration,
     getTotalPrice,
-    customizedServices
+    discountType,
+    discountValue,
+    paymentMethod,
+    notes: appointmentNotes
   });
 
   useEffect(() => {

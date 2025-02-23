@@ -26,6 +26,10 @@ interface UseSaveAppointmentProps {
     services: Service[],
     packages: Package[]
   ) => number;
+  discountType: "none" | "percentage" | "fixed";
+  discountValue: number;
+  paymentMethod: "cash" | "online";
+  notes: string;
 }
 
 const useSaveAppointment = ({
@@ -39,6 +43,10 @@ const useSaveAppointment = ({
   selectedStylists,
   getTotalDuration,
   getTotalPrice,
+  discountType,
+  discountValue,
+  paymentMethod,
+  notes,
 }: UseSaveAppointmentProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -75,6 +83,21 @@ const useSaveAppointment = ({
         packages || []
       );
       const endDateTime = addMinutes(startDateTime, totalDuration);
+      const totalPrice = getTotalPrice(
+        selectedServices,
+        selectedPackages,
+        services || [],
+        packages || []
+      );
+
+      // Calculate final price after discount
+      const discountAmount = discountType === "percentage"
+        ? (totalPrice * discountValue) / 100
+        : discountType === "fixed"
+        ? discountValue
+        : 0;
+      
+      const finalPrice = totalPrice - discountAmount;
 
       // Create the appointment
       const { data: appointmentData, error: appointmentError } = await supabase
@@ -85,13 +108,13 @@ const useSaveAppointment = ({
           end_time: endDateTime.toISOString(),
           status: "confirmed",
           number_of_bookings: selectedServices.length + selectedPackages.length,
-          total_price: getTotalPrice(
-            selectedServices,
-            selectedPackages,
-            services || [],
-            packages || []
-          ),
+          total_price: finalPrice,
+          original_total_price: totalPrice,
           total_duration: totalDuration,
+          discount_type: discountType,
+          discount_value: discountValue,
+          payment_method: paymentMethod,
+          notes: notes
         })
         .select()
         .single();
@@ -103,7 +126,6 @@ const useSaveAppointment = ({
       }
 
       const appointmentId = appointmentData.id;
-      let currentStartTime = startDateTime;
 
       // Create bookings for individual services
       for (const serviceId of selectedServices) {
@@ -117,76 +139,52 @@ const useSaveAppointment = ({
           return null;
         }
 
-        const bookingEndTime = addMinutes(currentStartTime, service.duration);
+        const bookingEndTime = addMinutes(startDateTime, service.duration);
         const { error: bookingError } = await supabase.from("bookings").insert({
           appointment_id: appointmentId,
           service_id: serviceId,
           employee_id: stylistId,
-          start_time: currentStartTime.toISOString(),
+          start_time: startDateTime.toISOString(),
           end_time: bookingEndTime.toISOString(),
           status: "confirmed",
           price_paid: service.selling_price,
+          original_price: service.original_price
         });
 
         if (bookingError) {
           console.error("Error inserting service booking:", bookingError);
           throw bookingError;
         }
-
-        currentStartTime = bookingEndTime;
       }
 
-      // Create bookings for packages and their services
+      // Create bookings for packages
       for (const packageId of selectedPackages) {
         const pkg = packages?.find((p) => p.id === packageId);
         if (!pkg) continue;
 
-        // Get all package services
-        const packageServices = pkg.package_services?.map(ps => ps.service.id) || [];
-        // Get all selected services for this package
-        const selectedPackageServices = new Set([
-          ...packageServices,
-          ...(pkg.is_customizable ? pkg.customizable_services?.filter(serviceId => 
-            selectedStylists[serviceId]
-          ) || [] : [])
-        ]);
+        const stylistId = selectedStylists[packageId];
+        if (!stylistId) {
+          toast.error(`Please select a stylist for ${pkg.name}`);
+          setIsSaving(false);
+          return null;
+        }
 
-        // Create bookings for all services in the package
-        for (const serviceId of selectedPackageServices) {
-          const service = services?.find((s) => s.id === serviceId);
-          if (!service) continue;
+        const { error: bookingError } = await supabase.from("bookings").insert({
+          appointment_id: appointmentId,
+          package_id: packageId,
+          employee_id: stylistId,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          status: "confirmed",
+          price_paid: pkg.price,
+        });
 
-          const stylistId = selectedStylists[serviceId];
-          if (!stylistId) {
-            toast.error(`Please select a stylist for ${service.name}`);
-            setIsSaving(false);
-            return null;
-          }
-
-          const bookingEndTime = addMinutes(currentStartTime, service.duration);
-          const { error: bookingError } = await supabase
-            .from("bookings")
-            .insert({
-              appointment_id: appointmentId,
-              service_id: serviceId,
-              package_id: packageId,
-              employee_id: stylistId,
-              start_time: currentStartTime.toISOString(),
-              end_time: bookingEndTime.toISOString(),
-              status: "confirmed",
-              price_paid: service.selling_price,
-            });
-
-          if (bookingError) {
-            console.error("Error inserting package service booking:", bookingError);
-            throw bookingError;
-          }
-
-          currentStartTime = bookingEndTime;
+        if (bookingError) {
+          console.error("Error inserting package booking:", bookingError);
+          throw bookingError;
         }
       }
 
-      toast.success("Appointment saved successfully");
       setIsSaving(false);
       return appointmentId;
     } catch (error: any) {
@@ -207,6 +205,10 @@ const useSaveAppointment = ({
     selectedStylists,
     getTotalDuration,
     getTotalPrice,
+    discountType,
+    discountValue,
+    paymentMethod,
+    notes,
   ]);
 
   return { handleSaveAppointment, isSaving, saveError };
