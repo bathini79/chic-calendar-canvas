@@ -115,3 +115,8 @@ export interface RefundData {
   notes?: string;
   refundedBy: string;
 }
+
+export interface TransactionDetails {
+  originalSale: Appointment;
+  refunds: Appointment[];
+}

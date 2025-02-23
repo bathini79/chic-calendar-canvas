@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, Booking, RefundData } from '../types';
+import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
 
 interface SelectedItem {
   id: string;
@@ -20,10 +20,12 @@ export function useAppointmentActions() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
 
-  const fetchAppointmentDetails = async (appointmentId: string) => {
+  const fetchAppointmentDetails = async (appointmentId: string): Promise<TransactionDetails | null> => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+
+      // First fetch the appointment
+      const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
         .select(`
           *,
@@ -38,47 +40,73 @@ export function useAppointmentActions() {
         .eq('id', appointmentId)
         .single();
 
-      if (error) throw error;
+      if (appointmentError) throw appointmentError;
 
-      if (data) {
-        // Map bookings to selected items
-        const items = data.bookings
-          .filter(booking => booking.status !== 'refunded') // Only show non-refunded items
-          .map(booking => {
-            if (booking.service) {
-              return {
-                id: booking.service.id,
-                name: booking.service.name,
-                price: booking.price_paid,
-                type: 'service' as const,
-                employee: booking.employee ? {
-                  id: booking.employee.id,
-                  name: booking.employee.name
-                } : undefined,
-                duration: booking.service.duration
-              };
-            }
-            if (booking.package) {
-              return {
-                id: booking.package.id,
-                name: booking.package.name,
-                price: booking.price_paid,
-                type: 'package' as const,
-                employee: booking.employee ? {
-                  id: booking.employee.id,
-                  name: booking.employee.name
-                } : undefined,
-                duration: booking.package.duration
-              };
-            }
-            return null;
-          })
-          .filter((item): item is NonNullable<typeof item> => item !== null);
+      // If this is a refund, get the original sale
+      if (appointment.transaction_type === 'refund') {
+        const { data: originalSale, error: originalError } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            customer:profiles!appointments_customer_id_fkey(*),
+            bookings (
+              *,
+              service:services(*),
+              package:packages(*),
+              employee:employees!bookings_employee_id_fkey(*)
+            )
+          `)
+          .eq('id', appointment.original_appointment_id)
+          .single();
 
-        setSelectedItems(items);
+        if (originalError) throw originalError;
+
+        // Get all refunds for this original sale
+        const { data: refunds, error: refundsError } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            customer:profiles!appointments_customer_id_fkey(*),
+            bookings (
+              *,
+              service:services(*),
+              package:packages(*),
+              employee:employees!bookings_employee_id_fkey(*)
+            )
+          `)
+          .eq('original_appointment_id', originalSale.id)
+          .eq('transaction_type', 'refund');
+
+        if (refundsError) throw refundsError;
+
+        return {
+          originalSale,
+          refunds: refunds || []
+        };
+      } else {
+        // This is the original sale, get all its refunds
+        const { data: refunds, error: refundsError } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            customer:profiles!appointments_customer_id_fkey(*),
+            bookings (
+              *,
+              service:services(*),
+              package:packages(*),
+              employee:employees!bookings_employee_id_fkey(*)
+            )
+          `)
+          .eq('original_appointment_id', appointmentId)
+          .eq('transaction_type', 'refund');
+
+        if (refundsError) throw refundsError;
+
+        return {
+          originalSale: appointment,
+          refunds: refunds || []
+        };
       }
-
-      return data as Appointment;
     } catch (error: any) {
       console.error('Error fetching appointment:', error);
       toast.error('Failed to load appointment details');

@@ -32,7 +32,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentActions } from '../hooks/useAppointmentActions';
-import type { Appointment, RefundData } from '../types';
+import type { Appointment, RefundData, TransactionDetails } from '../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -40,22 +40,6 @@ import { Textarea } from "@/components/ui/textarea";
 
 interface SummaryViewProps {
   appointmentId: string;
-  selectedItems: Array<{
-    id: string;
-    name: string;
-    price: number;
-    type: 'service' | 'package';
-    employee?: {
-      id: string;
-      name: string;
-    };
-  }>;
-  subtotal: number;
-  discountAmount: number;
-  total: number;
-  paymentMethod: 'cash' | 'online';
-  discountType: 'none' | 'percentage' | 'fixed';
-  discountValue: number;
 }
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
@@ -66,33 +50,23 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
   const [note, setNote] = useState('');
   const [refundItems, setRefundItems] = useState<{[key: string]: boolean}>({});
-  const [appointmentDetails, setAppointmentDetails] = useState<Appointment | null>(null);
+  const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
   const [refundReason, setRefundReason] = useState<RefundData['reason']>('customer_dissatisfaction');
   const [refundNotes, setRefundNotes] = useState('');
   const [refundedBy, setRefundedBy] = useState('');
   const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [relatedRefunds, setRelatedRefunds] = useState<Appointment[]>([]);
   const { fetchAppointmentDetails, updateAppointmentStatus, processRefund } = useAppointmentActions();
 
   useEffect(() => {
     loadAppointmentDetails();
     fetchEmployees();
-    loadRelatedRefunds();
   }, [appointmentId]);
 
-  const loadRelatedRefunds = async () => {
-    try {
-      const { data: refunds, error } = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('original_appointment_id', appointmentId)
-        .eq('transaction_type', 'refund');
-
-      if (error) throw error;
-      setRelatedRefunds(refunds || []);
-    } catch (error) {
-      console.error('Error loading refunds:', error);
+  const loadAppointmentDetails = async () => {
+    const details = await fetchAppointmentDetails(appointmentId);
+    if (details) {
+      setTransactionDetails(details);
     }
   };
 
@@ -110,15 +84,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
-  const loadAppointmentDetails = async () => {
-    const details = await fetchAppointmentDetails(appointmentId);
-    if (details) {
-      setAppointmentDetails(details);
-    }
-  };
-
   const handleRefundSale = async () => {
-    if (!appointmentDetails || !refundedBy) {
+    if (!transactionDetails?.originalSale || !refundedBy) {
       toast.error("Please select who processed the refund");
       return;
     }
@@ -153,10 +120,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   };
 
   const handleVoidSale = async () => {
-    if (!appointmentDetails) return;
+    if (!transactionDetails?.originalSale) return;
 
     try {
-      const bookingIds = appointmentDetails.bookings.map(booking => booking.id);
+      const bookingIds = transactionDetails.originalSale.bookings.map(booking => booking.id);
       
       const { error: bookingsError } = await supabase
         .from('bookings')
@@ -205,27 +172,26 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
-  if (!appointmentDetails) {
+  if (!transactionDetails) {
     return <div>Loading...</div>;
   }
 
-  const nonRefundedBookings = appointmentDetails.bookings.filter(
-    booking => booking.status !== 'refunded'
-  );
+  const { originalSale, refunds } = transactionDetails;
 
   return (
     <>
       <div className="space-y-6">
+        {/* Original Sale Card */}
         <Card className="bg-white">
           <CardContent className="p-6 space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
               <div className="flex-1">
                 <div className="inline-flex items-center px-2.5 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">
                   <CheckCircle2 className="h-4 w-4 mr-1" />
-                  {appointmentDetails?.status === 'completed' ? 'Completed' : appointmentDetails?.status}
+                  {originalSale?.status === 'completed' ? 'Completed' : originalSale?.status}
                 </div>
                 <div className="text-sm text-gray-500">
-                  {appointmentDetails && format(new Date(appointmentDetails.end_time), 'EEE dd MMM yyyy')}
+                  {originalSale && format(new Date(originalSale.end_time), 'EEE dd MMM yyyy')}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -279,18 +245,18 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
             <div className="p-4 bg-gray-50 rounded-lg">
               <h4 className="text-lg font-semibold">
-                {appointmentDetails.customer?.full_name || 'No name provided'}
+                {originalSale.customer?.full_name || 'No name provided'}
               </h4>
-              <p className="text-gray-600">{appointmentDetails.customer?.email || 'No email provided'}</p>
+              <p className="text-gray-600">{originalSale.customer?.email || 'No email provided'}</p>
             </div>
 
             <div>
               <h4 className="font-medium mb-2">Sale #{appointmentId.slice(0, 8)}</h4>
               <p className="text-sm text-gray-500 mb-4">
-                {appointmentDetails && format(new Date(appointmentDetails.end_time), 'EEE dd MMM yyyy')}
+                {originalSale && format(new Date(originalSale.end_time), 'EEE dd MMM yyyy')}
               </p>
 
-              {appointmentDetails?.bookings.map((booking) => {
+              {originalSale?.bookings.map((booking) => {
                 const itemName = booking.service?.name || booking.package?.name;
                 const itemPrice = booking.price_paid;
                 
@@ -314,54 +280,55 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             <div className="space-y-2 pt-4 border-t">
               <div className="flex justify-between text-sm">
                 <span>Subtotal</span>
-                <span>₹{appointmentDetails?.original_total_price?.toFixed(2)}</span>
+                <span>₹{originalSale?.original_total_price?.toFixed(2)}</span>
               </div>
-              {appointmentDetails?.discount_type !== 'none' && (
+              {originalSale?.discount_type !== 'none' && (
                 <div className="flex justify-between text-sm text-green-600">
                   <span>
-                    Discount ({appointmentDetails?.discount_type === 'percentage' ? 
-                      `${appointmentDetails?.discount_value}%` : 
-                      '₹' + appointmentDetails?.discount_value
+                    Discount ({originalSale?.discount_type === 'percentage' ? 
+                      `${originalSale?.discount_value}%` : 
+                      '₹' + originalSale?.discount_value
                     })
                   </span>
-                  <span>-₹{appointmentDetails?.discount_value.toFixed(2)}</span>
+                  <span>-₹{originalSale?.discount_value.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold pt-2">
                 <span>Total</span>
-                <span>₹{appointmentDetails?.total_price.toFixed(2)}</span>
+                <span>₹{originalSale?.total_price.toFixed(2)}</span>
               </div>
             </div>
 
             <div className="pt-4 border-t">
               <div className="flex justify-between text-sm">
-                <span>Paid with {appointmentDetails?.payment_method === 'cash' ? 'Cash' : 'Online'}</span>
+                <span>Paid with {originalSale?.payment_method === 'cash' ? 'Cash' : 'Online'}</span>
                 <div className="flex items-center">
-                  {appointmentDetails?.payment_method === 'cash' ? (
+                  {originalSale?.payment_method === 'cash' ? (
                     <Banknote className="h-4 w-4 mr-1" />
                   ) : (
                     <CreditCard className="h-4 w-4 mr-1" />
                   )}
-                  ₹{appointmentDetails?.total_price.toFixed(2)}
+                  ₹{originalSale?.total_price.toFixed(2)}
                 </div>
               </div>
               <p className="text-sm text-gray-500 mt-1">
-                {appointmentDetails && format(new Date(appointmentDetails.end_time), "EEE dd MMM yyyy 'at' h:mma")}
+                {originalSale && format(new Date(originalSale.end_time), "EEE dd MMM yyyy 'at' h:mma")}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {relatedRefunds.length > 0 && (
+        {/* Refund Transactions */}
+        {refunds.length > 0 && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Related Refunds</h3>
-            {relatedRefunds.map((refund) => (
+            <h3 className="text-lg font-semibold">Refund Transactions</h3>
+            {refunds.map((refund) => (
               <Card key={refund.id} className="bg-white border-red-200">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="inline-flex items-center px-2.5 py-1 rounded bg-red-100 text-red-700 text-sm font-medium mb-2">
-                        Refund
+                        Refund #{refund.id.slice(0, 8)}
                       </div>
                       <p className="text-sm text-gray-500">
                         {format(new Date(refund.created_at), 'dd MMM yyyy')}
@@ -371,6 +338,18 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                       -₹{Math.abs(refund.total_price).toFixed(2)}
                     </p>
                   </div>
+
+                  {/* Refunded Items */}
+                  <div className="space-y-2">
+                    <p className="font-medium text-sm">Refunded Items:</p>
+                    {refund.bookings.map((booking) => (
+                      <div key={booking.id} className="flex justify-between text-sm text-gray-600">
+                        <span>{booking.service?.name || booking.package?.name}</span>
+                        <span>₹{booking.price_paid.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
                   {refund.refund_reason && (
                     <div className="text-sm">
                       <p className="font-medium">Reason:</p>
@@ -432,7 +411,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             </div>
 
             <div className="max-h-48 overflow-y-auto space-y-2">
-              {nonRefundedBookings.map((booking) => {
+              {transactionDetails.originalSale.bookings.filter(
+                booking => booking.status !== 'refunded'
+              ).map((booking) => {
                 const itemName = booking.service?.name || booking.package?.name;
                 const itemPrice = booking.price_paid;
                 
