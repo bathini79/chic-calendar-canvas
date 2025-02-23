@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
-import { Employee } from "@/pages/admin/bookings/types";
 
 const UnifiedScheduling = () => {
   const navigate = useNavigate();
@@ -24,7 +22,7 @@ const UnifiedScheduling = () => {
         .eq("status", "active");
 
       if (error) throw error;
-      return data as Employee[];
+      return data;
     },
   });
 
@@ -92,13 +90,13 @@ const UnifiedScheduling = () => {
 
         <div className="bg-white rounded-lg shadow p-6">
           <ServiceSelector
+            onServiceSelect={handleServiceSelect}
+            onPackageSelect={handlePackageSelect}
+            onStylistSelect={handleStylistSelect}
             selectedServices={selectedServices}
             selectedPackages={selectedPackages}
             selectedStylists={selectedStylists}
             stylists={employees || []}
-            onServiceSelect={handleServiceSelect}
-            onPackageSelect={handlePackageSelect}
-            onStylistSelect={handleStylistSelect}
           />
 
           <div className="mt-6 flex justify-end">

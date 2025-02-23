@@ -22,7 +22,6 @@ import { useActiveServices } from "./bookings/hooks/useActiveServices";
 import { useActivePackages } from "./bookings/hooks/useActivePackages";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import useSaveAppointment from "./bookings/hooks/useSaveAppointment";
-import { Appointment } from "./bookings/types";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -61,7 +60,6 @@ export default function AdminBookings() {
   const { data: services } = useActiveServices();
   const { data: packages } = useActivePackages();
   const { data: appointments = [] } = useAppointmentsByDate(currentDate);
-  const appointmentsData = appointments as Appointment[];
   const {
     selectedCustomer,
     setSelectedCustomer,
@@ -415,13 +413,14 @@ export default function AdminBookings() {
                     </h3>
                     <SummaryView
                       appointmentId={newAppointmentId}
-                      appointment={appointments.find(a => a.id === newAppointmentId)}
+                      selectedItems={calculateSelectedItems()}
                       subtotal={calculateTotals().subtotal}
                       discountAmount={calculateTotals().discountAmount}
                       total={calculateTotals().total}
                       paymentMethod={paymentMethod}
                       discountType={discountType}
                       discountValue={discountValue}
+                      completedAt={new Date().toISOString()}
                     />
                     <div className="mt-6 flex justify-end">
                       <Button
