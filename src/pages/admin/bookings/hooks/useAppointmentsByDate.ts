@@ -30,9 +30,25 @@ export const useAppointmentsByDate = (currentDate: Date) => {
               *,
               service:services (*),
               package:packages (*),
-              employee:employees (*)
+              employee:employees!bookings_employee_id_fkey (
+                id,
+                name,
+                email,
+                phone,
+                avatar,
+                employment_type,
+                status
+              )
             ),
-            customer:profiles (*)
+            customer:profiles (
+              id,
+              full_name,
+              email,
+              phone_number,
+              role,
+              created_at,
+              updated_at
+            )
           `
           )
           .gte("start_time", startOfDay.toISOString())
