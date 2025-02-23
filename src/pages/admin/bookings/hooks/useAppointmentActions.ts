@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, Booking } from '../types';
+import { Appointment, Booking, RefundData } from '../types';
 
 interface SelectedItem {
   id: string;
@@ -40,6 +40,44 @@ export function useAppointmentActions() {
 
       if (error) throw error;
 
+      if (data) {
+        // Map bookings to selected items
+        const items = data.bookings
+          .filter(booking => booking.status !== 'refunded') // Only show non-refunded items
+          .map(booking => {
+            if (booking.service) {
+              return {
+                id: booking.service.id,
+                name: booking.service.name,
+                price: booking.price_paid,
+                type: 'service' as const,
+                employee: booking.employee ? {
+                  id: booking.employee.id,
+                  name: booking.employee.name
+                } : undefined,
+                duration: booking.service.duration
+              };
+            }
+            if (booking.package) {
+              return {
+                id: booking.package.id,
+                name: booking.package.name,
+                price: booking.price_paid,
+                type: 'package' as const,
+                employee: booking.employee ? {
+                  id: booking.employee.id,
+                  name: booking.employee.name
+                } : undefined,
+                duration: booking.package.duration
+              };
+            }
+            return null;
+          })
+          .filter((item): item is NonNullable<typeof item> => item !== null);
+
+        setSelectedItems(items);
+      }
+
       return data as Appointment;
     } catch (error: any) {
       console.error('Error fetching appointment:', error);
@@ -53,11 +91,7 @@ export function useAppointmentActions() {
   const processRefund = async (
     appointmentId: string,
     bookingIds: string[],
-    refundData: {
-      reason: string;
-      notes?: string;
-      refundedBy: string;
-    }
+    refundData: RefundData
   ) => {
     try {
       setIsLoading(true);
@@ -101,6 +135,9 @@ export function useAppointmentActions() {
         .eq('id', appointmentId);
 
       if (appointmentError) throw appointmentError;
+
+      // Refresh the selected items after refund
+      await fetchAppointmentDetails(appointmentId);
 
       toast.success('Refund processed successfully');
       return true;
