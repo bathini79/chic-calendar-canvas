@@ -38,7 +38,7 @@ export function useAppointmentActions() {
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: Appointment['status'],
+    status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded',
     bookingIds: string[]
   ) => {
     try {

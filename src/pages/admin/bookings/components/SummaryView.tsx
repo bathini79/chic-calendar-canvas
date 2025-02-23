@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -33,6 +33,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAppointmentActions } from '../hooks/useAppointmentActions';
+import type { Appointment } from '../types';
 
 interface SummaryViewProps {
   appointmentId: string;
@@ -68,26 +70,31 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
   const [note, setNote] = useState('');
   const [refundItems, setRefundItems] = useState<{[key: string]: boolean}>({});
+  const [appointmentDetails, setAppointmentDetails] = useState<Appointment | null>(null);
+  const { fetchAppointmentDetails, updateAppointmentStatus } = useAppointmentActions();
+
+  useEffect(() => {
+    loadAppointmentDetails();
+  }, [appointmentId]);
+
+  const loadAppointmentDetails = async () => {
+    const details = await fetchAppointmentDetails(appointmentId);
+    if (details) {
+      setAppointmentDetails(details);
+    }
+  };
 
   const handleVoidSale = async () => {
+    if (!appointmentDetails) return;
+    
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: 'voided' })
-        .eq('id', appointmentId);
+      const bookingIds = appointmentDetails.bookings.map(booking => booking.id);
+      const success = await updateAppointmentStatus(appointmentId, 'voided', bookingIds);
 
-      if (error) throw error;
-
-      // Update related bookings
-      const { error: bookingsError } = await supabase
-        .from('bookings')
-        .update({ status: 'voided' })
-        .eq('appointment_id', appointmentId);
-
-      if (bookingsError) throw bookingsError;
-
-      toast.success("Sale voided successfully");
-      setShowVoidDialog(false);
+      if (success) {
+        await loadAppointmentDetails();
+        setShowVoidDialog(false);
+      }
     } catch (error: any) {
       console.error("Error voiding sale:", error);
       toast.error("Failed to void sale");
@@ -95,27 +102,34 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   };
 
   const handleRefundSale = async () => {
+    if (!appointmentDetails) return;
+
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: 'refunded' })
-        .eq('id', appointmentId);
+      const selectedItemIds = Object.entries(refundItems)
+        .filter(([_, isSelected]) => isSelected)
+        .map(([id]) => id);
 
-      if (error) throw error;
+      if (selectedItemIds.length === 0) {
+        toast.error("Please select at least one item to refund");
+        return;
+      }
 
-      // Update related bookings
-      const { error: bookingsError } = await supabase
-        .from('bookings')
-        .update({ status: 'refunded' })
-        .eq('appointment_id', appointmentId);
+      const bookingIds = appointmentDetails.bookings
+        .filter(booking => {
+          const itemId = booking.service_id || booking.package_id;
+          return itemId && selectedItemIds.includes(itemId);
+        })
+        .map(booking => booking.id);
 
-      if (bookingsError) throw bookingsError;
+      const success = await updateAppointmentStatus(appointmentId, 'refunded', bookingIds);
 
-      toast.success("Sale refunded successfully");
-      setShowRefundDialog(false);
+      if (success) {
+        await loadAppointmentDetails();
+        setShowRefundDialog(false);
+      }
     } catch (error: any) {
       console.error("Error refunding sale:", error);
-      toast.error("Failed to refund sale");
+      toast.error("Failed to process refund");
     }
   };
 
@@ -129,12 +143,17 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       if (error) throw error;
 
       toast.success("Note added successfully");
+      await loadAppointmentDetails();
       setShowAddNoteDialog(false);
       setNote('');
     } catch (error: any) {
       toast.error("Failed to add note");
     }
   };
+
+  if (!appointmentDetails) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <>
@@ -144,10 +163,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             <div>
               <div className="inline-flex items-center px-2.5 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">
                 <CheckCircle2 className="h-4 w-4 mr-1" />
-                Completed
+                {appointmentDetails.status === 'completed' ? 'Completed' : appointmentDetails.status}
               </div>
               <div className="text-sm text-gray-500">
-                {format(new Date(completedAt), 'EEE dd MMM yyyy')} • bathini nipun
+                {format(new Date(completedAt), 'EEE dd MMM yyyy')}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -201,8 +220,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
           {/* Customer Details */}
           <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="text-lg font-semibold">Jack Doe</h4>
-            <p className="text-gray-600">jack@example.com</p>
+            <h4 className="text-lg font-semibold">
+              {appointmentDetails.customer?.full_name || 'No name provided'}
+            </h4>
+            <p className="text-gray-600">{appointmentDetails.customer?.email || 'No email provided'}</p>
           </div>
 
           {/* Sale Details */}
@@ -213,14 +234,14 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             </p>
 
             {selectedItems.map((item) => (
-              <div key={item.id} className="py-2 flex justify-between items-start">
+              <div key={item.id} className="py-2 flex justify-between items-start border-b">
                 <div className="flex-1">
                   <p className="font-medium">{item.name}</p>
                   <p className="text-sm text-gray-500">
-                    {format(new Date(completedAt), 'h:mma, dd MMM yyyy')} • 1h 15min • bathini nipun
+                    {format(new Date(completedAt), 'h:mma, dd MMM yyyy')}
                   </p>
                 </div>
-                <p className="text-right">₹{item.price}</p>
+                <p className="text-right text-gray-900">₹{item.price.toFixed(2)}</p>
               </div>
             ))}
           </div>
@@ -229,19 +250,19 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           <div className="space-y-2 pt-4 border-t">
             <div className="flex justify-between text-sm">
               <span>Subtotal</span>
-              <span>₹{subtotal}</span>
+              <span>₹{subtotal.toFixed(2)}</span>
             </div>
             {discountType !== 'none' && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>
                   Discount ({discountType === 'percentage' ? `${discountValue}%` : '₹' + discountValue})
                 </span>
-                <span>-₹{discountAmount}</span>
+                <span>-₹{discountAmount.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-bold pt-2">
               <span>Total</span>
-              <span>₹{total}</span>
+              <span>₹{total.toFixed(2)}</span>
             </div>
           </div>
 
@@ -255,7 +276,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 ) : (
                   <CreditCard className="h-4 w-4 mr-1" />
                 )}
-                ₹{total}
+                ₹{total.toFixed(2)}
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-1">
@@ -296,10 +317,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           </DialogHeader>
           <div className="py-4">
             {selectedItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between py-2">
+              <div key={item.id} className="flex items-center justify-between py-2 border-b">
                 <div>
                   <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-gray-500">₹{item.price}</p>
+                  <p className="text-sm text-gray-500">₹{item.price.toFixed(2)}</p>
                 </div>
                 <input
                   type="checkbox"
@@ -310,7 +331,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                       [item.id]: e.target.checked
                     })
                   }
-                  className="h-4 w-4"
+                  className="h-4 w-4 rounded border-gray-300"
                 />
               </div>
             ))}
