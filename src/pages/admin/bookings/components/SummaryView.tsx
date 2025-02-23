@@ -34,6 +34,11 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentActions } from '../hooks/useAppointmentActions';
 import type { Appointment } from '../types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { RefundData } from '../types';
 
 interface SummaryViewProps {
   appointmentId: string;
@@ -68,6 +73,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [note, setNote] = useState('');
   const [refundItems, setRefundItems] = useState<{[key: string]: boolean}>({});
   const [appointmentDetails, setAppointmentDetails] = useState<Appointment | null>(null);
+  const [refundReason, setRefundReason] = useState<RefundData['reason']>('customer_dissatisfaction');
+  const [refundNotes, setRefundNotes] = useState('');
+  const [selectAll, setSelectAll] = useState(false);
   const { fetchAppointmentDetails, updateAppointmentStatus, selectedItems } = useAppointmentActions();
 
   useEffect(() => {
@@ -80,6 +88,16 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       setAppointmentDetails(details);
     }
   };
+
+  useEffect(() => {
+    if (selectAll) {
+      const allItemIds = selectedItems.reduce((acc, item) => {
+        acc[item.id] = true;
+        return acc;
+      }, {} as {[key: string]: boolean});
+      setRefundItems(allItemIds);
+    }
+  }, [selectAll, selectedItems]);
 
   const handleVoidSale = async () => {
     if (!appointmentDetails) return;
@@ -118,11 +136,25 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
         })
         .map(booking => booking.id);
 
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'refunded',
+          refund_reason: refundReason,
+          refund_notes: refundNotes,
+          refunded_by: appointmentDetails.customer_id,
+          refunded_at: new Date().toISOString()
+        })
+        .in('id', bookingIds);
+
+      if (bookingsError) throw bookingsError;
+
       const success = await updateAppointmentStatus(appointmentId, 'refunded', bookingIds);
 
       if (success) {
         await loadAppointmentDetails();
         setShowRefundDialog(false);
+        toast.success('Refund processed successfully');
       }
     } catch (error: any) {
       console.error("Error refunding sale:", error);
@@ -311,26 +343,75 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               Select the items you want to refund
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            {selectedItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between py-2 border-b">
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-gray-500">₹{item.price.toFixed(2)}</p>
-                </div>
+          <div className="py-4 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <Label>Select Items</Label>
+              <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={refundItems[item.id] || false}
-                  onChange={(e) => 
-                    setRefundItems({
-                      ...refundItems,
-                      [item.id]: e.target.checked
-                    })
-                  }
+                  checked={selectAll}
+                  onChange={(e) => setSelectAll(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300"
                 />
+                <span className="text-sm">Select All</span>
               </div>
-            ))}
+            </div>
+
+            <div className="max-h-48 overflow-y-auto space-y-2">
+              {selectedItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between py-2 border-b">
+                  <div>
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-sm text-gray-500">₹{item.price.toFixed(2)}</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={refundItems[item.id] || false}
+                    onChange={(e) => 
+                      setRefundItems({
+                        ...refundItems,
+                        [item.id]: e.target.checked
+                      })
+                    }
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Refund Reason</Label>
+                <Select
+                  value={refundReason}
+                  onValueChange={(value) => setRefundReason(value as RefundData['reason'])}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer_dissatisfaction">Customer Dissatisfaction</SelectItem>
+                    <SelectItem value="service_quality_issue">Service Quality Issue</SelectItem>
+                    <SelectItem value="scheduling_error">Scheduling Error</SelectItem>
+                    <SelectItem value="health_concern">Health Concern</SelectItem>
+                    <SelectItem value="price_dispute">Price Dispute</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {refundReason === 'other' && (
+                <div className="space-y-2">
+                  <Label>Additional Notes</Label>
+                  <Textarea
+                    value={refundNotes}
+                    onChange={(e) => setRefundNotes(e.target.value)}
+                    placeholder="Please provide details for the refund..."
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRefundDialog(false)}>

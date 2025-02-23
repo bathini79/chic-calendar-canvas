@@ -1,4 +1,3 @@
-
 export interface Customer {
   id: string;
   full_name: string | null;
@@ -74,6 +73,9 @@ export interface Appointment {
   bookings: Booking[];
   created_at: string;
   updated_at: string;
+  refund_reason?: string;
+  refunded_by?: string;
+  refund_notes?: string;
 }
 
 export interface Booking {
@@ -90,6 +92,10 @@ export interface Booking {
   service?: Service;
   package?: Package;
   employee: Employee;
+  refund_reason?: string;
+  refund_notes?: string;
+  refunded_by?: string;
+  refunded_at?: string;
 }
 
 export interface CartItem {
@@ -99,4 +105,10 @@ export interface CartItem {
   duration: number;
   price: number;
   customized_services?: string[];
+}
+
+export interface RefundData {
+  reason: 'customer_dissatisfaction' | 'service_quality_issue' | 'scheduling_error' | 'health_concern' | 'price_dispute' | 'other';
+  notes?: string;
+  refundedBy: string;
 }
