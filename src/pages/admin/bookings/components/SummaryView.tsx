@@ -57,19 +57,11 @@ interface SummaryViewProps {
   paymentMethod: 'cash' | 'online';
   discountType: 'none' | 'percentage' | 'fixed';
   discountValue: number;
-  completedAt: string;
 }
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
   selectedItems,
-  subtotal,
-  discountAmount,
-  total,
-  paymentMethod,
-  discountType,
-  discountValue,
-  completedAt,
 }) => {
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
@@ -233,7 +225,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   if (!appointmentDetails) {
     return <div>Loading...</div>;
   }
-
+console.log("appointmentDetails",appointmentDetails)
   return (
     <>
       <Card className="bg-white">
@@ -245,7 +237,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 {appointmentDetails?.status === 'completed' ? 'Completed' : appointmentDetails?.status}
               </div>
               <div className="text-sm text-gray-500">
-                {format(new Date(completedAt), 'EEE dd MMM yyyy')}
+                {format(new Date(appointmentDetails?.end_time), 'EEE dd MMM yyyy')}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -307,19 +299,19 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           <div>
             <h4 className="font-medium mb-2">Sale #{appointmentId.slice(0, 8)}</h4>
             <p className="text-sm text-gray-500 mb-4">
-              {format(new Date(completedAt), 'EEE dd MMM yyyy')}
+              {format(new Date(appointmentDetails?.end_time), 'EEE dd MMM yyyy')}
             </p>
 
-            {selectedItems.map((item) => (
+            {appointmentDetails?.bookings.map((item) => (
               <div key={item.id} className="py-2 flex justify-between items-start border-b">
                 <div className="flex-1">
-                  <p className="font-medium">{item.name}</p>
+                  <p className="font-medium">{item.service.name}</p>
                   <p className="text-sm text-gray-500">
-                    {format(new Date(completedAt), 'h:mma, dd MMM yyyy')}
+                    {format(new Date(item.start_time), 'h:mma, dd MMM yyyy')}
                     {item.employee && ` • Stylist: ${item.employee.name}`}
                   </p>
                 </div>
-                <p className="text-right text-gray-900">₹{item.price.toFixed(2)}</p>
+                <p className="text-right text-gray-900">₹{item.price_paid.toFixed(2)}</p>
               </div>
             ))}
           </div>
@@ -327,22 +319,22 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           <div className="space-y-2 pt-4 border-t">
             <div className="flex justify-between text-sm">
               <span>Subtotal</span>
-              <span>₹{subtotal.toFixed(2)}</span>
+              <span>₹{appointmentDetails.original_total_price.toFixed(2)}</span>
             </div>
-            {discountType !== 'none' && (
+            {appointmentDetails.discount_type !== 'none' && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>
-                  Discount ({discountType === 'percentage' ? 
-                    `${discountValue}%` : 
-                    '₹' + discountValue
+                  Discount ({appointmentDetails.discount_type === 'percentage' ? 
+                    `${appointmentDetails.discount_value}%` : 
+                    '₹' + appointmentDetails.discount_value
                   })
                 </span>
-                <span>-₹{discountAmount.toFixed(2)}</span>
+                <span>-₹{appointmentDetails?.discount_value.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-bold pt-2">
               <span>Total</span>
-              <span>₹{total.toFixed(2)}</span>
+              <span>₹{appointmentDetails?.total_price.toFixed(2)}</span>
             </div>
           </div>
 
@@ -355,11 +347,11 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 ) : (
                   <CreditCard className="h-4 w-4 mr-1" />
                 )}
-                ₹{total.toFixed(2)}
+                ₹{appointmentDetails?.total_price.toFixed(2)}
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-1">
-              {format(new Date(completedAt), "EEE dd MMM yyyy 'at' h:mma")}
+              {format(new Date(appointmentDetails?.end_time), "EEE dd MMM yyyy 'at' h:mma")}
             </p>
           </div>
         </CardContent>
