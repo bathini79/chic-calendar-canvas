@@ -1,16 +1,17 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, RefundData } from '../types';
+import { Appointment, RefundData, TransactionDetails } from '../types';
 
 export function useAppointmentActions() {
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchAppointmentDetails = async (appointmentId: string) => {
+  const fetchAppointmentDetails = async (appointmentId: string): Promise<TransactionDetails | null> => {
     try {
       setIsLoading(true);
-      const { data: appointmentData, error: appointmentError } = await supabase
+
+      // First, check if this is a refund transaction
+      const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
         .select(`
           *,
@@ -27,28 +28,54 @@ export function useAppointmentActions() {
 
       if (appointmentError) throw appointmentError;
 
-      // Fetch related refunds
-      const { data: refunds, error: refundsError } = await supabase
-        .from('appointments')
-        .select(`
-          *,
-          customer:profiles!appointments_customer_id_fkey(*),
-          bookings (
+      if (appointment.transaction_type === 'refund') {
+        // If this is a refund, fetch the original sale
+        const { data: originalSale, error: originalError } = await supabase
+          .from('appointments')
+          .select(`
             *,
-            service:services(*),
-            package:packages(*),
-            employee:employees!bookings_employee_id_fkey(*)
-          )
-        `)
-        .eq('original_appointment_id', appointmentId)
-        .eq('transaction_type', 'refund');
+            customer:profiles!appointments_customer_id_fkey(*),
+            bookings (
+              *,
+              service:services(*),
+              package:packages(*),
+              employee:employees!bookings_employee_id_fkey(*)
+            )
+          `)
+          .eq('id', appointment.original_appointment_id)
+          .single();
 
-      if (refundsError) throw refundsError;
+        if (originalError) throw originalError;
 
-      return {
-        ...appointmentData,
-        refunds: refunds || []
-      } as Appointment & { refunds: Appointment[] };
+        return {
+          originalSale,
+          refund: appointment
+        };
+      } else {
+        // If this is the original sale, fetch its refund (if any)
+        const { data: refund, error: refundError } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            customer:profiles!appointments_customer_id_fkey(*),
+            bookings (
+              *,
+              service:services(*),
+              package:packages(*),
+              employee:employees!bookings_employee_id_fkey(*)
+            )
+          `)
+          .eq('original_appointment_id', appointmentId)
+          .eq('transaction_type', 'refund')
+          .maybeSingle();
+
+        if (refundError) throw refundError;
+
+        return {
+          originalSale: appointment,
+          refund: refund || undefined
+        };
+      }
     } catch (error: any) {
       console.error('Error fetching appointment:', error);
       toast.error('Failed to load appointment details');

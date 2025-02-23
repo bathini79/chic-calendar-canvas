@@ -1,4 +1,3 @@
-
 export interface Customer {
   id: string;
   full_name: string | null;
@@ -146,4 +145,9 @@ export interface SummaryViewProps {
   paymentMethod: 'cash' | 'online';
   discountType: 'none' | 'percentage' | 'fixed';
   discountValue: number;
+}
+
+export interface TransactionDetails {
+  originalSale: Appointment;
+  refund?: Appointment;
 }
