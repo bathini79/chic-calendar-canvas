@@ -19,7 +19,10 @@ interface TimeSlotsProps {
   nowPosition: number | null;
   isSameDay: (date1: Date, date2: Date) => boolean;
   appointments: Appointment[];
-  renderAppointmentBlock: (appointment: Appointment, booking: Booking) => JSX.Element | null;
+  renderAppointmentBlock: (
+    appointment: Appointment,
+    booking: Booking
+  ) => JSX.Element | null;
   setSelectedAppointment: (appointment: Appointment) => void;
   setClickedCell: (cell: {
     employeeId: string;
@@ -34,16 +37,65 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
   employees,
   formatTime,
   TOTAL_HOURS,
-  PIXELS_PER_HOUR,
-  handleColumnClick,
-  currentDate,
   nowPosition,
   isSameDay,
   appointments,
-  renderAppointmentBlock,
   setSelectedAppointment,
   setClickedCell,
+  currentDate,
 }) => {
+  const handleColumnClick = (e: React.MouseEvent, empId: string) => {
+    if (e.target !== e.currentTarget) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    let clickedTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
+    clickedTime = Math.round(clickedTime * 4) / 4;
+
+    setClickedCell({
+      employeeId: empId,
+      time: clickedTime,
+      x: e.pageX + 10,
+      y: e.pageY - 20,
+      date: currentDate,
+    });
+  };
+
+  const renderAppointmentBlock = (appointment: Appointment, booking: Booking) => {
+    if (!booking.id) return null;
+    
+    const statusColor = getAppointmentStatusColor(appointment.status || 'pending');
+    const duration = booking.service?.duration || booking.package?.duration || 60;
+    const startTime = new Date(booking.start_time);
+    const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+
+    const topPositionPx = (startHour - START_HOUR) * PIXELS_PER_HOUR;
+    const heightPx = (duration / 60) * PIXELS_PER_HOUR;
+
+    return (
+      <div
+        key={booking.id}
+        className={`absolute left-2 right-2 rounded border ${statusColor} cursor-pointer z-10 overflow-hidden`}
+        style={{
+          top: `${topPositionPx}px`,
+          height: `${heightPx}px`,
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedAppointment(appointment);
+        }}
+      >
+        <div className="p-2 text-xs">
+          <div className="font-medium truncate">
+            {appointment.customer?.full_name || 'No name'}
+          </div>
+          <div className="truncate text-gray-600">
+            {booking.service?.name || booking.package?.name || 'Unnamed service'}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 overflow-auto">
       <div className="flex">
@@ -55,7 +107,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
           >
             <div className="flex flex-col items-center space-y-1">
               <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
-                {emp.avatar || emp.name.charAt(0)}
+                {emp.avatar}
               </div>
               <div className="text-xs font-medium text-gray-700">
                 {emp.name}
@@ -103,9 +155,10 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
             )}
 
             {appointments.map((appointment) =>
-              appointment.bookings
-                .filter(booking => booking.employee?.id === emp.id)
-                .map(booking => renderAppointmentBlock(appointment, booking))
+              appointment.bookings.map((booking) => {
+                if (booking.employee?.id !== emp.id) return null;
+                return renderAppointmentBlock(appointment, booking);
+              })
             )}
           </div>
         ))}
