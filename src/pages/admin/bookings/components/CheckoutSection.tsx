@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +14,7 @@ import {
   MoreVertical, 
   IndianRupee, 
   Percent, 
-  Clock, 
-  User,
-  Mail
+  Clock
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -25,12 +24,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -160,26 +156,86 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   };
 
   return (
-    <div className="flex w-full h-full">
-      <div className="w-full max-w-2xl mx-auto p-6">
-        <Card className="mb-6">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-12 w-12 bg-primary/10">
-                  <AvatarFallback>JD</AvatarFallback>
-                </Avatar>
-                <div>
-                  <CardTitle className="text-lg">Jane Doe</CardTitle>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Mail className="mr-2 h-4 w-4" />
-                    jane@example.com
+    <div className="h-full w-full bg-gray-50 p-6">
+      <Card className="h-full">
+        <CardContent className="p-6 h-full flex flex-col">
+          <div className="flex-1 space-y-6">
+            {/* Services List */}
+            <div className="space-y-4">
+              {selectedItems.map((item) => (
+                item && (
+                  <div
+                    key={`${item.type}-${item.id}`}
+                    className="flex items-center justify-between py-3 border-b border-gray-100"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-medium text-base">{item.name}</p>
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Clock className="mr-2 h-4 w-4" />
+                        {item.duration} min
+                      </div>
+                    </div>
+                    <p className="font-medium text-base">
+                      <IndianRupee className="inline h-3 w-3" />
+                      {item.price}
+                    </p>
                   </div>
-                </div>
+                )
+              ))}
+            </div>
+
+            <Separator />
+
+            {/* Pricing Summary */}
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>₹{subtotal}</span>
               </div>
+              {discountType !== "none" && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span className="flex items-center">
+                    <Percent className="mr-2 h-4 w-4" />
+                    Discount
+                    {discountType === "percentage" && ` (${discountValue}%)`}
+                  </span>
+                  <span>-₹{discountAmount}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-lg font-bold pt-2">
+                <span>Total</span>
+                <span>₹{total}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Section */}
+          <div className="pt-6 space-y-4">
+            <div>
+              <h4 className="text-sm font-medium mb-2">Payment Method</h4>
+              <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2">
+              <Button 
+                className="flex-1" 
+                size="lg"
+                onClick={handlePayment}
+                disabled={!appointmentId}
+              >
+                Complete Payment
+              </Button>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="outline" size="lg">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
@@ -229,82 +285,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </PopoverContent>
               </Popover>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {selectedItems.map((item) => (
-                item && (
-                  <div
-                    key={`${item.type}-${item.id}`}
-                    className="flex items-center justify-between py-2"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-medium">{item.name}</p>
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Clock className="mr-2 h-4 w-4" />
-                        {item.duration} min
-                      </div>
-                    </div>
-                    <p className="font-medium">
-                      <IndianRupee className="inline h-3 w-3" />
-                      {item.price}
-                    </p>
-                  </div>
-                )
-              ))}
-
-              <Separator className="my-4" />
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal</span>
-                  <span>₹{subtotal}</span>
-                </div>
-                {discountType !== "none" && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span className="flex items-center">
-                      <Percent className="mr-2 h-4 w-4" />
-                      Discount
-                      {discountType === "percentage" && ` (${discountValue}%)`}
-                    </span>
-                    <span>-₹{discountAmount}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span>₹{total}</span>
-                </div>
-              </div>
-
-              <Separator className="my-4" />
-
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Payment Method</h4>
-                  <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="online">Online</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={handlePayment}
-                  disabled={!appointmentId}
-                >
-                  Complete Payment
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
