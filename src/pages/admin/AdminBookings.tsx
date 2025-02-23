@@ -147,11 +147,7 @@ export default function AdminBookings() {
 
   const handleProceedToCheckout = async () => {
     try {
-      const appointmentId = await handleSaveAppointment();
-      if (appointmentId) {
-        setNewAppointmentId(appointmentId);
-        setCurrentScreen(SCREEN.CHECKOUT);
-      }
+      setCurrentScreen(SCREEN.CHECKOUT);
     } catch (error) {
       console.error("Error proceeding to checkout:", error);
       toast.error("Failed to proceed to checkout. Please try again.");
@@ -357,7 +353,7 @@ export default function AdminBookings() {
 
                 {currentScreen === SCREEN.CHECKOUT && (
                   <CheckoutSection
-                    appointmentId={newAppointmentId || selectedAppointment?.id}
+                    appointmentId={selectedAppointment?.id}
                     selectedServices={selectedServices}
                     selectedPackages={selectedPackages}
                     services={services || []}
@@ -372,11 +368,10 @@ export default function AdminBookings() {
                     onNotesChange={setAppointmentNotes}
                     onPaymentComplete={() => {
                       setCurrentScreen(SCREEN.SUMMARY);
-                      setNewAppointmentId(null);
                       resetState();
                     }}
                     selectedStylists={selectedStylists}
-                    selectedTimeSlots={{ [newAppointmentId || selectedAppointment?.id || '']: selectedTime }}
+                    selectedTimeSlots={{ [selectedAppointment?.id || '']: selectedTime }}
                   />
                 )}
 

@@ -151,32 +151,89 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   );
 
   const handlePayment = async () => {
-    if (!appointmentId) {
-      toast.error("Invalid appointment ID");
-      return;
-    }
-
     try {
-      const { error: appointmentError } = await supabase
-        .from("appointments")
-        .update({
-          status: "completed",
-          payment_method: paymentMethod,
-          discount_type: discountType,
-          discount_value: discountValue,
-          total_price: total,
-          notes: notes,
-        })
-        .eq("id", appointmentId);
+      let appointmentId = appointmentId;
 
-      if (appointmentError) throw appointmentError;
+      // If no appointment exists, create it now
+      if (!appointmentId) {
+        const { data: appointmentData, error: createError } = await supabase
+          .from("appointments")
+          .insert({
+            customer_id: selectedStylists[Object.keys(selectedStylists)[0]], // Assuming the first stylist is the customer
+            start_time: new Date().toISOString(), // Placeholder, adjust as needed
+            end_time: new Date().toISOString(), // Placeholder, adjust as needed
+            status: "completed",
+            payment_method: paymentMethod,
+            discount_type: discountType,
+            discount_value: discountValue,
+            total_price: total,
+            notes: notes,
+            number_of_bookings: selectedServices.length + selectedPackages.length,
+          })
+          .select()
+          .single();
 
-      const { error: bookingsError } = await supabase
-        .from("bookings")
-        .update({ status: "completed" })
-        .eq("appointment_id", appointmentId);
+        if (createError) throw createError;
+        appointmentId = appointmentData.id;
 
-      if (bookingsError) throw bookingsError;
+        // Create bookings for services
+        for (const serviceId of selectedServices) {
+          const service = services.find(s => s.id === serviceId);
+          if (!service) continue;
+
+          const { error: bookingError } = await supabase
+            .from("bookings")
+            .insert({
+              appointment_id: appointmentId,
+              service_id: serviceId,
+              employee_id: selectedStylists[serviceId],
+              status: "completed",
+              price_paid: service.selling_price,
+            });
+
+          if (bookingError) throw bookingError;
+        }
+
+        // Create bookings for packages
+        for (const packageId of selectedPackages) {
+          const pkg = packages.find(p => p.id === packageId);
+          if (!pkg) continue;
+
+          const { error: bookingError } = await supabase
+            .from("bookings")
+            .insert({
+              appointment_id: appointmentId,
+              package_id: packageId,
+              employee_id: selectedStylists[packageId],
+              status: "completed",
+              price_paid: pkg.price,
+            });
+
+          if (bookingError) throw bookingError;
+        }
+      } else {
+        // If appointment exists, just update it
+        const { error: updateError } = await supabase
+          .from("appointments")
+          .update({
+            status: "completed",
+            payment_method: paymentMethod,
+            discount_type: discountType,
+            discount_value: discountValue,
+            total_price: total,
+            notes: notes,
+          })
+          .eq("id", appointmentId);
+
+        if (updateError) throw updateError;
+
+        const { error: bookingsError } = await supabase
+          .from("bookings")
+          .update({ status: "completed" })
+          .eq("appointment_id", appointmentId);
+
+        if (bookingsError) throw bookingsError;
+      }
 
       toast.success("Payment completed successfully");
       onPaymentComplete();
