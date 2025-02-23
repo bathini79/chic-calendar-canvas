@@ -10,15 +10,8 @@ import { Button } from "@/components/ui/button";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import {
-  formatTime,
-  isSameDay,
-  TOTAL_HOURS,
-} from "./bookings/utils/timeUtils";
-import {
-  getTotalPrice,
-  getTotalDuration,
-} from "./bookings/utils/bookingUtils";
+import { formatTime, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
+import { getTotalPrice, getTotalDuration } from "./bookings/utils/bookingUtils";
 import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import { CheckoutSection } from "./bookings/components/CheckoutSection";
@@ -90,6 +83,8 @@ export default function AdminBookings() {
     appointmentNotes,
     setAppointmentNotes,
     resetState,
+    customizedServices,
+    setCustomizedServices,
   } = useAppointmentState();
 
   const { handleSaveAppointment } = useSaveAppointment({
@@ -103,6 +98,7 @@ export default function AdminBookings() {
     selectedStylists,
     getTotalDuration,
     getTotalPrice,
+    customizedServices
   });
 
   useEffect(() => {
@@ -169,7 +165,21 @@ export default function AdminBookings() {
         : [...prev, serviceId]
     );
   };
-
+  const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
+    const pkg = packages?.find((p) => p.id === packageId);
+    if (!pkg) return;
+    // Update customized services
+    setCustomizedServices((prev) => {
+      const currentServices = prev[packageId] || [];
+      const newServices = currentServices.includes(serviceId)
+        ? currentServices.filter((id) => id !== serviceId)
+        : [...currentServices, serviceId];
+      return {
+        ...prev,
+        [packageId]: newServices,
+      };
+    });
+  };
   const handlePackageSelect = (packageId: string) => {
     setSelectedPackages((prev) =>
       prev.includes(packageId)
@@ -309,14 +319,14 @@ export default function AdminBookings() {
                   setShowCreateForm={setShowCreateForm}
                 />
               </div>
-              
+
               <div className="w-[70%] flex flex-col h-full">
                 {currentScreen === SCREEN.SERVICE_SELECTION && (
                   <div className="flex flex-col h-full">
                     <div className="p-6 flex-shrink-0">
                       <h3 className="text-lg font-semibold">Select Services</h3>
                     </div>
-                    
+
                     <div className="flex-1 overflow-y-auto px-6">
                       <ServiceSelector
                         onServiceSelect={handleServiceSelect}
@@ -326,14 +336,13 @@ export default function AdminBookings() {
                         selectedPackages={selectedPackages}
                         selectedStylists={selectedStylists}
                         stylists={employees}
+                        onCustomPackage = {handleCustomServiceToggle}
+                        customizedServices={customizedServices}
                       />
                     </div>
-                    
+
                     <div className="p-6 border-t mt-auto flex justify-end gap-4">
-                      <Button
-                        variant="outline"
-                        onClick={handleSaveAppointment}
-                      >
+                      <Button variant="outline" onClick={handleSaveAppointment}>
                         Save Appointment
                       </Button>
                       <Button
@@ -375,7 +384,9 @@ export default function AdminBookings() {
                       Appointment Summary
                     </h3>
                     <SummaryView
-                      appointmentId={newAppointmentId || selectedAppointment?.id || ""}
+                      appointmentId={
+                        newAppointmentId || selectedAppointment?.id || ""
+                      }
                       selectedItems={calculateSelectedItems()}
                       subtotal={calculateTotals().subtotal}
                       discountAmount={calculateTotals().discountAmount}
@@ -386,7 +397,11 @@ export default function AdminBookings() {
                       completedAt={new Date().toISOString()}
                     />
                     <div className="mt-6 flex justify-end">
-                      <Button onClick={() => setCurrentScreen(SCREEN.SERVICE_SELECTION)}>
+                      <Button
+                        onClick={() =>
+                          setCurrentScreen(SCREEN.SERVICE_SELECTION)
+                        }
+                      >
                         Create New Appointment
                       </Button>
                     </div>

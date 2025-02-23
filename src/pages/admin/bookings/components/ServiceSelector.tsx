@@ -43,12 +43,12 @@ export function ServiceSelector({
   selectedServices = [],
   selectedPackages = [],
   selectedStylists = {},
-  stylists = []
+  stylists = [],
+  onCustomPackage,
+  customizedServices
 }: ServiceSelectorProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
-  const [customizedServices, setCustomizedServices] = useState<Record<string, string[]>>({});
-
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
@@ -120,32 +120,6 @@ export function ServiceSelector({
     }))
   ];
 
-  const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
-    const pkg = packages?.find(p => p.id === packageId);
-    if (!pkg) return;
-
-    // Get base services from the package
-    const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
-
-    // Update customized services
-    setCustomizedServices(prev => {
-      const currentServices = prev[packageId] || [];
-      const newServices = currentServices.includes(serviceId)
-        ? currentServices.filter(id => id !== serviceId)
-        : [...currentServices, serviceId];
-
-      // Call onPackageSelect with both base and custom services
-      if (selectedPackages.includes(packageId)) {
-        onPackageSelect(packageId, [...baseServices, ...newServices]);
-      }
-
-      return {
-        ...prev,
-        [packageId]: newServices
-      };
-    });
-  };
-
   const calculatePackagePrice = (pkg: any) => {
     const basePrice = pkg.price || 0;
     const customServices = customizedServices[pkg.id] || [];
@@ -157,16 +131,13 @@ export function ServiceSelector({
   };
 
   const handlePackageSelect = (pkg: any) => {
-    const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
+    const baseServices = pkg?.package_services.map((ps: any) => ps.service.id);
     const currentCustomServices = customizedServices[pkg.id] || [];
 
     if (selectedPackages.includes(pkg.id)) {
       // Deselecting package - clear everything
       onPackageSelect(pkg.id, []);
-      setCustomizedServices(prev => {
-        const { [pkg.id]: _, ...rest } = prev;
-        return rest;
-      });
+      onCustomPackage(pkg.id, "")
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
       // Selecting package - add with base services and any existing customizations
@@ -201,7 +172,7 @@ export function ServiceSelector({
               const isExpanded = isPackage && (selectedPackages.includes(item.id) || expandedPackages.includes(item.id));
               const isSelected = isService 
                 ? selectedServices.includes(item.id)
-                : selectedPackages.includes(item.id);
+                : isExpanded;
 
               return (
                 <React.Fragment key={`${item.type}-${item.id}`}>
@@ -322,7 +293,7 @@ export function ServiceSelector({
                                   <div className="flex items-center gap-4">
                                     <Checkbox
                                       checked={customizedServices[item.id]?.includes(service.id)}
-                                      onCheckedChange={() => handleCustomServiceToggle(item.id, service.id)}
+                                      onCheckedChange={() => onCustomPackage(item.id, service.id)}
                                     />
                                     <span className="text-sm font-medium">{service.name}</span>
                                     <span className="text-sm text-muted-foreground">

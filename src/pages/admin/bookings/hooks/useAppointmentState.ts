@@ -1,21 +1,26 @@
-
-import { useState } from 'react';
-import type { Customer } from '../types';
+import { useState } from "react";
+import type { Customer } from "../types";
 
 export function useAppointmentState() {
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
-  const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
+  const [selectedStylists, setSelectedStylists] = useState<
+    Record<string, string>
+  >({});
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "online">("cash");
-  const [discountType, setDiscountType] = useState<"none" | "percentage" | "fixed">("none");
+  const [discountType, setDiscountType] = useState<
+    "none" | "percentage" | "fixed"
+  >("none");
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [appointmentNotes, setAppointmentNotes] = useState("");
-
+  const [customizedServices, setCustomizedServices] = useState({});
   const resetState = () => {
     setSelectedCustomer(null);
     setShowCreateForm(false);
@@ -29,6 +34,7 @@ export function useAppointmentState() {
     setDiscountType("none");
     setDiscountValue(0);
     setAppointmentNotes("");
+    setCustomizedServices({});
   };
 
   return {
@@ -57,5 +63,7 @@ export function useAppointmentState() {
     appointmentNotes,
     setAppointmentNotes,
     resetState,
+    customizedServices,
+    setCustomizedServices,
   };
 }
