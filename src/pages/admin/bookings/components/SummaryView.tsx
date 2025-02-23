@@ -187,8 +187,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
   return (
     <>
-      <div className="space-y-6">
-        {allTransactions.map((transaction, index) => {
+      <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto px-1">
+        {allTransactions.map((transaction) => {
           const isRefund = transaction.transaction_type === 'refund';
           
           return (
@@ -332,7 +332,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                   </div>
                 </div>
 
-                {isRefund && (
+                {isRefund && transaction.refund_reason && (
                   <div className="space-y-2 pt-4 border-t">
                     {transaction.refund_reason && (
                       <div>

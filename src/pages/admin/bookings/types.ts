@@ -49,11 +49,6 @@ export interface Package {
   image_urls: string[];
   created_at: string;
   updated_at: string;
-  package_services?: Array<{
-    service: {
-      id: string;
-    };
-  }>;
 }
 
 export interface Appointment {
@@ -65,8 +60,8 @@ export interface Appointment {
   end_time: string;
   total_price: number;
   payment_method: 'cash' | 'online';
-  discount_type?: 'none' | 'percentage' | 'fixed';
-  discount_value?: number;
+  discount_type: 'none' | 'percentage' | 'fixed';
+  discount_value: number;
   notes?: string;
   number_of_bookings: number;
   original_total_price?: number;
@@ -99,15 +94,6 @@ export interface Booking {
   refund_notes?: string;
   refunded_by?: string;
   refunded_at?: string;
-}
-
-export interface CartItem {
-  type: 'service' | 'package';
-  id: string;
-  name: string;
-  duration: number;
-  price: number;
-  customized_services?: string[];
 }
 
 export interface RefundData {
