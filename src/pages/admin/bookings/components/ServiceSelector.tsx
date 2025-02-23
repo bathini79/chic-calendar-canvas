@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -123,17 +124,30 @@ export function ServiceSelector({
     const pkg = packages?.find(p => p.id === packageId);
     if (!pkg) return;
 
+    // Get base services from the package
     const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
-    
+
+    // Only proceed if the package is selected
+    if (!selectedPackages.includes(packageId)) {
+      handlePackageSelect(pkg);
+    }
+
+    // Update customized services
     setCustomizedServices(prev => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
         ? currentServices.filter(id => id !== serviceId)
         : [...currentServices, serviceId];
-      
-      onPackageSelect(packageId, [...baseServices, ...newServices]);
-      
-      return { ...prev, [packageId]: newServices };
+
+      // Important: Update package services only after the package is selected
+      if (selectedPackages.includes(packageId)) {
+        onPackageSelect(packageId, [...baseServices, ...newServices]);
+      }
+
+      return {
+        ...prev,
+        [packageId]: newServices
+      };
     });
   };
 
@@ -148,7 +162,11 @@ export function ServiceSelector({
   };
 
   const handlePackageSelect = (pkg: any) => {
+    const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
+    const currentCustomServices = customizedServices[pkg.id] || [];
+
     if (selectedPackages.includes(pkg.id)) {
+      // Deselecting package
       onPackageSelect(pkg.id, []);
       setCustomizedServices(prev => {
         const { [pkg.id]: _, ...rest } = prev;
@@ -156,10 +174,9 @@ export function ServiceSelector({
       });
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
+      // Selecting package
       setExpandedPackages(prev => [...prev, pkg.id]);
-      const baseServices = pkg.package_services.map((ps: any) => ps.service.id);
-      const existingCustomServices = customizedServices[pkg.id] || [];
-      onPackageSelect(pkg.id, [...baseServices, ...existingCustomServices]);
+      onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
     }
   };
 
