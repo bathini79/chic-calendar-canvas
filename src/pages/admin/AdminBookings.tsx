@@ -22,6 +22,7 @@ import { useActiveServices } from "./bookings/hooks/useActiveServices";
 import { useActivePackages } from "./bookings/hooks/useActivePackages";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import useSaveAppointment from "./bookings/hooks/useSaveAppointment";
+import { Appointment, Service, Package } from "./bookings/types";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -33,7 +34,7 @@ const initialStats = [
 const SCREEN = {
   SERVICE_SELECTION: "SERVICE_SELECTION",
   CHECKOUT: "CHECKOUT",
-  SUMMARY: "SUMMARY",
+  SUMMARY: "SUMMARY"
 } as const;
 
 type ScreenType = (typeof SCREEN)[keyof typeof SCREEN];
@@ -274,7 +275,7 @@ export default function AdminBookings() {
     setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
-  const handlePaymentComplete = async (appointmentId: string) => {
+  const handlePaymentComplete = async () => {
     if (!checkoutData.appointmentId) {
       console.error("No appointment ID found in checkout data");
       return;
@@ -338,9 +339,9 @@ export default function AdminBookings() {
       selectedServices: services,
       selectedPackages: packages,
       selectedStylists: stylists,
-      paymentMethod: appointment.payment_method,
-      discountType: appointment.discount_type,
-      discountValue: appointment.discount_value,
+      paymentMethod: appointment.payment_method || 'cash',
+      discountType: appointment.discount_type || 'none',
+      discountValue: appointment.discount_value || 0,
       notes: appointment.notes || ''
     });
 
@@ -357,8 +358,9 @@ export default function AdminBookings() {
     setSelectedDate(startDate);
     setSelectedTime(format(startDate, 'HH:mm'));
 
-    setCurrentScreen(SCREEN.CHECKOUT);
+    setSelectedAppointment(null);
     setIsAddAppointmentOpen(true);
+    setCurrentScreen(SCREEN.CHECKOUT);
   };
 
   return (
@@ -483,7 +485,7 @@ export default function AdminBookings() {
 
                 {currentScreen === SCREEN.CHECKOUT && (
                   <CheckoutSection
-                    appointmentId={checkoutData.appointmentId || undefined}
+                    appointmentId={checkoutData.appointmentId}
                     selectedCustomer={selectedCustomer}
                     selectedServices={selectedServices}
                     selectedPackages={selectedPackages}
@@ -500,11 +502,7 @@ export default function AdminBookings() {
                     onPaymentComplete={handlePaymentComplete}
                     selectedStylists={selectedStylists}
                     selectedTimeSlots={{ [checkoutData.appointmentId || '']: selectedTime }}
-                    onSaveAppointment={handleSaveAppointment}
-                    onRemoveService={handleRemoveService}
-                    onRemovePackage={handleRemovePackage}
                     onBackToServices={handleBackToServices}
-                    isExistingAppointment={!!checkoutData.appointmentId}
                   />
                 )}
 
@@ -514,11 +512,7 @@ export default function AdminBookings() {
                       Appointment Summary
                     </h3>
                     <SummaryView
-                      appointmentId={newAppointmentId}
-                      selectedItems={calculateSelectedItems()}
-                      subtotal={calculateTotals().subtotal}
-                      discountAmount={calculateTotals().discountAmount}
-                      total={calculateTotals().total}
+                      appointment={checkoutData.existingAppointment}
                       paymentMethod={paymentMethod}
                       discountType={discountType}
                       discountValue={discountValue}
