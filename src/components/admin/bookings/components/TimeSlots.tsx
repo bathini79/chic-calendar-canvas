@@ -5,6 +5,7 @@ import {
   PIXELS_PER_HOUR,
   hourLabels,
 } from "@/pages/admin/bookings/utils/timeUtils";
+import { Flag } from "lucide-react";
 import React from "react";
 import { Appointment, Booking, Employee } from "@/pages/admin/bookings/types";
 
@@ -61,9 +62,14 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
   };
 
   const renderAppointmentBlock = (appointment: Appointment, booking: Booking) => {
-    if (!booking.id) return null;
+    // Don't render cancelled or voided appointments
+    if (appointment.status === 'canceled' || appointment.status === 'voided' || !booking.id) return null;
     
-    const statusColor = getAppointmentStatusColor(appointment.status || 'pending');
+    const isNoShow = appointment.status === 'noshow';
+    const statusColor = isNoShow 
+      ? 'bg-red-100 border-red-300 text-red-700'
+      : getAppointmentStatusColor(appointment.status);
+      
     const duration = booking.service?.duration || booking.package?.duration || 60;
     const startTime = new Date(booking.start_time);
     const startHour = startTime.getHours() + startTime.getMinutes() / 60;
@@ -84,6 +90,11 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
           setSelectedAppointment(appointment);
         }}
       >
+        {isNoShow && (
+          <div className="absolute -top-2 -left-2 bg-red-100 rounded-full p-1 border border-red-300">
+            <Flag className="h-4 w-4 text-red-600" />
+          </div>
+        )}
         <div className="p-2 text-xs">
           <div className="font-medium truncate">
             {appointment.customer?.full_name || 'No name'}
