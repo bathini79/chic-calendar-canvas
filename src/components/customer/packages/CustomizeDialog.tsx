@@ -69,11 +69,14 @@ export function CustomizeDialog({
         serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
       );
 
-      // Add the package with updated customizations
-      await addToCart(undefined, selectedPackage?.id, {
+      const cartItem = {
         customized_services: additionalServices,
-        selling_price: totalPrice
-      });
+        package_id: selectedPackage.id,
+        selling_price: totalPrice  // This will be properly handled by CartContext now
+      };
+
+      // Add the package with updated customizations
+      await addToCart(undefined, selectedPackage?.id, cartItem);
       
       toast.success(existingPackageInCart ? "Package updated in cart" : "Added to cart");
       onOpenChange(false);

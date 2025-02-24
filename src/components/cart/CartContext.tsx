@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { isErrored } from "stream";
 
 type CartItem = {
   id: string;
@@ -24,7 +23,7 @@ type CartItem = {
 
 type CartContextType = {
   items: CartItem[];
-  addToCart: (serviceId?: string, packageId?: string, options?: { customized_services?: string[] }) => Promise<void>;
+  addToCart: (serviceId?: string, packageId?: string, options?: { customized_services?: string[], selling_price?: number }) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   isLoading: boolean;
   setCartOpen: (open: boolean) => void;
@@ -97,7 +96,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   };
 
-  const addToCart = async (serviceId?: string, packageId?: string, options?: { customized_services?: string[] }) => {
+  const addToCart = async (serviceId?: string, packageId?: string, options?: { customized_services?: string[], selling_price?: number }) => {
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) {
       toast.error("Please sign in to add items to cart");
@@ -109,13 +108,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       (packageId && item.package_id === packageId)
     );
 
+    const cartItem = {
+      service_id: serviceId,
+      package_id: packageId,
+      status: 'pending',
+      customer_id: session.session.user.id,
+      customized_services: options?.customized_services || [],
+      selling_price: options?.selling_price || 0
+    };
+
     if (existingItem) {
       const { error } = await supabase
         .from('cart_items')
-        .update({ 
-          status: 'pending',
-          customized_services: options?.customized_services 
-        })
+        .update(cartItem)
         .eq('id', existingItem.id);
 
       if (error) {
@@ -125,15 +130,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } else {
       const { error } = await supabase
         .from('cart_items')
-        .insert([
-          {
-            service_id: serviceId,
-            package_id: packageId,
-            status: 'pending',
-            customer_id: session.session.user.id,
-            customized_services: options?.customized_services
-          },
-        ]);
+        .insert([cartItem]);
 
       if (error) {
         toast.error("Error adding item to cart");
