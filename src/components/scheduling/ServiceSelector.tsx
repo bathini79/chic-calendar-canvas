@@ -30,7 +30,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
       <CardTitle className="text-lg">Select Stylists</CardTitle>
     </CardHeader>
     <CardContent className="space-y-3">
-      {items.map((item) => (
+      {items?.map((item) => (
         <div 
           key={item.id} 
           className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
