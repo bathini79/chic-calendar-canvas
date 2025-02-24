@@ -55,27 +55,6 @@ export default function AdminBookings() {
     SCREEN.SERVICE_SELECTION
   );
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
-  const [checkoutData, setCheckoutData] = useState<{
-    appointmentId: string | null;
-    existingAppointment: Appointment | null;
-    selectedServices: string[];
-    selectedPackages: string[];
-    selectedStylists: Record<string, string>;
-    paymentMethod: 'cash' | 'online';
-    discountType: 'none' | 'percentage' | 'fixed';
-    discountValue: number;
-    notes: string;
-  }>({
-    appointmentId: null,
-    existingAppointment: null,
-    selectedServices: [],
-    selectedPackages: [],
-    selectedStylists: {},
-    paymentMethod: 'cash',
-    discountType: 'none',
-    discountValue: 0,
-    notes: ''
-  });
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -249,20 +228,6 @@ export default function AdminBookings() {
     ].filter(Boolean);
   };
 
-  const calculateTotals = () => {
-    const items = calculateSelectedItems();
-    const subtotal = items.reduce((sum, item) => sum + (item?.price || 0), 0);
-    const discountAmount =
-      discountType === "percentage"
-        ? (subtotal * discountValue) / 100
-        : discountType === "fixed"
-        ? discountValue
-        : 0;
-    const total = subtotal - discountAmount;
-
-    return { items, subtotal, discountAmount, total };
-  };
-
   const handleRemoveService = (serviceId: string) => {
     setSelectedServices(prev => prev.filter(id => id !== serviceId));
     const updatedStylists = { ...selectedStylists };
@@ -281,12 +246,7 @@ export default function AdminBookings() {
     setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
-  const handlePaymentComplete = async () => {
-    if (!checkoutData.appointmentId) {
-      console.error("No appointment ID found in checkout data");
-      return;
-    }
-
+  const handlePaymentComplete = async (appointmentId?: string) => {
     try {
       const { error: updateError } = await supabase
         .from('appointments')
@@ -298,7 +258,7 @@ export default function AdminBookings() {
           notes: appointmentNotes,
           updated_at: new Date().toISOString()
         })
-        .eq('id', checkoutData.appointmentId);
+        .eq('id',newAppointmentId || appointmentId);
 
       if (updateError) throw updateError;
 
@@ -308,11 +268,10 @@ export default function AdminBookings() {
           status: 'completed',
           updated_at: new Date().toISOString()
         })
-        .eq('appointment_id', checkoutData.appointmentId);
+        .eq('appointment_id', newAppointmentId || appointmentId);
 
       if (bookingsError) throw bookingsError;
 
-      setNewAppointmentId(checkoutData.appointmentId);
       setCurrentScreen(SCREEN.SUMMARY);
       resetState();
       
@@ -338,19 +297,7 @@ export default function AdminBookings() {
         stylists[booking.package_id] = booking.employee_id;
       }
     });
-
-    setCheckoutData({
-      appointmentId: appointment.id,
-      existingAppointment: appointment,
-      selectedServices: services,
-      selectedPackages: packages,
-      selectedStylists: stylists,
-      paymentMethod: appointment.payment_method || 'cash',
-      discountType: appointment.discount_type || 'none',
-      discountValue: appointment.discount_value || 0,
-      notes: appointment.notes || ''
-    });
-
+    setNewAppointmentId(appointment.id)
     setSelectedServices(services);
     setSelectedPackages(packages);
     setSelectedStylists(stylists);
@@ -368,7 +315,6 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(true);
     setCurrentScreen(SCREEN.CHECKOUT);
   };
-
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -491,7 +437,7 @@ export default function AdminBookings() {
 
                 {currentScreen === SCREEN.CHECKOUT && (
                   <CheckoutSection
-                    appointmentId={checkoutData.appointmentId}
+                    appointmentId={newAppointmentId}
                     selectedCustomer={selectedCustomer}
                     selectedServices={selectedServices}
                     selectedPackages={selectedPackages}
@@ -507,45 +453,28 @@ export default function AdminBookings() {
                     onNotesChange={setAppointmentNotes}
                     onPaymentComplete={handlePaymentComplete}
                     selectedStylists={selectedStylists}
-                    selectedTimeSlots={{ [checkoutData.appointmentId || '']: selectedTime }}
+                    selectedTimeSlots={{ [newAppointmentId || '']: selectedTime }}
                     onSaveAppointment={handleSaveAppointment}
                     onRemoveService={handleRemoveService}
                     onRemovePackage={handleRemovePackage}
                     onBackToServices={handleBackToServices}
-                    isExistingAppointment={!!checkoutData.appointmentId}
+                    setNewAppointmentId={setNewAppointmentId}
                   />
                 )}
 
-                {currentScreen === SCREEN.SUMMARY && checkoutData.appointmentId && (
+                {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
                   <div className="p-6">
                     <h3 className="text-xl font-semibold mb-6">
                       Appointment Summary
                     </h3>
                     <SummaryView
-                      appointmentId={checkoutData.appointmentId}
-                      paymentMethod={paymentMethod}
-                      discountType={discountType}
-                      discountValue={discountValue}
-                      completedAt={new Date().toISOString()}
+                      appointmentId={newAppointmentId}
                     />
                     <div className="mt-6 flex justify-end">
                       <Button
                         onClick={() => {
                           setCurrentScreen(SCREEN.SERVICE_SELECTION);
-                          setNewAppointmentId(null);
-                          resetState();
-                          setCheckoutData({
-                            appointmentId: null,
-                            existingAppointment: null,
-                            selectedServices: [],
-                            selectedPackages: [],
-                            selectedStylists: {},
-                            paymentMethod: 'cash',
-                            discountType: 'none',
-                            discountValue: 0,
-                            notes: ''
-                          });
-                        }}
+                          setNewAppointmentId(null)}}
                       >
                         Create New Appointment
                       </Button>

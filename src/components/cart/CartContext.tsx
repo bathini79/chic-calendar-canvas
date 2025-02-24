@@ -107,7 +107,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       (serviceId && item.service_id === serviceId) || 
       (packageId && item.package_id === packageId)
     );
-
     const cartItem = {
       service_id: serviceId,
       package_id: packageId,

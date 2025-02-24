@@ -84,7 +84,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onRemoveService,
   onRemovePackage,
   onBackToServices,
-  isExistingAppointment
+  setNewAppointmentId
 }) => {
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -174,16 +174,15 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         toast.error("Please select a customer");
         return;
       }
-
       const savedAppointmentId = await onSaveAppointment();
-      
+      setNewAppointmentId(savedAppointmentId)
       if (!savedAppointmentId) {
         toast.error("Failed to complete payment");
         return;
       }
 
       toast.success("Payment completed successfully");
-      onPaymentComplete();
+      onPaymentComplete(savedAppointmentId);
     } catch (error: any) {
       console.error("Error completing payment:", error);
       toast.error(error.message || "Failed to complete payment");

@@ -30,8 +30,6 @@ export function CustomizeDialog({
   onServiceToggle,
 }: CustomizeDialogProps) {
   const { addToCart, removeFromCart, items } = useCart();
-  const navigate = useNavigate();
-
   // Find if this package is already in cart
   const existingPackageInCart = items.find(item => 
     item.package_id === selectedPackage?.id

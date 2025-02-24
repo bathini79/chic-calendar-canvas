@@ -33,27 +33,18 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentActions } from '../hooks/useAppointmentActions';
-import type { Appointment, RefundData, TransactionDetails } from '../types';
+import type {  RefundData, TransactionDetails } from '../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRefundReason } from '../utils/formatters';
 
 export interface SummaryViewProps {
-  appointmentId: string;
-  paymentMethod?: 'cash' | 'online';
-  discountType?: 'none' | 'percentage' | 'fixed';
-  discountValue?: number;
-  completedAt: string;
+  appointmentId: string
 }
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
-  appointmentId,
-  paymentMethod,
-  discountType,
-  discountValue,
-  completedAt,
+  appointmentId
 }) => {
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);

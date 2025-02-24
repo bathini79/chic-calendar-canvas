@@ -11,7 +11,7 @@ export function MobileCartBar() {
   const isSchedulingPage = location.pathname === '/schedule';
 
   const totalPrice = items.reduce((sum, item) => {
-    return sum + (item.service?.selling_price || item.package?.price || 0);
+    return sum + (item.service?.selling_price || item.selling_price || 0);
   }, 0);
 
   if (items.length === 0) return null;

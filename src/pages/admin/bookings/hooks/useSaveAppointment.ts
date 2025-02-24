@@ -61,7 +61,6 @@ const useSaveAppointment = ({
       setIsSaving(false);
       return null;
     }
-
     try {
       const startDateTime = new Date(
         `${format(selectedDate, "yyyy-MM-dd")} ${selectedTime}`
@@ -133,14 +132,13 @@ const useSaveAppointment = ({
       for (const serviceId of selectedServices) {
         const service = services?.find((s) => s.id === serviceId);
         if (!service) continue;
-
+        
         const stylistId = selectedStylists[serviceId];
         if (!stylistId) {
           toast.error(`Please select a stylist for ${service.name}`);
           setIsSaving(false);
           return null;
         }
-
         const bookingEndTime = addMinutes(currentStartTime, service.duration);
         const { error: bookingError } = await supabase.from("bookings").insert({
           appointment_id: appointmentId,
@@ -214,7 +212,6 @@ const useSaveAppointment = ({
           currentStartTime = bookingEndTime;
         }
       }
-
       setIsSaving(false);
       return appointmentId;
     } catch (error: any) {
