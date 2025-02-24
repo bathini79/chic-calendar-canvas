@@ -49,13 +49,14 @@ export interface Package {
   image_urls: string[];
   created_at: string;
   updated_at: string;
+  services?: string[];
 }
 
 export interface Appointment {
   id: string;
   customer_id: string;
   customer?: Customer;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded';
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded' | 'noshow';
   start_time: string;
   end_time: string;
   total_price: number;
@@ -85,7 +86,7 @@ export interface Booking {
   employee: Employee;
   start_time: string;
   end_time: string;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded';
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'noshow';
   price_paid: number;
   original_price?: number;
   service?: Service;

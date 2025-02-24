@@ -5,7 +5,6 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
-  SheetFooter,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { 
@@ -14,7 +13,8 @@ import {
   Clock,
   Calendar,
   Ban,
-  XCircle
+  XCircle,
+  ShoppingCart
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -43,6 +43,7 @@ interface AppointmentDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   onEdit?: () => void;
   onUpdated?: () => void;
+  onCheckout?: (appointment: Appointment) => void;
 }
 
 const statusMessages = {
@@ -71,7 +72,8 @@ export function AppointmentDetailsDialog({
   open,
   onOpenChange,
   onEdit,
-  onUpdated
+  onUpdated,
+  onCheckout
 }: AppointmentDetailsDialogProps) {
   const { isLoading, updateAppointmentStatus } = useAppointmentActions();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -100,9 +102,14 @@ export function AppointmentDetailsDialog({
     }
   };
 
+  const handleCheckout = () => {
+    if (appointment && onCheckout) {
+      onCheckout(appointment);
+    }
+  };
+
   const appointmentDate = new Date(appointment.start_time);
 
-  // Get initials from customer name
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -124,10 +131,14 @@ export function AppointmentDetailsDialog({
         return 'bg-red-500';
       case 'confirmed':
         return 'bg-blue-500';
+      case 'inprogress':
+        return 'bg-yellow-500';
       default:
         return 'bg-gray-500';
     }
   };
+
+  const showCheckoutButton = ['inprogress', 'confirmed'].includes(appointment.status);
 
   const selectedMessage = selectedStatus ? statusMessages[selectedStatus as keyof typeof statusMessages] : null;
 
@@ -229,7 +240,7 @@ export function AppointmentDetailsDialog({
                         </div>
                       </div>
                       <span className="font-medium">
-                        ${booking.price_paid}
+                        ₹{booking.price_paid}
                       </span>
                     </div>
                   </div>
@@ -245,15 +256,25 @@ export function AppointmentDetailsDialog({
             )}
           </div>
 
-          <SheetFooter className="absolute bottom-0 left-0 right-0 p-6 bg-white border-t">
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-white border-t">
             <div className="flex w-full justify-between items-center">
               <div>
                 <div className="text-sm text-gray-500">Total</div>
                 <div className="text-xl font-semibold">
-                  ${appointment.total_price}
+                  ₹{appointment.total_price}
                 </div>
               </div>
               <div className="flex gap-2">
+                {showCheckoutButton && (
+                  <Button
+                    variant="default"
+                    onClick={handleCheckout}
+                    className="flex items-center gap-2"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    Checkout
+                  </Button>
+                )}
                 <Button
                   size="icon"
                   variant="outline"
@@ -263,7 +284,7 @@ export function AppointmentDetailsDialog({
                 </Button>
               </div>
             </div>
-          </SheetFooter>
+          </div>
         </SheetContent>
       </Sheet>
 
