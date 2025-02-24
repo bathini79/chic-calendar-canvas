@@ -5,30 +5,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-interface ServiceSelectorProps {
-  items: Array<{
-    id: string;
-    service_id?: string;
-    package_id?: string;
-    service?: {
-      id: string;
-      name: string;
-      duration: number;
-    };
-    package?: {
-      id: string;
-      name: string;
-      package_services?: Array<{
-        service: {
-          id: string;
-          name: string;
-          duration: number;
-        };
-      }>;
-    };
+interface Service {
+  id: string;
+  name: string;
+  duration: number;
+  selling_price: number;
+}
+
+interface Package {
+  id: string;
+  name: string;
+  package_services: Array<{
+    service: Service;
   }>;
+}
+
+interface CartItem {
+  id: string;
+  service_id?: string;
+  package_id?: string;
+  service?: Service;
+  package?: Package;
+  selling_price: number;
+}
+
+interface ServiceSelectorProps {
+  items: CartItem[];
   selectedStylists: Record<string, string>;
-  onStylistSelect: (itemId: string, stylistId: string) => void;
+  onStylistSelect: (serviceId: string, stylistId: string) => void;
 }
 
 export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
@@ -46,31 +50,34 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     },
   });
 
-  // Group items by package
+  // Group items by package and standalone services
   const groupedItems = items.reduce((acc, item) => {
-    if (item.package_id) {
+    if (item.package_id && item.package) {
       if (!acc.packages[item.package_id]) {
         acc.packages[item.package_id] = {
           package: item.package,
-          services: []
+          cartItemId: item.id,
+          services: item.package.package_services || []
         };
-      }
-      // Add package services
-      if (item.package?.package_services) {
-        acc.packages[item.package_id].services = item.package.package_services.map(ps => ({
-          id: ps.service.id,
-          name: ps.service.name,
-          duration: ps.service.duration
-        }));
       }
     } else if (item.service) {
       acc.services.push({
-        id: item.id,
+        cartItemId: item.id,
         service: item.service
       });
     }
     return acc;
-  }, { packages: {} as Record<string, any>, services: [] as any[] });
+  }, { 
+    packages: {} as Record<string, {
+      package: Package;
+      cartItemId: string;
+      services: Array<{service: Service}>;
+    }>, 
+    services: [] as Array<{
+      cartItemId: string;
+      service: Service;
+    }> 
+  });
 
   return (
     <Card className="w-full">
@@ -79,15 +86,15 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Render Package Services */}
-        {Object.entries(groupedItems.packages).map(([packageId, packageData]: [string, any]) => (
+        {Object.entries(groupedItems.packages).map(([packageId, packageData]) => (
           <div key={packageId} className="space-y-4">
             <div className="font-semibold text-lg">
               {packageData.package.name}
             </div>
             <div className="space-y-3 pl-4">
-              {packageData.services.map((service: any) => (
+              {packageData.services.map(({ service }) => (
                 <div 
-                  key={service.id}
+                  key={`${packageData.cartItemId}-${service.id}`}
                   className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
                 >
                   <div className="min-w-0 flex-1">
@@ -126,20 +133,20 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
               Individual Services
             </div>
             <div className="space-y-3">
-              {groupedItems.services.map((item: any) => (
+              {groupedItems.services.map(({ cartItemId, service }) => (
                 <div 
-                  key={item.id}
+                  key={cartItemId}
                   className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{item.service.name}</p>
+                    <p className="font-medium truncate">{service.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {item.service.duration} minutes
+                      {service.duration} minutes
                     </p>
                   </div>
                   <Select 
-                    value={selectedStylists[item.id] || ''} 
-                    onValueChange={(value) => onStylistSelect(item.id, value)}
+                    value={selectedStylists[service.id] || ''} 
+                    onValueChange={(value) => onStylistSelect(service.id, value)}
                   >
                     <SelectTrigger className="w-full sm:w-[200px]">
                       <SelectValue placeholder="Select stylist" />
