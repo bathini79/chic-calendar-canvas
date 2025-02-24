@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -63,11 +64,15 @@ export function CustomizeDialog({
         await removeFromCart(existingPackageInCart.id);
       }
       
+      // Get additional services (exclude services already included in package)
+      const additionalServices = selectedServices.filter(
+        serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
+      );
+
       // Add the package with updated customizations
       await addToCart(undefined, selectedPackage?.id, {
-        customized_services: selectedServices.filter(
-          serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
-        )
+        customized_services: additionalServices,
+        selling_price: totalPrice
       });
       
       toast.success(existingPackageInCart ? "Package updated in cart" : "Added to cart");
