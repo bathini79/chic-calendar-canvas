@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -23,6 +24,7 @@ export function useAppointmentActions() {
     try {
       setIsLoading(true);
 
+      // First fetch the appointment
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
         .select(`
@@ -40,12 +42,8 @@ export function useAppointmentActions() {
 
       if (appointmentError) throw appointmentError;
 
-      const typedAppointment = {
-        ...appointment,
-        payment_method: appointment.payment_method as 'cash' | 'online'
-      };
-
-      if (typedAppointment.transaction_type === 'refund') {
+      // If this is a refund, get the original sale
+      if (appointment.transaction_type === 'refund') {
         const { data: originalSale, error: originalError } = await supabase
           .from('appointments')
           .select(`
@@ -63,6 +61,7 @@ export function useAppointmentActions() {
 
         if (originalError) throw originalError;
 
+        // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
           .from('appointments')
           .select(`
@@ -85,6 +84,7 @@ export function useAppointmentActions() {
           refunds: refunds || []
         };
       } else {
+        // This is the original sale, get all its refunds
         const { data: refunds, error: refundsError } = await supabase
           .from('appointments')
           .select(`
@@ -103,11 +103,11 @@ export function useAppointmentActions() {
         if (refundsError) throw refundsError;
 
         return {
-          originalSale: typedAppointment,
+          originalSale: appointment,
           refunds: refunds || []
         };
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching appointment:', error);
       toast.error('Failed to load appointment details');
       return null;
@@ -124,6 +124,7 @@ export function useAppointmentActions() {
     try {
       setIsLoading(true);
 
+      // First get the original appointment details
       const { data: originalAppointment, error: appointmentError } = await supabase
         .from('appointments')
         .select('*')
@@ -132,6 +133,7 @@ export function useAppointmentActions() {
 
       if (appointmentError) throw appointmentError;
 
+      // Create a refund transaction
       const { data: refundAppointment, error: refundError } = await supabase
         .from('appointments')
         .insert({
@@ -142,7 +144,7 @@ export function useAppointmentActions() {
           refunded_by: refundData.refundedBy,
           refund_reason: refundData.reason,
           refund_notes: refundData.notes,
-          total_price: 0,
+          total_price: 0, // Will be updated after processing bookings
           start_time: originalAppointment.start_time,
           end_time: originalAppointment.end_time
         })
@@ -151,6 +153,7 @@ export function useAppointmentActions() {
 
       if (refundError) throw refundError;
 
+      // Update the original bookings
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({
@@ -164,6 +167,7 @@ export function useAppointmentActions() {
 
       if (bookingsError) throw bookingsError;
 
+      // Get all bookings for this appointment to determine if it's a full or partial refund
       const { data: allBookings, error: countError } = await supabase
         .from('bookings')
         .select('id, status, price_paid')
@@ -171,23 +175,27 @@ export function useAppointmentActions() {
 
       if (countError) throw countError;
 
+      // Check if all bookings are now refunded
       const isFullRefund = allBookings?.every(booking => 
         booking.status === 'refunded' || bookingIds.includes(booking.id)
       );
 
+      // Calculate total refund amount
       const refundAmount = allBookings
         ?.filter(booking => bookingIds.includes(booking.id))
         .reduce((total, booking) => total + (booking.price_paid || 0), 0) || 0;
 
+      // Update the refund appointment with the total amount
       const { error: updateRefundError } = await supabase
         .from('appointments')
         .update({
-          total_price: -refundAmount
+          total_price: -refundAmount // Negative amount to indicate refund
         })
         .eq('id', refundAppointment.id);
 
       if (updateRefundError) throw updateRefundError;
 
+      // Update the original appointment status
       const { error: originalAppointmentError } = await supabase
         .from('appointments')
         .update({
@@ -197,11 +205,12 @@ export function useAppointmentActions() {
 
       if (originalAppointmentError) throw originalAppointmentError;
 
+      // Refresh the selected items after refund
       await fetchAppointmentDetails(appointmentId);
 
       toast.success('Refund processed successfully');
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing refund:', error);
       toast.error(error.message || 'Failed to process refund');
       return false;
@@ -218,6 +227,7 @@ export function useAppointmentActions() {
     try {
       setIsLoading(true);
 
+      // First update the appointment status
       const { error: appointmentError } = await supabase
         .from('appointments')
         .update({ 
@@ -228,6 +238,7 @@ export function useAppointmentActions() {
 
       if (appointmentError) throw appointmentError;
 
+      // Then update all associated bookings
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({ 
@@ -252,7 +263,7 @@ export function useAppointmentActions() {
       
       toast.success(message);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating appointment:', error);
       toast.error(error.message || 'Failed to update appointment');
       return false;
