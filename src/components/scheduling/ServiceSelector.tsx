@@ -12,12 +12,16 @@ interface Service {
   selling_price: number;
 }
 
+interface PackageService {
+  service: Service;
+}
+
 interface Package {
   id: string;
   name: string;
-  package_services: Array<{
-    service: Service;
-  }>;
+  package_services: PackageService[];
+  duration: number;
+  price: number;
 }
 
 interface CartItem {
@@ -26,8 +30,8 @@ interface CartItem {
   package_id?: string;
   service?: Service;
   package?: Package;
-  selling_price: number;
   customized_services?: string[];
+  selling_price: number;
 }
 
 interface ServiceSelectorProps {
@@ -37,7 +41,7 @@ interface ServiceSelectorProps {
 }
 
 export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
-  // Query to get services for customized packages
+  // Query for additional services that might be customized in packages
   const { data: services } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -68,28 +72,30 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
   // Group items by package and standalone services
   const groupedItems = items.reduce((acc, item) => {
     if (item.package_id && item.package) {
-      const packageServices = [];
+      const packageServices: PackageService[] = [];
       
-      // Handle regular package services
+      // Add regular package services
       if (item.package.package_services) {
         packageServices.push(...item.package.package_services);
       }
       
-      // Handle customized services
-      if (item.customized_services && services) {
-        const customizedServiceObjects = services
-          .filter(service => item.customized_services?.includes(service.id))
-          .map(service => ({ service }));
+      // Add customized services
+      if (item.customized_services?.length && services) {
+        const customizedServiceObjects = item.customized_services
+          .map(serviceId => {
+            const service = services.find(s => s.id === serviceId);
+            return service ? { service } : null;
+          })
+          .filter((s): s is PackageService => s !== null);
+        
         packageServices.push(...customizedServiceObjects);
       }
 
-      if (!acc.packages[item.package_id]) {
-        acc.packages[item.package_id] = {
-          package: item.package,
-          cartItemId: item.id,
-          services: packageServices
-        };
-      }
+      acc.packages[item.package_id] = {
+        package: item.package,
+        cartItemId: item.id,
+        services: packageServices
+      };
     } else if (item.service) {
       acc.services.push({
         cartItemId: item.id,
@@ -101,7 +107,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     packages: {} as Record<string, {
       package: Package;
       cartItemId: string;
-      services: Array<{service: Service}>;
+      services: PackageService[];
     }>, 
     services: [] as Array<{
       cartItemId: string;
