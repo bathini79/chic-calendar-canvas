@@ -227,23 +227,41 @@ export function useAppointmentActions() {
     try {
       setIsLoading(true);
 
-      // Update appointment status
+      // First update the appointment status
       const { error: appointmentError } = await supabase
         .from('appointments')
-        .update({ status })
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', appointmentId);
 
       if (appointmentError) throw appointmentError;
 
-      // Update all associated bookings status
+      // Then update all associated bookings
       const { error: bookingsError } = await supabase
         .from('bookings')
-        .update({ status })
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
         .in('id', bookingIds);
 
       if (bookingsError) throw bookingsError;
 
-      toast.success(`Appointment ${status} successfully`);
+      let message = '';
+      switch (status) {
+        case 'canceled':
+          message = 'Appointment canceled successfully';
+          break;
+        case 'noshow':
+          message = 'Appointment marked as no-show';
+          break;
+        default:
+          message = `Appointment ${status} successfully`;
+      }
+      
+      toast.success(message);
       return true;
     } catch (error: any) {
       console.error('Error updating appointment:', error);
