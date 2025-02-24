@@ -25,15 +25,15 @@ export default function UnifiedScheduling() {
     }
   }, [items, navigate]);
 
-  const handleStylistSelect = (itemId: string, stylistId: string) => {
-    setSelectedStylists((prev: Record<string, string>) => ({
+  const handleStylistSelect = (serviceId: string, stylistId: string) => {
+    setSelectedStylists((prev) => ({
       ...prev,
-      [itemId]: stylistId,
+      [serviceId]: stylistId,
     }));
   };
 
   const handleTimeSlotSelect = (itemId: string, timeSlot: string) => {
-    setSelectedTimeSlots((prev: Record<string, string>) => ({
+    setSelectedTimeSlots((prev) => ({
       ...prev,
       [itemId]: timeSlot,
     }));
