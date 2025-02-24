@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -9,11 +10,13 @@ type CartItem = {
   status: 'pending' | 'scheduled' | 'removed';
   customized_services?: string[];
   service?: {
+    id: string;
     name: string;
     selling_price: number;
     duration: number;
   };
   package?: {
+    id: string;
     name: string;
     price: number;
     duration: number;
@@ -89,8 +92,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       .from('cart_items')
       .select(`
         *,
-        service:services(*),
-        package:packages(*)
+        service:services(
+          id,
+          name,
+          selling_price,
+          duration
+        ),
+        package:packages!cart_items_package_id_fkey(
+          id,
+          name,
+          price,
+          duration,
+          package_services(
+            service:services(
+              id,
+              name,
+              selling_price,
+              duration
+            )
+          )
+        )
       `)
       .eq('status', 'pending')
       .eq('customer_id', session.session.user.id);
@@ -100,7 +121,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setItems(cartItems);
+    const typedCartItems = cartItems as CartItem[];
+    setItems(typedCartItems);
     setIsLoading(false);
   };
 
@@ -111,46 +133,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const existingItem = items.find(item => 
-      (serviceId && item.service_id === serviceId) || 
-      (packageId && item.package_id === packageId)
-    );
-
-    const cartItem: {
-      service_id?: string;
-      package_id?: string;
-      status: 'pending' | 'scheduled' | 'removed';
-      customer_id: string;
-      customized_services?: string[];
-      selling_price?: number;
-    } = {
+    const cartItem = {
       service_id: serviceId,
       package_id: packageId,
-      status: 'pending',
+      status: 'pending' as const,
       customer_id: session.session.user.id,
       customized_services: options?.customized_services || [],
-      selling_price: options?.selling_price
+      selling_price: options?.selling_price || 0
     };
 
-    if (existingItem) {
-      const { error } = await supabase
-        .from('cart_items')
-        .update(cartItem)
-        .eq('id', existingItem.id);
+    const { error } = await supabase
+      .from('cart_items')
+      .insert([cartItem]);
 
-      if (error) {
-        toast.error("Error updating cart item");
-        return;
-      }
-    } else {
-      const { error } = await supabase
-        .from('cart_items')
-        .insert([cartItem]);
-
-      if (error) {
-        toast.error("Error adding item to cart");
-        return;
-      }
+    if (error) {
+      toast.error("Error adding item to cart");
+      return;
     }
 
     await fetchCartItems();
@@ -178,7 +176,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         let packageTotal = item.package.price;
         
         // Add prices for customized services
-        if (item.customized_services?.length) {
+        if (item.customized_services?.length && item.package.package_services) {
           const customServiceTotal = item.customized_services.reduce((sum, serviceId) => {
             const service = item.package?.package_services.find(
               ps => ps.service.id === serviceId
@@ -201,7 +199,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         let packageDuration = item.package.duration;
         
         // Add durations for customized services
-        if (item.customized_services?.length) {
+        if (item.customized_services?.length && item.package.package_services) {
           const customServiceDuration = item.customized_services.reduce((sum, serviceId) => {
             const service = item.package?.package_services.find(
               ps => ps.service.id === serviceId
