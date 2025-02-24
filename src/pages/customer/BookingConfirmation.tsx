@@ -86,7 +86,8 @@ export default function BookingConfirmation() {
           package_id: item.package_id,
           employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
           status: 'confirmed',
-          price_paid: item.service.selling_price
+          price_paid: item.service.selling_price,
+          original_price: item.service.original_price
         });
 
         if (bookingError) {

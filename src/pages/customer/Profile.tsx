@@ -96,7 +96,7 @@ const Profile = () => {
               *,
               service:services (*),
               package:packages (*),
-              employee:employees (*)
+              employee:employees!bookings_employee_id_fkey(*)
             )
           `)
           .eq('customer_id', customerId)

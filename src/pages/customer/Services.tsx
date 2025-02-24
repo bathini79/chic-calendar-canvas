@@ -162,15 +162,7 @@ export default function Services() {
   return (
     <div className="container mx-auto py-8">
       <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-8">
-        <div className="space-y-12">
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl font-bold">Our Services</h1>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Discover our range of professional services and packages designed to meet your needs.
-              Book your appointment today and experience excellence.
-            </p>
-          </div>
-
+        <div >
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div className="w-full sm:w-[400px]">
               <CategoryFilter
