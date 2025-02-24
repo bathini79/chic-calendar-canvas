@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,9 +31,9 @@ type CartContextType = {
   selectedDate: Date | null;
   setSelectedDate: (date: Date | null) => void;
   selectedTimeSlots: Record<string, string>;
-  setSelectedTimeSlots: (slots: Record<string, string>) => void;
+  setSelectedTimeSlots: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   selectedStylists: Record<string, string>;
-  setSelectedStylists: (stylists: Record<string, string>) => void;
+  setSelectedStylists: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   getTotalPrice: () => number;
   getTotalDuration: () => number;
 };
@@ -107,13 +108,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       (serviceId && item.service_id === serviceId) || 
       (packageId && item.package_id === packageId)
     );
-    const cartItem = {
+
+    const cartItem: {
+      service_id?: string;
+      package_id?: string;
+      status: 'pending' | 'scheduled' | 'removed';
+      customer_id: string;
+      customized_services?: string[];
+      selling_price?: number;
+    } = {
       service_id: serviceId,
       package_id: packageId,
       status: 'pending',
       customer_id: session.session.user.id,
       customized_services: options?.customized_services || [],
-      selling_price: options?.selling_price || 0
+      selling_price: options?.selling_price
     };
 
     if (existingItem) {
