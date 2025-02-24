@@ -1370,7 +1370,6 @@ export type Database = {
         | "voided"
         | "refunded"
         | "partially_refunded"
-        | "noshow"
       booking_status:
         | "pending"
         | "confirmed"
