@@ -50,6 +50,9 @@ export interface Package {
   created_at: string;
   updated_at: string;
   services?: string[];
+  package_services?: Array<{
+    service: Service;
+  }>;
 }
 
 export interface Appointment {

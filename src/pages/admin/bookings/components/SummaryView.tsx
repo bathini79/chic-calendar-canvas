@@ -40,12 +40,20 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRefundReason } from '../utils/formatters';
 
-interface SummaryViewProps {
+export interface SummaryViewProps {
   appointmentId: string;
+  paymentMethod?: 'cash' | 'online';
+  discountType?: 'none' | 'percentage' | 'fixed';
+  discountValue?: number;
+  completedAt: string;
 }
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
+  paymentMethod,
+  discountType,
+  discountValue,
+  completedAt,
 }) => {
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
