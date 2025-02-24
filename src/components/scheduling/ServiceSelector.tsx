@@ -27,6 +27,7 @@ interface CartItem {
   service?: Service;
   package?: Package;
   selling_price: number;
+  customized_services?: string[];
 }
 
 interface ServiceSelectorProps {
@@ -36,6 +37,20 @@ interface ServiceSelectorProps {
 }
 
 export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
+  // Query to get services for customized packages
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: items.some(item => item.customized_services?.length > 0)
+  });
+
   const { data: employees } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
@@ -53,11 +68,26 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
   // Group items by package and standalone services
   const groupedItems = items.reduce((acc, item) => {
     if (item.package_id && item.package) {
+      const packageServices = [];
+      
+      // Handle regular package services
+      if (item.package.package_services) {
+        packageServices.push(...item.package.package_services);
+      }
+      
+      // Handle customized services
+      if (item.customized_services && services) {
+        const customizedServiceObjects = services
+          .filter(service => item.customized_services?.includes(service.id))
+          .map(service => ({ service }));
+        packageServices.push(...customizedServiceObjects);
+      }
+
       if (!acc.packages[item.package_id]) {
         acc.packages[item.package_id] = {
           package: item.package,
           cartItemId: item.id,
-          services: item.package.package_services || []
+          services: packageServices
         };
       }
     } else if (item.service) {
