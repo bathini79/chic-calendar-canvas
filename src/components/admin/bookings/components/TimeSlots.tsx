@@ -1,29 +1,16 @@
-
 import { getAppointmentStatusColor } from "@/pages/admin/bookings/utils/bookingUtils";
-import {
-  START_HOUR,
-  PIXELS_PER_HOUR,
-  hourLabels,
-} from "@/pages/admin/bookings/utils/timeUtils";
+import { START_HOUR, PIXELS_PER_HOUR, hourLabels } from "@/pages/admin/bookings/utils/timeUtils";
 import { Flag } from "lucide-react";
-import React from "react";
 import { Appointment, Booking, Employee } from "@/pages/admin/bookings/types";
 
 interface TimeSlotsProps {
   employees: Employee[];
-  hourLabels: number[];
   formatTime: (hr: number) => string;
   TOTAL_HOURS: number;
-  PIXELS_PER_HOUR: number;
-  handleColumnClick: (e: React.MouseEvent, empId: string) => void;
   currentDate: Date;
   nowPosition: number | null;
   isSameDay: (date1: Date, date2: Date) => boolean;
   appointments: Appointment[];
-  renderAppointmentBlock: (
-    appointment: Appointment,
-    booking: Booking
-  ) => JSX.Element | null;
   setSelectedAppointment: (appointment: Appointment) => void;
   setClickedCell: (cell: {
     employeeId: string;
@@ -62,7 +49,6 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
   };
 
   const renderAppointmentBlock = (appointment: Appointment, booking: Booking) => {
-    // Don't render cancelled or voided appointments
     if (appointment.status === 'canceled' || appointment.status === 'voided' || !booking.id) return null;
     
     const isNoShow = appointment.status === 'noshow';

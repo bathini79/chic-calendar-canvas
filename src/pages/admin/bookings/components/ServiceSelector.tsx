@@ -26,9 +26,9 @@ type Stylist = {
   status: 'active' | 'inactive';
 };
 
-export interface ServiceSelectorProps {
-  onServiceSelect?: (serviceId: string) => void;
-  onPackageSelect?: (packageId: string) => void;
+interface ServiceSelectorProps {
+  onServiceSelect: (serviceId: string) => void;
+  onPackageSelect: (packageId: string) => void;
   onStylistSelect: (itemId: string, stylistId: string) => void;
   selectedServices: string[];
   selectedPackages: string[];
