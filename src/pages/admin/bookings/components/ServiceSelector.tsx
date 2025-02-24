@@ -26,14 +26,14 @@ type Stylist = {
   status: 'active' | 'inactive';
 };
 
-interface ServiceSelectorProps {
+export interface ServiceSelectorProps {
+  onServiceSelect?: (serviceId: string) => void;
+  onPackageSelect?: (packageId: string) => void;
+  onStylistSelect: (itemId: string, stylistId: string) => void;
   selectedServices: string[];
   selectedPackages: string[];
   selectedStylists: Record<string, string>;
   stylists: Employee[];
-  onServiceSelect: (serviceId: string) => void;
-  onPackageSelect: (packageId: string) => void;
-  onStylistSelect: (itemId: string, stylistId: string) => void;
   onCustomPackage?: (packageId: string, serviceId: string) => void;
   customizedServices?: Record<string, string[]>;
 }

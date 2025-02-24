@@ -107,7 +107,7 @@ export type Database = {
         Row: {
           appointment_id: string
           created_at: string | null
-          employee_id: string
+          employee_id: string | null
           end_time: string | null
           id: string
           original_price: number | null
@@ -127,7 +127,7 @@ export type Database = {
         Insert: {
           appointment_id: string
           created_at?: string | null
-          employee_id: string
+          employee_id?: string | null
           end_time?: string | null
           id?: string
           original_price?: number | null
@@ -147,7 +147,7 @@ export type Database = {
         Update: {
           appointment_id?: string
           created_at?: string | null
-          employee_id?: string
+          employee_id?: string | null
           end_time?: string | null
           id?: string
           original_price?: number | null

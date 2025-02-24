@@ -33,28 +33,33 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 
+interface Customer {
+  id: string;
+}
+
 interface CheckoutSectionProps {
   appointmentId?: string;
-  selectedCustomer: { id: string } | null;
+  selectedCustomer: Customer | null;
   selectedServices: string[];
   selectedPackages: string[];
   services: Service[];
   packages: Package[];
-  discountType: "none" | "percentage" | "fixed";
+  discountType: 'none' | 'percentage' | 'fixed';
   discountValue: number;
-  paymentMethod: "cash" | "online";
+  paymentMethod: 'cash' | 'online';
   notes: string;
-  onDiscountTypeChange: (value: "none" | "percentage" | "fixed") => void;
+  onDiscountTypeChange: (type: 'none' | 'percentage' | 'fixed') => void;
   onDiscountValueChange: (value: number) => void;
-  onPaymentMethodChange: (value: "cash" | "online") => void;
-  onNotesChange: (value: string) => void;
-  onPaymentComplete: (appointmentId: string) => void;
-  selectedStylists: { [key: string]: string };
-  selectedTimeSlots: { [key: string]: string };
+  onPaymentMethodChange: (method: 'cash' | 'online') => void;
+  onNotesChange: (notes: string) => void;
+  onPaymentComplete: () => void;
+  selectedStylists: Record<string, string>;
+  selectedTimeSlots: Record<string, string>;
   onSaveAppointment: () => Promise<string | null>;
   onRemoveService: (serviceId: string) => void;
   onRemovePackage: (packageId: string) => void;
   onBackToServices: () => void;
+  isExistingAppointment?: boolean;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -78,7 +83,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onSaveAppointment,
   onRemoveService,
   onRemovePackage,
-  onBackToServices
+  onBackToServices,
+  isExistingAppointment
 }) => {
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -177,7 +183,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       }
 
       toast.success("Payment completed successfully");
-      onPaymentComplete(savedAppointmentId);
+      onPaymentComplete();
     } catch (error: any) {
       console.error("Error completing payment:", error);
       toast.error(error.message || "Failed to complete payment");
