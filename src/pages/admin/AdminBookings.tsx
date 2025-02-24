@@ -54,6 +54,27 @@ export default function AdminBookings() {
     SCREEN.SERVICE_SELECTION
   );
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
+  const [checkoutData, setCheckoutData] = useState<{
+    appointmentId: string | null;
+    existingAppointment: Appointment | null;
+    selectedServices: string[];
+    selectedPackages: string[];
+    selectedStylists: Record<string, string>;
+    paymentMethod: 'cash' | 'online';
+    discountType: 'none' | 'percentage' | 'fixed';
+    discountValue: number;
+    notes: string;
+  }>({
+    appointmentId: null,
+    existingAppointment: null,
+    selectedServices: [],
+    selectedPackages: [],
+    selectedStylists: {},
+    paymentMethod: 'cash',
+    discountType: 'none',
+    discountValue: 0,
+    notes: ''
+  });
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -253,11 +274,90 @@ export default function AdminBookings() {
     setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
-  const handlePaymentComplete = (appointmentId: string) => {
-    console.log("Payment completed, appointment ID:", appointmentId);
-    setNewAppointmentId(appointmentId);
-    setCurrentScreen(SCREEN.SUMMARY);
-    resetState();
+  const handlePaymentComplete = async (appointmentId: string) => {
+    if (!checkoutData.appointmentId) {
+      console.error("No appointment ID found in checkout data");
+      return;
+    }
+
+    try {
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({
+          status: 'completed',
+          payment_method: paymentMethod,
+          discount_type: discountType,
+          discount_value: discountValue,
+          notes: appointmentNotes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', checkoutData.appointmentId);
+
+      if (updateError) throw updateError;
+
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('appointment_id', checkoutData.appointmentId);
+
+      if (bookingsError) throw bookingsError;
+
+      setNewAppointmentId(checkoutData.appointmentId);
+      setCurrentScreen(SCREEN.SUMMARY);
+      resetState();
+      
+      toast.success('Payment completed successfully');
+    } catch (error: any) {
+      console.error('Error completing payment:', error);
+      toast.error('Failed to complete payment');
+    }
+  };
+
+  const handleCheckoutFromAppointment = (appointment: Appointment) => {
+    const services: string[] = [];
+    const packages: string[] = [];
+    const stylists: Record<string, string> = {};
+
+    appointment.bookings.forEach(booking => {
+      if (booking.service_id) {
+        services.push(booking.service_id);
+        stylists[booking.service_id] = booking.employee_id;
+      }
+      if (booking.package_id) {
+        packages.push(booking.package_id);
+        stylists[booking.package_id] = booking.employee_id;
+      }
+    });
+
+    setCheckoutData({
+      appointmentId: appointment.id,
+      existingAppointment: appointment,
+      selectedServices: services,
+      selectedPackages: packages,
+      selectedStylists: stylists,
+      paymentMethod: appointment.payment_method,
+      discountType: appointment.discount_type,
+      discountValue: appointment.discount_value,
+      notes: appointment.notes || ''
+    });
+
+    setSelectedServices(services);
+    setSelectedPackages(packages);
+    setSelectedStylists(stylists);
+    setPaymentMethod(appointment.payment_method);
+    setDiscountType(appointment.discount_type);
+    setDiscountValue(appointment.discount_value);
+    setAppointmentNotes(appointment.notes || '');
+    setSelectedCustomer(appointment.customer || null);
+    
+    const startDate = new Date(appointment.start_time);
+    setSelectedDate(startDate);
+    setSelectedTime(format(startDate, 'HH:mm'));
+
+    setCurrentScreen(SCREEN.CHECKOUT);
     setIsAddAppointmentOpen(true);
   };
 
@@ -289,6 +389,7 @@ export default function AdminBookings() {
           appointment={selectedAppointment}
           open={!!selectedAppointment}
           onOpenChange={() => setSelectedAppointment(null)}
+          onCheckout={handleCheckoutFromAppointment}
         />
 
         {clickedCell && (
@@ -382,7 +483,7 @@ export default function AdminBookings() {
 
                 {currentScreen === SCREEN.CHECKOUT && (
                   <CheckoutSection
-                    appointmentId={selectedAppointment?.id}
+                    appointmentId={checkoutData.appointmentId || undefined}
                     selectedCustomer={selectedCustomer}
                     selectedServices={selectedServices}
                     selectedPackages={selectedPackages}
@@ -398,11 +499,12 @@ export default function AdminBookings() {
                     onNotesChange={setAppointmentNotes}
                     onPaymentComplete={handlePaymentComplete}
                     selectedStylists={selectedStylists}
-                    selectedTimeSlots={{ [selectedAppointment?.id || '']: selectedTime }}
+                    selectedTimeSlots={{ [checkoutData.appointmentId || '']: selectedTime }}
                     onSaveAppointment={handleSaveAppointment}
                     onRemoveService={handleRemoveService}
                     onRemovePackage={handleRemovePackage}
                     onBackToServices={handleBackToServices}
+                    isExistingAppointment={!!checkoutData.appointmentId}
                   />
                 )}
 
@@ -428,6 +530,17 @@ export default function AdminBookings() {
                           setCurrentScreen(SCREEN.SERVICE_SELECTION);
                           setNewAppointmentId(null);
                           resetState();
+                          setCheckoutData({
+                            appointmentId: null,
+                            existingAppointment: null,
+                            selectedServices: [],
+                            selectedPackages: [],
+                            selectedStylists: {},
+                            paymentMethod: 'cash',
+                            discountType: 'none',
+                            discountValue: 0,
+                            notes: ''
+                          });
                         }}
                       >
                         Create New Appointment
