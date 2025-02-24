@@ -5,14 +5,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { ShoppingCart } from "lucide-react";
 
 export function MobileCartBar() {
-  const { items, selectedDate, selectedTimeSlots } = useCart();
+  const { items, selectedDate, selectedTimeSlots, getTotalPrice } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const isSchedulingPage = location.pathname === '/schedule';
 
-  const totalPrice = items.reduce((sum, item) => {
-    return sum + (item.service?.selling_price || item.selling_price || 0);
-  }, 0);
+  const totalPrice = getTotalPrice();
 
   if (items.length === 0) return null;
 

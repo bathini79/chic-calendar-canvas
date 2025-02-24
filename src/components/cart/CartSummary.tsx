@@ -12,16 +12,14 @@ export function CartSummary() {
     removeFromCart, 
     selectedDate, 
     selectedTimeSlots,
-    selectedStylists
+    selectedStylists,
+    getTotalPrice
   } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const isSchedulingPage = location.pathname === '/schedule';
 
-  const totalPrice = items.reduce((sum, item) => {
-    return sum + (item.service?.selling_price || item.package?.price || 0);
-  }, 0);
-
+  const totalPrice = getTotalPrice();
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
 
   const handleContinue = () => {

@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -18,6 +17,14 @@ type CartItem = {
     name: string;
     price: number;
     duration: number;
+    package_services: Array<{
+      service: {
+        id: string;
+        name: string;
+        selling_price: number;
+        duration: number;
+      };
+    }>;
   };
   selling_price: number;
 };
@@ -165,13 +172,47 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const getTotalPrice = () => {
     return items.reduce((total, item) => {
-      return total + (item.service?.selling_price || item.package?.price || 0);
+      if (item.service) {
+        return total + item.service.selling_price;
+      } else if (item.package) {
+        let packageTotal = item.package.price;
+        
+        // Add prices for customized services
+        if (item.customized_services?.length) {
+          const customServiceTotal = item.customized_services.reduce((sum, serviceId) => {
+            const service = item.package?.package_services.find(
+              ps => ps.service.id === serviceId
+            )?.service;
+            return sum + (service?.selling_price || 0);
+          }, 0);
+          packageTotal += customServiceTotal;
+        }
+        return total + packageTotal;
+      }
+      return total;
     }, 0);
   };
 
   const getTotalDuration = () => {
     return items.reduce((total, item) => {
-      return total + (item.service?.duration || item.package?.duration || 0);
+      if (item.service) {
+        return total + item.service.duration;
+      } else if (item.package) {
+        let packageDuration = item.package.duration;
+        
+        // Add durations for customized services
+        if (item.customized_services?.length) {
+          const customServiceDuration = item.customized_services.reduce((sum, serviceId) => {
+            const service = item.package?.package_services.find(
+              ps => ps.service.id === serviceId
+            )?.service;
+            return sum + (service?.duration || 0);
+          }, 0);
+          packageDuration += customServiceDuration;
+        }
+        return total + packageDuration;
+      }
+      return total;
     }, 0);
   };
 
