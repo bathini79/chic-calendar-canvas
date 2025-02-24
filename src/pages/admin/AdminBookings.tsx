@@ -265,10 +265,16 @@ export default function AdminBookings() {
 
   const handleRemoveService = (serviceId: string) => {
     setSelectedServices(prev => prev.filter(id => id !== serviceId));
+    const updatedStylists = { ...selectedStylists };
+    delete updatedStylists[serviceId];
+    setSelectedStylists(updatedStylists);
   };
 
   const handleRemovePackage = (packageId: string) => {
     setSelectedPackages(prev => prev.filter(id => id !== packageId));
+    const updatedStylists = { ...selectedStylists };
+    delete updatedStylists[packageId];
+    setSelectedStylists(updatedStylists);
   };
 
   const handleBackToServices = () => {
@@ -502,17 +508,21 @@ export default function AdminBookings() {
                     onPaymentComplete={handlePaymentComplete}
                     selectedStylists={selectedStylists}
                     selectedTimeSlots={{ [checkoutData.appointmentId || '']: selectedTime }}
+                    onSaveAppointment={handleSaveAppointment}
+                    onRemoveService={handleRemoveService}
+                    onRemovePackage={handleRemovePackage}
                     onBackToServices={handleBackToServices}
+                    isExistingAppointment={!!checkoutData.appointmentId}
                   />
                 )}
 
-                {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
+                {currentScreen === SCREEN.SUMMARY && checkoutData.appointmentId && (
                   <div className="p-6">
                     <h3 className="text-xl font-semibold mb-6">
                       Appointment Summary
                     </h3>
                     <SummaryView
-                      appointment={checkoutData.existingAppointment}
+                      appointmentId={checkoutData.appointmentId}
                       paymentMethod={paymentMethod}
                       discountType={discountType}
                       discountValue={discountValue}
