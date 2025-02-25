@@ -125,7 +125,71 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   };
 
-  const addToCart = async (serviceId?: string, packageId?: string, options?: { customized_services?: string[], selling_price?: number }) => {
+  const calculateItemPrice = (item: CartItem): number => {
+    if (item.service) {
+      return item.service.selling_price;
+    } else if (item.package) {
+      let totalPrice = item.package.price;
+
+      if (item.customized_services?.length && item.package.package_services) {
+        const customServicesPrices = item.customized_services.reduce((sum, serviceId) => {
+          const service = item.package?.package_services.find(
+            ps => ps.service.id === serviceId
+          )?.service;
+          return sum + (service?.selling_price || 0);
+        }, 0);
+        totalPrice += customServicesPrices;
+      }
+
+      return totalPrice;
+    }
+    return 0;
+  };
+
+  const calculateItemDuration = (item: CartItem): number => {
+    if (item.service) {
+      return item.service.duration;
+    } else if (item.package) {
+      let totalDuration = 0;
+
+      if (item.package.package_services) {
+        totalDuration += item.package.package_services.reduce(
+          (sum, ps) => sum + ps.service.duration,
+          0
+        );
+      }
+
+      if (item.customized_services?.length && item.package.package_services) {
+        const customServicesDuration = item.customized_services.reduce((sum, serviceId) => {
+          const service = item.package?.package_services.find(
+            ps => ps.service.id === serviceId
+          )?.service;
+          return sum + (service?.duration || 0);
+        }, 0);
+        totalDuration += customServicesDuration;
+      }
+
+      return totalDuration;
+    }
+    return 0;
+  };
+
+  const getTotalPrice = () => {
+    return items.reduce((total, item) => total + calculateItemPrice(item), 0);
+  };
+
+  const getTotalDuration = () => {
+    return items.reduce((total, item) => total + calculateItemDuration(item), 0);
+  };
+
+  const addToCart = async (
+    serviceId?: string, 
+    packageId?: string, 
+    options?: { 
+      customized_services?: string[], 
+      selling_price?: number 
+    }
+  ) => {
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) {
       toast.error("Please sign in to add items to cart");
@@ -165,42 +229,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     await fetchCartItems();
-  };
-
-  const getTotalPrice = () => {
-    return items.reduce((total, item) => {
-      if (item.service) {
-        return total + item.service.selling_price;
-      } else if (item.package) {
-        if (item.selling_price) {
-          return total + item.selling_price;
-        }
-        return total + item.package.price;
-      }
-      return total;
-    }, 0);
-  };
-
-  const getTotalDuration = () => {
-    return items.reduce((total, item) => {
-      if (item.service) {
-        return total + item.service.duration;
-      } else if (item.package) {
-        let packageDuration = item.package.duration;
-        
-        if (item.customized_services?.length && item.package.package_services) {
-          const customServiceDuration = item.customized_services.reduce((sum, serviceId) => {
-            const service = item.package?.package_services.find(
-              ps => ps.service.id === serviceId
-            )?.service;
-            return sum + (service?.duration || 0);
-          }, 0);
-          packageDuration += customServiceDuration;
-        }
-        return total + packageDuration;
-      }
-      return total;
-    }, 0);
   };
 
   return (
