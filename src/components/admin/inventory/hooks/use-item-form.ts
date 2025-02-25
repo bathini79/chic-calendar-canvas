@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ItemFormValues } from "../schemas/item-schema";
+import { itemSchema, type ItemFormValues } from "../schemas/item-schema";
 import { useQueryClient } from "@tanstack/react-query";
 
 export function useItemForm(item?: any, onClose?: () => void) {
@@ -16,10 +16,12 @@ export function useItemForm(item?: any, onClose?: () => void) {
     description: item?.description || "",
     quantity: item?.quantity || 0,
     minimum_quantity: item?.minimum_quantity || 0,
-    max_quantity: item?.max_quantity || 0,
+    max_quantity: item?.max_quantity || 100,
     unit_price: item?.unit_price || 0,
     categories: item?.categories || [],
     status: item?.status || "active",
+    supplier_id: item?.supplier_id || "",
+    unit_of_quantity: item?.unit_of_quantity || "",
   };
 
   const handleSubmit = async (values: ItemFormValues) => {
@@ -31,39 +33,16 @@ export function useItemForm(item?: any, onClose?: () => void) {
         minimum_quantity: values.minimum_quantity,
         max_quantity: values.max_quantity,
         unit_price: values.unit_price,
-        status: values.status
+        status: values.status,
+        supplier_id: values.supplier_id || null,
+        unit_of_quantity: values.unit_of_quantity,
+        categories: values.categories
       };
 
-      let savedItem;
       if (item) {
-        savedItem = await update(item.id, itemData);
+        await update(item.id, itemData);
       } else {
-        savedItem = await create(itemData);
-      }
-
-      if (savedItem && values.categories.length > 0) {
-        if (item) {
-          // Delete existing category relationships
-          await supabase
-            .from('inventory_items_categories')
-            .delete()
-            .eq('item_id', savedItem.id);
-        }
-
-        // Create new category relationships
-        const { error } = await supabase
-          .from('inventory_items_categories')
-          .insert(
-            values.categories.map(categoryId => ({
-              item_id: savedItem.id,
-              category_id: categoryId,
-            }))
-          );
-
-        if (error) {
-          toast.error("Error linking categories");
-          return;
-        }
+        await create(itemData);
       }
 
       // Invalidate and refetch queries
