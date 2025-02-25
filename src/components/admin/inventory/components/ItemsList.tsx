@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import {
@@ -48,9 +49,9 @@ export function ItemsList() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [displayItems, setDisplayItems] = useState<InventoryItem[]>([]);
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
+  const [showLowStock, setShowLowStock] = useState(false);
   const queryClient = useQueryClient();
 
-  // Query for categories
   const { data: categories } = useQuery({
     queryKey: ['inventory_categories'],
     queryFn: async () => {
@@ -64,9 +65,8 @@ export function ItemsList() {
     },
   });
 
-  // Query for items with categories
   const { data: items, refetch } = useQuery({
-    queryKey: ['inventory_items', selectedCategory, selectedStatus, searchQuery],
+    queryKey: ['inventory_items', selectedCategory, selectedStatus, searchQuery, showLowStock],
     queryFn: async () => {
       let query = supabase
         .from('inventory_items')
@@ -83,6 +83,10 @@ export function ItemsList() {
 
       if (searchQuery) {
         query = query.ilike('name', `%${searchQuery}%`);
+      }
+
+      if (showLowStock) {
+        query = query.lte('quantity', supabase.raw('minimum_quantity'));
       }
 
       const { data, error } = await query;
@@ -201,6 +205,14 @@ export function ItemsList() {
             />
           </div>
         </div>
+
+        <Button
+          variant={showLowStock ? "secondary" : "outline"}
+          onClick={() => setShowLowStock(!showLowStock)}
+          className="ml-auto"
+        >
+          {showLowStock ? "Show All Items" : "Show Low Stock Items"}
+        </Button>
       </div>
 
       <div className="bg-card rounded-lg">
