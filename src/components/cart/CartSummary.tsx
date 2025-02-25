@@ -12,7 +12,6 @@ export function CartSummary() {
     removeFromCart, 
     selectedDate, 
     selectedTimeSlots,
-    selectedStylists,
     getTotalPrice
   } = useCart();
   const navigate = useNavigate();
@@ -59,7 +58,8 @@ export function CartSummary() {
                       Duration: {item.service?.duration || item.package?.duration} min
                     </p>
                     <p className="text-sm font-medium">
-                      ₹{item.service?.selling_price || item.package?.price}
+                      ₹{item.service?.selling_price || 
+                         (item.selling_price || item.package?.price)}
                     </p>
                     {isSchedulingPage && selectedTimeSlots[item.id] && (
                       <p className="text-sm text-muted-foreground mt-2">
