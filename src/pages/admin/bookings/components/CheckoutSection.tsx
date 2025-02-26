@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +33,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 import { getTotalPrice, getTotalDuration, getFinalPrice } from "../utils/bookingUtils";
+import { PackageDetailsView } from "./PackageDetailsView";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -107,7 +107,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
-  // Calculate totals using the shared utility functions
   const subtotal = useMemo(() => 
     getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
     [selectedServices, selectedPackages, services, packages, customizedServices]
@@ -128,42 +127,40 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   );
 
   const selectedItems = useMemo(() => {
-    const items = [
-      ...selectedServices.map((id) => {
-        const service = services.find((s) => s.id === id);
-        return service ? {
-          id,
-          name: service.name,
-          price: service.selling_price,
-          duration: service.duration,
-          type: "service" as const,
-          stylist: selectedStylists[id],
-          time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
-          formattedDuration: formatDuration(service.duration),
-        } : null;
-      }),
-      ...selectedPackages.map((id) => {
-        const pkg = packages.find((p) => p.id === id);
-        if (!pkg) return null;
-        // Calculate package duration including customizations
-        const packageDuration = getTotalDuration([], [id], services, packages, customizedServices);
-        // Calculate package price including customizations
-        const packagePrice = getTotalPrice([], [id], services, packages, customizedServices);
+    const serviceItems = selectedServices.map((id) => {
+      const service = services.find((s) => s.id === id);
+      return service ? {
+        id,
+        name: service.name,
+        price: service.selling_price,
+        duration: service.duration,
+        type: "service" as const,
+        stylist: selectedStylists[id],
+        time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
+        formattedDuration: formatDuration(service.duration),
+      } : null;
+    }).filter(Boolean);
 
-        return {
-          id,
-          name: pkg.name,
-          price: packagePrice,
-          duration: packageDuration,
-          type: "package" as const,
-          stylist: selectedStylists[id],
-          time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
-          formattedDuration: formatDuration(packageDuration),
-        };
-      }),
-    ].filter(Boolean);
+    const packageItems = selectedPackages.map((id) => {
+      const pkg = packages.find((p) => p.id === id);
+      if (!pkg) return null;
 
-    return items;
+      const packageDuration = getTotalDuration([], [id], services, packages, customizedServices);
+      const packagePrice = getTotalPrice([], [id], services, packages, customizedServices);
+
+      return {
+        id,
+        package: pkg,
+        price: packagePrice,
+        duration: packageDuration,
+        type: "package" as const,
+        stylist: selectedStylists[id],
+        time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
+        formattedDuration: formatDuration(packageDuration),
+      };
+    }).filter(Boolean);
+
+    return [...serviceItems, ...packageItems];
   }, [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots, appointmentId, customizedServices]);
 
   const handlePayment = async () => {
@@ -223,50 +220,68 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   item && (
                     <div
                       key={`${item.type}-${item.id}`}
-                      className="flex items-center justify-between py-4 border-b border-gray-100"
+                      className="py-4 border-b border-gray-100"
                     >
-                      <div className="space-y-2">
-                        <p className="text-lg font-semibold tracking-tight">{item.name}</p>
-                        <div className="space-y-1">
-                          <div className="flex flex-col text-sm text-muted-foreground gap-1">
-                            <div className="flex items-center">
-                              <Clock className="mr-2 h-4 w-4" />
-                              {item.time && (
-                                <span>{item.time} • {item.formattedDuration}</span>
-                              )}
-                              {!item.time && (
-                                <span>{item.formattedDuration}</span>
-                              )}
-                            </div>
-                            {item.stylist && (
-                              <div className="flex items-center">
-                                <User className="mr-2 h-4 w-4" />
-                                {item.stylist}
+                      {item.type === 'service' ? (
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-2">
+                            <p className="text-lg font-semibold tracking-tight">{item.name}</p>
+                            <div className="space-y-1">
+                              <div className="flex flex-col text-sm text-muted-foreground gap-1">
+                                <div className="flex items-center">
+                                  <Clock className="mr-2 h-4 w-4" />
+                                  {item.time && (
+                                    <span>{item.time} • {item.formattedDuration}</span>
+                                  )}
+                                  {!item.time && (
+                                    <span>{item.formattedDuration}</span>
+                                  )}
+                                </div>
+                                {item.stylist && (
+                                  <div className="flex items-center">
+                                    <User className="mr-2 h-4 w-4" />
+                                    {item.stylist}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <p className="font-semibold text-lg">
+                              <IndianRupee className="inline h-4 w-4" />
+                              {item.price}
+                            </p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => onRemoveService(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <p className="font-semibold text-lg">
-                          <IndianRupee className="inline h-4 w-4" />
-                          {item.price}
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => {
-                            if (item.type === 'service') {
-                              onRemoveService(item.id);
-                            } else {
-                              onRemovePackage(item.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => onRemovePackage(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <PackageDetailsView
+                            pkg={item.package}
+                            services={services}
+                            customizedServices={customizedServices[item.id] || []}
+                            stylist={item.stylist}
+                            time={item.time}
+                          />
+                        </div>
+                      )}
                     </div>
                   )
                 ))}
