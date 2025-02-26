@@ -86,7 +86,7 @@ export function ItemsList() {
       }
 
       if (showLowStock) {
-        query = query.lte('quantity', supabase.raw('minimum_quantity'));
+        query = query.lt('quantity', supabase.raw('minimum_quantity'));
       }
 
       const { data, error } = await query;

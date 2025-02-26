@@ -12,6 +12,7 @@ import { UnitSection } from "./item-form/UnitSection";
 import { QuantitySection } from "./item-form/QuantitySection";
 import { SupplierSection } from "./item-form/SupplierSection";
 import { StatusSection } from "./item-form/StatusSection";
+import { CategorySection } from "./item-form/CategorySection";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 
 interface ItemFormProps {
@@ -45,6 +46,19 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
         .from('suppliers')
         .select('*')
         .eq('status', 'active')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['inventory_categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_categories')
+        .select('*')
         .order('name');
       
       if (error) throw error;
@@ -103,6 +117,12 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
               <FormMessage />
             </FormItem>
           )}
+        />
+
+        <CategorySection
+          value={form.watch("categories")}
+          onValueChange={(values) => form.setValue("categories", values)}
+          categories={categories}
         />
 
         <UnitSection
