@@ -5,10 +5,12 @@ export const getTotalPrice = (
   selectedServices: string[],
   selectedPackages: string[],
   services: Service[],
-  packages: Package[]
+  packages: Package[],
+  customizedServices: Record<string, string[]> = {}
 ) => {
   let total = 0;
 
+  // Calculate price for individual services
   selectedServices.forEach((serviceId) => {
     const service = services?.find((s) => s.id === serviceId);
     if (service) {
@@ -16,10 +18,22 @@ export const getTotalPrice = (
     }
   });
 
+  // Calculate price for packages including customizations
   selectedPackages.forEach((packageId) => {
     const pkg = packages?.find((p) => p.id === packageId);
     if (pkg) {
+      // Add base package price
       total += pkg.price;
+
+      // Add price for additional customized services
+      if (pkg.is_customizable && customizedServices[packageId]) {
+        customizedServices[packageId].forEach((serviceId) => {
+          const service = services?.find((s) => s.id === serviceId);
+          if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+            total += service.selling_price;
+          }
+        });
+      }
     }
   });
 
@@ -30,10 +44,12 @@ export const getTotalDuration = (
   selectedServices: string[],
   selectedPackages: string[],
   services: Service[],
-  packages: Package[]
+  packages: Package[],
+  customizedServices: Record<string, string[]> = {}
 ) => {
   let totalDuration = 0;
 
+  // Calculate duration for individual services
   selectedServices.forEach((serviceId) => {
     const service = services?.find((s) => s.id === serviceId);
     if (service) {
@@ -41,10 +57,24 @@ export const getTotalDuration = (
     }
   });
 
+  // Calculate duration for packages including customizations
   selectedPackages.forEach((packageId) => {
     const pkg = packages?.find((p) => p.id === packageId);
     if (pkg) {
-      totalDuration += pkg.duration;
+      // Add durations of all included services
+      pkg.package_services?.forEach((ps) => {
+        totalDuration += ps.service.duration;
+      });
+
+      // Add duration for additional customized services
+      if (pkg.is_customizable && customizedServices[packageId]) {
+        customizedServices[packageId].forEach((serviceId) => {
+          const service = services?.find((s) => s.id === serviceId);
+          if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+            totalDuration += service.duration;
+          }
+        });
+      }
     }
   });
 
@@ -71,4 +101,49 @@ export const getAppointmentStatusColor = (status: string) => {
     default:
       return "bg-purple-100 hover:bg-purple-200 border-purple-300";
   }
+};
+
+export const calculatePackagePrice = (
+  pkg: Package,
+  customizedServices: string[],
+  services: Service[]
+) => {
+  let total = pkg.price || 0;
+
+  // Add price for additional customized services
+  if (pkg.is_customizable && customizedServices?.length > 0) {
+    customizedServices.forEach((serviceId) => {
+      const service = services?.find((s) => s.id === serviceId);
+      if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+        total += service.selling_price;
+      }
+    });
+  }
+
+  return total;
+};
+
+export const calculatePackageDuration = (
+  pkg: Package,
+  customizedServices: string[],
+  services: Service[]
+) => {
+  let duration = 0;
+
+  // Add duration for package services
+  pkg.package_services?.forEach((ps) => {
+    duration += ps.service.duration;
+  });
+
+  // Add duration for additional customized services
+  if (pkg.is_customizable && customizedServices?.length > 0) {
+    customizedServices.forEach((serviceId) => {
+      const service = services?.find((s) => s.id === serviceId);
+      if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+        duration += service.duration;
+      }
+    });
+  }
+
+  return duration;
 };

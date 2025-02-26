@@ -7,6 +7,7 @@ import { useCart } from "@/components/cart/CartContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
 
 interface CustomizeDialogProps {
   open: boolean;
@@ -25,8 +26,6 @@ export function CustomizeDialog({
   selectedPackage,
   selectedServices,
   allServices,
-  totalPrice,
-  totalDuration,
   onServiceToggle,
 }: CustomizeDialogProps) {
   const { addToCart, removeFromCart, items } = useCart();
@@ -67,10 +66,14 @@ export function CustomizeDialog({
         serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
       );
 
+      const calculatedPrice = calculatePackagePrice(selectedPackage, additionalServices, allServices);
+      const calculatedDuration = calculatePackageDuration(selectedPackage, additionalServices, allServices);
+
       const cartItem = {
         customized_services: additionalServices,
         package_id: selectedPackage.id,
-        selling_price: totalPrice  // This will be properly handled by CartContext now
+        selling_price: calculatedPrice,
+        duration: calculatedDuration
       };
 
       // Add the package with updated customizations
@@ -83,6 +86,13 @@ export function CustomizeDialog({
       toast.error("Failed to update cart");
     }
   };
+
+  // Calculate total price and duration
+  const additionalServices = selectedServices.filter(
+    serviceId => !selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId)
+  );
+  const totalPrice = calculatePackagePrice(selectedPackage, additionalServices, allServices);
+  const totalDuration = calculatePackageDuration(selectedPackage, additionalServices, allServices);
 
   if (!selectedPackage) return null;
 
