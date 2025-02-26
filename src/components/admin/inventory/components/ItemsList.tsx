@@ -12,6 +12,7 @@ import { InventoryTable } from "./list/InventoryTable";
 
 type InventoryItem = Database['public']['Tables']['inventory_items']['Row'] & {
   inventory_items_categories: Array<{ category_id: string }>;
+  categories: string[];
 };
 
 export function ItemsList() {
@@ -59,7 +60,8 @@ export function ItemsList() {
       }
 
       if (showLowStock) {
-        query = query.lt('quantity', 'minimum_quantity');
+        // Fixed: Compare quantity with minimum_quantity column
+        query = query.filter('quantity', 'lte', supabase.raw('minimum_quantity'));
       }
 
       const { data, error } = await query;
