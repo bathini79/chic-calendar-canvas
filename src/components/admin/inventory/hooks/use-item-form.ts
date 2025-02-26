@@ -1,8 +1,6 @@
 
 import { useState } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { itemSchema, type ItemFormValues } from "../schemas/item-schema";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -14,10 +12,10 @@ export function useItemForm(item?: any, onClose?: () => void) {
   const defaultValues: ItemFormValues = {
     name: item?.name || "",
     description: item?.description || "",
-    quantity: item?.quantity || 0,
-    minimum_quantity: item?.minimum_quantity || 0,
-    max_quantity: item?.max_quantity || 100,
-    unit_price: item?.unit_price || 0,
+    quantity: item?.quantity ?? 0,
+    minimum_quantity: item?.minimum_quantity ?? 0,
+    max_quantity: item?.max_quantity ?? 100,
+    unit_price: item?.unit_price ?? 0,
     categories: item?.categories || [],
     status: item?.status || "active",
     supplier_id: item?.supplier_id || "",
@@ -45,14 +43,11 @@ export function useItemForm(item?: any, onClose?: () => void) {
         await create(itemData);
       }
 
-      // Invalidate and refetch queries
       await queryClient.invalidateQueries({ queryKey: ['inventory_items'] });
-      
-      toast.success(item ? "Item updated" : "Item created");
       if (onClose) onClose();
     } catch (error: any) {
-      toast.error(error.message);
       console.error("Error saving item:", error);
+      throw error;
     }
   };
 
