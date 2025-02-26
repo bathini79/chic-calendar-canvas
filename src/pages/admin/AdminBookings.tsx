@@ -460,6 +460,7 @@ export default function AdminBookings() {
                     onRemovePackage={handleRemovePackage}
                     onBackToServices={handleBackToServices}
                     setNewAppointmentId={setNewAppointmentId}
+                    customizedServices={customizedServices}
                   />
                 )}
 

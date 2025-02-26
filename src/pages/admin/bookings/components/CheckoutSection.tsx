@@ -122,7 +122,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     getFinalPrice(subtotal, discountType, discountValue),
     [subtotal, discountType, discountValue]
   );
-
   const discountAmount = useMemo(() => 
     subtotal - total,
     [subtotal, total]
@@ -146,7 +145,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       ...selectedPackages.map((id) => {
         const pkg = packages.find((p) => p.id === id);
         if (!pkg) return null;
-
         // Calculate package duration including customizations
         const packageDuration = getTotalDuration([], [id], services, packages, customizedServices);
         // Calculate package price including customizations
