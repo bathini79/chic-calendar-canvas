@@ -18,7 +18,7 @@ export function useItemForm(item?: any, onClose?: () => void) {
     unit_price: item?.unit_price ?? 0,
     categories: item?.categories || [],
     status: item?.status || "active",
-    supplier_id: item?.supplier_id || "",
+    supplier_id: item?.supplier_id || "none",
     unit_of_quantity: item?.unit_of_quantity || "",
   };
 
@@ -32,7 +32,7 @@ export function useItemForm(item?: any, onClose?: () => void) {
         max_quantity: values.max_quantity,
         unit_price: values.unit_price,
         status: values.status,
-        supplier_id: values.supplier_id || null,
+        supplier_id: values.supplier_id === "none" ? null : values.supplier_id,
         unit_of_quantity: values.unit_of_quantity,
         categories: values.categories
       };
