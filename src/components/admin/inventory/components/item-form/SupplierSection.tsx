@@ -17,12 +17,12 @@ export function SupplierSection({ value, onValueChange, suppliers }: SupplierSec
   return (
     <div>
       <label className="text-sm font-medium">Supplier</label>
-      <Select value={value || "none"} onValueChange={onValueChange}>
+      <Select value={value} onValueChange={onValueChange}>
         <SelectTrigger>
           <SelectValue placeholder="Select a supplier" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">No Supplier</SelectItem>
+          <SelectItem value="_none">No Supplier</SelectItem>
           {suppliers.map((supplier) => (
             <SelectItem key={supplier.id} value={supplier.id}>
               {supplier.name}
