@@ -46,6 +46,7 @@ const useSaveAppointment = ({
   discountValue,
   paymentMethod,
   notes,
+  customizedServices
 }: UseSaveAppointmentProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -80,14 +81,16 @@ const useSaveAppointment = ({
         selectedServices,
         selectedPackages,
         services || [],
-        packages || []
+        packages || [],
+        customizedServices
       );
       const endDateTime = addMinutes(startDateTime, totalDuration);
       const totalPrice = getTotalPrice(
         selectedServices,
         selectedPackages,
         services || [],
-        packages || []
+        packages || [],
+        customizedServices
       );
 
       // Calculate final price after discount

@@ -102,7 +102,8 @@ export default function AdminBookings() {
     discountType,
     discountValue,
     paymentMethod,
-    notes: appointmentNotes
+    notes: appointmentNotes,
+    customizedServices
   });
 
   useEffect(() => {
