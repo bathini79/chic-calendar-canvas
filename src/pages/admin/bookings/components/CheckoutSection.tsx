@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,7 @@ import {
   Trash2
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Service, Package } from "../types";
+import type { Service, Package, Customer } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -32,10 +33,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
-
-interface Customer {
-  id: string;
-}
+import { getTotalPrice, getTotalDuration, getFinalPrice } from "../utils/bookingUtils";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -60,6 +58,7 @@ interface CheckoutSectionProps {
   onRemovePackage: (packageId: string) => void;
   onBackToServices: () => void;
   isExistingAppointment?: boolean;
+  customizedServices?: Record<string, string[]>;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -84,7 +83,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onRemoveService,
   onRemovePackage,
   onBackToServices,
-  setNewAppointmentId
+  isExistingAppointment,
+  customizedServices = {}
 }) => {
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -107,66 +107,66 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
-  const selectedItems = useMemo(
-    () =>
-      [
-        ...selectedServices.map((id) => {
-          const service = services.find((s) => s.id === id);
-          const stylist = selectedStylists[id];
-          const timeSlot = selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''];
-          return service
-            ? {
-                id,
-                name: service.name,
-                price: service.selling_price,
-                duration: service.duration,
-                type: "service" as const,
-                stylist,
-                time: timeSlot ? formatTimeSlot(timeSlot) : undefined,
-                formattedDuration: formatDuration(service.duration),
-              }
-            : null;
-        }),
-        ...selectedPackages.map((id) => {
-          const pkg = packages.find((p) => p.id === id);
-          const stylist = selectedStylists[id];
-          const timeSlot = selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''];
-          return pkg
-            ? {
-                id,
-                name: pkg.name,
-                price: pkg.price,
-                duration: pkg.duration || 0,
-                type: "package" as const,
-                stylist,
-                time: timeSlot ? formatTimeSlot(timeSlot) : undefined,
-                formattedDuration: formatDuration(pkg.duration || 0),
-              }
-            : null;
-        }),
-      ].filter(Boolean),
-    [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots, appointmentId]
+  // Calculate totals using the shared utility functions
+  const subtotal = useMemo(() => 
+    getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
+    [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  const subtotal = useMemo(
-    () => selectedItems.reduce((sum, item) => sum + (item?.price || 0), 0),
-    [selectedItems]
+  const totalDuration = useMemo(() => 
+    getTotalDuration(selectedServices, selectedPackages, services, packages, customizedServices),
+    [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  const discountAmount = useMemo(
-    () =>
-      discountType === "percentage"
-        ? (subtotal * discountValue) / 100
-        : discountType === "fixed"
-        ? discountValue
-        : 0,
-    [discountType, discountValue, subtotal]
+  const total = useMemo(() => 
+    getFinalPrice(subtotal, discountType, discountValue),
+    [subtotal, discountType, discountValue]
   );
 
-  const total = useMemo(
-    () => subtotal - discountAmount,
-    [subtotal, discountAmount]
+  const discountAmount = useMemo(() => 
+    subtotal - total,
+    [subtotal, total]
   );
+
+  const selectedItems = useMemo(() => {
+    const items = [
+      ...selectedServices.map((id) => {
+        const service = services.find((s) => s.id === id);
+        return service ? {
+          id,
+          name: service.name,
+          price: service.selling_price,
+          duration: service.duration,
+          type: "service" as const,
+          stylist: selectedStylists[id],
+          time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
+          formattedDuration: formatDuration(service.duration),
+        } : null;
+      }),
+      ...selectedPackages.map((id) => {
+        const pkg = packages.find((p) => p.id === id);
+        if (!pkg) return null;
+
+        // Calculate package duration including customizations
+        const packageDuration = getTotalDuration([], [id], services, packages, customizedServices);
+        // Calculate package price including customizations
+        const packagePrice = getTotalPrice([], [id], services, packages, customizedServices);
+
+        return {
+          id,
+          name: pkg.name,
+          price: packagePrice,
+          duration: packageDuration,
+          type: "package" as const,
+          stylist: selectedStylists[id],
+          time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
+          formattedDuration: formatDuration(packageDuration),
+        };
+      }),
+    ].filter(Boolean);
+
+    return items;
+  }, [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots, appointmentId, customizedServices]);
 
   const handlePayment = async () => {
     try {
@@ -175,14 +175,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         return;
       }
       const savedAppointmentId = await onSaveAppointment();
-      setNewAppointmentId(savedAppointmentId)
       if (!savedAppointmentId) {
         toast.error("Failed to complete payment");
         return;
       }
 
       toast.success("Payment completed successfully");
-      onPaymentComplete(savedAppointmentId);
+      onPaymentComplete();
     } catch (error: any) {
       console.error("Error completing payment:", error);
       toast.error(error.message || "Failed to complete payment");
