@@ -137,12 +137,17 @@ export const calculatePackageDuration = (
 ) => {
   if (!pkg || !services) return 0;
   
+  // Initialize duration with the sum of all package service durations
   let duration = 0;
-
-  // Add duration for package services
-  pkg?.package_services?.forEach((ps) => {
-    duration += ps.service.duration;
-  });
+  
+  // Add duration for all package services
+  if (pkg.package_services && pkg.package_services.length > 0) {
+    pkg.package_services.forEach((ps) => {
+      if (ps.service && typeof ps.service.duration === 'number') {
+        duration += ps.service.duration;
+      }
+    });
+  }
 
   // Add duration for additional customized services
   if (pkg?.is_customizable && customizedServices?.length > 0) {
@@ -153,7 +158,7 @@ export const calculatePackageDuration = (
       // Check if this service is not already in the package
       const isInPackage = pkg.package_services?.some(ps => ps.service.id === serviceId);
       
-      if (service && !isInPackage) {
+      if (service && !isInPackage && typeof service.duration === 'number') {
         duration += service.duration;
       }
     });

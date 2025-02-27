@@ -96,8 +96,23 @@ export function CustomizeDialog({
   const additionalServices = selectedServices.filter(
     serviceId => !selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId)
   );
+
+  // Calculate the base package duration from package services
+  const basePackageDuration = selectedPackage?.package_services?.reduce(
+    (total: number, ps: any) => total + ps.service.duration, 0
+  ) || 0;
+
+  // Calculate additional duration from customized services
+  const additionalDuration = additionalServices.reduce((total: number, serviceId: string) => {
+    const service = localServices?.find(s => s.id === serviceId);
+    return total + (service?.duration || 0);
+  }, 0);
+
+  // Total duration is base package duration plus additional services duration
+  const totalDuration = basePackageDuration + additionalDuration;
+
+  // Calculate total price using the utility function
   const totalPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
-  const totalDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
   if (!selectedPackage) return null;
 
