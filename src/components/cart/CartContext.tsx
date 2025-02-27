@@ -132,18 +132,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } else if (item.package) {
       let totalPrice = item.package.price;
 
-      // Add prices for customized services that aren't already in the package
+      // Add prices for customized services
       if (item.customized_services?.length) {
-        item.customized_services.forEach((serviceId) => {
-          const isInPackage = item.package?.package_services.some(
-            ps => ps.service.id === serviceId
-          );
+        // First, get all services (including customized ones)
+        const allServices = item.package.package_services.map(ps => ps.service);
+        
+        // For each customized service
+        item.customized_services.forEach(serviceId => {
+          // Check if this service is not already in the package
+          const isInPackage = item.package?.package_services.some(ps => ps.service.id === serviceId);
           if (!isInPackage) {
-            const service = item.package?.package_services.find(
-              ps => ps.service.id === serviceId
-            )?.service;
-            if (service) {
-              totalPrice += service.selling_price;
+            // Find the service in the complete list
+            const customService = allServices.find(s => s.id === serviceId);
+            if (customService) {
+              totalPrice += customService.selling_price;
             }
           }
         });
@@ -160,23 +162,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } else if (item.package) {
       let totalDuration = 0;
 
-      // Add duration for base package services
-      item.package.package_services.forEach((ps) => {
+      // Add base package services duration
+      item.package.package_services.forEach(ps => {
         totalDuration += ps.service.duration;
       });
 
-      // Add duration for customized services that aren't already in the package
+      // Add duration for customized services
       if (item.customized_services?.length) {
-        item.customized_services.forEach((serviceId) => {
-          const isInPackage = item.package?.package_services.some(
-            ps => ps.service.id === serviceId
-          );
+        // First, get all services (including customized ones)
+        const allServices = item.package.package_services.map(ps => ps.service);
+
+        // For each customized service
+        item.customized_services.forEach(serviceId => {
+          // Check if this service is not already in the package
+          const isInPackage = item.package?.package_services.some(ps => ps.service.id === serviceId);
           if (!isInPackage) {
-            const service = item.package?.package_services.find(
-              ps => ps.service.id === serviceId
-            )?.service;
-            if (service) {
-              totalDuration += service.duration;
+            // Find the service in the complete list
+            const customService = allServices.find(s => s.id === serviceId);
+            if (customService) {
+              totalDuration += customService.duration;
             }
           }
         });
