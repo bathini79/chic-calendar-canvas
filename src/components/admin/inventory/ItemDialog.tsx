@@ -14,7 +14,7 @@ interface ItemDialogProps {
   open?: boolean;
 }
 
-export function ItemDialog({ item, onClose, open }: ItemDialogProps) {
+export function ItemDialog({ item, onClose, open = false }: ItemDialogProps) {
   const { defaultValues, handleSubmit } = useItemForm(item, onClose);
 
   return (

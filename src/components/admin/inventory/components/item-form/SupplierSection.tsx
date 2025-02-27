@@ -22,7 +22,7 @@ export function SupplierSection({ value, onValueChange, suppliers }: SupplierSec
           <SelectValue placeholder="Select a supplier" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">None</SelectItem>
+          <SelectItem value="_none">No Supplier</SelectItem>
           {suppliers.map((supplier) => (
             <SelectItem key={supplier.id} value={supplier.id}>
               {supplier.name}

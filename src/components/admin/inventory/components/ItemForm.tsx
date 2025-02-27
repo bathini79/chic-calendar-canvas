@@ -12,6 +12,8 @@ import { UnitSection } from "./item-form/UnitSection";
 import { QuantitySection } from "./item-form/QuantitySection";
 import { SupplierSection } from "./item-form/SupplierSection";
 import { StatusSection } from "./item-form/StatusSection";
+import { CategorySection } from "./item-form/CategorySection";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 
 interface ItemFormProps {
   defaultValues: ItemFormValues;
@@ -51,31 +53,77 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
     }
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ['inventory_categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_categories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div>
-          <label htmlFor="name" className="text-sm font-medium">Name</label>
-          <Input id="name" {...form.register("name")} />
-        </div>
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         
-        <div>
-          <label htmlFor="description" className="text-sm font-medium">Description</label>
-          <Textarea id="description" {...form.register("description")} />
-        </div>
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Textarea {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <QuantitySection register={form.register} />
 
-        <div>
-          <label htmlFor="unitPrice" className="text-sm font-medium">Unit Price</label>
-          <Input
-            id="unitPrice"
-            type="number"
-            min="0"
-            step="0.01"
-            {...form.register("unit_price", { valueAsNumber: true })}
-          />
-        </div>
+        <FormField
+          control={form.control}
+          name="unit_price"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Unit Price</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  {...field}
+                  onChange={e => field.onChange(parseFloat(e.target.value))}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <CategorySection
+          value={form.watch("categories")}
+          onValueChange={(values) => form.setValue("categories", values)}
+          categories={categories}
+        />
 
         <UnitSection
           value={form.watch("unit_of_quantity")}
