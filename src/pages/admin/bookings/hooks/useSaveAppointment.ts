@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { format, addMinutes } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Customer, Service, Package } from "../types";
+import { Customer, Service, Package, SCREEN } from "../types";
 
 interface UseSaveAppointmentProps {
   selectedDate: Date | null;
@@ -46,7 +46,8 @@ const useSaveAppointment = ({
   discountValue,
   paymentMethod,
   notes,
-  customizedServices
+  customizedServices,
+  currentScreen
 }: UseSaveAppointmentProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -102,7 +103,14 @@ const useSaveAppointment = ({
           : 0;
 
       const finalPrice = totalPrice - discountAmount;
-
+      let status = "" 
+      if(currentScreen == SCREEN.CHECKOUT){
+        status="completed"
+      }
+      else if(currentScreen == SCREEN.SERVICE_SELECTION){
+        status="confirmed"
+      }
+      
       // Create the appointment
       const { data: appointmentData, error: appointmentError } = await supabase
         .from("appointments")
@@ -110,7 +118,7 @@ const useSaveAppointment = ({
           customer_id: selectedCustomer.id,
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
-          status: "confirmed",
+          status,
           number_of_bookings: selectedServices.length + selectedPackages.length,
           total_price: finalPrice,
           original_total_price: totalPrice,
@@ -149,7 +157,7 @@ const useSaveAppointment = ({
           employee_id: stylistId,
           start_time: currentStartTime.toISOString(),
           end_time: bookingEndTime.toISOString(),
-          status: "confirmed",
+          status,
           price_paid: service.selling_price,
           original_price: service.original_price,
         });
@@ -204,7 +212,7 @@ const useSaveAppointment = ({
               employee_id: stylistId,
               start_time: currentStartTime.toISOString(),
               end_time: bookingEndTime.toISOString(),
-              status: "confirmed",
+              status,
               price_paid: service.selling_price,
             });
 

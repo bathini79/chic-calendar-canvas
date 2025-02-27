@@ -22,7 +22,7 @@ import { useActiveServices } from "./bookings/hooks/useActiveServices";
 import { useActivePackages } from "./bookings/hooks/useActivePackages";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import useSaveAppointment from "./bookings/hooks/useSaveAppointment";
-import { Appointment, Service, Package } from "./bookings/types";
+import { Appointment, Service, Package,SCREEN } from "./bookings/types";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -31,11 +31,7 @@ const initialStats = [
   { label: "Today's Revenue", value: 1950 },
 ];
 
-const SCREEN = {
-  SERVICE_SELECTION: "SERVICE_SELECTION",
-  CHECKOUT: "CHECKOUT",
-  SUMMARY: "SUMMARY"
-} as const;
+
 
 type ScreenType = (typeof SCREEN)[keyof typeof SCREEN];
 
@@ -103,7 +99,8 @@ export default function AdminBookings() {
     discountValue,
     paymentMethod,
     notes: appointmentNotes,
-    customizedServices
+    customizedServices,
+    currentScreen
   });
 
   useEffect(() => {
@@ -247,40 +244,10 @@ export default function AdminBookings() {
     setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
-  const handlePaymentComplete = async (appointmentId?: string) => {
-    try {
-      const { error: updateError } = await supabase
-        .from('appointments')
-        .update({
-          status: 'completed',
-          payment_method: paymentMethod,
-          discount_type: discountType,
-          discount_value: discountValue,
-          notes: appointmentNotes,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id',newAppointmentId || appointmentId);
-
-      if (updateError) throw updateError;
-
-      const { error: bookingsError } = await supabase
-        .from('bookings')
-        .update({
-          status: 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('appointment_id', newAppointmentId || appointmentId);
-
-      if (bookingsError) throw bookingsError;
-
+  const handlePaymentComplete = async (appointmentId?: string) => {  
+      setNewAppointmentId(appointmentId)
       setCurrentScreen(SCREEN.SUMMARY);
       resetState();
-      
-      toast.success('Payment completed successfully');
-    } catch (error: any) {
-      console.error('Error completing payment:', error);
-      toast.error('Failed to complete payment');
-    }
   };
 
   const handleCheckoutFromAppointment = (appointment: Appointment) => {
@@ -316,6 +283,14 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(true);
     setCurrentScreen(SCREEN.CHECKOUT);
   };
+
+  const onHandleSaveAppointment = async() => {
+    const appointmentId = await handleSaveAppointment()
+    if(appointmentId){
+      closeAddAppointment()
+      resetState()
+    }
+  }
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -423,7 +398,7 @@ export default function AdminBookings() {
                     </div>
 
                     <div className="p-6 border-t mt-auto flex justify-end gap-4">
-                      <Button variant="outline" onClick={handleSaveAppointment}>
+                      <Button variant="outline" onClick={onHandleSaveAppointment}>
                         Save Appointment
                       </Button>
                       <Button

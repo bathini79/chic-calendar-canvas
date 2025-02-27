@@ -179,7 +179,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       }
 
       toast.success("Payment completed successfully");
-      onPaymentComplete();
+      onPaymentComplete(savedAppointmentId);
     } catch (error: any) {
       console.error("Error completing payment:", error);
       toast.error(error.message || "Failed to complete payment");

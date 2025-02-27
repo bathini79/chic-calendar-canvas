@@ -110,3 +110,9 @@ export interface TransactionDetails {
   originalSale: Appointment;
   refunds: Appointment[];
 }
+
+export const SCREEN = {
+  SERVICE_SELECTION: "SERVICE_SELECTION",
+  CHECKOUT: "CHECKOUT",
+  SUMMARY: "SUMMARY"
+} as const;
