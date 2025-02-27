@@ -108,10 +108,10 @@ export const calculatePackagePrice = (
   customizedServices: string[],
   services: Service[]
 ) => {
-  let total = pkg.price || 0;
+  let total = pkg?.price || 0;
 
   // Add price for additional customized services
-  if (pkg.is_customizable && customizedServices?.length > 0) {
+  if (pkg?.is_customizable && customizedServices?.length > 0) {
     customizedServices.forEach((serviceId) => {
       const service = services?.find((s) => s.id === serviceId);
       if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
@@ -131,12 +131,12 @@ export const calculatePackageDuration = (
   let duration = 0;
 
   // Add duration for package services
-  pkg.package_services?.forEach((ps) => {
+  pkg?.package_services?.forEach((ps) => {
     duration += ps.service.duration;
   });
 
   // Add duration for additional customized services
-  if (pkg.is_customizable && customizedServices?.length > 0) {
+  if (pkg?.is_customizable && customizedServices?.length > 0) {
     customizedServices.forEach((serviceId) => {
       const service = services?.find((s) => s.id === serviceId);
       if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
