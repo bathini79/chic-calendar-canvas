@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -131,14 +132,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } else if (item.package) {
       let totalPrice = item.package.price;
 
-      if (item.customized_services?.length && item.package.package_services) {
-        const customServicesPrices = item.customized_services.reduce((sum, serviceId) => {
-          const service = item.package?.package_services.find(
+      // Add prices for customized services that aren't already in the package
+      if (item.customized_services?.length) {
+        item.customized_services.forEach((serviceId) => {
+          const isInPackage = item.package?.package_services.some(
             ps => ps.service.id === serviceId
-          )?.service;
-          return sum + (service?.selling_price || 0);
-        }, 0);
-        totalPrice += customServicesPrices;
+          );
+          if (!isInPackage) {
+            const service = item.package?.package_services.find(
+              ps => ps.service.id === serviceId
+            )?.service;
+            if (service) {
+              totalPrice += service.selling_price;
+            }
+          }
+        });
       }
 
       return totalPrice;
@@ -152,21 +160,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } else if (item.package) {
       let totalDuration = 0;
 
-      if (item.package.package_services) {
-        totalDuration += item.package.package_services.reduce(
-          (sum, ps) => sum + ps.service.duration,
-          0
-        );
-      }
+      // Add duration for base package services
+      item.package.package_services.forEach((ps) => {
+        totalDuration += ps.service.duration;
+      });
 
-      if (item.customized_services?.length && item.package.package_services) {
-        const customServicesDuration = item.customized_services.reduce((sum, serviceId) => {
-          const service = item.package?.package_services.find(
+      // Add duration for customized services that aren't already in the package
+      if (item.customized_services?.length) {
+        item.customized_services.forEach((serviceId) => {
+          const isInPackage = item.package?.package_services.some(
             ps => ps.service.id === serviceId
-          )?.service;
-          return sum + (service?.duration || 0);
-        }, 0);
-        totalDuration += customServicesDuration;
+          );
+          if (!isInPackage) {
+            const service = item.package?.package_services.find(
+              ps => ps.service.id === serviceId
+            )?.service;
+            if (service) {
+              totalDuration += service.duration;
+            }
+          }
+        });
       }
 
       return totalDuration;
