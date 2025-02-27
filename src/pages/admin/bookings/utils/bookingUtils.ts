@@ -108,13 +108,20 @@ export const calculatePackagePrice = (
   customizedServices: string[],
   services: Service[]
 ) => {
+  if (!pkg || !services) return 0;
+  
   let total = pkg?.price || 0;
 
   // Add price for additional customized services
   if (pkg?.is_customizable && customizedServices?.length > 0) {
     customizedServices.forEach((serviceId) => {
+      // Find the service in the complete list of services
       const service = services?.find((s) => s.id === serviceId);
-      if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+      
+      // Check if this service is not already in the package
+      const isInPackage = pkg.package_services?.some(ps => ps.service.id === serviceId);
+      
+      if (service && !isInPackage) {
         total += service.selling_price;
       }
     });
@@ -128,6 +135,8 @@ export const calculatePackageDuration = (
   customizedServices: string[],
   services: Service[]
 ) => {
+  if (!pkg || !services) return 0;
+  
   let duration = 0;
 
   // Add duration for package services
@@ -138,8 +147,13 @@ export const calculatePackageDuration = (
   // Add duration for additional customized services
   if (pkg?.is_customizable && customizedServices?.length > 0) {
     customizedServices.forEach((serviceId) => {
+      // Find the service in the complete list of services
       const service = services?.find((s) => s.id === serviceId);
-      if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+      
+      // Check if this service is not already in the package
+      const isInPackage = pkg.package_services?.some(ps => ps.service.id === serviceId);
+      
+      if (service && !isInPackage) {
         duration += service.duration;
       }
     });

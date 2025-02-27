@@ -57,9 +57,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<Record<string, string>>({});
   const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
+  const [allServices, setAllServices] = useState<any[]>([]);
 
   useEffect(() => {
     fetchCartItems();
+    fetchAllServices();
 
     const channel = supabase
       .channel('cart-changes')
@@ -80,6 +82,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const fetchAllServices = async () => {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*')
+      .eq('status', 'active');
+      
+    if (error) {
+      console.error('Error fetching services:', error);
+      return;
+    }
+    
+    if (data) {
+      setAllServices(data);
+    }
+  };
 
   const fetchCartItems = async () => {
     const { data: session } = await supabase.auth.getSession();
@@ -133,16 +151,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       let totalPrice = item.package.price;
 
       // Add prices for customized services
-      if (item.customized_services?.length) {
-        // First, get all services (including customized ones)
-        const allServices = item.package.package_services.map(ps => ps.service);
-        
-        // For each customized service
+      if (item.customized_services?.length && allServices.length > 0) {
         item.customized_services.forEach(serviceId => {
           // Check if this service is not already in the package
           const isInPackage = item.package?.package_services.some(ps => ps.service.id === serviceId);
           if (!isInPackage) {
-            // Find the service in the complete list
+            // Find the service in the complete list of all services
             const customService = allServices.find(s => s.id === serviceId);
             if (customService) {
               totalPrice += customService.selling_price;
@@ -168,16 +182,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       });
 
       // Add duration for customized services
-      if (item.customized_services?.length) {
-        // First, get all services (including customized ones)
-        const allServices = item.package.package_services.map(ps => ps.service);
-
-        // For each customized service
+      if (item.customized_services?.length && allServices.length > 0) {
         item.customized_services.forEach(serviceId => {
           // Check if this service is not already in the package
           const isInPackage = item.package?.package_services.some(ps => ps.service.id === serviceId);
           if (!isInPackage) {
-            // Find the service in the complete list
+            // Find the service in the complete list of all services
             const customService = allServices.find(s => s.id === serviceId);
             if (customService) {
               totalDuration += customService.duration;

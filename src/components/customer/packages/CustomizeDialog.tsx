@@ -6,7 +6,7 @@ import { ServicesList } from "./ServicesList";
 import { useCart } from "@/components/cart/CartContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
 
 interface CustomizeDialogProps {
@@ -29,11 +29,19 @@ export function CustomizeDialog({
   onServiceToggle,
 }: CustomizeDialogProps) {
   const { addToCart, removeFromCart, items } = useCart();
+  const [localServices, setLocalServices] = useState<any[]>([]);
+  
   // Find if this package is already in cart
   const existingPackageInCart = items.find(item => 
     item.package_id === selectedPackage?.id
   );
 
+  useEffect(() => {
+    if (allServices) {
+      setLocalServices(allServices);
+    }
+  }, [allServices]);
+  
   // When dialog opens, initialize selected services from cart if package exists
   useEffect(() => {
     if (open && selectedPackage && existingPackageInCart) {
@@ -66,18 +74,15 @@ export function CustomizeDialog({
         serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
       );
 
-      const calculatedPrice = calculatePackagePrice(selectedPackage, additionalServices, allServices);
-      const calculatedDuration = calculatePackageDuration(selectedPackage, additionalServices, allServices);
-
-      const cartItem = {
-        customized_services: additionalServices,
-        package_id: selectedPackage.id,
-        selling_price: calculatedPrice,
-        duration: calculatedDuration
-      };
+      // Use the correct services list to calculate price and duration
+      const calculatedPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
+      const calculatedDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
       // Add the package with updated customizations
-      await addToCart(undefined, selectedPackage?.id, cartItem);
+      await addToCart(undefined, selectedPackage?.id, {
+        customized_services: additionalServices,
+        selling_price: calculatedPrice
+      });
       
       toast.success(existingPackageInCart ? "Package updated in cart" : "Added to cart");
       onOpenChange(false);
@@ -91,8 +96,8 @@ export function CustomizeDialog({
   const additionalServices = selectedServices.filter(
     serviceId => !selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId)
   );
-  const totalPrice = calculatePackagePrice(selectedPackage, additionalServices, allServices);
-  const totalDuration = calculatePackageDuration(selectedPackage, additionalServices, allServices);
+  const totalPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
+  const totalDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
   if (!selectedPackage) return null;
 
@@ -110,7 +115,7 @@ export function CustomizeDialog({
             <ServicesList
               selectedPackage={selectedPackage}
               selectedServices={selectedServices}
-              allServices={allServices}
+              allServices={localServices}
               onServiceToggle={onServiceToggle}
             />
           </div>
