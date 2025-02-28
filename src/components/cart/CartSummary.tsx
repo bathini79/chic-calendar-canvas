@@ -55,7 +55,7 @@ export function CartSummary() {
                       {item.service?.name || item.package?.name}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Duration: {item.service?.duration || item.package?.duration} min
+                      Duration: {item.service?.duration || (item?.duration || item.package?.duration)} min
                     </p>
                     <p className="text-sm font-medium">
                       ₹{item.service?.selling_price || 

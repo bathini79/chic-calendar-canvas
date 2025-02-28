@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,11 +29,16 @@ type CartItem = {
     }>;
   };
   selling_price: number;
+  duration?: number;
 };
 
 type CartContextType = {
   items: CartItem[];
-  addToCart: (serviceId?: string, packageId?: string, options?: { customized_services?: string[], selling_price?: number }) => Promise<void>;
+  addToCart: (serviceId?: string, packageId?: string, options?: { 
+    customized_services?: string[],
+    selling_price?: number,
+    duration?: number
+  }) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   isLoading: boolean;
   setCartOpen: (open: boolean) => void;
@@ -148,6 +152,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (item.service) {
       return item.service.selling_price;
     } else if (item.package) {
+      // If we have a pre-calculated selling_price, use it
+      if (item.selling_price) {
+        return item.selling_price;
+      }
+      
       let totalPrice = item.package.price;
 
       // Add prices for customized services
@@ -174,6 +183,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (item.service) {
       return item.service.duration;
     } else if (item.package) {
+      // If we have a pre-calculated duration, use it
+      if (item.duration) {
+        return item.duration;
+      }
+      
       let totalDuration = 0;
 
       // Add base package services duration
@@ -214,7 +228,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     packageId?: string, 
     options?: { 
       customized_services?: string[], 
-      selling_price?: number 
+      selling_price?: number,
+      duration?: number
     }
   ) => {
     const { data: session } = await supabase.auth.getSession();
@@ -229,7 +244,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       status: 'pending' as const,
       customer_id: session.session.user.id,
       customized_services: options?.customized_services || [],
-      selling_price: options?.selling_price || 0
+      selling_price: options?.selling_price || 0,
+      duration: options?.duration || 0
     };
 
     const { error } = await supabase

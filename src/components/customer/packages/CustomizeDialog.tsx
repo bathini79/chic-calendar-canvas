@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -74,14 +73,28 @@ export function CustomizeDialog({
         serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
       );
 
-      // Use the correct services list to calculate price and duration
+      // Calculate the base package duration from package services
+      const basePackageDuration = selectedPackage?.package_services?.reduce(
+        (total: number, ps: any) => total + ps.service.duration, 0
+      ) || 0;
+
+      // Calculate additional duration from customized services
+      const additionalDuration = additionalServices.reduce((total: number, serviceId: string) => {
+        const service = localServices?.find(s => s.id === serviceId);
+        return total + (service?.duration || 0);
+      }, 0);
+
+      // Total duration is base package duration plus additional services duration
+      const calculatedDuration = basePackageDuration + additionalDuration;
+
+      // Calculate price
       const calculatedPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
-      const calculatedDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
       // Add the package with updated customizations
       await addToCart(undefined, selectedPackage?.id, {
         customized_services: additionalServices,
-        selling_price: calculatedPrice
+        selling_price: calculatedPrice,
+        duration: calculatedDuration
       });
       
       toast.success(existingPackageInCart ? "Package updated in cart" : "Added to cart");
