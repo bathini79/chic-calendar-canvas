@@ -10,6 +10,7 @@ import { ItemsList } from "@/components/admin/inventory/components/ItemsList";
 import { PurchaseOrdersList } from "@/components/admin/inventory/components/PurchaseOrdersList";
 import { HeaderActions } from "@/components/admin/inventory/components/HeaderActions";
 import { ItemDialog } from "@/components/admin/inventory/ItemDialog";
+import { AutoConsumption } from "@/components/admin/inventory/components/AutoConsumption";
 
 export default function Inventory() {
   const [view, setView] = useState<"grid" | "list">("list");
@@ -38,6 +39,7 @@ export default function Inventory() {
                 <TabsTrigger value="categories">Categories</TabsTrigger>
                 <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
                 <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
+                <TabsTrigger value="auto-consumption">Auto Consumption</TabsTrigger>
               </TabsList>
             </div>
 
@@ -66,6 +68,10 @@ export default function Inventory() {
 
               <TabsContent value="purchase-orders" className="m-0">
                 <PurchaseOrdersList />
+              </TabsContent>
+              
+              <TabsContent value="auto-consumption" className="m-0">
+                <AutoConsumption />
               </TabsContent>
             </div>
           </Tabs>

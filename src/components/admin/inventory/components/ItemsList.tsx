@@ -60,8 +60,8 @@ export function ItemsList() {
       }
 
       if (showLowStock) {
-        // Fixed: Compare quantity with minimum_quantity column
-        query = query.filter('quantity', 'lte', supabase.raw('minimum_quantity'));
+        // Compare quantity with minimum_quantity column
+        query = query.filter('quantity', 'lte', 'minimum_quantity');
       }
 
       const { data, error } = await query;
