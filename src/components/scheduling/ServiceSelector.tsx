@@ -34,6 +34,11 @@ interface CartItem {
   selling_price: number;
 }
 
+interface Employee {
+  id: string;
+  name: string;
+}
+
 interface ServiceSelectorProps {
   items: CartItem[];
   selectedStylists: Record<string, string>;
@@ -70,7 +75,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
   });
 
   // Group items by package and standalone services
-  const groupedItems = items.reduce((acc, item) => {
+  const groupedItems = items.reduce((acc: any, item) => {
     if (item.package_id && item.package) {
       const packageServices: PackageService[] = [];
       
@@ -86,7 +91,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
             const service = services.find(s => s.id === serviceId);
             return service ? { service } : null;
           })
-          .filter((s): s is PackageService => s !== null);
+          .filter(Boolean) as PackageService[];
         
         packageServices.push(...customizedServiceObjects);
       }

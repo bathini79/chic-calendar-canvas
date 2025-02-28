@@ -109,6 +109,11 @@ export default function BookingConfirmation() {
         const itemStartTimeString = selectedTimeSlots[item.id];
         let currentStartTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${itemStartTimeString}`);
         
+        // Get the selected stylist for this item
+        const stylistId = selectedStylists[item.id] && selectedStylists[item.id] !== 'any' 
+          ? selectedStylists[item.id] 
+          : null;
+        
         if (item.service_id) {
           // This is a regular service - add a single booking
           const itemDuration = item.service?.duration || 0;
@@ -117,7 +122,7 @@ export default function BookingConfirmation() {
           const bookingPromise = supabase.from('bookings').insert({
             appointment_id: appointmentId,
             service_id: item.service_id,
-            employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
+            employee_id: stylistId,
             status: 'confirmed',
             price_paid: item.service?.selling_price || 0,
             original_price: item.service?.original_price || 0,
@@ -140,7 +145,7 @@ export default function BookingConfirmation() {
                 appointment_id: appointmentId,
                 service_id: packageService.service.id,
                 package_id: item.package_id,
-                employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
+                employee_id: stylistId,
                 status: 'confirmed',
                 price_paid: packageService.service.selling_price || 0,
                 start_time: currentStartTime.toISOString(),
@@ -180,7 +185,7 @@ export default function BookingConfirmation() {
                       appointment_id: appointmentId,
                       service_id: serviceId,
                       package_id: item.package_id,
-                      employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
+                      employee_id: stylistId,
                       status: 'confirmed',
                       price_paid: customService.selling_price || 0,
                       start_time: currentStartTime.toISOString(),

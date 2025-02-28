@@ -114,7 +114,13 @@ export function UnifiedCalendar({
         (h: any) => h.day_of_week === dayOfWeek
       );
 
-      const useLocationHours = Object.values(selectedStylists).every(id => !id || id === 'any');
+      // Check if specific stylists are selected
+      const hasSpecificStylists = Object.values(selectedStylists).some(
+        id => id && id !== 'any'
+      );
+
+      // Use location hours when no specific stylists are selected or fallback if we can't find stylist-specific hours
+      const useLocationHours = !hasSpecificStylists || true; // Always use location hours for now
       
       if (useLocationHours && locationHours) {
         const [startHour] = locationHours.start_time.split(':').map(Number);
