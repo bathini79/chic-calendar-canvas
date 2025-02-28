@@ -104,8 +104,9 @@ const useSaveAppointment = ({
           : 0;
 
       const finalPrice = totalPrice - discountAmount;
-      let status = "confirmed";
-      if(currentScreen === SCREEN.CHECKOUT){
+      // Use the correct type for status ("confirmed" | "completed")
+      let status: "confirmed" | "completed" = "confirmed";
+      if (currentScreen === SCREEN.CHECKOUT) {
         status = "completed";
       }
       

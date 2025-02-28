@@ -132,17 +132,21 @@ export function UnifiedCalendar({
             closingTime.setHours(endHour, 0, 0, 0);
             if (slotEnd > closingTime) continue;
 
+            // Check for conflicts with existing bookings
             const hasConflict = existingBookings?.some(booking => {
               const bookingStart = new Date(booking.start_time);
               const bookingEnd = new Date(booking.end_time);
+              
+              // Check if this slot overlaps with any existing booking
               return (
-                (slotStart >= bookingStart && slotStart < bookingEnd) ||
-                (slotEnd > bookingStart && slotEnd <= bookingEnd)
+                (slotStart <= bookingEnd && slotEnd >= bookingStart)
               );
             });
 
-            // Check if this time slot is selected (any item has this time slot)
-            const isSelected = Object.values(selectedTimeSlots).includes(timeString);
+            // Check if this is the selected start time
+            // Only check the first item's time slot to determine if it's selected
+            const firstItemId = sortedItems.length > 0 ? sortedItems[0].id : '';
+            const isSelected = firstItemId && selectedTimeSlots[firstItemId] === timeString;
 
             slots.push({
               time: timeString,
@@ -159,11 +163,11 @@ export function UnifiedCalendar({
 
     const generatedSlots = generateTimeSlots();
     setTimeSlots(generatedSlots);
-  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, locationData, totalDuration]);
+  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, locationData, totalDuration, sortedItems]);
 
   // Generate sequential time slots for each item based on the selected start time
   const calculateSequentialTimeSlots = (startTimeString: string) => {
-    if (!selectedDate) return {};
+    if (!selectedDate || sortedItems.length === 0) return {};
     
     let currentStartTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${startTimeString}`);
     const newTimeSlots: Record<string, string> = {};
@@ -178,6 +182,13 @@ export function UnifiedCalendar({
     });
     
     return newTimeSlots;
+  };
+
+  // Clear all selected time slots
+  const clearSelectedTimeSlots = () => {
+    sortedItems.forEach(item => {
+      onTimeSlotSelect(item.id, '');
+    });
   };
 
   return (
@@ -212,7 +223,11 @@ export function UnifiedCalendar({
                         ? "bg-primary text-primary-foreground hover:bg-primary/90"
                         : "hover:bg-accent"
                     )}
-                    onClick={() => onDateSelect(date)}
+                    onClick={() => {
+                      onDateSelect(date);
+                      // Clear time slots when date changes
+                      clearSelectedTimeSlots();
+                    }}
                   >
                     <span className="text-2xl font-semibold">{format(date, "d")}</span>
                   </Button>
@@ -242,14 +257,22 @@ export function UnifiedCalendar({
                     !slot.isAvailable && !slot.isSelected && "bg-muted text-muted-foreground"
                   )}
                   onClick={() => {
-                    if (slot.isAvailable && !slot.isSelected) {
-                      // Generate sequential time slots based on this start time
-                      const sequentialTimeSlots = calculateSequentialTimeSlots(slot.time);
-                      
-                      // Update all time slots at once
-                      Object.entries(sequentialTimeSlots).forEach(([itemId, timeSlot]) => {
-                        onTimeSlotSelect(itemId, timeSlot);
-                      });
+                    if (slot.isAvailable) {
+                      if (slot.isSelected) {
+                        // If already selected, deselect all slots
+                        clearSelectedTimeSlots();
+                      } else {
+                        // First clear any existing selections
+                        clearSelectedTimeSlots();
+                        
+                        // Then generate and set new sequential time slots
+                        const sequentialTimeSlots = calculateSequentialTimeSlots(slot.time);
+                        
+                        // Update all time slots at once
+                        Object.entries(sequentialTimeSlots).forEach(([itemId, timeSlot]) => {
+                          onTimeSlotSelect(itemId, timeSlot);
+                        });
+                      }
                     }
                   }}
                 >
