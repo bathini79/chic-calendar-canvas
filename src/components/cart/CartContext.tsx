@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ type CartItem = {
     name: string;
     selling_price: number;
     duration: number;
+    original_price?: number;
   };
   package?: {
     id: string;
@@ -118,7 +120,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           id,
           name,
           selling_price,
-          duration
+          duration,
+          original_price
         ),
         package:packages!cart_items_package_id_fkey(
           id,

@@ -100,36 +100,113 @@ export default function BookingConfirmation() {
       }
 
       const appointmentId = appointmentData[0].id;
+      
+      // Array to hold all booking promises
+      const bookingPromises = [];
 
-      // 2. Iterate through each item in the cart to create bookings with sequential times
+      // 2. Process each item in the cart to create bookings
       for (const item of sortedItems) {
         const itemStartTimeString = selectedTimeSlots[item.id];
-        const itemStartTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${itemStartTimeString}`);
-        const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
-        const itemEndTime = addMinutes(itemStartTime, itemDuration);
-
-        // Insert a new booking into the 'bookings' table with the specific start/end times for this item
-        const { error: bookingError } = await supabase.from('bookings').insert({
-          appointment_id: appointmentId,
-          service_id: item.service_id,
-          package_id: item.package_id,
-          employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
-          status: 'confirmed',
-          price_paid: item.selling_price || item.service?.selling_price || item.package?.price || 0,
-          original_price: item.service?.original_price || 0,
-          start_time: itemStartTime.toISOString(),
-          end_time: itemEndTime.toISOString()
-        });
-
-        if (bookingError) {
-          console.error("Error inserting booking:", bookingError);
-          if (bookingError.code === '23505') { // Unique constraint violation
-            toast.error(`Booking conflict: ${bookingError.message}`);
-          } else {
-            toast.error("Failed to create booking. Please try again.");
+        let currentStartTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${itemStartTimeString}`);
+        
+        if (item.service_id) {
+          // This is a regular service - add a single booking
+          const itemDuration = item.service?.duration || 0;
+          const itemEndTime = addMinutes(currentStartTime, itemDuration);
+          
+          const bookingPromise = supabase.from('bookings').insert({
+            appointment_id: appointmentId,
+            service_id: item.service_id,
+            employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
+            status: 'confirmed',
+            price_paid: item.service?.selling_price || 0,
+            original_price: item.service?.original_price || 0,
+            start_time: currentStartTime.toISOString(),
+            end_time: itemEndTime.toISOString()
+          });
+          
+          bookingPromises.push(bookingPromise);
+        } 
+        else if (item.package_id) {
+          // This is a package - we need to add a booking for each service in the package
+          
+          // Step 1: Process the base package services first
+          if (item.package?.package_services && item.package.package_services.length > 0) {
+            for (const packageService of item.package.package_services) {
+              const serviceDuration = packageService.service?.duration || 0;
+              const serviceEndTime = addMinutes(currentStartTime, serviceDuration);
+              
+              const bookingPromise = supabase.from('bookings').insert({
+                appointment_id: appointmentId,
+                service_id: packageService.service.id,
+                package_id: item.package_id,
+                employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
+                status: 'confirmed',
+                price_paid: packageService.service.selling_price || 0,
+                start_time: currentStartTime.toISOString(),
+                end_time: serviceEndTime.toISOString()
+              });
+              
+              bookingPromises.push(bookingPromise);
+              
+              // Update start time for the next service
+              currentStartTime = serviceEndTime;
+            }
           }
-          throw bookingError;
+          
+          // Step 2: Handle customized services if present
+          if (item.customized_services && item.customized_services.length > 0) {
+            // Fetch all services to get details for customized services
+            const { data: allServices } = await supabase
+              .from('services')
+              .select('*')
+              .in('id', item.customized_services);
+              
+            if (allServices) {
+              for (const serviceId of item.customized_services) {
+                // Check if this service is not already part of the base package
+                const isBaseService = item.package?.package_services.some(
+                  ps => ps.service.id === serviceId
+                );
+                
+                if (!isBaseService) {
+                  const customService = allServices.find(s => s.id === serviceId);
+                  
+                  if (customService) {
+                    const serviceDuration = customService.duration || 0;
+                    const serviceEndTime = addMinutes(currentStartTime, serviceDuration);
+                    
+                    const bookingPromise = supabase.from('bookings').insert({
+                      appointment_id: appointmentId,
+                      service_id: serviceId,
+                      package_id: item.package_id,
+                      employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
+                      status: 'confirmed',
+                      price_paid: customService.selling_price || 0,
+                      start_time: currentStartTime.toISOString(),
+                      end_time: serviceEndTime.toISOString()
+                    });
+                    
+                    bookingPromises.push(bookingPromise);
+                    
+                    // Update start time for the next service
+                    currentStartTime = serviceEndTime;
+                  }
+                }
+              }
+            }
+          }
         }
+      }
+      
+      // Wait for all booking operations to complete
+      const bookingResults = await Promise.all(bookingPromises);
+      
+      // Check if any booking operations failed
+      const bookingErrors = bookingResults.filter(result => result.error);
+      if (bookingErrors.length > 0) {
+        console.error("Errors inserting bookings:", bookingErrors);
+        throw new Error("Failed to create some bookings. Please try again.");
       }
 
       toast.success("Booking confirmed successfully!");

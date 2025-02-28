@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -22,7 +23,7 @@ import { useActiveServices } from "./bookings/hooks/useActiveServices";
 import { useActivePackages } from "./bookings/hooks/useActivePackages";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import useSaveAppointment from "./bookings/hooks/useSaveAppointment";
-import { Appointment, Service, Package,SCREEN } from "./bookings/types";
+import { Appointment, Service, Package, SCREEN } from "./bookings/types";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -30,8 +31,6 @@ const initialStats = [
   { label: "Today's Bookings", value: 5 },
   { label: "Today's Revenue", value: 1950 },
 ];
-
-
 
 type ScreenType = (typeof SCREEN)[keyof typeof SCREEN];
 
@@ -244,10 +243,10 @@ export default function AdminBookings() {
     setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
-  const handlePaymentComplete = async (appointmentId?: string) => {  
-      setNewAppointmentId(appointmentId)
-      setCurrentScreen(SCREEN.SUMMARY);
-      resetState();
+  const handlePaymentComplete = (appointmentId?: string) => {  
+    setNewAppointmentId(appointmentId || null);
+    setCurrentScreen(SCREEN.SUMMARY);
+    resetState();
   };
 
   const handleCheckoutFromAppointment = (appointment: Appointment) => {
@@ -265,7 +264,7 @@ export default function AdminBookings() {
         stylists[booking.package_id] = booking.employee_id;
       }
     });
-    setNewAppointmentId(appointment.id)
+    setNewAppointmentId(appointment.id);
     setSelectedServices(services);
     setSelectedPackages(packages);
     setSelectedStylists(stylists);
@@ -285,12 +284,30 @@ export default function AdminBookings() {
   };
 
   const onHandleSaveAppointment = async() => {
-    const appointmentId = await handleSaveAppointment()
+    const appointmentId = await handleSaveAppointment();
     if(appointmentId){
-      closeAddAppointment()
-      resetState()
+      closeAddAppointment();
+      resetState();
     }
-  }
+  };
+
+  // This is a temporary prop for the TimeSlots component until we fix the imports
+  const timeSlotsProps = {
+    employees,
+    formatTime,
+    TOTAL_HOURS,
+    currentDate,
+    nowPosition,
+    isSameDay,
+    appointments,
+    setSelectedAppointment,
+    setClickedCell: handleCellClick,
+    hourLabels: [],
+    PIXELS_PER_HOUR: 60,
+    handleColumnClick: () => {},
+    renderAppointmentBlock: () => <></>
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -305,15 +322,7 @@ export default function AdminBookings() {
           onNext={goNext}
         />
         <TimeSlots
-          employees={employees}
-          formatTime={formatTime}
-          TOTAL_HOURS={TOTAL_HOURS}
-          currentDate={currentDate}
-          nowPosition={nowPosition}
-          isSameDay={isSameDay}
-          appointments={appointments}
-          setSelectedAppointment={setSelectedAppointment}
-          setClickedCell={handleCellClick}
+          {...timeSlotsProps}
         />
         <AppointmentDetailsDialog
           appointment={selectedAppointment}
@@ -434,8 +443,8 @@ export default function AdminBookings() {
                     onRemoveService={handleRemoveService}
                     onRemovePackage={handleRemovePackage}
                     onBackToServices={handleBackToServices}
-                    setNewAppointmentId={setNewAppointmentId}
                     customizedServices={customizedServices}
+                    isExistingAppointment={false}
                   />
                 )}
 
@@ -451,7 +460,8 @@ export default function AdminBookings() {
                       <Button
                         onClick={() => {
                           setCurrentScreen(SCREEN.SERVICE_SELECTION);
-                          setNewAppointmentId(null)}}
+                          setNewAppointmentId(null);
+                        }}
                       >
                         Create New Appointment
                       </Button>

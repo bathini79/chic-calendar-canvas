@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from "react";
 import { format, addMinutes } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,8 @@ interface UseSaveAppointmentProps {
   discountValue: number;
   paymentMethod: "cash" | "online";
   notes: string;
+  customizedServices?: Record<string, string[]>;
+  currentScreen?: string;
 }
 
 const useSaveAppointment = ({
@@ -46,7 +49,7 @@ const useSaveAppointment = ({
   discountValue,
   paymentMethod,
   notes,
-  customizedServices,
+  customizedServices = {},
   currentScreen
 }: UseSaveAppointmentProps) => {
   const [isSaving, setIsSaving] = useState(false);
@@ -82,16 +85,14 @@ const useSaveAppointment = ({
         selectedServices,
         selectedPackages,
         services || [],
-        packages || [],
-        customizedServices
+        packages || []
       );
       const endDateTime = addMinutes(startDateTime, totalDuration);
       const totalPrice = getTotalPrice(
         selectedServices,
         selectedPackages,
         services || [],
-        packages || [],
-        customizedServices
+        packages || []
       );
 
       // Calculate final price after discount
@@ -103,12 +104,9 @@ const useSaveAppointment = ({
           : 0;
 
       const finalPrice = totalPrice - discountAmount;
-      let status = "" 
-      if(currentScreen == SCREEN.CHECKOUT){
-        status="completed"
-      }
-      else if(currentScreen == SCREEN.SERVICE_SELECTION){
-        status="confirmed"
+      let status = "confirmed";
+      if(currentScreen === SCREEN.CHECKOUT){
+        status = "completed";
       }
       
       // Create the appointment
@@ -139,6 +137,7 @@ const useSaveAppointment = ({
 
       const appointmentId = appointmentData.id;
       let currentStartTime = startDateTime;
+      
       // Create bookings for individual services
       for (const serviceId of selectedServices) {
         const service = services?.find((s) => s.id === serviceId);
@@ -178,28 +177,23 @@ const useSaveAppointment = ({
           pkg.package_services?.map((ps) => ps.service.id) || [];
 
         // Get all selected services for this package
-
         const selectedPackageServices = new Set([
           ...packageServices,
-
-          ...(pkg.is_customizable
-            ? pkg.customizable_services?.filter(
-                (serviceId) => selectedStylists[serviceId]
-              ) || []
+          ...(pkg.is_customizable && customizedServices
+            ? customizedServices[packageId] || []
             : []),
         ]);
+
         for (const serviceId of selectedPackageServices) {
           const service = services?.find((s) => s.id === serviceId);
 
           if (!service) continue;
 
-          const stylistId = selectedStylists[serviceId];
+          const stylistId = selectedStylists[serviceId] || selectedStylists[packageId];
 
           if (!stylistId) {
             toast.error(`Please select a stylist for ${service.name}`);
-
             setIsSaving(false);
-
             return null;
           }
           const bookingEndTime = addMinutes(currentStartTime, service.duration);
@@ -247,6 +241,8 @@ const useSaveAppointment = ({
     discountValue,
     paymentMethod,
     notes,
+    customizedServices,
+    currentScreen
   ]);
 
   return { handleSaveAppointment, isSaving, saveError };

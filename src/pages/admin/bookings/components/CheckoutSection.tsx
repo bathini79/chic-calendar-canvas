@@ -50,7 +50,7 @@ interface CheckoutSectionProps {
   onDiscountValueChange: (value: number) => void;
   onPaymentMethodChange: (method: 'cash' | 'online') => void;
   onNotesChange: (notes: string) => void;
-  onPaymentComplete: () => void;
+  onPaymentComplete: (appointmentId?: string) => void;
   selectedStylists: Record<string, string>;
   selectedTimeSlots: Record<string, string>;
   onSaveAppointment: () => Promise<string | null>;
@@ -161,7 +161,16 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           formattedDuration: formatDuration(packageDuration),
         };
       }),
-    ].filter(Boolean);
+    ].filter(Boolean) as Array<{
+      id: string;
+      name: string;
+      price: number;
+      duration: number;
+      type: "service" | "package";
+      stylist: string;
+      time: string;
+      formattedDuration: string;
+    }>;
 
     return items;
   }, [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots, appointmentId, customizedServices]);
