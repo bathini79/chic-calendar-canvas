@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { useNavigate, useLocation } from "react-router-dom";
-import { format } from "date-fns";
+import { format, addMinutes } from "date-fns";
 
 export function CartSummary() {
   const { 
@@ -20,6 +20,13 @@ export function CartSummary() {
 
   const totalPrice = getTotalPrice();
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
+  
+  // Sort items by their scheduled start time
+  const sortedItems = [...items].sort((a, b) => {
+    const aTime = selectedTimeSlots[a.id] || "00:00";
+    const bTime = selectedTimeSlots[b.id] || "00:00";
+    return aTime.localeCompare(bTime);
+  });
 
   const handleContinue = () => {
     if (isSchedulingPage) {
@@ -44,41 +51,51 @@ export function CartSummary() {
               Your cart is empty
             </p>
           ) : (
-            items.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-col space-y-2 p-4 border rounded-lg"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-medium">
-                      {item.service?.name || item.package?.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Duration: {item.service?.duration || (item?.duration || item.package?.duration)} min
-                    </p>
-                    <p className="text-sm font-medium">
-                      ₹{item.service?.selling_price || 
-                         (item.selling_price || item.package?.price)}
-                    </p>
-                    {isSchedulingPage && selectedTimeSlots[item.id] && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {format(selectedDate!, "MMM d")} at {selectedTimeSlots[item.id]}
+            sortedItems.map((item) => {
+              const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
+              
+              return (
+                <div
+                  key={item.id}
+                  className="flex flex-col space-y-2 p-4 border rounded-lg"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-medium">
+                        {item.service?.name || item.package?.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Duration: {itemDuration} min
                       </p>
+                      <p className="text-sm font-medium">
+                        ₹{item.selling_price || item.service?.selling_price || item.package?.price}
+                      </p>
+                      {isSchedulingPage && selectedTimeSlots[item.id] && selectedDate && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {format(selectedDate, "MMM d")} at {selectedTimeSlots[item.id]} - 
+                          {format(
+                            addMinutes(
+                              new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTimeSlots[item.id]}`),
+                              itemDuration
+                            ),
+                            "HH:mm"
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    {!isSchedulingPage && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeFromCart(item.id)}
+                      >
+                        Remove
+                      </Button>
                     )}
                   </div>
-                  {!isSchedulingPage && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeFromCart(item.id)}
-                    >
-                      Remove
-                    </Button>
-                  )}
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </ScrollArea>

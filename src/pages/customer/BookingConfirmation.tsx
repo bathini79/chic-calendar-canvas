@@ -1,8 +1,9 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { format, addMinutes } from "date-fns";
+import { format, addMinutes, parseISO } from "date-fns";
 import { ArrowRight, Calendar, Clock, Package, Store } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -28,13 +29,35 @@ export default function BookingConfirmation() {
     return null;
   }
 
-  const startTime = Object.values(selectedTimeSlots)[0];
+  // Sort items by their start times
+  const sortedItems = [...items].sort((a, b) => {
+    const aTime = selectedTimeSlots[a.id] || "00:00";
+    const bTime = selectedTimeSlots[b.id] || "00:00";
+    return aTime.localeCompare(bTime);
+  });
+
+  const firstStartTime = Object.values(selectedTimeSlots)[0];
   const totalDuration = getTotalDuration();
   const totalHours = Math.floor(totalDuration / 60);
   const remainingMinutes = totalDuration % 60;
   const durationDisplay = totalHours > 0
     ? `${totalHours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`
     : `${remainingMinutes}m`;
+
+  const calculateEndTime = (startTime: string, duration: number) => {
+    if (!selectedDate) return "";
+    const dateTimeString = `${format(selectedDate, 'yyyy-MM-dd')} ${startTime}`;
+    const startDateTime = new Date(dateTimeString);
+    const endDateTime = addMinutes(startDateTime, duration);
+    return format(endDateTime, 'HH:mm');
+  };
+
+  // Calculate the end time based on the first service's start time and the total duration
+  const firstItemStartTime = selectedTimeSlots[sortedItems[0]?.id] || "00:00";
+  const lastItemEndTime = addMinutes(
+    new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${firstItemStartTime}`),
+    totalDuration
+  );
 
   const handleBookingConfirmation = async () => {
     setIsLoading(true);
@@ -47,9 +70,10 @@ export default function BookingConfirmation() {
 
       const customer_id = session.user.id;
 
-      const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${startTime}`);
+      const firstStartTime = selectedTimeSlots[sortedItems[0]?.id] || "00:00";
+      const startDateTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${firstStartTime}`);
       if (isNaN(startDateTime.getTime())) {
-        console.error(`Invalid date generated, date: ${format(selectedDate, 'yyyy-MM-dd')}, time: ${startTime}`);
+        console.error(`Invalid date generated, date: ${format(selectedDate, 'yyyy-MM-dd')}, time: ${firstStartTime}`);
         return;
       }
       const endDateTime = addMinutes(startDateTime, totalDuration);
@@ -63,7 +87,7 @@ export default function BookingConfirmation() {
           end_time: endDateTime.toISOString(),
           notes: notes,
           status: 'confirmed',
-          number_of_bookings:items.length,
+          number_of_bookings: items.length,
           total_price: getTotalPrice(),
           total_duration: totalDuration
         })
@@ -77,17 +101,24 @@ export default function BookingConfirmation() {
 
       const appointmentId = appointmentData[0].id;
 
-      // 2. Iterate through each item in the cart to create bookings
-      for (const item of items) {
-        // Insert a new booking into the 'bookings' table.
+      // 2. Iterate through each item in the cart to create bookings with sequential times
+      for (const item of sortedItems) {
+        const itemStartTimeString = selectedTimeSlots[item.id];
+        const itemStartTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${itemStartTimeString}`);
+        const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
+        const itemEndTime = addMinutes(itemStartTime, itemDuration);
+
+        // Insert a new booking into the 'bookings' table with the specific start/end times for this item
         const { error: bookingError } = await supabase.from('bookings').insert({
           appointment_id: appointmentId,
           service_id: item.service_id,
           package_id: item.package_id,
           employee_id: selectedStylists[item.id] !== 'any' ? selectedStylists[item.id] : null,
           status: 'confirmed',
-          price_paid: item.service.selling_price,
-          original_price: item.service.original_price
+          price_paid: item.selling_price || item.service?.selling_price || item.package?.price || 0,
+          original_price: item.service?.original_price || 0,
+          start_time: itemStartTime.toISOString(),
+          end_time: itemEndTime.toISOString()
         });
 
         if (bookingError) {
@@ -102,7 +133,7 @@ export default function BookingConfirmation() {
       }
 
       toast.success("Booking confirmed successfully!");
-      clearCart()
+      clearCart();
       navigate('/profile'); // Redirect to profile
 
     } catch (error: any) {
@@ -112,11 +143,13 @@ export default function BookingConfirmation() {
       setIsLoading(false);
     }
   };
+
   const clearCart = async () => {
     for (const item of items) {
       await removeFromCart(item.id);
     }
   };
+
   return (
     <div className="min-h-screen pb-24">
       <div className="container max-w-2xl mx-auto py-6 px-4">
@@ -129,18 +162,21 @@ export default function BookingConfirmation() {
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Clock className="h-4 w-4" />
-              <span>{format(new Date(`2000/01/01 ${startTime}`), 'hh:mm a')}</span>
+              <span>{format(new Date(`2000/01/01 ${firstItemStartTime}`), 'hh:mm a')}</span>
               <ArrowRight className="h-4 w-4" />
               <span>
-              {format(addMinutes(new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${startTime}`),getTotalDuration()), 'hh:mm a')}
+                {format(lastItemEndTime, 'hh:mm a')}
                 <span className="ml-1 text-sm">({durationDisplay})</span>
               </span>
             </div>
           </div>
 
           <div className="space-y-4">
-            {items.map((item) => {
-              const itemDuration = item.service?.duration || item.package?.duration || 0;
+            {sortedItems.map((item, index) => {
+              const itemStartTime = selectedTimeSlots[item.id] || "00:00";
+              const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
+              const itemEndTime = calculateEndTime(itemStartTime, itemDuration);
+              
               const hours = Math.floor(itemDuration / 60);
               const minutes = itemDuration % 60;
               const itemDurationDisplay = hours > 0
@@ -159,12 +195,12 @@ export default function BookingConfirmation() {
                       )}
                       <p className="text-sm text-muted-foreground flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {itemDurationDisplay}
+                        {format(new Date(`2000/01/01 ${itemStartTime}`), 'hh:mm a')} - {format(new Date(`2000/01/01 ${itemEndTime}`), 'hh:mm a')} ({itemDurationDisplay})
                       </p>
                     </div>
                   </div>
                   <div className="font-medium">
-                    ₹{item.service?.selling_price || item.package?.price}
+                    ₹{item.selling_price || item.service?.selling_price || item.package?.price}
                   </div>
                 </div>
               );

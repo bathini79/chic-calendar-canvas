@@ -1,6 +1,7 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addDays, startOfToday, isSameDay, addMinutes } from "date-fns";
+import { format, addDays, startOfToday, isSameDay, addMinutes, parseISO } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -48,11 +49,19 @@ export function UnifiedCalendar({
     }
   }, [selectedDate, onDateSelect]);
 
-  const totalDuration = useMemo(() => {
-    return items.reduce((total, item) => {
-      return total + (item.service?.duration || item.package?.duration || 30);
-    }, 0);
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const aDuration = a.service?.duration || a.duration || a.package?.duration || 0;
+      const bDuration = b.service?.duration || b.duration || b.package?.duration || 0;
+      return bDuration - aDuration; // Sort by duration (longest first)
+    });
   }, [items]);
+
+  const totalDuration = useMemo(() => {
+    return sortedItems.reduce((total, item) => {
+      return total + (item.service?.duration || item.duration || item.package?.duration || 0);
+    }, 0);
+  }, [sortedItems]);
 
   const { data: locationData } = useQuery({
     queryKey: ['location'],
@@ -132,6 +141,7 @@ export function UnifiedCalendar({
               );
             });
 
+            // Check if this time slot is selected (any item has this time slot)
             const isSelected = Object.values(selectedTimeSlots).includes(timeString);
 
             slots.push({
@@ -150,6 +160,25 @@ export function UnifiedCalendar({
     const generatedSlots = generateTimeSlots();
     setTimeSlots(generatedSlots);
   }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, locationData, totalDuration]);
+
+  // Generate sequential time slots for each item based on the selected start time
+  const calculateSequentialTimeSlots = (startTimeString: string) => {
+    if (!selectedDate) return {};
+    
+    let currentStartTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${startTimeString}`);
+    const newTimeSlots: Record<string, string> = {};
+    
+    // Assign sequential time slots to each item in the sorted order
+    sortedItems.forEach((item) => {
+      newTimeSlots[item.id] = format(currentStartTime, 'HH:mm');
+      
+      // Add the duration of this item to get the start time for the next item
+      const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
+      currentStartTime = addMinutes(currentStartTime, itemDuration);
+    });
+    
+    return newTimeSlots;
+  };
 
   return (
     <Card className="border-0 shadow-none bg-transparent w-full">
@@ -214,8 +243,12 @@ export function UnifiedCalendar({
                   )}
                   onClick={() => {
                     if (slot.isAvailable && !slot.isSelected) {
-                      items.forEach((item) => {
-                        onTimeSlotSelect(item.id, slot.time);
+                      // Generate sequential time slots based on this start time
+                      const sequentialTimeSlots = calculateSequentialTimeSlots(slot.time);
+                      
+                      // Update all time slots at once
+                      Object.entries(sequentialTimeSlots).forEach(([itemId, timeSlot]) => {
+                        onTimeSlotSelect(itemId, timeSlot);
                       });
                     }
                   }}
