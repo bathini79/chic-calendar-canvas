@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -101,7 +101,11 @@ export function ServiceInventoryRequirements({
 
   const handleItemChange = (index: number, field: 'itemId' | 'quantity', value: string | number) => {
     const newItemRequirements = [...itemRequirements];
-    newItemRequirements[index][field] = value;
+    if (field === 'itemId') {
+      newItemRequirements[index].itemId = value as string;
+    } else if (field === 'quantity') {
+      newItemRequirements[index].quantity = value as number;
+    }
     setItemRequirements(newItemRequirements);
   };
 

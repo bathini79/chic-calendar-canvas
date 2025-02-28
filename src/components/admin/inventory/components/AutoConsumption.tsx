@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package } from "lucide-react";
 
@@ -74,15 +73,17 @@ interface ExistingRequirement {
   };
 }
 
+interface ItemInput {
+  itemId: string;
+  quantity: number;
+}
+
 export function AutoConsumption() {
   const [activeTab, setActiveTab] = useState<"services" | "packages">("services");
   const [selectedService, setSelectedService] = useState<string>("");
   const [selectedPackage, setSelectedPackage] = useState<string>("");
   const [requirements, setRequirements] = useState<ServiceRequirement[]>([]);
-  const [itemInputs, setItemInputs] = useState<{
-    itemId: string;
-    quantity: number;
-  }[]>([{ itemId: "", quantity: 1 }]);
+  const [itemInputs, setItemInputs] = useState<ItemInput[]>([{ itemId: "", quantity: 1 }]);
 
   // Fetch services
   const { data: services, isLoading: servicesLoading } = useQuery({
@@ -164,7 +165,7 @@ export function AutoConsumption() {
   useEffect(() => {
     if (existingRequirements) {
       // Group by service_id
-      const groupedRequirements = existingRequirements.reduce((acc, req) => {
+      const groupedRequirements = existingRequirements.reduce((acc: Record<string, ServiceRequirement>, req) => {
         if (!acc[req.service_id]) {
           acc[req.service_id] = {
             id: req.id,
@@ -182,7 +183,7 @@ export function AutoConsumption() {
         });
 
         return acc;
-      }, {} as Record<string, ServiceRequirement>);
+      }, {});
 
       setRequirements(Object.values(groupedRequirements));
     }
@@ -198,7 +199,11 @@ export function AutoConsumption() {
 
   const handleItemChange = (index: number, field: 'itemId' | 'quantity', value: string | number) => {
     const newItemInputs = [...itemInputs];
-    newItemInputs[index][field] = value;
+    if (field === 'itemId') {
+      newItemInputs[index].itemId = value as string;
+    } else if (field === 'quantity') {
+      newItemInputs[index].quantity = value as number;
+    }
     setItemInputs(newItemInputs);
   };
 
