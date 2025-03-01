@@ -12,7 +12,9 @@ import {
   Printer,
   Download,
   Ban,
-  Clock
+  Clock,
+  Package,
+  User
 } from "lucide-react";
 import { format } from 'date-fns';
 import {
@@ -173,6 +175,40 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
+  const getGroupedBookings = (transaction) => {
+    const groups = {
+      packages: {} as Record<string, { 
+        packageDetails: any, 
+        bookings: any[], 
+        stylist: string,
+        startTime: string,
+        totalPrice: number
+      }>, 
+      services: [] as any[]
+    };
+
+    transaction.bookings.forEach(booking => {
+      if (booking.package_id) {
+        if (!groups.packages[booking.package_id]) {
+          groups.packages[booking.package_id] = {
+            packageDetails: booking.package,
+            bookings: [],
+            stylist: booking.employee?.name || '',
+            startTime: booking.start_time,
+            totalPrice: booking.package ? booking.package.price : booking.price_paid
+          };
+        }
+        if (booking.service_id && booking.service) {
+          groups.packages[booking.package_id].bookings.push(booking);
+        }
+      } else if (booking.service_id) {
+        groups.services.push(booking);
+      }
+    });
+    
+    return groups;
+  };
+
   if (!transactionDetails) {
     return <div>Loading...</div>;
   }
@@ -189,6 +225,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto px-1">
         {allTransactions.map((transaction) => {
           const isRefund = transaction.transaction_type === 'refund';
+          const groupedBookings = getGroupedBookings(transaction);
           
           return (
             <Card key={transaction.id} className={`bg-white h-full ${isRefund ? 'border-red-200' : ''}`}>
@@ -275,24 +312,66 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
                 <div className="overflow-y-auto">
                   <h4 className="font-medium mb-4">{isRefund ? 'Refunded Items' : 'Items'}</h4>
-                  {transaction.bookings.map((booking) => {
-                    const itemName = booking.service?.name || booking.package?.name;
-                    
-                    return (
-                      <div key={booking.id} className="py-2 flex justify-between items-start border-b">
+                  
+                  {Object.entries(groupedBookings.packages).map(([packageId, packageGroup]) => (
+                    <div key={`${transaction.id}-package-${packageId}`} className="mb-4">
+                      <div className="py-2 flex justify-between items-start border-b">
                         <div className="flex-1">
-                          <p className="font-medium text-sm line-clamp-1">{itemName}</p>
-                          <p className="text-xs text-gray-500">
-                            {format(new Date(booking.start_time), 'h:mma')}{' '}
-                            {booking.employee && ` • ${booking.employee.name}`}
-                          </p>
+                          <div className="flex items-center">
+                            <Package className="h-4 w-4 mr-2 text-blue-500" />
+                            <p className="font-medium text-blue-600">{packageGroup.packageDetails.name}</p>
+                          </div>
+                          <div className="flex flex-col text-xs text-gray-500 mt-1">
+                            <p>{format(new Date(packageGroup.startTime), 'h:mma')}</p>
+                            {packageGroup.stylist && (
+                              <div className="flex items-center mt-1">
+                                <User className="h-3 w-3 mr-1" />
+                                <span>{packageGroup.stylist}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
+                          {isRefund ? '-' : ''}₹{packageGroup.totalPrice.toFixed(2)}
+                        </p>
+                      </div>
+                      
+                      <div className="pl-6 border-l-2 border-blue-200 mt-1 space-y-1">
+                        {packageGroup.bookings.map((booking) => (
+                          booking.service && (
+                            <div key={`${transaction.id}-package-service-${booking.id}`} className="flex justify-between text-sm py-1">
+                              <div>
+                                <p className="text-gray-700">{booking.service.name}</p>
+                                <p className="text-xs text-gray-500">{booking.service.duration}min</p>
+                              </div>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {groupedBookings.services.map((booking) => (
+                    booking.service && (
+                      <div key={`${transaction.id}-service-${booking.id}`} className="py-2 flex justify-between items-start border-b">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{booking.service.name}</p>
+                          <div className="flex flex-col text-xs text-gray-500 mt-1">
+                            <p>{format(new Date(booking.start_time), 'h:mma')}</p>
+                            {booking.employee && (
+                              <div className="flex items-center mt-1">
+                                <User className="h-3 w-3 mr-1" />
+                                <span>{booking.employee.name}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
                           {isRefund ? '-' : ''}₹{booking.price_paid.toFixed(2)}
                         </p>
                       </div>
-                    );
-                  })}
+                    )
+                  ))}
                 </div>
 
                 <div className="space-y-1 pt-2 border-t">
@@ -387,7 +466,19 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 <input
                   type="checkbox"
                   checked={selectAll}
-                  onChange={(e) => setSelectAll(e.target.checked)}
+                  onChange={(e) => {
+                    setSelectAll(e.target.checked);
+                    if (transactionDetails?.originalSale) {
+                      const allBookings = transactionDetails.originalSale.bookings
+                        .filter(booking => booking.status !== 'refunded')
+                        .reduce((acc, booking) => {
+                          acc[booking.id] = e.target.checked;
+                          return acc;
+                        }, {} as Record<string, boolean>);
+                      
+                      setRefundItems(allBookings);
+                    }
+                  }}
                   className="h-4 w-4 rounded border-gray-300"
                 />
                 <span className="text-sm">Select All</span>
