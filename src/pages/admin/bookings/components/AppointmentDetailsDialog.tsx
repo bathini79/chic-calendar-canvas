@@ -47,12 +47,6 @@ interface AppointmentDetailsDialogProps {
 }
 
 const statusMessages = {
-  completed: {
-    title: "Complete Appointment",
-    description: "Are you sure you want to mark this appointment as completed? This will update the service status and cannot be undone.",
-    action: "Yes, Complete",
-    icon: <CheckCircle className="h-5 w-5 text-green-500" />
-  },
   canceled: {
     title: "Cancel Appointment",
     description: "Are you sure you want to cancel this appointment? This will notify the customer and free up the time slot.",
@@ -83,7 +77,11 @@ export function AppointmentDetailsDialog({
 
   const handleStatusChange = async (newStatus: string) => {
     setSelectedStatus(newStatus);
-    setShowConfirmDialog(true);
+    if(statusMessages[newStatus]){
+      setShowConfirmDialog(true)
+    }else{
+      handleStatusConfirm()
+    }
   };
 
   const handleStatusConfirm = async () => {
@@ -174,10 +172,10 @@ export function AppointmentDetailsDialog({
                       Confirmed
                     </div>
                   </SelectItem>
-                  <SelectItem value="completed">
+                  <SelectItem value="inprogress">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-green-500" />
-                      Completed
+                      In Progress
                     </div>
                   </SelectItem>
                   <SelectItem value="canceled">
