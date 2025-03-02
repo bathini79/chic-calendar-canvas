@@ -23,8 +23,38 @@ export function CartSummary() {
   
   // Group items by packages and standalone services
   const groupedItems = items.reduce((acc, item) => {
-    // If it's a package
-    if (item.package_id || item.package) {
+    // Handle items with package_id (usually from appointment dialog)
+    if (item.package_id) {
+      const packageId = item.package_id;
+      
+      // Initialize package if it doesn't exist in accumulator
+      if (!acc.packages[packageId]) {
+        // Find the package item in the cart items array
+        const packageItem = items.find(p => 
+          (p.id === packageId) || (p.package?.id === packageId)
+        );
+        
+        acc.packages[packageId] = {
+          package: packageItem?.package || { 
+            id: packageId,
+            name: item.package?.name || 'Package',
+            duration: item.package?.duration || 0,
+            selling_price: item.package?.price || item.price_paid || 0,
+          },
+          services: [],
+          timeSlot: selectedTimeSlots[packageId] || selectedTimeSlots[item.id] || ''
+        };
+      }
+      
+      // Add service to package's services array if it has service_id
+      if (item.service_id && item.service) {
+        if (!acc.packages[packageId].services.some(s => s.id === item.service_id)) {
+          acc.packages[packageId].services.push(item.service);
+        }
+      }
+    }
+    // Handle regular package items (From CartContext)
+    else if (item.package_id || item.package) {
       const packageId = item.package_id || item.package?.id || item.id;
       
       if (!acc.packages[packageId]) {
@@ -56,16 +86,21 @@ export function CartSummary() {
         });
       }
     } 
-    // It's a standalone service (only if not part of a package)
+    // Handle standalone service items
     else if (item.service_id || item.service) {
       const serviceId = item.service_id || item.service?.id;
-      // Check if this service is part of a customized package
+      // Check if this service is part of a package (in booking data)
       const isPartOfPackage = items.some(packageItem => 
+        packageItem.package_id && packageItem.service_id === serviceId
+      );
+      
+      // Also check in customized services
+      const isPartOfCustomPackage = items.some(packageItem => 
         packageItem.customized_services?.includes(serviceId)
       );
       
       // Only add to standalone services if not part of a package
-      if (!isPartOfPackage) {
+      if (!isPartOfPackage && !isPartOfCustomPackage) {
         acc.services.push({
           ...item,
           timeSlot: selectedTimeSlots[item.id] || ''
@@ -132,14 +167,14 @@ export function CartSummary() {
                           Duration: {itemDuration} min
                         </p>
                         <p className="text-sm font-medium">
-                          ₹{pkg.selling_price || pkg.price}
+                          ₹{pkg.selling_price || pkg.price || pkg.price_paid}
                         </p>
-                        {isSchedulingPage && selectedTimeSlots[pkg.id] && selectedDate && (
+                        {isSchedulingPage && packageItem.timeSlot && selectedDate && (
                           <p className="text-sm text-muted-foreground mt-2">
-                            {format(selectedDate, "MMM d")} at {selectedTimeSlots[pkg.id]} - 
+                            {format(selectedDate, "MMM d")} at {packageItem.timeSlot} - 
                             {format(
                               addMinutes(
-                                new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTimeSlots[pkg.id]}`),
+                                new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${packageItem.timeSlot}`),
                                 itemDuration
                               ),
                               "HH:mm"
@@ -179,6 +214,7 @@ export function CartSummary() {
               {sortedServices.map((item) => {
                 const service = item.service || {};
                 const itemDuration = service.duration || item.duration || 0;
+                const price = item.selling_price || service.selling_price || item.price_paid || 0;
                 
                 return (
                   <div
@@ -194,14 +230,14 @@ export function CartSummary() {
                           Duration: {itemDuration} min
                         </p>
                         <p className="text-sm font-medium">
-                          ₹{item.selling_price || service.selling_price}
+                          ₹{price}
                         </p>
-                        {isSchedulingPage && selectedTimeSlots[item.id] && selectedDate && (
+                        {isSchedulingPage && item.timeSlot && selectedDate && (
                           <p className="text-sm text-muted-foreground mt-2">
-                            {format(selectedDate, "MMM d")} at {selectedTimeSlots[item.id]} - 
+                            {format(selectedDate, "MMM d")} at {item.timeSlot} - 
                             {format(
                               addMinutes(
-                                new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTimeSlots[item.id]}`),
+                                new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${item.timeSlot}`),
                                 itemDuration
                               ),
                               "HH:mm"

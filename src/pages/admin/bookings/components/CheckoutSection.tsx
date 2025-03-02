@@ -155,7 +155,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       const pkg = packages.find(p => p.id === packageId);
       if (!pkg || !packageGroups[packageId]) return;
       
-      // Add default package services first
+      // Add default package services first from package_services
       if (pkg.package_services) {
         pkg.package_services.forEach(ps => {
           if (ps.service && !packageGroups[packageId].services.some(s => s.id === ps.service.id)) {
@@ -186,7 +186,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     
     // Filter out standalone services (not part of any package)
     const standaloneServices = selectedServices
-      .filter(id => !packageServiceIds.has(id))
+      .filter(id => !packageServiceIds.has(id) && !selectedPackages.some(pkgId => 
+        customizedServices[pkgId]?.includes(id)
+      ))
       .map(id => {
         const service = services.find(s => s.id === id);
         return service ? {
