@@ -176,6 +176,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   };
 
   const getGroupedBookings = (transaction) => {
+    if (!transaction || !transaction.bookings) return { packages: {}, services: [] };
+    
     const groups = {
       packages: {} as Record<string, { 
         packageDetails: any, 
@@ -186,10 +188,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       }>, 
       services: [] as any[]
     };
-
-    if (!transaction.bookings) return groups;
     
-    transaction.bookings.forEach(booking => {
+    // First collect all package bookings
+    for (const booking of transaction.bookings) {
       if (booking.package_id) {
         if (!groups.packages[booking.package_id]) {
           groups.packages[booking.package_id] = {
@@ -200,12 +201,21 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             totalPrice: booking.package ? booking.package.price : booking.price_paid
           };
         }
-        
-        groups.packages[booking.package_id].bookings.push(booking);
+      }
+    }
+    
+    // Then assign services to packages or standalone services
+    for (const booking of transaction.bookings) {
+      if (booking.package_id) {
+        // Add this service to its package
+        if (booking.service_id && booking.service) {
+          groups.packages[booking.package_id].bookings.push(booking);
+        }
       } else if (booking.service_id) {
+        // This is a standalone service
         groups.services.push(booking);
       }
-    });
+    }
     
     return groups;
   };
@@ -314,6 +324,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 <div className="overflow-y-auto">
                   <h4 className="font-medium mb-4">{isRefund ? 'Refunded Items' : 'Items'}</h4>
                   
+                  {/* Display package groups first */}
                   {Object.entries(groupedBookings.packages).map(([packageId, packageGroup]) => (
                     <div key={`${transaction.id}-package-${packageId}`} className="mb-4">
                       <div className="py-2 flex justify-between items-start border-b">
@@ -323,7 +334,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                             <p className="font-medium text-blue-600">{packageGroup.packageDetails.name}</p>
                           </div>
                           <div className="flex flex-col text-xs text-gray-500 mt-1">
-                            <p>{packageGroup.startTime ? format(new Date(packageGroup.startTime), 'h:mma') : 'Time not set'}</p>
+                            {packageGroup.startTime && (
+                              <div className="flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                <span>{format(new Date(packageGroup.startTime), 'h:mma')}</span>
+                              </div>
+                            )}
                             {packageGroup.stylist && (
                               <div className="flex items-center mt-1">
                                 <User className="h-3 w-3 mr-1" />
@@ -337,21 +353,25 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                         </p>
                       </div>
                       
-                      <div className="pl-6 border-l-2 border-blue-200 mt-1 space-y-1">
-                        {packageGroup.bookings.map((booking) => (
-                          booking.service && (
-                            <div key={`${transaction.id}-package-service-${booking.id}`} className="flex justify-between text-sm py-1">
-                              <div>
-                                <p className="text-gray-700">{booking.service.name}</p>
-                                <p className="text-xs text-gray-500">{booking.service.duration}min</p>
+                      {/* Display nested services in package */}
+                      {packageGroup.bookings.length > 0 && (
+                        <div className="pl-6 border-l-2 border-blue-200 mt-1 space-y-1">
+                          {packageGroup.bookings.map((booking) => (
+                            booking.service && (
+                              <div key={`${transaction.id}-package-service-${booking.id}`} className="flex justify-between text-sm py-1">
+                                <div>
+                                  <p className="text-gray-700">{booking.service.name}</p>
+                                  <p className="text-xs text-gray-500">{booking.service.duration}min</p>
+                                </div>
                               </div>
-                            </div>
-                          )
-                        ))}
-                      </div>
+                            )
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                   
+                  {/* Display standalone services */}
                   {groupedBookings.services.map((booking) => (
                     booking.service && (
                       <div key={`${transaction.id}-service-${booking.id}`} className="py-2 flex justify-between items-start border-b">
@@ -359,7 +379,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                           <p className="font-medium text-sm">{booking.service.name}</p>
                           <div className="flex flex-col text-xs text-gray-500 mt-1">
                             {booking.start_time && (
-                              <p>{format(new Date(booking.start_time), 'h:mma')}</p>
+                              <div className="flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                <span>{format(new Date(booking.start_time), 'h:mma')}</span>
+                              </div>
                             )}
                             {booking.employee && (
                               <div className="flex items-center mt-1">

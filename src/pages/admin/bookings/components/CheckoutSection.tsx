@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ import {
   Package
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Service, Package, Customer } from "../types";
+import type { Service, Package as PackageType, Customer } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -41,7 +42,7 @@ interface CheckoutSectionProps {
   selectedServices: string[];
   selectedPackages: string[];
   services: Service[];
-  packages: Package[];
+  packages: PackageType[];
   discountType: 'none' | 'percentage' | 'fixed';
   discountValue: number;
   paymentMethod: 'cash' | 'online';
@@ -126,34 +127,61 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [subtotal, total]
   );
 
+  // Group bookings into packages and standalone services
   const groupedItems = useMemo(() => {
     const packageGroups: Record<string, {
-      package: Package,
+      package: PackageType,
       services: Service[],
       stylist: string,
       time: string,
     }> = {};
     
-    const packageServiceIds = new Set<string>();
-    
+    // First pass: Initialize package groups with their details
     selectedPackages.forEach(packageId => {
       const pkg = packages.find(p => p.id === packageId);
       if (!pkg) return;
       
-      const packageServiceList = customizedServices[packageId] || pkg.services?.map(s => s.id) || [];
-      
-      packageServiceList.forEach(serviceId => packageServiceIds.add(serviceId));
-      
       packageGroups[packageId] = {
         package: pkg,
-        services: packageServiceList
-          .map(serviceId => services.find(s => s.id === serviceId))
-          .filter(Boolean) as Service[],
+        services: [],
         stylist: selectedStylists[packageId] || '',
         time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''] || '',
       };
     });
     
+    // Second pass: Populate services within each package
+    selectedPackages.forEach(packageId => {
+      const pkg = packages.find(p => p.id === packageId);
+      if (!pkg || !packageGroups[packageId]) return;
+      
+      // Get customized services for this package or fallback to default services
+      const packageServiceIds = customizedServices[packageId] || 
+                               (pkg.services ? pkg.services : 
+                               (pkg.package_services ? pkg.package_services.map(ps => ps.service.id) : []));
+      
+      // Add each service to the package
+      const servicesInPackage = packageServiceIds
+        .map(serviceId => {
+          // Handle both string ids and objects with service property
+          const id = typeof serviceId === 'string' ? serviceId : serviceId.service?.id;
+          return services.find(s => s.id === id);
+        })
+        .filter(Boolean) as Service[];
+      
+      packageGroups[packageId].services = servicesInPackage;
+    });
+    
+    // Handle standalone services (not part of any package)
+    const packageServiceIds = new Set<string>();
+    
+    // Collect all service IDs that are part of packages
+    Object.values(packageGroups).forEach(group => {
+      group.services.forEach(service => {
+        packageServiceIds.add(service.id);
+      });
+    });
+    
+    // Filter out standalone services
     const standaloneServices = selectedServices
       .filter(id => !packageServiceIds.has(id))
       .map(id => {
@@ -229,6 +257,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               </div>
             ) : (
               <div className="space-y-6">
+                {/* Display packages with their services grouped underneath */}
                 {Object.entries(groupedItems.packageGroups).map(([packageId, packageGroup]) => (
                   <div
                     key={`package-${packageId}`}
@@ -276,6 +305,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       </div>
                     </div>
                     
+                    {/* Display services in this package */}
                     <div className="pl-6 mt-3 space-y-2 border-l-2 border-blue-200">
                       {packageGroup.services.map((service) => (
                         <div key={`package-service-${service.id}`} className="flex justify-between items-center py-1">
@@ -289,6 +319,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   </div>
                 ))}
                 
+                {/* Display standalone services */}
                 {groupedItems.standaloneServices.map((item) => (
                   <div
                     key={`service-${item.service.id}`}

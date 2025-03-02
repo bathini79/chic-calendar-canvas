@@ -21,10 +21,46 @@ export function CartSummary() {
   const totalPrice = getTotalPrice();
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
   
+  // Group items by packages and standalone services
+  const groupedItems = items.reduce((acc, item) => {
+    // If it's a package
+    if (item.package_id || item.package) {
+      const packageId = item.package_id || item.package?.id || item.id;
+      
+      if (!acc.packages[packageId]) {
+        acc.packages[packageId] = {
+          package: item.package || item,
+          services: [],
+          timeSlot: selectedTimeSlots[item.id] || ''
+        };
+      }
+      
+      // If it has services, add them to the package
+      if (item.service && !acc.packages[packageId].services.includes(item.service)) {
+        acc.packages[packageId].services.push(item.service);
+      }
+    } 
+    // It's a standalone service
+    else if (item.service_id || item.service) {
+      acc.services.push({
+        ...item,
+        timeSlot: selectedTimeSlots[item.id] || ''
+      });
+    }
+    
+    return acc;
+  }, { packages: {}, services: [] });
+  
   // Sort items by their scheduled start time
-  const sortedItems = [...items].sort((a, b) => {
-    const aTime = selectedTimeSlots[a.id] || "00:00";
-    const bTime = selectedTimeSlots[b.id] || "00:00";
+  const sortedServices = [...groupedItems.services].sort((a, b) => {
+    const aTime = a.timeSlot || "00:00";
+    const bTime = b.timeSlot || "00:00";
+    return aTime.localeCompare(bTime);
+  });
+  
+  const sortedPackages = Object.values(groupedItems.packages).sort((a, b) => {
+    const aTime = a.timeSlot || "00:00";
+    const bTime = b.timeSlot || "00:00";
     return aTime.localeCompare(bTime);
   });
 
@@ -51,51 +87,116 @@ export function CartSummary() {
               Your cart is empty
             </p>
           ) : (
-            sortedItems.map((item) => {
-              const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
-              
-              return (
-                <div
-                  key={item.id}
-                  className="flex flex-col space-y-2 p-4 border rounded-lg"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-medium">
-                        {item.service?.name || item.package?.name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Duration: {itemDuration} min
-                      </p>
-                      <p className="text-sm font-medium">
-                        ₹{item.selling_price || item.service?.selling_price || item.package?.price}
-                      </p>
-                      {isSchedulingPage && selectedTimeSlots[item.id] && selectedDate && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          {format(selectedDate, "MMM d")} at {selectedTimeSlots[item.id]} - 
-                          {format(
-                            addMinutes(
-                              new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTimeSlots[item.id]}`),
-                              itemDuration
-                            ),
-                            "HH:mm"
-                          )}
+            <>
+              {/* Display packages first */}
+              {sortedPackages.map((packageItem) => {
+                const pkg = packageItem.package;
+                const itemDuration = pkg.duration || 0;
+                
+                return (
+                  <div
+                    key={pkg.id}
+                    className="flex flex-col space-y-2 p-4 border rounded-lg"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-medium text-blue-600">
+                          {pkg.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Duration: {itemDuration} min
                         </p>
+                        <p className="text-sm font-medium">
+                          ₹{pkg.selling_price || pkg.price}
+                        </p>
+                        {isSchedulingPage && selectedTimeSlots[pkg.id] && selectedDate && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            {format(selectedDate, "MMM d")} at {selectedTimeSlots[pkg.id]} - 
+                            {format(
+                              addMinutes(
+                                new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTimeSlots[pkg.id]}`),
+                                itemDuration
+                              ),
+                              "HH:mm"
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      {!isSchedulingPage && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeFromCart(pkg.id)}
+                        >
+                          Remove
+                        </Button>
                       )}
                     </div>
-                    {!isSchedulingPage && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => removeFromCart(item.id)}
-                      >
-                        Remove
-                      </Button>
+                    
+                    {/* Display services in this package */}
+                    {packageItem.services && packageItem.services.length > 0 && (
+                      <div className="pl-4 mt-2 space-y-2 border-l-2 border-blue-200">
+                        {packageItem.services.map((service) => (
+                          <div key={`pkg-${pkg.id}-service-${service.id}`} className="text-sm">
+                            <p className="font-medium">{service.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Duration: {service.duration} min
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
-              )
-            })
+                );
+              })}
+              
+              {/* Display standalone services */}
+              {sortedServices.map((item) => {
+                const itemDuration = item.service?.duration || item.duration || 0;
+                
+                return (
+                  <div
+                    key={item.id}
+                    className="flex flex-col space-y-2 p-4 border rounded-lg"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-medium">
+                          {item.service?.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Duration: {itemDuration} min
+                        </p>
+                        <p className="text-sm font-medium">
+                          ₹{item.selling_price || item.service?.selling_price}
+                        </p>
+                        {isSchedulingPage && selectedTimeSlots[item.id] && selectedDate && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            {format(selectedDate, "MMM d")} at {selectedTimeSlots[item.id]} - 
+                            {format(
+                              addMinutes(
+                                new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTimeSlots[item.id]}`),
+                                itemDuration
+                              ),
+                              "HH:mm"
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      {!isSchedulingPage && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeFromCart(item.id)}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </ScrollArea>
