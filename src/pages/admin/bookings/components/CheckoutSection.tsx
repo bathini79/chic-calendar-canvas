@@ -18,11 +18,10 @@ import {
   User,
   Plus,
   ArrowLeft,
-  Trash2,
-  Package
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Service, Package as PackageType, Customer } from "../types";
+import type { Service, Package, Customer } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -42,7 +41,7 @@ interface CheckoutSectionProps {
   selectedServices: string[];
   selectedPackages: string[];
   services: Service[];
-  packages: PackageType[];
+  packages: Package[];
   discountType: 'none' | 'percentage' | 'fixed';
   discountValue: number;
   paymentMethod: 'cash' | 'online';
@@ -108,6 +107,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
+  // Calculate totals using the shared utility functions
   const subtotal = useMemo(() => 
     getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
     [selectedServices, selectedPackages, services, packages, customizedServices]
@@ -122,101 +122,58 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     getFinalPrice(subtotal, discountType, discountValue),
     [subtotal, discountType, discountValue]
   );
-
   const discountAmount = useMemo(() => 
     subtotal - total,
     [subtotal, total]
   );
 
-  // Group bookings into packages and standalone services
-  const groupedItems = useMemo(() => {
-    const packageGroups: Record<string, {
-      package: PackageType;
-      services: Service[];
+  const selectedItems = useMemo(() => {
+    const items = [
+      ...selectedServices.map((id) => {
+        const service = services.find((s) => s.id === id);
+        return service ? {
+          id,
+          name: service.name,
+          price: service.selling_price,
+          duration: service.duration,
+          type: "service" as const,
+          stylist: selectedStylists[id],
+          time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
+          formattedDuration: formatDuration(service.duration),
+        } : null;
+      }),
+      ...selectedPackages.map((id) => {
+        const pkg = packages.find((p) => p.id === id);
+        if (!pkg) return null;
+        // Calculate package duration including customizations
+        const packageDuration = getTotalDuration([], [id], services, packages, customizedServices);
+        // Calculate package price including customizations
+        const packagePrice = getTotalPrice([], [id], services, packages, customizedServices);
+
+        return {
+          id,
+          name: pkg.name,
+          price: packagePrice,
+          duration: packageDuration,
+          type: "package" as const,
+          stylist: selectedStylists[id],
+          time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
+          formattedDuration: formatDuration(packageDuration),
+        };
+      }),
+    ].filter(Boolean) as Array<{
+      id: string;
+      name: string;
+      price: number;
+      duration: number;
+      type: "service" | "package";
       stylist: string;
       time: string;
-    }> = {};
-    
-    // First pass: Initialize package groups with their details
-    selectedPackages.forEach(packageId => {
-      const pkg = packages.find(p => p.id === packageId);
-      if (!pkg) return;
-      
-      packageGroups[packageId] = {
-        package: pkg,
-        services: [],
-        stylist: selectedStylists[packageId] || '',
-        time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''] || '',
-      };
-    });
-    
-    // Second pass: Populate services within each package
-    selectedPackages.forEach(packageId => {
-      const pkg = packages.find(p => p.id === packageId);
-      if (!pkg || !packageGroups[packageId]) return;
-      
-      // Add default package services first from package_services
-      if (pkg.package_services) {
-        pkg.package_services.forEach(ps => {
-          if (ps.service && !packageGroups[packageId].services.some(s => s.id === ps.service.id)) {
-            packageGroups[packageId].services.push(ps.service);
-          }
-        });
-      }
-      
-      // Add customized services if available
-      if (customizedServices[packageId]) {
-        customizedServices[packageId].forEach(serviceId => {
-          const service = services.find(s => s.id === serviceId);
-          // Only add if not already included and exists
-          if (service && !packageGroups[packageId].services.some(s => s.id === serviceId)) {
-            packageGroups[packageId].services.push(service);
-          }
-        });
-      }
-    });
-    
-    // Collect all service IDs that are part of packages
-    const packageServiceIds = new Set<string>();
-    Object.values(packageGroups).forEach(group => {
-      group.services.forEach(service => {
-        packageServiceIds.add(service.id);
-      });
-    });
-    
-    // Filter out standalone services (not part of any package)
-    const standaloneServices = selectedServices
-      .filter(id => !packageServiceIds.has(id) && !selectedPackages.some(pkgId => 
-        customizedServices[pkgId]?.includes(id)
-      ))
-      .map(id => {
-        const service = services.find(s => s.id === id);
-        return service ? {
-          service,
-          stylist: selectedStylists[id] || '',
-          time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''] || '',
-        } : null;
-      })
-      .filter(Boolean) as {
-        service: Service;
-        stylist: string;
-        time: string;
-      }[];
-    
-    return {
-      packageGroups,
-      standaloneServices,
-    };
-  }, [
-    selectedServices, 
-    selectedPackages, 
-    services, 
-    packages, 
-    selectedStylists, 
-    selectedTimeSlots, 
-    appointmentId, 
-    customizedServices
-  ]);
+      formattedDuration: string;
+    }>;
+
+    return items;
+  }, [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots, appointmentId, customizedServices]);
 
   const handlePayment = async () => {
     try {
@@ -255,7 +212,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           </div>
 
           <div className="flex-1 space-y-6">
-            {(Object.keys(groupedItems.packageGroups).length === 0 && groupedItems.standaloneServices.length === 0) ? (
+            {selectedItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full space-y-4">
                 <p className="text-muted-foreground text-center">
                   No services or packages selected
@@ -270,114 +227,57 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="space-y-6">
-                {/* Display packages with their services grouped underneath */}
-                {Object.entries(groupedItems.packageGroups).map(([packageId, packageGroup]) => (
-                  <div
-                    key={`package-${packageId}`}
-                    className="border rounded-md p-4 mb-4"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="flex items-center">
-                          <Package className="mr-2 h-4 w-4 text-blue-500" />
-                          <h3 className="text-lg font-semibold tracking-tight text-blue-600">
-                            {packageGroup.package.name}
-                          </h3>
-                        </div>
-                        <div className="flex flex-col mt-2 text-sm text-muted-foreground">
-                          {packageGroup.time && (
+              <div className="space-y-4">
+                {selectedItems.map((item) => (
+                  item && (
+                    <div
+                      key={`${item.type}-${item.id}`}
+                      className="flex items-center justify-between py-4 border-b border-gray-100"
+                    >
+                      <div className="space-y-2">
+                        <p className="text-lg font-semibold tracking-tight">{item.name}</p>
+                        <div className="space-y-1">
+                          <div className="flex flex-col text-sm text-muted-foreground gap-1">
                             <div className="flex items-center">
                               <Clock className="mr-2 h-4 w-4" />
-                              <span>
-                                {formatTimeSlot(packageGroup.time)} • 
-                                {formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices))}
-                              </span>
+                              {item.time && (
+                                <span>{item.time} • {item.formattedDuration}</span>
+                              )}
+                              {!item.time && (
+                                <span>{item.formattedDuration}</span>
+                              )}
                             </div>
-                          )}
-                          {packageGroup.stylist && (
-                            <div className="flex items-center mt-1">
-                              <User className="mr-2 h-4 w-4" />
-                              <span>{packageGroup.stylist}</span>
-                            </div>
-                          )}
+                            {item.stylist && (
+                              <div className="flex items-center">
+                                <User className="mr-2 h-4 w-4" />
+                                {item.stylist}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
                         <p className="font-semibold text-lg">
                           <IndianRupee className="inline h-4 w-4" />
-                          {getTotalPrice([], [packageId], services, packages, customizedServices)}
+                          {item.price}
                         </p>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => onRemovePackage(packageId)}
+                          onClick={() => {
+                            if (item.type === 'service') {
+                              onRemoveService(item.id);
+                            } else {
+                              onRemovePackage(item.id);
+                            }
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
-                    
-                    {/* Display services in this package */}
-                    <div className="pl-6 mt-3 space-y-2 border-l-2 border-blue-200">
-                      {packageGroup.services.map((service) => (
-                        <div key={`package-service-${service.id}`} className="flex justify-between items-center py-1">
-                          <div>
-                            <p className="text-sm font-medium">{service.name}</p>
-                            <p className="text-xs text-gray-500">{service.duration}min</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Display standalone services */}
-                {groupedItems.standaloneServices.map((item) => (
-                  <div
-                    key={`service-${item.service.id}`}
-                    className="flex items-center justify-between py-4 border-b border-gray-100"
-                  >
-                    <div className="space-y-2">
-                      <p className="text-lg font-semibold tracking-tight">{item.service.name}</p>
-                      <div className="space-y-1">
-                        <div className="flex flex-col text-sm text-muted-foreground gap-1">
-                          <div className="flex items-center">
-                            <Clock className="mr-2 h-4 w-4" />
-                            {item.time && (
-                              <span>
-                                {formatTimeSlot(item.time)} • {formatDuration(item.service.duration)}
-                              </span>
-                            )}
-                            {!item.time && (
-                              <span>{formatDuration(item.service.duration)}</span>
-                            )}
-                          </div>
-                          {item.stylist && (
-                            <div className="flex items-center">
-                              <User className="mr-2 h-4 w-4" />
-                              {item.stylist}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <p className="font-semibold text-lg">
-                        <IndianRupee className="inline h-4 w-4" />
-                        {item.service.selling_price}
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => onRemoveService(item.service.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  )
                 ))}
               </div>
             )}
@@ -425,7 +325,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 className="flex-1" 
                 size="lg"
                 onClick={handlePayment}
-                disabled={Object.keys(groupedItems.packageGroups).length === 0 && groupedItems.standaloneServices.length === 0}
+                disabled={selectedItems.length === 0}
               >
                 Complete Payment
               </Button>

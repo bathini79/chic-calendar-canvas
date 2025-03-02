@@ -14,9 +14,7 @@ import {
   Calendar,
   Ban,
   XCircle,
-  ShoppingCart,
-  Package,
-  User
+  ShoppingCart
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -137,38 +135,6 @@ export function AppointmentDetailsDialog({
         return 'bg-gray-500';
     }
   };
-  // Group bookings by package
-  const groupedBookings = appointment.bookings.reduce((groups, booking) => {
-    if (booking.package_id) {
-      // If it's a package booking
-      if (!groups.packages[booking.package_id]) {
-        groups.packages[booking.package_id] = {
-          packageDetails: booking.package,
-          bookings: [],
-          startTime: booking.start_time,
-          totalPrice: appointment.total_price
-        };
-      }
-      if (booking.service_id) {
-        // Add service to the package
-        groups.packages[booking.package_id].bookings.push(booking);
-      }
-    } else if (booking.service_id) {
-      // It's a standalone service
-      groups.services.push(booking);
-    }
-    return groups;
-  }, { 
-    packages: {} as Record<string, { 
-      packageDetails: any, 
-      bookings: typeof appointment.bookings, 
-      stylist: any, 
-      startTime: string,
-      totalPrice: number
-    }>, 
-    services: [] as typeof appointment.bookings 
-  });
-  console.log("packageGroup.bookings",Object.values(groupedBookings.packages))
 
   const showCheckoutButton = ['inprogress', 'confirmed'].includes(appointment.status);
 
@@ -252,87 +218,30 @@ export function AppointmentDetailsDialog({
             <div>
               <h3 className="font-semibold mb-4">Services</h3>
               <div className="space-y-4">
-                {/* Display packages first with their services nested underneath */}
-                {Object.values(groupedBookings.packages).map((packageGroup) => (
+                {appointment.bookings.map((booking) => (
                   <div 
-                    key={packageGroup.packageDetails.id} 
-                    className="border rounded-md p-4"
+                    key={booking.id} 
+                    className="border-l-4 border-blue-400 pl-4 py-2"
                   >
-                    <div className="flex justify-between items-start mb-2">
+                    <div className="flex justify-between items-start">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4 text-blue-500" />
-                          <h4 className="font-medium text-blue-600">
-                            {packageGroup.packageDetails.name}
-                          </h4>
-                        </div>
+                        <h4 className="font-medium">
+                          {booking.service?.name || booking.package?.name}
+                        </h4>
                         <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                           <Clock className="h-4 w-4" />
                           <span>
-                            {format(new Date(packageGroup.startTime), "h:mm a")} · 
-                            {packageGroup.packageDetails.duration}min
+                            {format(new Date(booking.start_time), "h:mm a")} · 
+                            {booking.service?.duration || booking.package?.duration}min · 
+                            {booking.employee?.name}
                           </span>
                         </div>
-                        {packageGroup.stylist && (
-                          <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                            <User className="h-4 w-4" />
-                            <span>{packageGroup.stylist.name}</span>
-                          </div>
-                        )}
                       </div>
                       <span className="font-medium">
-                        ₹{packageGroup.totalPrice}
+                        ₹{booking.price_paid}
                       </span>
                     </div>
-
-                    {/* Display services in this package */}
-                    <div className="pl-6 mt-3 space-y-2 border-l-2 border-blue-200">
-                      {packageGroup.bookings.map((booking) => (
-                        booking.service && (
-                          <div key={booking.id} className="flex justify-between items-start">
-                            <div>
-                              <p className="text-sm font-medium">{booking.service.name}</p>
-                              <p className="text-xs text-gray-500">{booking.service.duration}min with {booking?.employee?.name}</p>
-                            </div>
-                          </div>
-                        )
-                      ))}
-                    </div>
                   </div>
-                ))}
-                
-                {/* Display standalone services */}
-                {groupedBookings.services.map((booking) => (
-                  booking.service && (
-                    <div 
-                      key={booking.id} 
-                      className="border-l-4 border-blue-400 pl-4 py-2"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-medium">
-                            {booking.service.name}
-                          </h4>
-                          <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                            <Clock className="h-4 w-4" />
-                            <span>
-                              {format(new Date(booking.start_time), "h:mm a")} · 
-                              {booking.service.duration}min
-                            </span>
-                          </div>
-                          {booking.employee && (
-                            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                              <User className="h-4 w-4" />
-                              <span>{booking.employee.name}</span>
-                            </div>
-                          )}
-                        </div>
-                        <span className="font-medium">
-                          ₹{booking.price_paid}
-                        </span>
-                      </div>
-                    </div>
-                  )
                 ))}
               </div>
             </div>
