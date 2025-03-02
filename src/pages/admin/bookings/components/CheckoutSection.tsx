@@ -122,6 +122,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     getFinalPrice(subtotal, discountType, discountValue),
     [subtotal, discountType, discountValue]
   );
+
   const discountAmount = useMemo(() => 
     subtotal - total,
     [subtotal, total]
@@ -130,10 +131,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   // Group bookings into packages and standalone services
   const groupedItems = useMemo(() => {
     const packageGroups: Record<string, {
-      package: PackageType,
-      services: Service[],
-      stylist: string,
-      time: string,
+      package: PackageType;
+      services: Service[];
+      stylist: string;
+      time: string;
     }> = {};
     
     // First pass: Initialize package groups with their details
@@ -154,34 +155,36 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       const pkg = packages.find(p => p.id === packageId);
       if (!pkg || !packageGroups[packageId]) return;
       
-      // Get customized services for this package or fallback to default services
-      const packageServiceIds = customizedServices[packageId] || 
-                               (pkg.services ? pkg.services : 
-                               (pkg.package_services ? pkg.package_services.map(ps => ps.service.id) : []));
+      // Add default package services first
+      if (pkg.package_services) {
+        pkg.package_services.forEach(ps => {
+          if (ps.service && !packageGroups[packageId].services.some(s => s.id === ps.service.id)) {
+            packageGroups[packageId].services.push(ps.service);
+          }
+        });
+      }
       
-      // Add each service to the package
-      const servicesInPackage = packageServiceIds
-        .map(serviceId => {
-          // Handle both string ids and objects with service property
-          const id = typeof serviceId === 'string' ? serviceId : serviceId.service?.id;
-          return services.find(s => s.id === id);
-        })
-        .filter(Boolean) as Service[];
-      
-      packageGroups[packageId].services = servicesInPackage;
+      // Add customized services if available
+      if (customizedServices[packageId]) {
+        customizedServices[packageId].forEach(serviceId => {
+          const service = services.find(s => s.id === serviceId);
+          // Only add if not already included and exists
+          if (service && !packageGroups[packageId].services.some(s => s.id === serviceId)) {
+            packageGroups[packageId].services.push(service);
+          }
+        });
+      }
     });
     
-    // Handle standalone services (not part of any package)
-    const packageServiceIds = new Set<string>();
-    
     // Collect all service IDs that are part of packages
+    const packageServiceIds = new Set<string>();
     Object.values(packageGroups).forEach(group => {
       group.services.forEach(service => {
         packageServiceIds.add(service.id);
       });
     });
     
-    // Filter out standalone services
+    // Filter out standalone services (not part of any package)
     const standaloneServices = selectedServices
       .filter(id => !packageServiceIds.has(id))
       .map(id => {
@@ -193,16 +196,25 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         } : null;
       })
       .filter(Boolean) as {
-        service: Service,
-        stylist: string,
-        time: string,
+        service: Service;
+        stylist: string;
+        time: string;
       }[];
     
     return {
       packageGroups,
       standaloneServices,
     };
-  }, [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots, appointmentId, customizedServices]);
+  }, [
+    selectedServices, 
+    selectedPackages, 
+    services, 
+    packages, 
+    selectedStylists, 
+    selectedTimeSlots, 
+    appointmentId, 
+    customizedServices
+  ]);
 
   const handlePayment = async () => {
     try {

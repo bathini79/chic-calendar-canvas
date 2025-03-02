@@ -47,15 +47,11 @@ export function CartSummary() {
       // Add customized services if available
       if (item.customized_services && item.customized_services.length > 0) {
         // Find the services that match the customized_services ids
-        const customServices = items.filter(cartItem => 
-          cartItem.service && 
-          item.customized_services?.includes(cartItem.service.id)
-        ).map(cartItem => cartItem.service);
-        
-        // Add them to the package services if not already there
-        customServices.forEach(service => {
-          if (service && !acc.packages[packageId].services.some(s => s.id === service.id)) {
-            acc.packages[packageId].services.push(service);
+        items.forEach(cartItem => {
+          if (cartItem.service && 
+              item.customized_services?.includes(cartItem.service.id) && 
+              !acc.packages[packageId].services.some(s => s.id === cartItem.service.id)) {
+            acc.packages[packageId].services.push(cartItem.service);
           }
         });
       }
@@ -64,8 +60,8 @@ export function CartSummary() {
     else if (item.service_id || item.service) {
       const serviceId = item.service_id || item.service?.id;
       // Check if this service is part of a customized package
-      const isPartOfPackage = Object.values(items).some(
-        packageItem => packageItem.customized_services?.includes(serviceId)
+      const isPartOfPackage = items.some(packageItem => 
+        packageItem.customized_services?.includes(serviceId)
       );
       
       // Only add to standalone services if not part of a package
@@ -78,7 +74,7 @@ export function CartSummary() {
     }
     
     return acc;
-  }, { packages: {}, services: [] });
+  }, { packages: {} as Record<string, any>, services: [] as any[] });
   
   // Sort items by their scheduled start time
   const sortedServices = [...groupedItems.services].sort((a, b) => {
