@@ -187,6 +187,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       services: [] as any[]
     };
 
+    if (!transaction.bookings) return groups;
+    
     transaction.bookings.forEach(booking => {
       if (booking.package_id) {
         if (!groups.packages[booking.package_id]) {
@@ -198,9 +200,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             totalPrice: booking.package ? booking.package.price : booking.price_paid
           };
         }
-        if (booking.service_id && booking.service) {
-          groups.packages[booking.package_id].bookings.push(booking);
-        }
+        
+        groups.packages[booking.package_id].bookings.push(booking);
       } else if (booking.service_id) {
         groups.services.push(booking);
       }
@@ -322,7 +323,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                             <p className="font-medium text-blue-600">{packageGroup.packageDetails.name}</p>
                           </div>
                           <div className="flex flex-col text-xs text-gray-500 mt-1">
-                            <p>{format(new Date(packageGroup.startTime), 'h:mma')}</p>
+                            <p>{packageGroup.startTime ? format(new Date(packageGroup.startTime), 'h:mma') : 'Time not set'}</p>
                             {packageGroup.stylist && (
                               <div className="flex items-center mt-1">
                                 <User className="h-3 w-3 mr-1" />
@@ -357,7 +358,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                         <div className="flex-1">
                           <p className="font-medium text-sm">{booking.service.name}</p>
                           <div className="flex flex-col text-xs text-gray-500 mt-1">
-                            <p>{format(new Date(booking.start_time), 'h:mma')}</p>
+                            {booking.start_time && (
+                              <p>{format(new Date(booking.start_time), 'h:mma')}</p>
+                            )}
                             {booking.employee && (
                               <div className="flex items-center mt-1">
                                 <User className="h-3 w-3 mr-1" />
