@@ -137,7 +137,6 @@ export function AppointmentDetailsDialog({
         return 'bg-gray-500';
     }
   };
-
   // Group bookings by package
   const groupedBookings = appointment.bookings.reduce((groups, booking) => {
     if (booking.package_id) {
@@ -146,9 +145,8 @@ export function AppointmentDetailsDialog({
         groups.packages[booking.package_id] = {
           packageDetails: booking.package,
           bookings: [],
-          stylist: booking.employee,
           startTime: booking.start_time,
-          totalPrice: booking.price_paid
+          totalPrice: appointment.total_price
         };
       }
       if (booking.service_id) {
@@ -170,6 +168,7 @@ export function AppointmentDetailsDialog({
     }>, 
     services: [] as typeof appointment.bookings 
   });
+  console.log("packageGroup.bookings",Object.values(groupedBookings.packages))
 
   const showCheckoutButton = ['inprogress', 'confirmed'].includes(appointment.status);
 
@@ -293,7 +292,7 @@ export function AppointmentDetailsDialog({
                           <div key={booking.id} className="flex justify-between items-start">
                             <div>
                               <p className="text-sm font-medium">{booking.service.name}</p>
-                              <p className="text-xs text-gray-500">{booking.service.duration}min</p>
+                              <p className="text-xs text-gray-500">{booking.service.duration}min with {booking?.employee?.name}</p>
                             </div>
                           </div>
                         )
