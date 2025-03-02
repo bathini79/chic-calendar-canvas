@@ -35,17 +35,46 @@ export function CartSummary() {
         };
       }
       
-      // If it has services, add them to the package
-      if (item.service && !acc.packages[packageId].services.includes(item.service)) {
-        acc.packages[packageId].services.push(item.service);
+      // If the package has services from package_services, add them
+      if (item.package?.package_services) {
+        item.package.package_services.forEach(ps => {
+          if (ps.service && !acc.packages[packageId].services.some(s => s.id === ps.service.id)) {
+            acc.packages[packageId].services.push(ps.service);
+          }
+        });
+      }
+      
+      // Add customized services if available
+      if (item.customized_services && item.customized_services.length > 0) {
+        // Find the services that match the customized_services ids
+        const customServices = items.filter(cartItem => 
+          cartItem.service && 
+          item.customized_services?.includes(cartItem.service.id)
+        ).map(cartItem => cartItem.service);
+        
+        // Add them to the package services if not already there
+        customServices.forEach(service => {
+          if (service && !acc.packages[packageId].services.some(s => s.id === service.id)) {
+            acc.packages[packageId].services.push(service);
+          }
+        });
       }
     } 
-    // It's a standalone service
+    // It's a standalone service (only if not part of a package)
     else if (item.service_id || item.service) {
-      acc.services.push({
-        ...item,
-        timeSlot: selectedTimeSlots[item.id] || ''
-      });
+      const serviceId = item.service_id || item.service?.id;
+      // Check if this service is part of a customized package
+      const isPartOfPackage = Object.values(items).some(
+        packageItem => packageItem.customized_services?.includes(serviceId)
+      );
+      
+      // Only add to standalone services if not part of a package
+      if (!isPartOfPackage) {
+        acc.services.push({
+          ...item,
+          timeSlot: selectedTimeSlots[item.id] || ''
+        });
+      }
     }
     
     return acc;
@@ -152,7 +181,8 @@ export function CartSummary() {
               
               {/* Display standalone services */}
               {sortedServices.map((item) => {
-                const itemDuration = item.service?.duration || item.duration || 0;
+                const service = item.service || {};
+                const itemDuration = service.duration || item.duration || 0;
                 
                 return (
                   <div
@@ -162,13 +192,13 @@ export function CartSummary() {
                     <div className="flex items-start justify-between">
                       <div>
                         <h3 className="font-medium">
-                          {item.service?.name}
+                          {service.name}
                         </h3>
                         <p className="text-sm text-muted-foreground">
                           Duration: {itemDuration} min
                         </p>
                         <p className="text-sm font-medium">
-                          ₹{item.selling_price || item.service?.selling_price}
+                          ₹{item.selling_price || service.selling_price}
                         </p>
                         {isSchedulingPage && selectedTimeSlots[item.id] && selectedDate && (
                           <p className="text-sm text-muted-foreground mt-2">
