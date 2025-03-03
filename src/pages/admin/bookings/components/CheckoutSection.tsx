@@ -305,7 +305,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+              <div className="space-y-4 overflow-y-auto flex-1 pr-2 max-h-[calc(100vh-400px)]">
                 {selectedItems.map((item) => (
                   item && (
                     <div
