@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { useNavigate, useLocation } from "react-router-dom";
 import { format, addMinutes } from "date-fns";
 import { formatPrice } from "@/lib/utils";
-import { User, Clock } from "lucide-react";
 
 export function CartSummary() {
   const { 
@@ -14,8 +13,6 @@ export function CartSummary() {
     removeFromCart, 
     selectedDate, 
     selectedTimeSlots,
-    selectedStylists,
-    stylists,
     getTotalPrice
   } = useCart();
   const navigate = useNavigate();
@@ -31,11 +28,6 @@ export function CartSummary() {
     const bTime = selectedTimeSlots[b.id] || "00:00";
     return aTime.localeCompare(bTime);
   });
-
-  const getStylistName = (stylistId: string) => {
-    const stylist = stylists?.find(s => s.id === stylistId);
-    return stylist ? stylist.name : '';
-  };
 
   const handleContinue = () => {
     if (isSchedulingPage) {
@@ -63,8 +55,6 @@ export function CartSummary() {
             sortedItems.map((item) => {
               const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
               const itemPrice = item.selling_price || item.service?.selling_price || item.package?.price || 0;
-              const stylistId = selectedStylists[item.id];
-              const stylistName = stylistId ? getStylistName(stylistId) : '';
               
               return (
                 <div
@@ -72,37 +62,25 @@ export function CartSummary() {
                   className="flex flex-col space-y-2 p-4 border rounded-lg"
                 >
                   <div className="flex items-start justify-between">
-                    <div className="space-y-2">
+                    <div>
                       <h3 className="font-medium">
                         {item.service?.name || item.package?.name}
                       </h3>
-                      <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                        <div className="flex items-center">
-                          <Clock className="mr-1 h-4 w-4" />
-                          <span>Duration: {itemDuration} min</span>
-                        </div>
-                        {stylistName && (
-                          <div className="flex items-center">
-                            <User className="mr-1 h-4 w-4" />
-                            <span>{stylistName}</span>
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Duration: {itemDuration} min
+                      </p>
                       <p className="text-sm font-medium">
                         {formatPrice(itemPrice)}
                       </p>
                       {isSchedulingPage && selectedTimeSlots[item.id] && selectedDate && (
                         <p className="text-sm text-muted-foreground mt-2">
-                          {format(selectedDate, "MMM d")} at {format(
-                            new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlots[item.id]}`),
-                            "h:mm a"
-                          )} - 
+                          {format(selectedDate, "MMM d")} at {selectedTimeSlots[item.id]} - 
                           {format(
                             addMinutes(
-                              new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlots[item.id]}`),
+                              new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTimeSlots[item.id]}`),
                               itemDuration
                             ),
-                            "h:mm a"
+                            "HH:mm"
                           )}
                         </p>
                       )}

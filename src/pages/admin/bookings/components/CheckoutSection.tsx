@@ -1,5 +1,4 @@
-
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +20,7 @@ import {
   Trash2
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Service, Package, Customer, Employee } from "../types";
+import type { Service, Package, Customer } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -65,7 +64,6 @@ interface CheckoutSectionProps {
   onBackToServices: () => void;
   isExistingAppointment?: boolean;
   customizedServices?: Record<string, string[]>;
-  employees?: Employee[];
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -91,8 +89,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onRemovePackage,
   onBackToServices,
   isExistingAppointment,
-  customizedServices = {},
-  employees = []
+  customizedServices = {}
 }) => {
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -113,11 +110,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       console.error('Error formatting time:', error);
       return timeString;
     }
-  };
-
-  const getStylistName = (stylistId: string) => {
-    const employee = employees.find(emp => emp.id === stylistId);
-    return employee ? employee.name : stylistId;
   };
 
   const subtotal = useMemo(() => 
@@ -151,7 +143,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         type: "service" as const,
         packageId: null as string | null,
         stylist: selectedStylists[id],
-        stylistName: getStylistName(selectedStylists[id] || ''),
         time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
         formattedDuration: formatDuration(service.duration),
       } : null;
@@ -171,7 +162,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         type: "package" as const,
         packageId: null as string | null,
         stylist: selectedStylists[packageId],
-        stylistName: getStylistName(selectedStylists[packageId] || ''),
         time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''],
         formattedDuration: formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices)),
         services: [] as Array<{
@@ -180,7 +170,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           price: number;
           duration: number;
           stylist: string | null;
-          stylistName: string;
         }>
       };
       
@@ -188,36 +177,30 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         packageItem.services = pkg.package_services.map(ps => {
           const adjustedPrice = 'package_selling_price' in ps && ps.package_selling_price !== null && ps.package_selling_price !== undefined
             ? ps.package_selling_price : ps.service.selling_price;
-          
-          const serviceStyleId = selectedStylists[ps.service.id] || selectedStylists[packageId] || null;
             
           return {
             id: ps.service.id,
             name: ps.service.name,
             price: adjustedPrice,
             duration: ps.service.duration,
-            stylist: serviceStyleId,
-            stylistName: getStylistName(serviceStyleId || '')
+            stylist: selectedStylists[ps.service.id] || selectedStylists[packageId] || null
           };
         });
       }
       
       if (pkg.is_customizable && customizedServices[packageId]) {
         const additionalServices = customizedServices[packageId]
-          .filter(serviceId => !pkg.package_services?.some(ps => ps.service.id === serviceId))
+          .filter(serviceId => !pkg.package_services.some(ps => ps.service.id === serviceId))
           .map(serviceId => {
             const service = services.find(s => s.id === serviceId);
             if (!service) return null;
-            
-            const serviceStyleId = selectedStylists[service.id] || selectedStylists[packageId] || null;
             
             return {
               id: service.id,
               name: service.name,
               price: service.selling_price,
               duration: service.duration,
-              stylist: serviceStyleId,
-              stylistName: getStylistName(serviceStyleId || '')
+              stylist: selectedStylists[service.id] || selectedStylists[packageId] || null
             };
           })
           .filter(Boolean);
@@ -237,8 +220,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     selectedStylists, 
     selectedTimeSlots, 
     appointmentId, 
-    customizedServices,
-    employees
+    customizedServices
   ]);
 
   const handlePayment = async () => {
@@ -277,7 +259,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             </Button>
           </div>
 
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 space-y-6">
             {selectedItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full space-y-4">
                 <p className="text-muted-foreground text-center">
@@ -293,7 +275,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4 overflow-y-auto flex-1 max-h-[calc(100vh-360px)]">
+              <div className="space-y-4">
                 {selectedItems.map((item) => (
                   item && (
                     <div
@@ -307,7 +289,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                             <div className="flex items-center">
                               <Clock className="mr-1 h-4 w-4" />
                               {item.time && (
-                                <span>{formatTimeSlot(item.time)} • {item.formattedDuration}</span>
+                                <span>{item.time} • {item.formattedDuration}</span>
                               )}
                               {!item.time && (
                                 <span>{item.formattedDuration}</span>
@@ -316,7 +298,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                             {item.stylist && (
                               <div className="flex items-center">
                                 <User className="mr-1 h-4 w-4" />
-                                {item.stylistName}
+                                {item.stylist}
                               </div>
                             )}
                           </div>
@@ -356,7 +338,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                                   {service.stylist && (
                                     <div className="flex items-center">
                                       <User className="mr-1 h-3 w-3" />
-                                      {service.stylistName}
+                                      {service.stylist}
                                     </div>
                                   )}
                                 </div>
@@ -384,28 +366,26 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               </div>
             )}
 
-            <div className="pt-4 mt-auto">
-              <Separator />
+            <Separator />
 
-              <div className="space-y-3 py-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>₹{subtotal}</span>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>₹{subtotal}</span>
+              </div>
+              {discountType !== "none" && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span className="flex items-center">
+                    <Percent className="mr-2 h-4 w-4" />
+                    Discount
+                    {discountType === "percentage" && ` (${discountValue}%)`}
+                  </span>
+                  <span>-₹{discountAmount}</span>
                 </div>
-                {discountType !== "none" && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span className="flex items-center">
-                      <Percent className="mr-2 h-4 w-4" />
-                      Discount
-                      {discountType === "percentage" && ` (${discountValue}%)`}
-                    </span>
-                    <span>-₹{discountAmount}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-lg font-bold pt-2">
-                  <span>Total</span>
-                  <span>₹{total}</span>
-                </div>
+              )}
+              <div className="flex justify-between text-lg font-bold pt-2">
+                <span>Total</span>
+                <span>₹{total}</span>
               </div>
             </div>
           </div>
