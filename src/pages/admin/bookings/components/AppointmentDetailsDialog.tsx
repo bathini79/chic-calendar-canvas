@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import {
@@ -160,13 +159,8 @@ export function AppointmentDetailsDialog({
     }
   };
 
-  // Calculate the total from all bookings to make sure it matches
-  const calculatedTotal = appointment.bookings.reduce((sum, booking) => sum + booking.price_paid, 0);
-
-  // Group bookings by package
   const groupedBookings = appointment.bookings.reduce((groups, booking) => {
     if (booking.package_id) {
-      // If it's a package booking
       if (!groups.packages[booking.package_id]) {
         groups.packages[booking.package_id] = {
           packageDetails: booking.package,
@@ -176,16 +170,12 @@ export function AppointmentDetailsDialog({
           totalPrice: 0
         };
       }
-      if (booking.service_id) {
-        // Add service to the package
-        groups.packages[booking.package_id].bookings.push(booking);
-      } else if (!booking.service_id) {
-        // This is the main package booking (without a specific service)
-        groups.packages[booking.package_id].mainBooking = booking;
+      groups.packages[booking.package_id].bookings.push(booking);
+      
+      if (!booking.service_id) {
         groups.packages[booking.package_id].totalPrice = booking.price_paid;
       }
     } else if (booking.service_id) {
-      // It's a standalone service
       groups.services.push(booking);
     }
     return groups;
@@ -193,7 +183,6 @@ export function AppointmentDetailsDialog({
     packages: {} as Record<string, { 
       packageDetails: any, 
       bookings: typeof appointment.bookings, 
-      mainBooking?: typeof appointment.bookings[0],
       stylist: any, 
       startTime: string,
       totalPrice: number
@@ -318,7 +307,6 @@ export function AppointmentDetailsDialog({
             <div>
               <h3 className="font-semibold mb-4">Services</h3>
               <div className="space-y-4">
-                {/* Display packages first with their services nested underneath */}
                 {Object.values(groupedBookings.packages).map((packageGroup) => (
                   <div 
                     key={packageGroup.packageDetails?.id || 'package-group'} 
@@ -351,25 +339,24 @@ export function AppointmentDetailsDialog({
                       </span>
                     </div>
 
-                    {/* Display services in this package */}
                     {packageGroup.bookings.length > 0 && (
                       <div className="pl-6 mt-3 space-y-2 border-l-2 border-blue-200">
-                        {packageGroup.bookings.map((booking) => (
-                          booking.service && (
+                        {packageGroup.bookings
+                          .filter(booking => booking.service)
+                          .map((booking) => (
                             <div key={booking.id} className="flex justify-between items-start">
                               <div>
-                                <p className="text-sm font-medium">{booking.service.name}</p>
-                                <p className="text-xs text-gray-500">{booking.service.duration}min</p>
+                                <p className="text-sm font-medium">{booking.service?.name}</p>
+                                <p className="text-xs text-gray-500">{booking.service?.duration}min</p>
                               </div>
                             </div>
-                          )
-                        ))}
+                          ))
+                        }
                       </div>
                     )}
                   </div>
                 ))}
                 
-                {/* Display standalone services */}
                 {groupedBookings.services.map((booking) => (
                   booking.service && (
                     <div 
@@ -418,7 +405,7 @@ export function AppointmentDetailsDialog({
               <div>
                 <div className="text-sm text-gray-500">Total</div>
                 <div className="text-xl font-semibold">
-                  ₹{calculatedTotal.toFixed(2)}
+                  ₹{appointment.total_price.toFixed(2)}
                 </div>
               </div>
               <div className="flex gap-2">
