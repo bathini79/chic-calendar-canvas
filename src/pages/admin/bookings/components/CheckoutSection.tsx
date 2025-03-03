@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,8 @@ import {
   getServicePriceInPackage,
   calculatePackagePrice 
 } from "../utils/bookingUtils";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -91,6 +94,20 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   isExistingAppointment,
   customizedServices = {}
 }) => {
+  // Fetch employees to get stylist names
+  const { data: employees } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('employment_type', 'stylist');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+  
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
@@ -110,6 +127,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       console.error('Error formatting time:', error);
       return timeString;
     }
+  };
+
+  // Get stylist name from ID
+  const getStylistName = (stylistId: string) => {
+    if (!employees || !stylistId) return null;
+    const stylist = employees.find(emp => emp.id === stylistId);
+    return stylist ? stylist.name : null;
   };
 
   const subtotal = useMemo(() => 
@@ -143,6 +167,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         type: "service" as const,
         packageId: null as string | null,
         stylist: selectedStylists[id],
+        stylistName: getStylistName(selectedStylists[id]),
         time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
         formattedDuration: formatDuration(service.duration),
       } : null;
@@ -162,6 +187,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         type: "package" as const,
         packageId: null as string | null,
         stylist: selectedStylists[packageId],
+        stylistName: getStylistName(selectedStylists[packageId]),
         time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''],
         formattedDuration: formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices)),
         services: [] as Array<{
@@ -170,6 +196,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           price: number;
           duration: number;
           stylist: string | null;
+          stylistName: string | null;
         }>
       };
       
@@ -183,7 +210,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             name: ps.service.name,
             price: adjustedPrice,
             duration: ps.service.duration,
-            stylist: selectedStylists[ps.service.id] || selectedStylists[packageId] || null
+            stylist: selectedStylists[ps.service.id] || selectedStylists[packageId] || null,
+            stylistName: getStylistName(selectedStylists[ps.service.id] || selectedStylists[packageId] || '')
           };
         });
       }
@@ -200,7 +228,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               name: service.name,
               price: service.selling_price,
               duration: service.duration,
-              stylist: selectedStylists[service.id] || selectedStylists[packageId] || null
+              stylist: selectedStylists[service.id] || selectedStylists[packageId] || null,
+              stylistName: getStylistName(selectedStylists[service.id] || selectedStylists[packageId] || '')
             };
           })
           .filter(Boolean);
@@ -220,7 +249,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     selectedStylists, 
     selectedTimeSlots, 
     appointmentId, 
-    customizedServices
+    customizedServices,
+    employees
   ]);
 
   const handlePayment = async () => {
@@ -259,7 +289,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             </Button>
           </div>
 
-          <div className="flex-1 space-y-6">
+          <div className="flex-1 space-y-6 overflow-hidden flex flex-col">
             {selectedItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full space-y-4">
                 <p className="text-muted-foreground text-center">
@@ -275,7 +305,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 overflow-y-auto flex-1 pr-2">
                 {selectedItems.map((item) => (
                   item && (
                     <div
@@ -295,10 +325,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                                 <span>{item.formattedDuration}</span>
                               )}
                             </div>
-                            {item.stylist && (
+                            {item.stylistName && (
                               <div className="flex items-center">
                                 <User className="mr-1 h-4 w-4" />
-                                {item.stylist}
+                                {item.stylistName}
                               </div>
                             )}
                           </div>
@@ -335,10 +365,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                                 <p className="text-sm font-medium">{service.name}</p>
                                 <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
                                   <span>{formatDuration(service.duration)}</span>
-                                  {service.stylist && (
+                                  {service.stylistName && (
                                     <div className="flex items-center">
                                       <User className="mr-1 h-3 w-3" />
-                                      {service.stylist}
+                                      {service.stylistName}
                                     </div>
                                   )}
                                 </div>
@@ -390,7 +420,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             </div>
           </div>
 
-          <div className="pt-6 space-y-4">
+          <div className="pt-6 space-y-4 mt-auto">
             <div>
               <h4 className="text-sm font-medium mb-2">Payment Method</h4>
               <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
