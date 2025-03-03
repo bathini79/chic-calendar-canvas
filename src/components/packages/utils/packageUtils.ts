@@ -1,13 +1,9 @@
 
-// This is a placeholder file to fix the build error
-// The actual implementation would go here
-
+// This is a placeholder file for tests
 export const calculatePackagePrice = () => {
-  // Implementation will be added later
   return 0;
 };
 
-export const getPackageServices = () => {
-  // Implementation will be added later
-  return [];
+export const calculatePackageDuration = () => {
+  return 0;
 };

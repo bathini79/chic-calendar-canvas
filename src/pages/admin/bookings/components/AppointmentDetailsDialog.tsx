@@ -160,9 +160,6 @@ export function AppointmentDetailsDialog({
     }
   };
 
-  // Calculate the total from all bookings to make sure it matches
-  const calculatedTotal = appointment.bookings.reduce((sum, booking) => sum + booking.price_paid, 0);
-
   // Group bookings by package
   const groupedBookings = appointment.bookings.reduce((groups, booking) => {
     if (booking.package_id) {
@@ -176,14 +173,7 @@ export function AppointmentDetailsDialog({
           totalPrice: 0
         };
       }
-      if (booking.service_id) {
-        // Add service to the package
-        groups.packages[booking.package_id].bookings.push(booking);
-      } else if (!booking.service_id) {
-        // This is the main package booking (without a specific service)
-        groups.packages[booking.package_id].mainBooking = booking;
-        groups.packages[booking.package_id].totalPrice = booking.price_paid;
-      }
+      groups.packages[booking.package_id].bookings.push(booking);
     } else if (booking.service_id) {
       // It's a standalone service
       groups.services.push(booking);
@@ -193,13 +183,26 @@ export function AppointmentDetailsDialog({
     packages: {} as Record<string, { 
       packageDetails: any, 
       bookings: typeof appointment.bookings, 
-      mainBooking?: typeof appointment.bookings[0],
       stylist: any, 
       startTime: string,
       totalPrice: number
     }>, 
     services: [] as typeof appointment.bookings 
   });
+  
+  // Calculate package totals correctly
+  Object.values(groupedBookings.packages).forEach(packageGroup => {
+    // For each package, find the bookings directly assigned to it
+    const packageBookings = packageGroup.bookings.filter(booking => booking.package_id === packageGroup.packageDetails?.id);
+    
+    // Calculate the total by summing up all the price_paid values in the package
+    packageGroup.totalPrice = packageBookings.reduce((sum, booking) => sum + booking.price_paid, 0);
+  });
+
+  // Calculate the total from all standalone services and packages
+  const servicesTotal = groupedBookings.services.reduce((sum, booking) => sum + booking.price_paid, 0);
+  const packagesTotal = Object.values(groupedBookings.packages).reduce((sum, pkg) => sum + pkg.totalPrice, 0);
+  const calculatedTotal = servicesTotal + packagesTotal;
 
   const showCheckoutButton = ['inprogress', 'confirmed', 'pending'].includes(appointment.status);
 

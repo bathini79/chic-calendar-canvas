@@ -15,6 +15,8 @@ interface CustomizeDialogProps {
   selectedServices: string[];
   allServices: any[];
   onServiceToggle: (serviceId: string, checked: boolean) => void;
+  totalPrice?: number;
+  totalDuration?: number;
 }
 
 export function CustomizeDialog({
@@ -24,6 +26,8 @@ export function CustomizeDialog({
   selectedServices,
   allServices,
   onServiceToggle,
+  totalPrice,
+  totalDuration,
 }: CustomizeDialogProps) {
   const { addToCart, removeFromCart, items } = useCart();
   const [localServices, setLocalServices] = useState<any[]>([]);
@@ -95,8 +99,12 @@ export function CustomizeDialog({
     serviceId => !selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId)
   );
   
-  const totalPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
-  const totalDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
+  const calculatedPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
+  const calculatedDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
+
+  // Use the props if provided, otherwise use calculated values
+  const finalTotalPrice = totalPrice !== undefined ? totalPrice : calculatedPrice;
+  const finalTotalDuration = totalDuration !== undefined ? totalDuration : calculatedDuration;
 
   if (!selectedPackage) return null;
 
@@ -124,10 +132,10 @@ export function CustomizeDialog({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                {selectedServices.length} services selected • {totalDuration} min
+                {selectedServices.length} services selected • {finalTotalDuration} min
               </div>
               <div className="text-2xl font-bold">
-                ₹{totalPrice}
+                ₹{finalTotalPrice}
               </div>
             </div>
             <Button 
