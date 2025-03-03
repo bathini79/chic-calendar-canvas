@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -22,7 +23,7 @@ import { useActiveServices } from "./bookings/hooks/useActiveServices";
 import { useActivePackages } from "./bookings/hooks/useActivePackages";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import useSaveAppointment from "./bookings/hooks/useSaveAppointment";
-import { Appointment, Service, Package, SCREEN, AppointmentStatus, DiscountType } from "./bookings/types";
+import { Appointment, Service, Package, SCREEN } from "./bookings/types";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -267,7 +268,7 @@ export default function AdminBookings() {
     setSelectedServices(services);
     setSelectedPackages(packages);
     setSelectedStylists(stylists);
-    setPaymentMethod(appointment.payment_method as "cash" | "online");
+    setPaymentMethod(appointment.payment_method);
     setDiscountType(appointment.discount_type);
     setDiscountValue(appointment.discount_value);
     setAppointmentNotes(appointment.notes || '');
@@ -290,6 +291,7 @@ export default function AdminBookings() {
     }
   };
 
+  // This is a temporary prop for the TimeSlots component until we fix the imports
   const timeSlotsProps = {
     employees,
     formatTime,
