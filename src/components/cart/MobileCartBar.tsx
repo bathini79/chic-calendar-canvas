@@ -28,7 +28,7 @@ export function MobileCartBar() {
   };
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t p-4 flex items-center justify-between gap-4">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t p-4 flex items-center justify-between gap-4 z-10">
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-2">
           <ShoppingCart className="h-5 w-5" />

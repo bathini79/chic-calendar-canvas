@@ -1,5 +1,5 @@
 
-import { type Service, type Package } from "../types";
+import { type Service, type Package, type Employee } from "../types";
 
 export const getTotalPrice = (
   selectedServices: string[],
@@ -199,4 +199,18 @@ export const calculatePackageDuration = (
   }
 
   return duration;
+};
+
+export const getStylistName = (stylistId: string, employees: Employee[] = []) => {
+  const employee = employees.find(emp => emp.id === stylistId);
+  return employee ? employee.name : stylistId;
+};
+
+export const formatDuration = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours > 0) {
+    return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`;
+  }
+  return `${minutes}m`;
 };

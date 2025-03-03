@@ -15,7 +15,8 @@ export default function UnifiedScheduling() {
     selectedTimeSlots, 
     setSelectedTimeSlots, 
     selectedStylists, 
-    setSelectedStylists 
+    setSelectedStylists,
+    stylists
   } = useCart();
   const navigate = useNavigate();
 
@@ -47,6 +48,7 @@ export default function UnifiedScheduling() {
             items={items}
             selectedStylists={selectedStylists}
             onStylistSelect={handleStylistSelect}
+            stylists={stylists}
           />
           <UnifiedCalendar
             selectedDate={selectedDate}
