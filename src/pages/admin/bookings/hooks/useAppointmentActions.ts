@@ -42,14 +42,8 @@ export function useAppointmentActions() {
 
       if (appointmentError) throw appointmentError;
 
-      // Type assertion to ensure payment_method matches the expected type
-      const typedAppointment = {
-        ...appointment,
-        payment_method: appointment.payment_method as "cash" | "online"
-      } as Appointment;
-
       // If this is a refund, get the original sale
-      if (typedAppointment.transaction_type === 'refund') {
+      if (appointment.transaction_type === 'refund') {
         const { data: originalSale, error: originalError } = await supabase
           .from('appointments')
           .select(`
@@ -62,16 +56,10 @@ export function useAppointmentActions() {
               employee:employees!bookings_employee_id_fkey(*)
             )
           `)
-          .eq('id', typedAppointment.original_appointment_id)
+          .eq('id', appointment.original_appointment_id)
           .single();
 
         if (originalError) throw originalError;
-
-        // Type assertion for original sale
-        const typedOriginalSale = {
-          ...originalSale,
-          payment_method: originalSale.payment_method as "cash" | "online"
-        } as Appointment;
 
         // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
@@ -86,20 +74,14 @@ export function useAppointmentActions() {
               employee:employees!bookings_employee_id_fkey(*)
             )
           `)
-          .eq('original_appointment_id', typedOriginalSale.id)
+          .eq('original_appointment_id', originalSale.id)
           .eq('transaction_type', 'refund');
 
         if (refundsError) throw refundsError;
 
-        // Type assertion for refunds
-        const typedRefunds = refunds?.map(refund => ({
-          ...refund,
-          payment_method: refund.payment_method as "cash" | "online"
-        })) as Appointment[] || [];
-
         return {
-          originalSale: typedOriginalSale,
-          refunds: typedRefunds
+          originalSale,
+          refunds: refunds || []
         };
       } else {
         // This is the original sale, get all its refunds
@@ -120,15 +102,9 @@ export function useAppointmentActions() {
 
         if (refundsError) throw refundsError;
 
-        // Type assertion for refunds
-        const typedRefunds = refunds?.map(refund => ({
-          ...refund,
-          payment_method: refund.payment_method as "cash" | "online"
-        })) as Appointment[] || [];
-
         return {
-          originalSale: typedAppointment,
-          refunds: typedRefunds
+          originalSale: appointment,
+          refunds: refunds || []
         };
       }
     } catch (error: any) {

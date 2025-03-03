@@ -99,7 +99,6 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
               </div>
               <div className="flex flex-wrap gap-1">
                 {pkg.package_services.map((ps: any) => {
-                  // Use package_selling_price if available, otherwise use service.selling_price
                   const servicePrice = typeof ps.package_selling_price === 'number'
                     ? ps.package_selling_price
                     : ps.service.selling_price;
