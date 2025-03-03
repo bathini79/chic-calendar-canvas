@@ -90,7 +90,7 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
             )}
             <div className="space-y-2">
               <div className="flex flex-wrap gap-1">
-                {pkg?.package_categories.map((pc: any) => (
+                {pkg?.package_categories?.map((pc: any) => (
                   <Badge key={pc.categories?.id} variant="secondary">
                     {pc.categories?.name}
                   </Badge>
