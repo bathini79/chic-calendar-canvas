@@ -56,16 +56,29 @@ export interface Package {
   }>;
 }
 
+export type AppointmentStatus = 
+  | 'pending' 
+  | 'confirmed' 
+  | 'canceled' 
+  | 'completed' 
+  | 'inprogress' 
+  | 'voided' 
+  | 'refunded' 
+  | 'partially_refunded' 
+  | 'noshow';
+
+export type DiscountType = 'none' | 'percentage' | 'fixed';
+
 export interface Appointment {
   id: string;
   customer_id: string;
   customer?: Customer;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded' | 'noshow';
+  status: AppointmentStatus;
   start_time: string;
   end_time: string;
   total_price: number;
   payment_method: string; // Changed from 'cash' | 'online' to string to match DB
-  discount_type: 'none' | 'percentage' | 'fixed';
+  discount_type: DiscountType;
   discount_value: number;
   notes?: string;
   number_of_bookings: number;
@@ -90,7 +103,7 @@ export interface Booking {
   employee: Employee;
   start_time: string;
   end_time: string;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'noshow';
+  status: AppointmentStatus;
   price_paid: number;
   original_price?: number;
   service?: Service;
