@@ -1,3 +1,4 @@
+
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useFormContext } from "react-hook-form";
@@ -8,10 +9,10 @@ interface PriceSectionProps {
   calculatedPrice: number;
   selectedServices: any[];
   services: any[];
-  discountedPrice:any;
+  discountedPrice: any;
 }
 
-export function PriceSection({ calculatedPrice, selectedServices, services,discountedPrice }: PriceSectionProps) {
+export function PriceSection({ calculatedPrice, selectedServices, services, discountedPrice }: PriceSectionProps) {
   const form = useFormContext();
   return (
     <div className="space-y-6">
@@ -72,16 +73,20 @@ export function PriceSection({ calculatedPrice, selectedServices, services,disco
                 const service = services.find(s => s.id === serviceId);
                 if (!service) return null;
                 
-                // const discountedPrice = getServicePrice(serviceId);
+                const displayPrice = discountedPrice?.[serviceId];
+                const originalPrice = service.package_selling_price !== null && 
+                                     service.package_selling_price !== undefined
+                  ? service.package_selling_price
+                  : service.selling_price;
                 
                 return (
                   <div key={serviceId} className="flex justify-between items-center p-2 bg-background rounded-lg">
                     <span className="font-medium">{service.name}</span>
                     <div className="text-sm space-x-2">
-                      {discountedPrice?.[serviceId] !== service.selling_price && (
-                        <span className="text-muted-foreground line-through">₹{service.selling_price}</span>
+                      {displayPrice !== originalPrice && (
+                        <span className="text-muted-foreground line-through">₹{originalPrice}</span>
                       )}
-                      <span className="font-medium">₹{discountedPrice?.[serviceId]?.toFixed(2)}</span>
+                      <span className="font-medium">₹{displayPrice?.toFixed(2) || originalPrice?.toFixed(2)}</span>
                     </div>
                   </div>
                 );

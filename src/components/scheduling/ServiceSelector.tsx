@@ -14,6 +14,7 @@ interface Service {
 
 interface PackageService {
   service: Service;
+  package_selling_price?: number;
 }
 
 interface Package {
@@ -133,35 +134,42 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
               {packageData.package.name}
             </div>
             <div className="space-y-3 pl-4">
-              {packageData.services.map(({ service }) => (
-                <div 
-                  key={`${packageData.cartItemId}-${service.id}`}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{service.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {service.duration} minutes
-                    </p>
-                  </div>
-                  <Select 
-                    value={selectedStylists[service.id] || ''} 
-                    onValueChange={(value) => onStylistSelect(service.id, value)}
+              {packageData.services.map(({ service, package_selling_price }) => {
+                // Use package_selling_price if available, otherwise fall back to service's selling_price
+                const displayPrice = package_selling_price !== undefined && package_selling_price !== null
+                  ? package_selling_price
+                  : service.selling_price;
+                
+                return (
+                  <div 
+                    key={`${packageData.cartItemId}-${service.id}`}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
                   >
-                    <SelectTrigger className="w-full sm:w-[200px]">
-                      <SelectValue placeholder="Select stylist" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="any">Any Available Stylist</SelectItem>
-                      {employees?.map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{service.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {service.duration} minutes • ₹{displayPrice}
+                      </p>
+                    </div>
+                    <Select 
+                      value={selectedStylists[service.id] || ''} 
+                      onValueChange={(value) => onStylistSelect(service.id, value)}
+                    >
+                      <SelectTrigger className="w-full sm:w-[200px]">
+                        <SelectValue placeholder="Select stylist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any Available Stylist</SelectItem>
+                        {employees?.map((employee) => (
+                          <SelectItem key={employee.id} value={employee.id}>
+                            {employee.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
             </div>
             <Separator className="my-4" />
           </div>
@@ -182,7 +190,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
                   <div className="min-w-0 flex-1">
                     <p className="font-medium truncate">{service.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {service.duration} minutes
+                      {service.duration} minutes • ₹{service.selling_price}
                     </p>
                   </div>
                   <Select 

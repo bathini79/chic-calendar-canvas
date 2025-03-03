@@ -33,7 +33,12 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
-import { getTotalPrice, getTotalDuration, getFinalPrice } from "../utils/bookingUtils";
+import { 
+  getTotalPrice, 
+  getTotalDuration, 
+  getFinalPrice, 
+  getServicePriceInPackage 
+} from "../utils/bookingUtils";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -122,58 +127,107 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     getFinalPrice(subtotal, discountType, discountValue),
     [subtotal, discountType, discountValue]
   );
+  
   const discountAmount = useMemo(() => 
     subtotal - total,
     [subtotal, total]
   );
 
   const selectedItems = useMemo(() => {
-    const items = [
-      ...selectedServices.map((id) => {
-        const service = services.find((s) => s.id === id);
-        return service ? {
-          id,
-          name: service.name,
-          price: service.selling_price,
-          duration: service.duration,
-          type: "service" as const,
-          stylist: selectedStylists[id],
-          time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
-          formattedDuration: formatDuration(service.duration),
-        } : null;
-      }),
-      ...selectedPackages.map((id) => {
-        const pkg = packages.find((p) => p.id === id);
-        if (!pkg) return null;
-        // Calculate package duration including customizations
-        const packageDuration = getTotalDuration([], [id], services, packages, customizedServices);
-        // Calculate package price including customizations
-        const packagePrice = getTotalPrice([], [id], services, packages, customizedServices);
+    // First, collect all individual services (not part of packages)
+    const individualServices = selectedServices.map((id) => {
+      const service = services.find((s) => s.id === id);
+      return service ? {
+        id,
+        name: service.name,
+        price: service.selling_price,
+        duration: service.duration,
+        type: "service" as const,
+        packageId: null as string | null,
+        stylist: selectedStylists[id],
+        time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
+        formattedDuration: formatDuration(service.duration),
+      } : null;
+    }).filter(Boolean);
 
-        return {
-          id,
-          name: pkg.name,
-          price: packagePrice,
-          duration: packageDuration,
-          type: "package" as const,
-          stylist: selectedStylists[id],
-          time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
-          formattedDuration: formatDuration(packageDuration),
-        };
-      }),
-    ].filter(Boolean) as Array<{
-      id: string;
-      name: string;
-      price: number;
-      duration: number;
-      type: "service" | "package";
-      stylist: string;
-      time: string;
-      formattedDuration: string;
-    }>;
+    // Then collect all package services
+    const packageItems = selectedPackages.flatMap((packageId) => {
+      const pkg = packages.find((p) => p.id === packageId);
+      if (!pkg) return [];
+      
+      // Create an entry for the package itself
+      const packageItem = {
+        id: packageId,
+        name: pkg.name,
+        price: pkg.price,
+        duration: getTotalDuration([], [packageId], services, packages, customizedServices),
+        type: "package" as const,
+        packageId: null as string | null,
+        stylist: null,
+        time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''],
+        formattedDuration: formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices)),
+        services: [] as Array<{
+          id: string;
+          name: string;
+          price: number;
+          duration: number;
+          stylist: string | null;
+        }>
+      };
+      
+      // Add the package services
+      if (pkg.package_services) {
+        packageItem.services = pkg.package_services.map(ps => {
+          // Use package_selling_price if available, otherwise use service.selling_price
+          const servicePrice = ps.package_selling_price !== null && ps.package_selling_price !== undefined
+            ? ps.package_selling_price
+            : ps.service.selling_price;
+            
+          return {
+            id: ps.service.id,
+            name: ps.service.name,
+            price: servicePrice,
+            duration: ps.service.duration,
+            stylist: selectedStylists[ps.service.id] || null
+          };
+        });
+      }
+      
+      // Add customized services
+      if (pkg.is_customizable && customizedServices[packageId]) {
+        const additionalServices = customizedServices[packageId]
+          .filter(serviceId => !pkg.package_services.some(ps => ps.service.id === serviceId))
+          .map(serviceId => {
+            const service = services.find(s => s.id === serviceId);
+            if (!service) return null;
+            
+            return {
+              id: service.id,
+              name: service.name,
+              price: service.selling_price,
+              duration: service.duration,
+              stylist: selectedStylists[service.id] || null
+            };
+          })
+          .filter(Boolean);
+        
+        packageItem.services.push(...additionalServices);
+      }
+      
+      return [packageItem];
+    });
 
-    return items;
-  }, [selectedServices, selectedPackages, services, packages, selectedStylists, selectedTimeSlots, appointmentId, customizedServices]);
+    return [...individualServices, ...packageItems] as Array<any>;
+  }, [
+    selectedServices, 
+    selectedPackages, 
+    services, 
+    packages, 
+    selectedStylists, 
+    selectedTimeSlots, 
+    appointmentId, 
+    customizedServices
+  ]);
 
   const handlePayment = async () => {
     try {
@@ -232,14 +286,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   item && (
                     <div
                       key={`${item.type}-${item.id}`}
-                      className="flex items-center justify-between py-4 border-b border-gray-100"
+                      className="flex flex-col py-4 border-b border-gray-100"
                     >
-                      <div className="space-y-2">
-                        <p className="text-lg font-semibold tracking-tight">{item.name}</p>
+                      <div className="flex items-center justify-between mb-2">
                         <div className="space-y-1">
-                          <div className="flex flex-col text-sm text-muted-foreground gap-1">
+                          <p className="text-lg font-semibold tracking-tight">{item.name}</p>
+                          <div className="flex flex-wrap text-sm text-muted-foreground gap-2">
                             <div className="flex items-center">
-                              <Clock className="mr-2 h-4 w-4" />
+                              <Clock className="mr-1 h-4 w-4" />
                               {item.time && (
                                 <span>{item.time} • {item.formattedDuration}</span>
                               )}
@@ -249,33 +303,70 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                             </div>
                             {item.stylist && (
                               <div className="flex items-center">
-                                <User className="mr-2 h-4 w-4" />
+                                <User className="mr-1 h-4 w-4" />
                                 {item.stylist}
                               </div>
                             )}
                           </div>
                         </div>
+                        <div className="flex items-center gap-4">
+                          {item.type === "package" && (
+                            <p className="font-semibold text-lg">
+                              <IndianRupee className="inline h-4 w-4" />
+                              {item.price}
+                            </p>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              if (item.type === 'service') {
+                                onRemoveService(item.id);
+                              } else {
+                                onRemovePackage(item.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <p className="font-semibold text-lg">
-                          <IndianRupee className="inline h-4 w-4" />
-                          {item.price}
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => {
-                            if (item.type === 'service') {
-                              onRemoveService(item.id);
-                            } else {
-                              onRemovePackage(item.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+
+                      {/* Display package services */}
+                      {item.type === "package" && item.services && item.services.length > 0 && (
+                        <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
+                          {item.services.map(service => (
+                            <div key={service.id} className="flex items-center justify-between py-1">
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">{service.name}</p>
+                                <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
+                                  <span>{formatDuration(service.duration)}</span>
+                                  {service.stylist && (
+                                    <div className="flex items-center">
+                                      <User className="mr-1 h-3 w-3" />
+                                      {service.stylist}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm">
+                                <IndianRupee className="inline h-3 w-3" />
+                                {service.price}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {item.type === "service" && (
+                        <div className="flex justify-end">
+                          <p className="font-semibold text-lg">
+                            <IndianRupee className="inline h-4 w-4" />
+                            {item.price}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )
                 ))}
@@ -387,3 +478,4 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     </div>
   );
 };
+

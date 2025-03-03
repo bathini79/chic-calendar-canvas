@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,8 @@ import {
   Printer,
   Download,
   Ban,
-  Clock
+  Clock,
+  Package
 } from "lucide-react";
 import { format } from 'date-fns';
 import {
@@ -33,7 +35,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentActions } from '../hooks/useAppointmentActions';
-import type {  RefundData, TransactionDetails } from '../types';
+import type { RefundData, TransactionDetails } from '../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -173,6 +175,42 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
+  // Group bookings by package
+  const getGroupedBookings = (transaction: any) => {
+    if (!transaction) return [];
+
+    // First, separate package bookings from individual service bookings
+    const packageBookings = transaction.bookings.filter(b => b.package_id);
+    const serviceBookings = transaction.bookings.filter(b => b.service_id && !b.package_id);
+    
+    // Group bookings by package_id
+    const packageGroups = packageBookings.reduce((groups, booking) => {
+      const packageId = booking.package_id;
+      if (!groups[packageId]) {
+        groups[packageId] = {
+          package: booking.package,
+          bookings: []
+        };
+      }
+      groups[packageId].bookings.push(booking);
+      return groups;
+    }, {});
+
+    // Create the final array with packages and their services, followed by individual services
+    const result = [
+      ...Object.values(packageGroups).map((group: any) => ({
+        type: 'package',
+        ...group
+      })),
+      ...serviceBookings.map(booking => ({
+        type: 'service',
+        booking
+      }))
+    ];
+
+    return result;
+  };
+
   if (!transactionDetails) {
     return <div>Loading...</div>;
   }
@@ -189,6 +227,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto px-1">
         {allTransactions.map((transaction) => {
           const isRefund = transaction.transaction_type === 'refund';
+          const groupedBookings = getGroupedBookings(transaction);
           
           return (
             <Card key={transaction.id} className={`bg-white h-full ${isRefund ? 'border-red-200' : ''}`}>
@@ -275,23 +314,70 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
                 <div className="overflow-y-auto">
                   <h4 className="font-medium mb-4">{isRefund ? 'Refunded Items' : 'Items'}</h4>
-                  {transaction.bookings.map((booking) => {
-                    const itemName = booking.service?.name || booking.package?.name;
-                    
-                    return (
-                      <div key={booking.id} className="py-2 flex justify-between items-start border-b">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm line-clamp-1">{itemName}</p>
-                          <p className="text-xs text-gray-500">
-                            {format(new Date(booking.start_time), 'h:mma')}{' '}
-                            {booking.employee && ` • ${booking.employee.name}`}
+                  
+                  {groupedBookings.map((item: any, idx: number) => {
+                    if (item.type === 'package') {
+                      // This is a package with multiple services
+                      return (
+                        <div key={idx} className="mb-4">
+                          <div className="py-2 flex justify-between items-start border-b bg-slate-50 px-2 rounded-t-md">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4" />
+                                <p className="font-medium line-clamp-1">{item.package.name}</p>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {item.bookings.length} services
+                              </p>
+                            </div>
+                            <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
+                              {isRefund ? '-' : ''}₹{item.package.price.toFixed(2)}
+                            </p>
+                          </div>
+                          
+                          <div className="pl-6 border-l-2 border-gray-300 ml-4 mt-2 space-y-1">
+                            {item.bookings.map((booking: any) => {
+                              const servicePrice = booking.service?.package_selling_price !== null && 
+                                                  booking.service?.package_selling_price !== undefined
+                                ? booking.service.package_selling_price
+                                : booking.service?.selling_price;
+                                
+                              return (
+                                <div key={booking.id} className="py-1 flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="text-sm line-clamp-1">{booking.service?.name}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {booking.start_time && format(new Date(booking.start_time), 'h:mma')}{' '}
+                                      {booking.employee && ` • ${booking.employee.name}`}
+                                    </p>
+                                  </div>
+                                  <p className="text-xs text-gray-600">
+                                    {servicePrice ? `₹${servicePrice.toFixed(2)}` : ''}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      // This is a standalone service
+                      const booking = item.booking;
+                      return (
+                        <div key={booking.id} className="py-2 flex justify-between items-start border-b">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm line-clamp-1">{booking.service?.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {booking.start_time && format(new Date(booking.start_time), 'h:mma')}{' '}
+                              {booking.employee && ` • ${booking.employee.name}`}
+                            </p>
+                          </div>
+                          <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
+                            {isRefund ? '-' : ''}₹{booking.price_paid.toFixed(2)}
                           </p>
                         </div>
-                        <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
-                          {isRefund ? '-' : ''}₹{booking.price_paid.toFixed(2)}
-                        </p>
-                      </div>
-                    );
+                      );
+                    }
                   })}
                 </div>
 
@@ -387,7 +473,17 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 <input
                   type="checkbox"
                   checked={selectAll}
-                  onChange={(e) => setSelectAll(e.target.checked)}
+                  onChange={(e) => {
+                    setSelectAll(e.target.checked);
+                    // Update all refund items based on selectAll status
+                    const allBookingIds = transactionDetails.originalSale.bookings
+                      .filter(booking => booking.status !== 'refunded')
+                      .reduce((acc, booking) => {
+                        acc[booking.id] = e.target.checked;
+                        return acc;
+                      }, {});
+                    setRefundItems(allBookingIds);
+                  }}
                   className="h-4 w-4 rounded border-gray-300"
                 />
                 <span className="text-sm">Select All</span>
@@ -514,3 +610,4 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     </>
   );
 };
+

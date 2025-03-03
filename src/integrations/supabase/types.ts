@@ -690,14 +690,17 @@ export type Database = {
       package_services: {
         Row: {
           package_id: string
+          package_selling_price: number | null
           service_id: string
         }
         Insert: {
           package_id: string
+          package_selling_price?: number | null
           service_id: string
         }
         Update: {
           package_id?: string
+          package_selling_price?: number | null
           service_id?: string
         }
         Relationships: [

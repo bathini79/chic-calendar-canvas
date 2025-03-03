@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
@@ -28,12 +29,12 @@ type Stylist = {
 
 export interface ServiceSelectorProps {
   onServiceSelect?: (serviceId: string) => void;
-  onPackageSelect?: (packageId: string) => void;
+  onPackageSelect?: (packageId: string, serviceIds?: string[]) => void;
   onStylistSelect: (itemId: string, stylistId: string) => void;
   selectedServices: string[];
   selectedPackages: string[];
   selectedStylists: Record<string, string>;
-  stylists: Employee[];
+  stylists: Stylist[];
   onCustomPackage?: (packageId: string, serviceId: string) => void;
   customizedServices?: Record<string, string[]>;
 }
@@ -86,7 +87,8 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         .select(`
           *,
           package_services(
-            service:services(*)
+            service:services(*),
+            package_selling_price
           )
         `)
         .eq('status', 'active');
@@ -134,16 +136,38 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   };
 
   const handlePackageSelect = (pkg: any) => {
+    // Extract base service IDs from the package
     const baseServices = pkg?.package_services.map((ps: any) => ps.service.id);
     const currentCustomServices = customizedServices[pkg.id] || [];
 
     if (selectedPackages.includes(pkg.id)) {
+      // If already selected, deselect the package
       onPackageSelect(pkg.id);
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
+      // Expand the package view even if not selecting yet
       setExpandedPackages(prev => [...prev, pkg.id]);
+      // Select the package and provide all service IDs (base + custom)
       onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
     }
+  };
+
+  // Get the price of a service within a package
+  const getServicePriceInPackage = (packageId: string, serviceId: string) => {
+    const pkg = packages?.find(p => p.id === packageId);
+    if (!pkg) return 0;
+
+    const packageService = pkg.package_services?.find(ps => ps.service.id === serviceId);
+    if (packageService) {
+      // Use package_selling_price if available, otherwise fall back to the service's selling_price
+      return packageService.package_selling_price !== null && packageService.package_selling_price !== undefined
+        ? packageService.package_selling_price
+        : packageService.service.selling_price;
+    }
+
+    // For customized services not in the base package
+    const service = services?.find(s => s.id === serviceId);
+    return service?.selling_price || 0;
   };
 
   return (
@@ -200,7 +224,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                       } min
                     </TableCell>
                     <TableCell>
-                    ₹{isService ? item.selling_price : calculatePackagePrice(item)}
+                      ₹{isService ? item.selling_price : calculatePackagePrice(item)}
                     </TableCell>
                     <TableCell>
                       {isService && isSelected && (
@@ -258,7 +282,9 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                               </div>
                               <div className="flex items-center gap-4">
                                 <span className="text-sm font-medium">
-                                ₹{ps.service.selling_price}
+                                  ₹{ps.package_selling_price !== null && ps.package_selling_price !== undefined
+                                    ? ps.package_selling_price
+                                    : ps.service.selling_price}
                                 </span>
                                 <Select 
                                   value={selectedStylists[ps.service.id] || ''} 
@@ -337,3 +363,4 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     </div>
   );
 };
+

@@ -36,8 +36,10 @@ export function PackagesList({ searchQuery, onEdit }: PackagesListProps) {
           package_services (
             service:services (
               id,
-              name
-            )
+              name,
+              selling_price
+            ),
+            package_selling_price
           )
         `)
         .order('name');
@@ -92,6 +94,10 @@ export function PackagesList({ searchQuery, onEdit }: PackagesListProps) {
                   {pkg.package_services.map((ps: any) => (
                     <Badge key={ps.service.id} variant="outline">
                       {ps.service.name}
+                      {ps.package_selling_price !== null && 
+                       ps.package_selling_price !== undefined && 
+                       ps.package_selling_price !== ps.service.selling_price ? 
+                        ` (₹${ps.package_selling_price})` : ''}
                     </Badge>
                   ))}
                 </div>

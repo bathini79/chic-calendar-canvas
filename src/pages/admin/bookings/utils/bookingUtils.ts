@@ -130,6 +130,40 @@ export const calculatePackagePrice = (
   return total;
 };
 
+// Get the price of a service within a package context
+export const getServicePriceInPackage = (
+  serviceId: string,
+  packageId: string | null,
+  packages: Package[],
+  services: Service[]
+) => {
+  // If there's no package context, return the regular service price
+  if (!packageId) {
+    const service = services?.find(s => s.id === serviceId);
+    return service?.selling_price || 0;
+  }
+
+  // Find the package
+  const pkg = packages?.find(p => p.id === packageId);
+  if (!pkg) {
+    const service = services?.find(s => s.id === serviceId);
+    return service?.selling_price || 0;
+  }
+
+  // Check if the service is part of the package
+  const packageService = pkg.package_services?.find(ps => ps.service.id === serviceId);
+  if (packageService) {
+    // Use package_selling_price if available, otherwise fall back to service's selling_price
+    return packageService.package_selling_price !== null && packageService.package_selling_price !== undefined
+      ? packageService.package_selling_price
+      : packageService.service.selling_price;
+  }
+
+  // If it's a customized service not in the base package
+  const service = services?.find(s => s.id === serviceId);
+  return service?.selling_price || 0;
+};
+
 export const calculatePackageDuration = (
   pkg: Package,
   customizedServices: string[],
