@@ -42,6 +42,12 @@ export function useAppointmentActions() {
 
       if (appointmentError) throw appointmentError;
 
+      // Cast the discount_type to ensure it matches the expected types
+      const typedAppointment = {
+        ...appointment,
+        discount_type: appointment.discount_type as 'none' | 'percentage' | 'fixed'
+      };
+
       // If this is a refund, get the original sale
       if (appointment.transaction_type === 'refund') {
         const { data: originalSale, error: originalError } = await supabase
@@ -61,6 +67,12 @@ export function useAppointmentActions() {
 
         if (originalError) throw originalError;
 
+        // Cast the discount_type for original sale
+        const typedOriginalSale = {
+          ...originalSale,
+          discount_type: originalSale.discount_type as 'none' | 'percentage' | 'fixed'
+        };
+
         // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
           .from('appointments')
@@ -79,9 +91,15 @@ export function useAppointmentActions() {
 
         if (refundsError) throw refundsError;
 
+        // Cast the discount_type for all refunds
+        const typedRefunds = refunds?.map(refund => ({
+          ...refund,
+          discount_type: refund.discount_type as 'none' | 'percentage' | 'fixed'
+        })) || [];
+
         return {
-          originalSale,
-          refunds: refunds || []
+          originalSale: typedOriginalSale as Appointment,
+          refunds: typedRefunds as Appointment[]
         };
       } else {
         // This is the original sale, get all its refunds
@@ -102,9 +120,15 @@ export function useAppointmentActions() {
 
         if (refundsError) throw refundsError;
 
+        // Cast the discount_type for all refunds
+        const typedRefunds = refunds?.map(refund => ({
+          ...refund,
+          discount_type: refund.discount_type as 'none' | 'percentage' | 'fixed'
+        })) || [];
+
         return {
-          originalSale: appointment,
-          refunds: refunds || []
+          originalSale: typedAppointment as Appointment,
+          refunds: typedRefunds as Appointment[]
         };
       }
     } catch (error: any) {
