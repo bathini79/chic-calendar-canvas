@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,7 +112,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
-  // Calculate totals using the shared utility functions
   const subtotal = useMemo(() => 
     getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
     [selectedServices, selectedPackages, services, packages, customizedServices]
@@ -135,7 +133,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   );
 
   const selectedItems = useMemo(() => {
-    // First, collect all individual services (not part of packages)
     const individualServices = selectedServices.map((id) => {
       const service = services.find((s) => s.id === id);
       return service ? {
@@ -151,15 +148,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       } : null;
     }).filter(Boolean);
 
-    // Then collect all package services
     const packageItems = selectedPackages.flatMap((packageId) => {
       const pkg = packages.find((p) => p.id === packageId);
       if (!pkg) return [];
       
-      // Calculate the actual package price including customized services
       const packageTotalPrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
       
-      // Create an entry for the package itself
       const packageItem = {
         id: packageId,
         name: pkg.name,
@@ -179,25 +173,21 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         }>
       };
       
-      // Add the package services
       if (pkg.package_services) {
         packageItem.services = pkg.package_services.map(ps => {
-          // Use package_selling_price if available, otherwise use service.selling_price
-          const servicePrice = typeof ps.package_selling_price === 'number'
-            ? ps.package_selling_price
-            : ps.service.selling_price;
+          const adjustedPrice = 'package_selling_price' in ps && ps.package_selling_price !== null && ps.package_selling_price !== undefined
+            ? ps.package_selling_price : ps.service.selling_price;
             
           return {
             id: ps.service.id,
             name: ps.service.name,
-            price: servicePrice,
+            price: adjustedPrice,
             duration: ps.service.duration,
             stylist: selectedStylists[ps.service.id] || selectedStylists[packageId] || null
           };
         });
       }
       
-      // Add customized services
       if (pkg.is_customizable && customizedServices[packageId]) {
         const additionalServices = customizedServices[packageId]
           .filter(serviceId => !pkg.package_services.some(ps => ps.service.id === serviceId))
@@ -337,7 +327,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                         </div>
                       </div>
 
-                      {/* Display package services */}
                       {item.type === "package" && item.services && item.services.length > 0 && (
                         <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
                           {item.services.map(service => (
@@ -482,4 +471,3 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     </div>
   );
 };
-

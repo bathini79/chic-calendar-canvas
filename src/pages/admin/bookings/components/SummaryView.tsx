@@ -86,6 +86,40 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
+  const getGroupedBookings = (transaction: any) => {
+    if (!transaction) return [];
+
+    const packageBookings = transaction.bookings.filter(b => b.package_id);
+    const serviceBookings = transaction.bookings.filter(b => b.service_id && !b.package_id);
+    
+    const packageGroups = packageBookings.reduce((groups, booking) => {
+      const packageId = booking.package_id;
+      if (!groups[packageId]) {
+        groups[packageId] = {
+          package: booking.package,
+          bookings: [],
+          totalPricePaid: 0
+        };
+      }
+      groups[packageId].bookings.push(booking);
+      groups[packageId].totalPricePaid += booking.price_paid || 0;
+      return groups;
+    }, {});
+
+    const result = [
+      ...Object.values(packageGroups).map((group: any) => ({
+        type: 'package',
+        ...group
+      })),
+      ...serviceBookings.map(booking => ({
+        type: 'service',
+        booking
+      }))
+    ];
+
+    return result;
+  };
+
   const handleRefundSale = async () => {
     if (!transactionDetails?.originalSale || !refundedBy) {
       toast.error("Please select who processed the refund");
@@ -172,38 +206,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       console.error("Error adding note:", error);
       toast.error("Failed to add note");
     }
-  };
-
-  const getGroupedBookings = (transaction: any) => {
-    if (!transaction) return [];
-
-    const packageBookings = transaction.bookings.filter(b => b.package_id);
-    const serviceBookings = transaction.bookings.filter(b => b.service_id && !b.package_id);
-    
-    const packageGroups = packageBookings.reduce((groups, booking) => {
-      const packageId = booking.package_id;
-      if (!groups[packageId]) {
-        groups[packageId] = {
-          package: booking.package,
-          bookings: []
-        };
-      }
-      groups[packageId].bookings.push(booking);
-      return groups;
-    }, {});
-
-    const result = [
-      ...Object.values(packageGroups).map((group: any) => ({
-        type: 'package',
-        ...group
-      })),
-      ...serviceBookings.map(booking => ({
-        type: 'service',
-        booking
-      }))
-    ];
-
-    return result;
   };
 
   if (!transactionDetails) {
@@ -325,17 +327,13 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                               </p>
                             </div>
                             <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
-                              {isRefund ? '-' : ''}₹{item.package.price.toFixed(2)}
+                              {isRefund ? '-' : ''}₹{item.totalPricePaid.toFixed(2)}
                             </p>
                           </div>
                           
                           <div className="pl-6 border-l-2 border-gray-300 ml-4 mt-2 space-y-1">
                             {item.bookings.map((booking: any) => {
-                              const servicePrice = booking.service && 
-                                                  booking.package_selling_price !== null && 
-                                                  booking.package_selling_price !== undefined
-                                ? booking.package_selling_price
-                                : booking.service?.selling_price;
+                              const servicePrice = booking.price_paid || 0;
                                 
                               return (
                                 <div key={booking.id} className="py-1 flex justify-between items-start">
@@ -347,7 +345,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                                     </p>
                                   </div>
                                   <p className="text-xs text-gray-600">
-                                    {servicePrice ? `₹${servicePrice.toFixed(2)}` : ''}
+                                    ₹{servicePrice.toFixed(2)}
                                   </p>
                                 </div>
                               );

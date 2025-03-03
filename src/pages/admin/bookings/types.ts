@@ -52,6 +52,7 @@ export interface Package {
   services?: string[];
   package_services?: Array<{
     service: Service;
+    package_selling_price?: number;
   }>;
 }
 
@@ -63,7 +64,7 @@ export interface Appointment {
   start_time: string;
   end_time: string;
   total_price: number;
-  payment_method: 'cash' | 'online';
+  payment_method: string; // Changed from 'cash' | 'online' to string to match DB
   discount_type: 'none' | 'percentage' | 'fixed';
   discount_value: number;
   notes?: string;
@@ -98,6 +99,7 @@ export interface Booking {
   refund_notes?: string;
   refunded_by?: string;
   refunded_at?: string;
+  package_selling_price?: number;
 }
 
 export interface RefundData {
