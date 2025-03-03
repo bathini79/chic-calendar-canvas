@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Package, PenSquare } from "lucide-react";
+import { formatPrice } from "@/lib/utils";
 
 interface PackagesGridProps {
   searchQuery: string;
@@ -108,7 +109,7 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
                       {ps.service.name}
                       {typeof ps.package_selling_price === 'number' && 
                        ps.package_selling_price !== ps.service.selling_price ? 
-                        ` (₹${ps.package_selling_price})` : ''}
+                        ` (${formatPrice(ps.package_selling_price)})` : ''}
                     </Badge>
                   );
                 })}
@@ -116,7 +117,7 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
             </div>
             <div className="flex items-center justify-between text-sm">
               <span>{pkg.duration} min</span>
-              <span className="font-medium">₹{pkg.price}</span>
+              <span className="font-medium">{formatPrice(pkg.price)}</span>
             </div>
           </CardContent>
           <CardFooter>

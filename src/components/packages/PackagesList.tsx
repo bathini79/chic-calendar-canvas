@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Package, PenSquare } from "lucide-react";
+import { formatPrice } from "@/lib/utils";
 
 interface PackagesListProps {
   searchQuery: string;
@@ -105,7 +106,7 @@ export function PackagesList({ searchQuery, onEdit }: PackagesListProps) {
                 </div>
               </TableCell>
               <TableCell>{pkg.duration} min</TableCell>
-              <TableCell>₹{pkg.price}</TableCell>
+              <TableCell>{formatPrice(pkg.price)}</TableCell>
               <TableCell>{pkg.status}</TableCell>
               <TableCell>
                 <Button

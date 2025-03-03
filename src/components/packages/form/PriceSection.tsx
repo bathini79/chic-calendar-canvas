@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { useFormContext } from "react-hook-form";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatPrice } from "@/lib/utils";
 
 interface PriceSectionProps {
   calculatedPrice: number;
@@ -83,9 +84,13 @@ export function PriceSection({ calculatedPrice, selectedServices, services, disc
                     <span className="font-medium">{service.name}</span>
                     <div className="text-sm space-x-2">
                       {displayPrice !== originalPrice && (
-                        <span className="text-muted-foreground line-through">₹{originalPrice}</span>
+                        <span className="text-muted-foreground line-through">
+                          {formatPrice(originalPrice)}
+                        </span>
                       )}
-                      <span className="font-medium">₹{displayPrice?.toFixed(2) || originalPrice?.toFixed(2)}</span>
+                      <span className="font-medium">
+                        {formatPrice(displayPrice || originalPrice)}
+                      </span>
                     </div>
                   </div>
                 );
@@ -95,7 +100,7 @@ export function PriceSection({ calculatedPrice, selectedServices, services, disc
             <div className="pt-4 border-t">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total Price</span>
-                <span className="font-semibold text-lg">₹{calculatedPrice.toFixed(2)}</span>
+                <span className="font-semibold text-lg">{formatPrice(calculatedPrice)}</span>
               </div>
             </div>
           </div>

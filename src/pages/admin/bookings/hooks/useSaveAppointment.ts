@@ -18,13 +18,15 @@ interface UseSaveAppointmentProps {
     selectedServices: string[],
     selectedPackages: string[],
     services: Service[],
-    packages: Package[]
+    packages: Package[],
+    customizedServices?: Record<string, string[]>
   ) => number;
   getTotalPrice: (
     selectedServices: string[],
     selectedPackages: string[],
     services: Service[],
-    packages: Package[]
+    packages: Package[],
+    customizedServices?: Record<string, string[]>
   ) => number;
   discountType: "none" | "percentage" | "fixed";
   discountValue: number;
@@ -85,14 +87,16 @@ const useSaveAppointment = ({
         selectedServices,
         selectedPackages,
         services || [],
-        packages || []
+        packages || [],
+        customizedServices
       );
       const endDateTime = addMinutes(startDateTime, totalDuration);
       const totalPrice = getTotalPrice(
         selectedServices,
         selectedPackages,
         services || [],
-        packages || []
+        packages || [],
+        customizedServices
       );
 
       // Calculate final price after discount
@@ -197,6 +201,13 @@ const useSaveAppointment = ({
             setIsSaving(false);
             return null;
           }
+          
+          // Find if this service is part of the package to get the package_selling_price
+          const packageService = pkg.package_services?.find(ps => ps.service.id === serviceId);
+          const servicePriceInPackage = packageService && 
+            typeof packageService.package_selling_price === 'number' ? 
+            packageService.package_selling_price : service.selling_price;
+            
           const bookingEndTime = addMinutes(currentStartTime, service.duration);
           const { error: bookingError } = await supabase
             .from("bookings")
@@ -208,7 +219,7 @@ const useSaveAppointment = ({
               start_time: currentStartTime.toISOString(),
               end_time: bookingEndTime.toISOString(),
               status,
-              price_paid: service.selling_price,
+              price_paid: servicePriceInPackage,
             });
 
           if (bookingError) {

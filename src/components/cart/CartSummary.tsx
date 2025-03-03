@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { useNavigate, useLocation } from "react-router-dom";
 import { format, addMinutes } from "date-fns";
+import { formatPrice } from "@/lib/utils";
 
 export function CartSummary() {
   const { 
@@ -42,7 +43,7 @@ export function CartSummary() {
     <Card className="flex flex-col h-full">
       <div className="p-4 border-b">
         <h2 className="font-semibold text-lg">Your Cart ({items.length} items)</h2>
-        <p className="text-2xl font-bold mt-2">₹{totalPrice}</p>
+        <p className="text-2xl font-bold mt-2">{formatPrice(totalPrice)}</p>
       </div>
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
@@ -53,6 +54,7 @@ export function CartSummary() {
           ) : (
             sortedItems.map((item) => {
               const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
+              const itemPrice = item.selling_price || item.service?.selling_price || item.package?.price || 0;
               
               return (
                 <div
@@ -68,7 +70,7 @@ export function CartSummary() {
                         Duration: {itemDuration} min
                       </p>
                       <p className="text-sm font-medium">
-                        ₹{item.selling_price || item.service?.selling_price || item.package?.price}
+                        {formatPrice(itemPrice)}
                       </p>
                       {isSchedulingPage && selectedTimeSlots[item.id] && selectedDate && (
                         <p className="text-sm text-muted-foreground mt-2">

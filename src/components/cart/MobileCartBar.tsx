@@ -3,6 +3,7 @@ import { useCart } from "./CartContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ShoppingCart } from "lucide-react";
+import { formatPrice } from "@/lib/utils";
 
 export function MobileCartBar() {
   const { items, selectedDate, selectedTimeSlots, getTotalPrice } = useCart();
@@ -33,7 +34,7 @@ export function MobileCartBar() {
           <ShoppingCart className="h-5 w-5" />
           <span>{items.length} items</span>
         </div>
-        <span className="font-bold">₹{totalPrice}</span>
+        <span className="font-bold">{formatPrice(totalPrice)}</span>
       </div>
       <Button 
         onClick={handleContinue}
