@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,6 +43,38 @@ interface ServiceSelectorProps {
   items: CartItem[];
   selectedStylists: Record<string, string>;
   onStylistSelect: (serviceId: string, stylistId: string) => void;
+}
+
+interface CustomizeCardProps {
+  selectedPackage: {
+    id: string;
+    name: string;
+    price: number;
+    package: {
+      id: string;
+      name: string;
+      description: string;
+      price: number;
+      customizable_services: string[];
+      package_services: Array<{
+        service: {
+          id: string;
+          name: string;
+          duration: number;
+          selling_price: number;
+        }
+      }>;
+    };
+    services: any[];
+    duration: number;
+    cartItemId: string;
+  };
+  
+  onClose: () => void;
+  onServiceToggle: (serviceId: string, checked: boolean) => void;
+  onAddToCart: () => void;
+  services: any[];
+  selectedServices: string[];
 }
 
 export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {

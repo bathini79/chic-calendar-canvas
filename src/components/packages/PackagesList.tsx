@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -96,8 +95,7 @@ export function PackagesList({ searchQuery, onEdit }: PackagesListProps) {
                   {pkg.package_services.map((ps: any) => (
                     <Badge key={ps.service.id} variant="outline">
                       {ps.service.name}
-                      {ps.package_selling_price !== null && 
-                       ps.package_selling_price !== undefined && 
+                      {typeof ps.package_selling_price === 'number' && 
                        ps.package_selling_price !== ps.service.selling_price ? 
                         ` (₹${ps.package_selling_price})` : ''}
                     </Badge>

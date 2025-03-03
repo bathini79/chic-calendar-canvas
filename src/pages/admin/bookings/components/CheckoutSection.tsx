@@ -182,10 +182,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       // Add the package services
       if (pkg.package_services) {
         packageItem.services = pkg.package_services.map(ps => {
-          // Use package_selling_price if available, otherwise use service.selling_price
-          const servicePrice = typeof ps.package_selling_price === 'number'
-            ? ps.package_selling_price
-            : ps.service.selling_price;
+          // Get the correct price for this service
+          let servicePrice = ps.service.selling_price;
+          
+          // Use package_selling_price if available
+          if (typeof ps.package_selling_price === 'number') {
+            servicePrice = ps.package_selling_price;
+          }
             
           return {
             id: ps.service.id,
@@ -200,7 +203,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       // Add customized services
       if (pkg.is_customizable && customizedServices[packageId]) {
         const additionalServices = customizedServices[packageId]
-          .filter(serviceId => !pkg.package_services.some(ps => ps.service.id === serviceId))
+          .filter(serviceId => !pkg.package_services?.some(ps => ps.service.id === serviceId))
           .map(serviceId => {
             const service = services.find(s => s.id === serviceId);
             if (!service) return null;
@@ -482,4 +485,3 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     </div>
   );
 };
-
