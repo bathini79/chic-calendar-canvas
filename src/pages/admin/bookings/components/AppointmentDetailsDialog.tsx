@@ -36,9 +36,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Badge
-} from "@/components/ui/badge";
 import type { Appointment } from '../types';
 import { useAppointmentActions } from '../hooks/useAppointmentActions';
 
@@ -63,42 +60,7 @@ const statusMessages = {
     description: "Are you sure you want to mark this appointment as a no-show? This will be recorded in the customer's history.",
     action: "Yes, Mark as No Show",
     icon: <Ban className="h-5 w-5 text-orange-500" />
-  },
-  voided: {
-    title: "Void Appointment",
-    description: "Are you sure you want to void this appointment? This cannot be undone.",
-    action: "Yes, Void",
-    icon: <XCircle className="h-5 w-5 text-red-500" />
   }
-};
-
-// Statuses that can no longer be changed (terminal states)
-const terminalStatuses = ['completed', 'refunded', 'partially_refunded', 'voided'];
-
-// Status color mapping
-const statusColors = {
-  completed: 'bg-green-500 text-white',
-  confirmed: 'bg-blue-500 text-white',
-  inprogress: 'bg-yellow-500 text-white',
-  canceled: 'bg-red-500 text-white',
-  noshow: 'bg-orange-500 text-white',
-  refunded: 'bg-purple-500 text-white',
-  partially_refunded: 'bg-purple-300 text-white',
-  voided: 'bg-gray-500 text-white',
-  pending: 'bg-gray-300 text-black'
-};
-
-// Status label mapping
-const statusLabels = {
-  completed: 'Completed',
-  confirmed: 'Confirmed',
-  inprogress: 'In Progress',
-  canceled: 'Canceled',
-  noshow: 'No Show',
-  refunded: 'Refunded',
-  partially_refunded: 'Partially Refunded',
-  voided: 'Voided',
-  pending: 'Pending'
 };
 
 export function AppointmentDetailsDialog({
@@ -117,10 +79,10 @@ export function AppointmentDetailsDialog({
 
   const handleStatusChange = async (newStatus: string) => {
     setSelectedStatus(newStatus);
-    if(statusMessages[newStatus as keyof typeof statusMessages]){
-      setShowConfirmDialog(true);
-    } else {
-      handleStatusConfirm();
+    if(statusMessages[newStatus]){
+      setShowConfirmDialog(true)
+    }else{
+      handleStatusConfirm()
     }
   };
 
@@ -161,7 +123,19 @@ export function AppointmentDetailsDialog({
     : '?';
 
   const getStatusColor = (status: string) => {
-    return statusColors[status as keyof typeof statusColors] || 'bg-gray-500';
+    switch (status) {
+      case 'completed':
+        return 'bg-green-500';
+      case 'canceled':
+      case 'noshow':
+        return 'bg-red-500';
+      case 'confirmed':
+        return 'bg-blue-500';
+      case 'inprogress':
+        return 'bg-yellow-500';
+      default:
+        return 'bg-gray-500';
+    }
   };
 
   // Group bookings by package
@@ -174,17 +148,15 @@ export function AppointmentDetailsDialog({
           bookings: [],
           stylist: booking.employee,
           startTime: booking.start_time,
-          totalPrice: 0
+          totalPrice: booking.price_paid
         };
       }
-      
-      // Add to package total price if this is a service within the package
       if (booking.service_id) {
+        // Add service to the package
         groups.packages[booking.package_id].bookings.push(booking);
       } else if (!booking.service_id) {
         // This is the main package booking (without a specific service)
         groups.packages[booking.package_id].mainBooking = booking;
-        groups.packages[booking.package_id].totalPrice = booking.price_paid;
       }
     } else if (booking.service_id) {
       // It's a standalone service
@@ -203,11 +175,7 @@ export function AppointmentDetailsDialog({
     services: [] as typeof appointment.bookings 
   });
 
-  // Only show checkout for active appointments
-  const showCheckoutButton = ['inprogress', 'confirmed', 'pending'].includes(appointment.status);
-  
-  // Check if status is terminal
-  const isTerminalStatus = terminalStatuses.includes(appointment.status);
+  const showCheckoutButton = ['inprogress', 'confirmed'].includes(appointment.status);
 
   const selectedMessage = selectedStatus ? statusMessages[selectedStatus as keyof typeof statusMessages] : null;
 
@@ -228,60 +196,41 @@ export function AppointmentDetailsDialog({
                   </p>
                 </div>
               </div>
-              
-              {isTerminalStatus ? (
-                <Badge className={getStatusColor(appointment.status)}>
-                  {statusLabels[appointment.status as keyof typeof statusLabels]}
-                </Badge>
-              ) : (
-                <Select 
-                  value={appointment.status} 
-                  onValueChange={handleStatusChange}
-                  disabled={isLoading || isTerminalStatus}
-                >
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="confirmed">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-blue-500" />
-                        Confirmed
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="inprogress">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-yellow-500" />
-                        In Progress
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="completed">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-green-500" />
-                        Completed
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="canceled">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-red-500" />
-                        Canceled
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="noshow">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-orange-500" />
-                        No Show
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="voided">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-gray-500" />
-                        Voided
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
+              <Select 
+                value={appointment.status} 
+                onValueChange={handleStatusChange}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="confirmed">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-blue-500" />
+                      Confirmed
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="inprogress">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-green-500" />
+                      In Progress
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="canceled">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-red-500" />
+                      Canceled
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="noshow">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-orange-500" />
+                      No Show
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </SheetHeader>
 
@@ -307,7 +256,7 @@ export function AppointmentDetailsDialog({
 
             <div>
               <h3 className="font-semibold mb-4">Services</h3>
-              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+              <div className="space-y-4">
                 {/* Display packages first with their services nested underneath */}
                 {Object.values(groupedBookings.packages).map((packageGroup) => (
                   <div 
@@ -350,12 +299,6 @@ export function AppointmentDetailsDialog({
                               <div>
                                 <p className="text-sm font-medium">{booking.service.name}</p>
                                 <p className="text-xs text-gray-500">{booking.service.duration}min</p>
-                                {booking.employee && (
-                                  <p className="text-xs text-gray-500 flex items-center">
-                                    <User className="h-3 w-3 mr-1" />
-                                    {booking.employee.name}
-                                  </p>
-                                )}
                               </div>
                             </div>
                           )

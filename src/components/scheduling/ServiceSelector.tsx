@@ -128,13 +128,13 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Render Package Services */}
-        {Object.entries(groupedItems.packages).map(([packageId, packageData]: [string, any]) => (
+        {Object.entries(groupedItems.packages).map(([packageId, packageData]) => (
           <div key={packageId} className="space-y-4">
             <div className="font-semibold text-lg">
               {packageData.package.name}
             </div>
             <div className="space-y-3 pl-4">
-              {packageData.services.map(({ service, package_selling_price }: PackageService) => {
+              {packageData.services.map(({ service, package_selling_price }) => {
                 // Use package_selling_price if available, otherwise fall back to service's selling_price
                 const displayPrice = package_selling_price !== undefined && package_selling_price !== null
                   ? package_selling_price
@@ -182,7 +182,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
               Individual Services
             </div>
             <div className="space-y-3">
-              {groupedItems.services.map(({ cartItemId, service }: {cartItemId: string, service: Service}) => (
+              {groupedItems.services.map(({ cartItemId, service }) => (
                 <div 
                   key={cartItemId}
                   className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"

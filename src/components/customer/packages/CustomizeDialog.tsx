@@ -1,19 +1,19 @@
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { ServicesList } from "./ServicesList";
 import { useCart } from "@/components/cart/CartContext";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
 
-export interface CustomizeDialogProps {
+interface CustomizeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedPackage: any;
   selectedServices: string[];
   allServices: any[];
-  totalPrice: number;
-  totalDuration: number;
   onServiceToggle: (serviceId: string, checked: boolean) => void;
 }
 
@@ -23,111 +23,122 @@ export function CustomizeDialog({
   selectedPackage,
   selectedServices,
   allServices,
-  totalPrice,
-  totalDuration,
-  onServiceToggle
+  onServiceToggle,
 }: CustomizeDialogProps) {
-  const { addToCart } = useCart();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { addToCart, removeFromCart, items } = useCart();
+  const [localServices, setLocalServices] = useState<any[]>([]);
+  
+  // Find if this package is already in cart
+  const existingPackageInCart = items.find(item => 
+    item.package_id === selectedPackage?.id
+  );
 
-  if (!selectedPackage) return null;
-
-  const includedServiceIds = selectedPackage.package_services?.map((ps: any) => ps.service.id) || [];
-  const customizableServiceIds = selectedPackage.customizable_services || [];
-
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    try {
-      // Filter out included services from the custom selections
-      const customSelections = selectedServices.filter(
-        id => !includedServiceIds.includes(id) && customizableServiceIds.includes(id)
-      );
+  useEffect(() => {
+    if (allServices) {
+      setLocalServices(allServices);
+    }
+  }, [allServices]);
+  
+  // When dialog opens, initialize selected services from cart if package exists
+  useEffect(() => {
+    if (open && selectedPackage && existingPackageInCart) {
+      // Reset all selections first
+      selectedServices.forEach(id => onServiceToggle(id, false));
       
-      await addToCart(undefined, selectedPackage.id, customSelections);
+      // Add back the included services
+      selectedPackage.package_services.forEach((ps: any) => {
+        onServiceToggle(ps.service.id, true);
+      });
+
+      // Add any additional services that were previously selected
+      if (existingPackageInCart.customized_services) {
+        existingPackageInCart.customized_services.forEach((serviceId: string) => {
+          onServiceToggle(serviceId, true);
+        });
+      }
+    }
+  }, [open, selectedPackage, existingPackageInCart]);
+
+  const handleBookNow = async () => {
+    try {
+      if (existingPackageInCart) {
+        // First remove the existing package from cart
+        await removeFromCart(existingPackageInCart.id);
+      }
+      
+      // Get additional services (exclude services already included in package)
+      const additionalServices = selectedServices.filter(
+        serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
+      );
+
+      // Calculate the final package price and duration
+      const calculatedPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
+      const calculatedDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
+
+      // Add the package with updated customizations
+      await addToCart(undefined, selectedPackage?.id, {
+        customized_services: additionalServices,
+        selling_price: calculatedPrice,
+        duration: calculatedDuration
+      });
+      
+      toast.success(existingPackageInCart ? "Package updated in cart" : "Added to cart");
       onOpenChange(false);
-      toast.success("Package added to cart");
     } catch (error) {
-      console.error("Error adding customized package:", error);
-      toast.error("Failed to add package to cart");
-    } finally {
-      setIsSubmitting(false);
+      console.error('Error handling package:', error);
+      toast.error("Failed to update cart");
     }
   };
 
-  const availableServices = allServices?.filter(
-    service => customizableServiceIds.includes(service.id) && !includedServiceIds.includes(service.id)
+  // Calculate total price and duration using the utility functions
+  const additionalServices = selectedServices.filter(
+    serviceId => !selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId)
   );
+  
+  const totalPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
+  const totalDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
+
+  if (!selectedPackage) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Customize {selectedPackage.name}</DialogTitle>
+      <DialogContent 
+        className="max-w-2xl h-[90vh] flex flex-col p-0"
+      >
+        <DialogHeader className="p-6 pb-0">
+          <DialogTitle>Customize {selectedPackage?.name}</DialogTitle>
         </DialogHeader>
-        <div className="py-4">
-          <h3 className="text-sm font-medium mb-3">Included Services</h3>
-          <div className="space-y-2 mb-6">
-            {selectedPackage.package_services?.map((ps: any) => (
-              <div key={ps.service.id} className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{ps.service.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {ps.service.duration} min
-                  </p>
-                </div>
-                <Checkbox checked disabled />
-              </div>
-            ))}
+
+        <ScrollArea className="flex-1">
+          <div className="p-6">
+            <ServicesList
+              selectedPackage={selectedPackage}
+              selectedServices={selectedServices}
+              allServices={localServices}
+              onServiceToggle={onServiceToggle}
+            />
           </div>
+        </ScrollArea>
 
-          {availableServices && availableServices.length > 0 && (
-            <>
-              <h3 className="text-sm font-medium mb-3">Additional Services</h3>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {availableServices.map((service: any) => (
-                  <div key={service.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{service.name}</p>
-                      <div className="flex justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          {service.duration} min
-                        </p>
-                        <p className="text-sm font-medium ml-6">
-                          ₹{service.selling_price}
-                        </p>
-                      </div>
-                    </div>
-                    <Checkbox
-                      checked={selectedServices.includes(service.id)}
-                      onCheckedChange={(checked) => 
-                        onServiceToggle(service.id, checked === true)
-                      }
-                    />
-                  </div>
-                ))}
+        <div className="border-t bg-background p-4 mt-auto">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                {selectedServices.length} services selected • {totalDuration} min
               </div>
-            </>
-          )}
-
-          <div className="border-t mt-6 pt-4">
-            <div className="flex justify-between mb-2">
-              <span>Total Duration:</span>
-              <span>{totalDuration} min</span>
+              <div className="text-2xl font-bold">
+                ₹{totalPrice}
+              </div>
             </div>
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total Price:</span>
-              <span>₹{totalPrice}</span>
-            </div>
+            <Button 
+              className="w-full" 
+              size="lg"
+              onClick={handleBookNow}
+            >
+              Book Now
+            </Button>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? "Adding..." : "Add to Cart"}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
