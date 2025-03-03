@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -175,15 +174,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
-  // Group bookings by package
   const getGroupedBookings = (transaction: any) => {
     if (!transaction) return [];
 
-    // First, separate package bookings from individual service bookings
     const packageBookings = transaction.bookings.filter(b => b.package_id);
     const serviceBookings = transaction.bookings.filter(b => b.service_id && !b.package_id);
     
-    // Group bookings by package_id
     const packageGroups = packageBookings.reduce((groups, booking) => {
       const packageId = booking.package_id;
       if (!groups[packageId]) {
@@ -196,7 +192,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       return groups;
     }, {});
 
-    // Create the final array with packages and their services, followed by individual services
     const result = [
       ...Object.values(packageGroups).map((group: any) => ({
         type: 'package',
@@ -317,7 +312,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                   
                   {groupedBookings.map((item: any, idx: number) => {
                     if (item.type === 'package') {
-                      // This is a package with multiple services
                       return (
                         <div key={idx} className="mb-4">
                           <div className="py-2 flex justify-between items-start border-b bg-slate-50 px-2 rounded-t-md">
@@ -337,9 +331,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                           
                           <div className="pl-6 border-l-2 border-gray-300 ml-4 mt-2 space-y-1">
                             {item.bookings.map((booking: any) => {
-                              const servicePrice = booking.service?.package_selling_price !== null && 
-                                                  booking.service?.package_selling_price !== undefined
-                                ? booking.service.package_selling_price
+                              const servicePrice = booking.service && 
+                                                  booking.package_selling_price !== null && 
+                                                  booking.package_selling_price !== undefined
+                                ? booking.package_selling_price
                                 : booking.service?.selling_price;
                                 
                               return (
@@ -361,7 +356,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                         </div>
                       );
                     } else {
-                      // This is a standalone service
                       const booking = item.booking;
                       return (
                         <div key={booking.id} className="py-2 flex justify-between items-start border-b">
@@ -475,7 +469,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                   checked={selectAll}
                   onChange={(e) => {
                     setSelectAll(e.target.checked);
-                    // Update all refund items based on selectAll status
                     const allBookingIds = transactionDetails.originalSale.bookings
                       .filter(booking => booking.status !== 'refunded')
                       .reduce((acc, booking) => {
@@ -610,4 +603,3 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     </>
   );
 };
-

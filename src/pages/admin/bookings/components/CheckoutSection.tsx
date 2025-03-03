@@ -37,7 +37,8 @@ import {
   getTotalPrice, 
   getTotalDuration, 
   getFinalPrice, 
-  getServicePriceInPackage 
+  getServicePriceInPackage,
+  calculatePackagePrice 
 } from "../utils/bookingUtils";
 
 interface CheckoutSectionProps {
@@ -155,15 +156,18 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       const pkg = packages.find((p) => p.id === packageId);
       if (!pkg) return [];
       
+      // Calculate the actual package price including customized services
+      const packageTotalPrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
+      
       // Create an entry for the package itself
       const packageItem = {
         id: packageId,
         name: pkg.name,
-        price: pkg.price,
+        price: packageTotalPrice,
         duration: getTotalDuration([], [packageId], services, packages, customizedServices),
         type: "package" as const,
         packageId: null as string | null,
-        stylist: null,
+        stylist: selectedStylists[packageId],
         time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''],
         formattedDuration: formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices)),
         services: [] as Array<{
@@ -179,7 +183,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       if (pkg.package_services) {
         packageItem.services = pkg.package_services.map(ps => {
           // Use package_selling_price if available, otherwise use service.selling_price
-          const servicePrice = ps.package_selling_price !== null && ps.package_selling_price !== undefined
+          const servicePrice = typeof ps.package_selling_price === 'number'
             ? ps.package_selling_price
             : ps.service.selling_price;
             
@@ -188,7 +192,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             name: ps.service.name,
             price: servicePrice,
             duration: ps.service.duration,
-            stylist: selectedStylists[ps.service.id] || null
+            stylist: selectedStylists[ps.service.id] || selectedStylists[packageId] || null
           };
         });
       }
@@ -206,7 +210,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               name: service.name,
               price: service.selling_price,
               duration: service.duration,
-              stylist: selectedStylists[service.id] || null
+              stylist: selectedStylists[service.id] || selectedStylists[packageId] || null
             };
           })
           .filter(Boolean);

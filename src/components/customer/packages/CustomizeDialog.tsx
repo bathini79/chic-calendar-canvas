@@ -1,9 +1,9 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ServicesList } from "./ServicesList";
 import { useCart } from "@/components/cart/CartContext";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
@@ -14,8 +14,6 @@ interface CustomizeDialogProps {
   selectedPackage: any;
   selectedServices: string[];
   allServices: any[];
-  totalPrice: number;
-  totalDuration: number;
   onServiceToggle: (serviceId: string, checked: boolean) => void;
 }
 
@@ -73,22 +71,9 @@ export function CustomizeDialog({
         serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
       );
 
-      // Calculate the base package duration from package services
-      const basePackageDuration = selectedPackage?.package_services?.reduce(
-        (total: number, ps: any) => total + ps.service.duration, 0
-      ) || 0;
-
-      // Calculate additional duration from customized services
-      const additionalDuration = additionalServices.reduce((total: number, serviceId: string) => {
-        const service = localServices?.find(s => s.id === serviceId);
-        return total + (service?.duration || 0);
-      }, 0);
-
-      // Total duration is base package duration plus additional services duration
-      const calculatedDuration = basePackageDuration + additionalDuration;
-
-      // Calculate price
+      // Calculate the final package price and duration
       const calculatedPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
+      const calculatedDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
       // Add the package with updated customizations
       await addToCart(undefined, selectedPackage?.id, {
@@ -105,27 +90,13 @@ export function CustomizeDialog({
     }
   };
 
-  // Calculate total price and duration
+  // Calculate total price and duration using the utility functions
   const additionalServices = selectedServices.filter(
     serviceId => !selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId)
   );
-
-  // Calculate the base package duration from package services
-  const basePackageDuration = selectedPackage?.package_services?.reduce(
-    (total: number, ps: any) => total + ps.service.duration, 0
-  ) || 0;
-
-  // Calculate additional duration from customized services
-  const additionalDuration = additionalServices.reduce((total: number, serviceId: string) => {
-    const service = localServices?.find(s => s.id === serviceId);
-    return total + (service?.duration || 0);
-  }, 0);
-
-  // Total duration is base package duration plus additional services duration
-  const totalDuration = basePackageDuration + additionalDuration;
-
-  // Calculate total price using the utility function
+  
   const totalPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
+  const totalDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
   if (!selectedPackage) return null;
 

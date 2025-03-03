@@ -34,12 +34,14 @@ export function PackagesList({ searchQuery, onEdit }: PackagesListProps) {
             )
           ),
           package_services (
+            service_id,
+            package_selling_price,
             service:services (
               id,
               name,
-              selling_price
-            ),
-            package_selling_price
+              selling_price,
+              duration
+            )
           )
         `)
         .order('name');

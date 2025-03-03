@@ -22,12 +22,13 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
         .select(`
           *,
           package_services (
+            package_selling_price,
             service:services (
               id,
               name,
-              selling_price
-            ),
-            package_selling_price
+              selling_price,
+              duration
+            )
           )
         `)
         .order('name');
@@ -98,16 +99,14 @@ export function PackagesGrid({ searchQuery, onEdit }: PackagesGridProps) {
               </div>
               <div className="flex flex-wrap gap-1">
                 {pkg.package_services.map((ps: any) => {
-                  const servicePrice = ps.package_selling_price !== null && 
-                                      ps.package_selling_price !== undefined
+                  const servicePrice = typeof ps.package_selling_price === 'number'
                     ? ps.package_selling_price
                     : ps.service.selling_price;
                   
                   return (
                     <Badge key={ps.service.id} variant="outline">
                       {ps.service.name}
-                      {ps.package_selling_price !== null && 
-                       ps.package_selling_price !== undefined && 
+                      {typeof ps.package_selling_price === 'number' && 
                        ps.package_selling_price !== ps.service.selling_price ? 
                         ` (₹${ps.package_selling_price})` : ''}
                     </Badge>

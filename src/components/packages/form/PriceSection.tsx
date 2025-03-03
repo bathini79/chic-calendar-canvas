@@ -74,8 +74,7 @@ export function PriceSection({ calculatedPrice, selectedServices, services, disc
                 if (!service) return null;
                 
                 const displayPrice = discountedPrice?.[serviceId];
-                const originalPrice = service.package_selling_price !== null && 
-                                     service.package_selling_price !== undefined
+                const originalPrice = typeof service.package_selling_price === 'number'
                   ? service.package_selling_price
                   : service.selling_price;
                 
