@@ -33,7 +33,7 @@ const formSchema = z.object({
   discount_type: z.enum(['none', 'percentage', 'fixed']).default('none'),
   discount_value: z.number().min(0).default(0),
   image_urls: z.array(z.string()).optional(),
-  customizable_services: z.array(z.string()).default([]),
+  customizable_services: z.array(z.string()).default([]),  selling_price: z.record(z.string(), z.number()).default({}), // Dynamic service prices
 });
 
 type PackageFormData = z.infer<typeof formSchema>;
@@ -54,6 +54,9 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
   );
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
   const [calculatedPrice, setCalculatedPrice] = useState(0);
+  const [discountedPrice,setDiscountedPrice] = useState({
+
+  })
 
   const form = useForm<PackageFormData>({
     resolver: zodResolver(formSchema),
@@ -143,29 +146,43 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     setSelectedCategories(updatedCategories);
     form.setValue('categories', updatedCategories);
   };
-
-  // Calculate total price based on selected services and apply discount
-  useEffect(() => {
-    if (services) {
-      const basePrice = selectedServices.reduce((total, serviceId) => {
-        const service = services.find(s => s.id === serviceId);
-        return total + (service?.selling_price || 0);
-      }, 0);
-
-      const discountType = form.watch('discount_type');
-      const discountValue = form.watch('discount_value') || 0;
-
-      let finalPrice = basePrice;
-      if (discountType === 'percentage') {
-        finalPrice = basePrice * (1 - (discountValue / 100));
-      } else if (discountType === 'fixed') {
-        finalPrice = Math.max(0, basePrice - discountValue);
-      }
-
-      setCalculatedPrice(Math.max(0, finalPrice));
-      form.setValue('price', Math.max(0, finalPrice));
+  const calculateDiscountedPrice = (basePrice, discountType, discountValue, totalBasePrice = basePrice) => {
+    if (discountType === 'percentage') {
+      return basePrice * (1 - discountValue / 100);
+    } else if (discountType === 'fixed' && totalBasePrice > 0) {
+      return Math.max(0, basePrice - (discountValue * (basePrice / totalBasePrice)));
     }
+    return basePrice;
+  };
+  
+  const getTotalBasePrice = () =>
+    selectedServices.reduce((total, id) => total + (services?.find((s) => s.id === id)?.selling_price || 0), 0);
+  
+  const getServicePrice = (serviceId) => {
+    const service = services?.find((s) => s.id === serviceId);
+    if (!service) return 0;
+  
+    const discountType = form.watch('discount_type');
+    const discountValue = form.watch('discount_value') || 0;
+    const totalBasePrice = getTotalBasePrice();
+    const finalPrice = calculateDiscountedPrice(service.selling_price, discountType, discountValue, totalBasePrice);
+    setDiscountedPrice((prev) => ({ ...prev, [serviceId]: finalPrice }));
+    form.setValue(`selling_price.${serviceId}`, finalPrice);  };
+  
+  useEffect(() => {
+    if (!services) return;
+  
+    const basePrice = getTotalBasePrice();
+    selectedServices.forEach(getServicePrice);
+  
+    const discountType = form.watch('discount_type');
+    const discountValue = form.watch('discount_value') || 0;
+    const finalPrice = calculateDiscountedPrice(basePrice, discountType, discountValue);
+  
+    setCalculatedPrice(finalPrice);
+    form.setValue('price', finalPrice);
   }, [selectedServices, services, form.watch('discount_type'), form.watch('discount_value')]);
+  
 
   // Calculate total duration based on selected services
   useEffect(() => {
@@ -238,6 +255,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
           calculatedPrice={calculatedPrice} 
           selectedServices={selectedServices}
           services={services || []}
+          discountedPrice={discountedPrice}
         />
 
         <CustomizationSection

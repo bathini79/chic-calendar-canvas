@@ -80,7 +80,7 @@ export function PackagesList({ searchQuery, onEdit }: PackagesListProps) {
               </TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">
-                  {pkg.package_categories.map((pc: any) => (
+                  {pkg?.package_categories.map((pc: any) => (
                     <Badge key={pc.categories.id} variant="secondary">
                       {pc.categories.name}
                     </Badge>

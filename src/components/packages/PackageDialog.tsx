@@ -86,10 +86,12 @@ export function PackageDialog({ open, onOpenChange, initialData }: PackageDialog
             console.error('Error deleting package services:', deleteError);
             throw deleteError;
           }
+      
 
           const packageServicesData = data.services.map((serviceId: string) => ({
             package_id: initialData.id,
             service_id: serviceId,
+            selling_price: data.selling_price[serviceId] || 0,
           }));
 
           const { error: insertServicesError } = await supabase
