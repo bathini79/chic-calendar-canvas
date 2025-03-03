@@ -1,22 +1,13 @@
 
-// This is a placeholder file for tests
-import { useState } from 'react';
+// This is a placeholder file to fix the build error
+// The actual implementation would go here
 
-export const usePackageForm = (initialData: any = {}) => {
-  const [data] = useState(initialData);
-  
+export const usePackageForm = () => {
   return {
-    data,
+    // Implementation will be added later
+    data: {},
     isLoading: false,
     error: null,
     submit: async () => {},
-    getValues: () => ({}),
-    trigger: () => Promise.resolve(true),
-    formState: { 
-      errors: {},
-      isValid: true
-    }
   };
 };
-
-export default usePackageForm;

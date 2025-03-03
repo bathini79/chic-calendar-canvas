@@ -1,20 +1,12 @@
 
-// This is a placeholder file for tests
-import { useState } from 'react';
+// This is a placeholder file to fix the build error
+// The actual implementation would go here
 
-export const useScheduleState = (employeeId?: string) => {
-  const [scheduleData] = useState<any[]>([]);
-  
+export const useScheduleState = () => {
   return {
-    scheduleData,
+    // Implementation will be added later
+    scheduleData: [],
     isLoading: false,
     error: null,
-    scheduleType: 'weekly',
-    currentWeek: new Date(),
-    weekConfigs: [],
-    setScheduleType: () => {},
-    handleSubmit: () => {}
   };
 };
-
-export default useScheduleState;

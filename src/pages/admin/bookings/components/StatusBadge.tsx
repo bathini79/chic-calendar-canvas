@@ -1,66 +1,83 @@
 
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
+import { CheckCircle, XCircle, Clock, Ban, RotateCcw } from "lucide-react";
 import type { AppointmentStatus } from '../types';
 
 interface StatusBadgeProps {
   status: AppointmentStatus;
+  className?: string;
 }
 
-export function StatusBadge({ status }: StatusBadgeProps) {
-  const getStatusStyles = () => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) => {
+  const getStatusConfig = () => {
     switch (status) {
-      case 'pending':
-        return 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300';
-      case 'confirmed':
-        return 'bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300';
-      case 'inprogress':
-        return 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300';
       case 'completed':
-        return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
+        return {
+          label: 'Completed',
+          icon: <CheckCircle className="h-3 w-3 mr-1" />,
+          variant: 'success' as const
+        };
+      case 'confirmed':
+        return {
+          label: 'Confirmed',
+          icon: <CheckCircle className="h-3 w-3 mr-1" />,
+          variant: 'default' as const
+        };
+      case 'inprogress':
+        return {
+          label: 'In Progress',
+          icon: <Clock className="h-3 w-3 mr-1" />,
+          variant: 'warning' as const
+        };
       case 'canceled':
-        return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300';
-      case 'noshow':
-        return 'bg-orange-100 hover:bg-orange-200 text-orange-800 border-orange-300';
+        return {
+          label: 'Canceled',
+          icon: <XCircle className="h-3 w-3 mr-1" />,
+          variant: 'destructive' as const
+        };
       case 'voided':
-        return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300';
+        return {
+          label: 'Voided',
+          icon: <Ban className="h-3 w-3 mr-1" />,
+          variant: 'destructive' as const
+        };
       case 'refunded':
-        return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300';
+        return {
+          label: 'Refunded',
+          icon: <RotateCcw className="h-3 w-3 mr-1" />,
+          variant: 'destructive' as const
+        };
       case 'partially_refunded':
-        return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300';
+        return {
+          label: 'Partially Refunded',
+          icon: <RotateCcw className="h-3 w-3 mr-1" />,
+          variant: 'destructive' as const
+        };
+      case 'noshow':
+        return {
+          label: 'No Show',
+          icon: <Ban className="h-3 w-3 mr-1" />,
+          variant: 'destructive' as const
+        };
       default:
-        return 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300';
+        return {
+          label: 'Pending',
+          icon: <Clock className="h-3 w-3 mr-1" />,
+          variant: 'outline' as const
+        };
     }
   };
 
-  const getStatusLabel = () => {
-    switch (status) {
-      case 'pending':
-        return 'Pending';
-      case 'confirmed':
-        return 'Confirmed';
-      case 'inprogress':
-        return 'In Progress';
-      case 'completed':
-        return 'Completed';
-      case 'canceled':
-        return 'Canceled';
-      case 'noshow':
-        return 'No Show';
-      case 'voided':
-        return 'Voided';
-      case 'refunded':
-        return 'Refunded';
-      case 'partially_refunded':
-        return 'Partially Refunded';
-      default:
-        return status;
-    }
-  };
+  const { label, icon, variant } = getStatusConfig();
 
   return (
-    <Badge variant="outline" className={`${getStatusStyles()} uppercase text-xs px-2 py-0.5`}>
-      {getStatusLabel()}
+    <Badge
+      variant={variant}
+      className={`flex items-center ${className}`}
+    >
+      {icon}
+      {label}
     </Badge>
   );
-}
+};

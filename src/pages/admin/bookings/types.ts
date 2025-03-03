@@ -15,7 +15,7 @@ export interface Employee {
   email: string;
   phone?: string;
   avatar?: string;
-  employment_type: 'stylist' | 'admin' | 'operations';
+  employment_type: 'stylist' | 'admin';
   status: 'active' | 'inactive';
 }
 
