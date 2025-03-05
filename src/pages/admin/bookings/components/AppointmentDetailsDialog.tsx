@@ -194,7 +194,7 @@ export function AppointmentDetailsDialog({
   const showCheckoutButton = ['inprogress', 'confirmed', 'pending'].includes(appointment.status);
 
   const selectedMessage = selectedStatus ? statusMessages[selectedStatus as keyof typeof statusMessages] : null;
-
+console.log("groupedBookings",groupedBookings)
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -328,12 +328,6 @@ export function AppointmentDetailsDialog({
                             {packageGroup.packageDetails?.duration || '0'}min
                           </span>
                         </div>
-                        {packageGroup.stylist && (
-                          <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                            <User className="h-4 w-4" />
-                            <span>{packageGroup.stylist.name}</span>
-                          </div>
-                        )}
                       </div>
                       <span className="font-medium">
                         ₹{packageGroup.totalPrice}
@@ -348,7 +342,7 @@ export function AppointmentDetailsDialog({
                             <div key={booking.id} className="flex justify-between items-start">
                               <div>
                                 <p className="text-sm font-medium">{booking.service?.name}</p>
-                                <p className="text-xs text-gray-500">{booking.service?.duration}min</p>
+                                <p className="text-xs text-gray-500">{booking.service?.duration}min with {booking.employee?.name}</p>
                               </div>
                             </div>
                           ))
@@ -376,12 +370,12 @@ export function AppointmentDetailsDialog({
                               {booking.service.duration}min
                             </span>
                           </div>
-                          {booking.employee && (
+                          {/* {booking.employee && (
                             <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                               <User className="h-4 w-4" />
                               <span>{booking.employee.name}</span>
                             </div>
-                          )}
+                          )} */}
                         </div>
                         <span className="font-medium">
                           ₹{booking.price_paid}
