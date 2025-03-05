@@ -1,3 +1,4 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -109,7 +110,8 @@ export default function BookingConfirmation() {
       }
 
       const appointmentId = appointmentData[0].id;
-
+      let currentStartTime = startDateTime;
+      
       // Array to hold all booking promises
       const bookingPromises = [];
 
@@ -119,8 +121,6 @@ export default function BookingConfirmation() {
         let currentStartTime = new Date(
           `${format(selectedDate, "yyyy-MM-dd")} ${itemStartTimeString}`
         );
-
-        // Get the selected stylist for this item
 
         if (item.service_id) {
           const stylistId =
@@ -136,7 +136,7 @@ export default function BookingConfirmation() {
             service_id: item.service_id,
             employee_id: stylistId,
             status: "confirmed",
-            price_paid: item.service?.selling_price || 0,
+            price_paid: item.selling_price || item.service?.selling_price || 0,
             original_price: item.service?.original_price || 0,
             start_time: currentStartTime.toISOString(),
             end_time: itemEndTime.toISOString(),
@@ -162,13 +162,20 @@ export default function BookingConfirmation() {
                 serviceDuration
               );
 
+              // Use package_selling_price if available, otherwise fall back to service selling_price
+              const servicePriceInPackage = 
+                packageService.package_selling_price !== undefined && 
+                packageService.package_selling_price !== null
+                  ? packageService.package_selling_price
+                  : packageService.service.selling_price;
+
               const bookingPromise = supabase.from("bookings").insert({
                 appointment_id: appointmentId,
                 service_id: packageService.service.id,
                 package_id: item.package_id,
                 employee_id: stylistId,
                 status: "confirmed",
-                price_paid: packageService.service.selling_price || 0,
+                price_paid: servicePriceInPackage,
                 start_time: currentStartTime.toISOString(),
                 end_time: serviceEndTime.toISOString(),
               });
@@ -211,6 +218,7 @@ export default function BookingConfirmation() {
                       selectedStylists[serviceId] !== "any"
                         ? selectedStylists[serviceId]
                         : null;
+                    
                     const bookingPromise = supabase.from("bookings").insert({
                       appointment_id: appointmentId,
                       service_id: serviceId,
