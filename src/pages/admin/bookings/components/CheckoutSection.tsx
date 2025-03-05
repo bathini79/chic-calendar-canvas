@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,7 +93,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   isExistingAppointment,
   customizedServices = {}
 }) => {
-  // Fetch employees to get stylist names
   const { data: employees } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
@@ -107,7 +105,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       return data;
     },
   });
-  
+
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
@@ -129,7 +127,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
-  // Get stylist name from ID
   const getStylistName = (stylistId: string) => {
     if (!employees || !stylistId) return null;
     const stylist = employees.find(emp => emp.id === stylistId);
@@ -197,13 +194,15 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           duration: number;
           stylist: string | null;
           stylistName: string | null;
+          isCustomized: boolean;
         }>
       };
       
       if (pkg.package_services) {
         packageItem.services = pkg.package_services.map(ps => {
-          const adjustedPrice = 'package_selling_price' in ps && ps.package_selling_price !== null && ps.package_selling_price !== undefined
-            ? ps.package_selling_price : ps.service.selling_price;
+          const adjustedPrice = ps.package_selling_price !== undefined && ps.package_selling_price !== null
+            ? ps.package_selling_price 
+            : ps.service.selling_price;
             
           return {
             id: ps.service.id,
@@ -211,14 +210,17 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             price: adjustedPrice,
             duration: ps.service.duration,
             stylist: selectedStylists[ps.service.id] || selectedStylists[packageId] || null,
-            stylistName: getStylistName(selectedStylists[ps.service.id] || selectedStylists[packageId] || '')
+            stylistName: getStylistName(selectedStylists[ps.service.id] || selectedStylists[packageId] || ''),
+            isCustomized: false
           };
         });
       }
       
-      if (pkg.is_customizable && customizedServices[packageId]) {
+      if (customizedServices[packageId] && customizedServices[packageId].length > 0) {
         const additionalServices = customizedServices[packageId]
-          .filter(serviceId => !pkg.package_services.some(ps => ps.service.id === serviceId))
+          .filter(serviceId => {
+            return !pkg.package_services.some(ps => ps.service.id === serviceId);
+          })
           .map(serviceId => {
             const service = services.find(s => s.id === serviceId);
             if (!service) return null;
@@ -229,7 +231,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               price: service.selling_price,
               duration: service.duration,
               stylist: selectedStylists[service.id] || selectedStylists[packageId] || null,
-              stylistName: getStylistName(selectedStylists[service.id] || selectedStylists[packageId] || '')
+              stylistName: getStylistName(selectedStylists[service.id] || selectedStylists[packageId] || ''),
+              isCustomized: true
             };
           })
           .filter(Boolean);
@@ -362,7 +365,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           {item.services.map(service => (
                             <div key={service.id} className="flex items-center justify-between py-1">
                               <div className="space-y-1">
-                                <p className="text-sm font-medium">{service.name}</p>
+                                <p className="text-sm font-medium">
+                                  {service.name}
+                                  {service.isCustomized && (
+                                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                      Added
+                                    </span>
+                                  )}
+                                </p>
                                 <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
                                   <span>{formatDuration(service.duration)}</span>
                                   {service.stylistName && (
