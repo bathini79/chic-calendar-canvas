@@ -285,7 +285,7 @@ export default function AdminBookings() {
             )?.package;
 
             if (pkgDetails) {
-              const isBaseService = pkgDetails.package_services.some(
+              const isBaseService = pkgDetails?.package_services?.some(
                 ps => ps.service.id === booking.service_id
               );
 
