@@ -253,24 +253,76 @@ export default function AdminBookings() {
     const services: string[] = [];
     const packages: string[] = [];
     const stylists: Record<string, string> = {};
+    const customizedServicesMap: Record<string, string[]> = {};
 
+    // First collect all packages
+    const packageIdsSet = new Set<string>();
     appointment.bookings.forEach(booking => {
-      if (booking.service_id) {
-        services.push(booking.service_id);
-        stylists[booking.service_id] = booking.employee_id;
-      }
       if (booking.package_id) {
-        packages.push(booking.package_id);
-        stylists[booking.package_id] = booking.employee_id;
+        packageIdsSet.add(booking.package_id);
+        if (booking.employee_id) {
+          stylists[booking.package_id] = booking.employee_id;
+        }
       }
     });
+
+    // Add packages to the selectedPackages array
+    const packageIds = Array.from(packageIdsSet);
+    packageIds.forEach(pkgId => {
+      packages.push(pkgId);
+    });
+
+    // Now process all services
+    appointment.bookings.forEach(booking => {
+      if (booking.service_id) {
+        // If service is part of a package
+        if (booking.package_id) {
+          // Check if this service is a part of the base package or a customized one
+          const basePackage = packages?.find(p => p === booking.package_id);
+          if (basePackage) {
+            const pkgDetails = appointment.bookings.find(b => 
+              b.package && b.package.id === booking.package_id
+            )?.package;
+
+            if (pkgDetails) {
+              const isBaseService = pkgDetails.package_services.some(
+                ps => ps.service.id === booking.service_id
+              );
+
+              // If not in base services, it's a customized service
+              if (!isBaseService) {
+                if (!customizedServicesMap[booking.package_id]) {
+                  customizedServicesMap[booking.package_id] = [];
+                }
+                customizedServicesMap[booking.package_id].push(booking.service_id);
+              }
+            }
+          }
+
+          // Add stylist to this service if available
+          if (booking.employee_id) {
+            stylists[booking.service_id] = booking.employee_id;
+          }
+        } else {
+          // This is a standalone service, not part of any package
+          services.push(booking.service_id);
+          
+          // Add stylist to this service if available
+          if (booking.employee_id) {
+            stylists[booking.service_id] = booking.employee_id;
+          }
+        }
+      }
+    });
+
     setNewAppointmentId(appointment.id);
     setSelectedServices(services);
     setSelectedPackages(packages);
     setSelectedStylists(stylists);
-    setPaymentMethod(appointment.payment_method);
-    setDiscountType(appointment.discount_type);
-    setDiscountValue(appointment.discount_value);
+    setCustomizedServices(customizedServicesMap);
+    setPaymentMethod(appointment.payment_method || 'cash');
+    setDiscountType(appointment.discount_type || 'none');
+    setDiscountValue(appointment.discount_value || 0);
     setAppointmentNotes(appointment.notes || '');
     setSelectedCustomer(appointment.customer || null);
     
