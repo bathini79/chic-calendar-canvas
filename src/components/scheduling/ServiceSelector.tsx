@@ -121,6 +121,14 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     }> 
   });
 
+  // Get the price for a service, prioritizing package_selling_price if available
+  const getServicePrice = (service: Service, packageService?: PackageService): number => {
+    if (packageService && packageService.package_selling_price !== undefined && packageService.package_selling_price !== null) {
+      return packageService.package_selling_price;
+    }
+    return service.selling_price;
+  };
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -134,26 +142,34 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
               {packageData.package.name}
             </div>
             <div className="space-y-3 pl-4">
-              {packageData.services.map(({ service, package_selling_price }) => {
-                // Use package_selling_price if available, otherwise fall back to service's selling_price
-                const displayPrice = package_selling_price !== undefined && package_selling_price !== null
-                  ? package_selling_price
-                  : service.selling_price;
+              {packageData.services.map((ps: PackageService) => {
+                // Determine if this is a package service with package_selling_price
+                const isPackageService = packageData.package.package_services.some(
+                  basePs => basePs.service.id === ps.service.id
+                );
+                
+                // Get the corresponding base package service if exists
+                const basePackageService = isPackageService 
+                  ? packageData.package.package_services.find(basePs => basePs.service.id === ps.service.id)
+                  : undefined;
+                
+                // Calculate the display price
+                const displayPrice = getServicePrice(ps.service, basePackageService);
                 
                 return (
                   <div 
-                    key={`${packageData.cartItemId}-${service.id}`}
+                    key={`${packageData.cartItemId}-${ps.service.id}`}
                     className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{service.name}</p>
+                      <p className="font-medium truncate">{ps.service.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {service.duration} minutes • ₹{displayPrice}
+                        {ps.service.duration} minutes • ₹{displayPrice}
                       </p>
                     </div>
                     <Select 
-                      value={selectedStylists[service.id] || ''} 
-                      onValueChange={(value) => onStylistSelect(service.id, value)}
+                      value={selectedStylists[ps.service.id] || ''} 
+                      onValueChange={(value) => onStylistSelect(ps.service.id, value)}
                     >
                       <SelectTrigger className="w-full sm:w-[200px]">
                         <SelectValue placeholder="Select stylist" />

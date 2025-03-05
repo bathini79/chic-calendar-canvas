@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,7 +57,8 @@ export default function Services() {
               name,
               selling_price,
               duration
-            )
+            ),
+            package_selling_price
           )
         `)
         .eq("status", "active");
@@ -113,7 +115,13 @@ export default function Services() {
     
     // Calculate initial totals
     let price = pkg.price;
-    let duration = pkg.duration;
+    let duration = 0;
+    
+    // Calculate duration and price using package_selling_price when available
+    pkg.package_services.forEach((ps: any) => {
+      duration += ps.service.duration;
+    });
+    
     setTotalPrice(price);
     setTotalDuration(duration);
   };
@@ -131,14 +139,24 @@ export default function Services() {
 
     // Recalculate totals
     let price = selectedPackage.price;
-    let duration = selectedPackage.duration;
+    let duration = 0;
+    
+    // First, add all base package services duration
+    selectedPackage.package_services.forEach((ps: any) => {
+      duration += ps.service.duration;
+    });
+    
+    // Then add any additional custom services
     newSelectedServices.forEach(id => {
       const service = services?.find(s => s.id === id);
-      if (service && !selectedPackage.package_services.some((ps: any) => ps.service.id === id)) {
+      const isInBasePackage = selectedPackage.package_services.some((ps: any) => ps.service.id === id);
+      
+      if (service && !isInBasePackage) {
         price += service.selling_price;
         duration += service.duration;
       }
     });
+    
     setTotalPrice(price);
     setTotalDuration(duration);
   };

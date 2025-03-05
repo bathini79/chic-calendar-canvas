@@ -154,7 +154,7 @@ export const getServicePriceInPackage = (
   const packageService = pkg.package_services?.find(ps => ps.service.id === serviceId);
   if (packageService) {
     // Use package_selling_price if available, otherwise fall back to service's selling_price
-    return 'package_selling_price' in packageService && typeof packageService.package_selling_price === 'number'
+    return packageService.package_selling_price !== undefined && packageService.package_selling_price !== null
       ? packageService.package_selling_price
       : packageService.service.selling_price;
   }

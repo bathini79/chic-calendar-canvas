@@ -1,3 +1,4 @@
+
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -19,13 +20,21 @@ export function ServicesList({
     return selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId);
   };
 
+  // Get the price of a service, considering package_selling_price if available
+  const getServicePrice = (service: any, packageService: any) => {
+    if (packageService && packageService.package_selling_price !== null && packageService.package_selling_price !== undefined) {
+      return packageService.package_selling_price;
+    }
+    return service.selling_price;
+  };
+
   return (
     <div className="space-y-6 p-1">
       <div className="space-y-4">
         <h3 className="font-semibold">Included Services</h3>
-        {selectedPackage?.package_services.map(({ service }: any) => (
+        {selectedPackage?.package_services.map((ps: any) => (
           <div
-            key={service.id}
+            key={ps.service.id}
             className="flex items-center space-x-2 p-2 rounded-lg bg-muted"
           >
             <Checkbox
@@ -33,9 +42,9 @@ export function ServicesList({
               disabled
             />
             <div className="flex-1">
-              <p className="font-medium">{service.name}</p>
+              <p className="font-medium">{ps.service.name}</p>
               <p className="text-sm text-muted-foreground">
-                {service.duration} min • ₹{service.selling_price}
+                {ps.service.duration} min • ₹{getServicePrice(ps.service, ps)}
               </p>
             </div>
             <Badge>Included</Badge>

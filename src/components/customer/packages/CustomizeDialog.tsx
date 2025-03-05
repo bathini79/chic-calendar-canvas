@@ -15,6 +15,8 @@ interface CustomizeDialogProps {
   selectedServices: string[];
   allServices: any[];
   onServiceToggle: (serviceId: string, checked: boolean) => void;
+  totalPrice?: number;
+  totalDuration?: number;
 }
 
 export function CustomizeDialog({
@@ -24,6 +26,8 @@ export function CustomizeDialog({
   selectedServices,
   allServices,
   onServiceToggle,
+  totalPrice: externalTotalPrice,
+  totalDuration: externalTotalDuration
 }: CustomizeDialogProps) {
   const { addToCart, removeFromCart, items } = useCart();
   const [localServices, setLocalServices] = useState<any[]>([]);
@@ -90,13 +94,18 @@ export function CustomizeDialog({
     }
   };
 
-  // Calculate total price and duration using the utility functions
+  // Calculate total price and duration using the utility functions or use externally provided values
   const additionalServices = selectedServices.filter(
     serviceId => !selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId)
   );
   
-  const totalPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
-  const totalDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
+  const calculatedTotalPrice = externalTotalPrice !== undefined 
+    ? externalTotalPrice 
+    : calculatePackagePrice(selectedPackage, additionalServices, localServices);
+  
+  const calculatedTotalDuration = externalTotalDuration !== undefined
+    ? externalTotalDuration
+    : calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
   if (!selectedPackage) return null;
 
@@ -124,10 +133,10 @@ export function CustomizeDialog({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                {selectedServices.length} services selected • {totalDuration} min
+                {selectedServices.length} services selected • {calculatedTotalDuration} min
               </div>
               <div className="text-2xl font-bold">
-                ₹{totalPrice}
+                ₹{calculatedTotalPrice}
               </div>
             </div>
             <Button 
