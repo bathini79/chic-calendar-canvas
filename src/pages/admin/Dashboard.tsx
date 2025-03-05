@@ -1038,48 +1038,6 @@ export default function AdminDashboard() {
           </Card>
         </div>
       </div>
-      
-      {/* Growth Opportunities */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Growth Opportunities</h2>
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="flex items-start gap-4 py-6">
-              <div className="bg-purple-100 p-3 rounded-full">
-                <Zap className="h-5 w-5 text-purple-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium mb-1">Launch a referral program to increase customer acquisition</h3>
-                <p className="text-sm text-gray-500 mb-2">Potential impact: <span className="text-green-600">+15% new customers</span></p>
-                <Button variant="link" size="sm" className="px-0 text-purple-600" asChild>
-                  <a href="#">
-                    Learn More
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </a>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="flex items-start gap-4 py-6">
-              <div className="bg-purple-100 p-3 rounded-full">
-                <Zap className="h-5 w-5 text-purple-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium mb-1">Introduce a Spin-to-Save promotion to engage clients with a chance to win discounts or services</h3>
-                <p className="text-sm text-gray-500 mb-2">Potential impact: <span className="text-green-600">+20% bookings</span></p>
-                <Button variant="link" size="sm" className="px-0 text-purple-600" asChild>
-                  <a href="#">
-                    Learn More
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </a>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
     </div>
   );
 }

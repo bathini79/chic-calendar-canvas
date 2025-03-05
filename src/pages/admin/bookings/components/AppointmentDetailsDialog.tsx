@@ -170,6 +170,7 @@ export function AppointmentDetailsDialog({
           totalPrice: 0
         };
       }
+      groups.packages[booking.package_id].totalPrice =(groups.packages[booking.package_id].totalPrice || 0) + booking.price_paid
       groups.packages[booking.package_id].bookings.push(booking);
       
       if (!booking.service_id) {
