@@ -34,7 +34,7 @@ export const useUpcomingAppointments = (limit: number = 5) => {
         .limit(limit);
 
       if (error) throw error;
-      return data as Appointment[];
+      return data as unknown as Appointment[];
     }
   });
 };
@@ -68,7 +68,7 @@ export const useTodayAppointments = () => {
         .order("start_time", { ascending: true });
 
       if (error) throw error;
-      return data as Appointment[];
+      return data as unknown as Appointment[];
     }
   });
 };
@@ -99,7 +99,7 @@ export const useAppointmentActivity = (limit: number = 10) => {
         .limit(limit);
 
       if (error) throw error;
-      return data as Appointment[];
+      return data as unknown as Appointment[];
     }
   });
 };
@@ -124,7 +124,8 @@ export const useBusinessMetrics = () => {
           status,
           total_price,
           customer_id,
-          total_duration
+          total_duration,
+          created_at
         `)
         .gte("created_at", firstDayThisMonth.toISOString());
       
@@ -168,7 +169,7 @@ export const useBusinessMetrics = () => {
       
       // 3. Returning customer rate
       // Count customers with more than one appointment
-      const customerAppointmentCounts = {};
+      const customerAppointmentCounts: Record<string, number> = {};
       appointmentsData.forEach(app => {
         customerAppointmentCounts[app.customer_id] = (customerAppointmentCounts[app.customer_id] || 0) + 1;
       });
