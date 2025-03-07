@@ -56,7 +56,7 @@ export interface Package {
   }>;
 }
 
-export type AppointmentStatus = 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded' | 'noshow';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'canceled' | 'completed' | 'inprogress' | 'voided' | 'refunded' | 'partially_refunded' | 'noshow' | 'booked';
 
 export type DiscountType = 'none' | 'percentage' | 'fixed';
 

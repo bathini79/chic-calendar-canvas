@@ -49,7 +49,7 @@ interface AppointmentDetailsDialogProps {
 }
 
 const TERMINAL_STATUSES: AppointmentStatus[] = ['completed', 'refunded', 'partially_refunded', 'voided'];
-const ACTIVE_STATUSES: AppointmentStatus[] = ['pending', 'confirmed', 'inprogress'];
+const ACTIVE_STATUSES: AppointmentStatus[] = ['pending', 'confirmed', 'inprogress','booked'];
 
 const statusMessages = {
   canceled: {
@@ -154,6 +154,8 @@ export function AppointmentDetailsDialog({
         return 'bg-blue-500';
       case 'inprogress':
         return 'bg-yellow-500';
+        case 'booked':
+        return 'bg-yellow-500';
       default:
         return 'bg-gray-500';
     }
@@ -225,6 +227,12 @@ console.log("groupedBookings",groupedBookings)
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                  <SelectItem value="booked">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-gray-500" />
+                        Booked
+                      </div>
+                    </SelectItem>
                     <SelectItem value="pending">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-gray-500" />
