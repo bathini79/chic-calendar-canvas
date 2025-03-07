@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { format, subDays, isToday } from "date-fns";
 import { 
   Card, 
@@ -28,8 +28,7 @@ import {
   LucideCalendarClock, 
   AlertCircle,
   ChevronRight,
-  Zap,
-  Loader2
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { adminSupabase, supabase } from "@/integrations/supabase/client";
@@ -52,14 +51,6 @@ import {
 } from "@/components/ui/select";
 import { AdminRoute } from "@/components/auth/AdminRoute";
 import { toast } from "sonner";
-import { 
-  useUpcomingAppointments, 
-  useTodayAppointments, 
-  useAppointmentsActivity,
-  usePerformanceMetrics
-} from "./bookings/hooks/useDashboardAppointments";
-import { useInView } from "react-intersection-observer";
-import { AppointmentStatus } from "./bookings/types";
 
 export default function AdminDashboard() {
   const [timeRange, setTimeRange] = useState("week");
@@ -69,79 +60,45 @@ export default function AdminDashboard() {
     value: 0
   });
   const [totalRevenue, setTotalRevenue] = useState(0);
-  const [appointmentsActivityPage, setAppointmentsActivityPage] = useState(0);
-  const [allAppointmentActivity, setAllAppointmentActivity] = useState([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
+  const [todayAppointments, setTodayAppointments] = useState([]);
+  const [appointmentsActivity, setAppointmentsActivity] = useState([]);
   const [topServices, setTopServices] = useState([]);
   const [topStylists, setTopStylists] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [businessMetrics, setBusinessMetrics] = useState({
+    revenue: "0.00",
+    occupancyRate: "0.00",
+    returningCustomerRate: "0.00",
+    tips: "0.00",
+    revenueChange: "0.00",
+    occupancyChange: "0.00",
+    returningCustomerChange: "0.00",
+    tipsChange: "--"
+  });
   const [quickActions, setQuickActions] = useState({
     pendingConfirmations: 0,
     upcomingBookings: 0,
     todayBookings: 0,
     lowStockItems: 0
   });
-  
-  // Load more ref for infinite scrolling
-  const { ref: loadMoreRef, inView } = useInView();
-
-  // Queries
-  const { 
-    data: upcomingAppointments = [], 
-    isLoading: isUpcomingLoading 
-  } = useUpcomingAppointments(5);
-  
-  const { 
-    data: todayAppointments = [], 
-    isLoading: isTodayLoading 
-  } = useTodayAppointments();
-  
-  const { 
-    data: appointmentsActivity = [], 
-    isLoading: isActivityLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage
-  } = useAppointmentsActivity(appointmentsActivityPage, 10);
-
-  const { 
-    data: performanceMetrics = { 
-      totalAppointments: 0, 
-      totalRevenue: 0, 
-      occupancyRate: 0, 
-      returningCustomerRate: 0 
-    }, 
-    isLoading: isMetricsLoading 
-  } = usePerformanceMetrics(timeRange);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
   }, [timeRange]);
-
-  // Handle infinite scroll for appointments activity
-  useEffect(() => {
-    if (appointmentsActivity?.length) {
-      setAllAppointmentActivity(prev => 
-        [...prev, ...appointmentsActivity.filter(app => 
-          !prev.some(p => p.id === app.id)
-        )]
-      );
-    }
-  }, [appointmentsActivity]);
-
-  // Load more when scrolled to bottom
-  useEffect(() => {
-    if (inView && !isActivityLoading) {
-      setAppointmentsActivityPage(prev => prev + 1);
-    }
-  }, [inView, isActivityLoading]);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
       await Promise.all([
         fetchRevenueData(),
+        fetchAppointmentsStats(),
+        fetchUpcomingAppointments(),
+        fetchTodayAppointments(),
+        fetchAppointmentsActivity(),
         fetchTopServices(),
         fetchTopStylists(),
+        fetchBusinessMetrics(),
         fetchQuickActionsData()
       ]);
     } catch (error) {
@@ -207,6 +164,105 @@ export default function AdminDashboard() {
       });
     } catch (error) {
       console.error("Error fetching revenue data:", error);
+    }
+  };
+
+  const fetchAppointmentsStats = async () => {
+    // Already calculated in fetchRevenueData
+  };
+
+  const fetchUpcomingAppointments = async () => {
+    try {
+      const today = new Date();
+      const nextWeek = new Date();
+      nextWeek.setDate(today.getDate() + 7);
+
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(`
+          id, 
+          start_time, 
+          end_time, 
+          status,
+          customer:profiles (id, full_name),
+          bookings (
+            id,
+            service:services (id, name, duration),
+            package:packages (id, name),
+            employee:employees (id, name)
+          )
+        `)
+        .gte("start_time", today.toISOString())
+        .lte("start_time", nextWeek.toISOString())
+        .order("start_time", { ascending: true })
+        .limit(5);
+
+      if (error) throw error;
+      setUpcomingAppointments(data || []);
+    } catch (error) {
+      console.error("Error fetching upcoming appointments:", error);
+    }
+  };
+
+  const fetchTodayAppointments = async () => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(`
+          id, 
+          start_time, 
+          end_time, 
+          status,
+          customer:profiles (id, full_name),
+          bookings (
+            id,
+            service:services (id, name, duration),
+            package:packages (id, name),
+            employee:employees (id, name)
+          )
+        `)
+        .gte("start_time", today.toISOString())
+        .lt("start_time", tomorrow.toISOString())
+        .order("start_time", { ascending: true });
+
+      if (error) throw error;
+      setTodayAppointments(data || []);
+    } catch (error) {
+      console.error("Error fetching today's appointments:", error);
+    }
+  };
+
+  const fetchAppointmentsActivity = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(`
+          id, 
+          start_time, 
+          end_time, 
+          status,
+          total_price,
+          customer:profiles (id, full_name),
+          bookings (
+            id,
+            price_paid,
+            service:services (id, name, duration),
+            package:packages (id, name),
+            employee:employees (id, name)
+          )
+        `)
+        .order("start_time", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setAppointmentsActivity(data || []);
+    } catch (error) {
+      console.error("Error fetching appointments activity:", error);
     }
   };
 
@@ -295,7 +351,7 @@ export default function AdminDashboard() {
         .from("bookings")
         .select(`
           price_paid,
-          employee:employees!bookings_employee_id_fkey (id, name),
+          employee:employees (id, name),
           created_at
         `)
         .gte("created_at", firstDayThisMonth.toISOString())
@@ -307,7 +363,7 @@ export default function AdminDashboard() {
         .from("bookings")
         .select(`
           price_paid,
-          employee:employees!bookings_employee_id_fkey (id, name),
+          employee:employees (id, name),
           created_at
         `)
         .gte("created_at", firstDayLastMonth.toISOString())
@@ -319,7 +375,7 @@ export default function AdminDashboard() {
       // Sum revenue by stylist for this month
       const thisMonthRevenue = {};
       thisMonthData?.forEach(booking => {
-        if (booking.employee && booking.employee.name) {
+        if (booking.employee) {
           const stylistName = booking.employee.name;
           thisMonthRevenue[stylistName] = (thisMonthRevenue[stylistName] || 0) + (booking.price_paid || 0);
         }
@@ -328,7 +384,7 @@ export default function AdminDashboard() {
       // Sum revenue by stylist for last month
       const lastMonthRevenue = {};
       lastMonthData?.forEach(booking => {
-        if (booking.employee && booking.employee.name) {
+        if (booking.employee) {
           const stylistName = booking.employee.name;
           lastMonthRevenue[stylistName] = (lastMonthRevenue[stylistName] || 0) + (booking.price_paid || 0);
         }
@@ -347,6 +403,46 @@ export default function AdminDashboard() {
       setTopStylists(stylistsArray.slice(0, 5));
     } catch (error) {
       console.error("Error fetching top stylists:", error);
+    }
+  };
+
+  const fetchBusinessMetrics = async () => {
+    try {
+      // For demo purposes, using mock data with some calculations
+      // In a real app, you would fetch and calculate these metrics from your database
+
+      // Revenue calculation (already done in fetchRevenueData)
+      const revenue = totalRevenue;
+      
+      // Calculate occupancy rate
+      // (bookings / available slots) * 100
+      const occupancyRate = 21.09; // Mock value
+      
+      // Calculate returning customer rate
+      // (returning customers / total customers) * 100
+      const returningCustomerRate = 65.12; // Mock value
+      
+      // Calculate tips
+      const tips = 0.00; // Mock value
+
+      // Calculate changes from previous period
+      const revenueChange = -21.58; // Mock value (percent change)
+      const occupancyChange = -0.99; // Mock value (percent change)
+      const returningCustomerChange = -7.33; // Mock value (percent change)
+      const tipsChange = "--"; // Mock value (percent change)
+
+      setBusinessMetrics({
+        revenue: revenue.toFixed(2),
+        occupancyRate: occupancyRate.toFixed(2),
+        returningCustomerRate: returningCustomerRate.toFixed(2),
+        tips: tips.toFixed(2),
+        revenueChange: revenueChange.toFixed(2),
+        occupancyChange: occupancyChange.toFixed(2),
+        returningCustomerChange: returningCustomerChange.toFixed(2),
+        tipsChange: tipsChange
+      });
+    } catch (error) {
+      console.error("Error calculating business metrics:", error);
     }
   };
 
@@ -413,7 +509,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const formatAppointmentStatus = (status: AppointmentStatus) => {
+  const formatAppointmentStatus = (status) => {
     switch (status) {
       case "confirmed":
         return <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">CONFIRMED</span>;
@@ -423,32 +519,10 @@ export default function AdminDashboard() {
         return <span className="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800">CANCELED</span>;
       case "completed":
         return <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">COMPLETED</span>;
-      case "booked":
-        return <span className="px-2 py-1 text-xs font-medium rounded bg-indigo-100 text-indigo-800">BOOKED</span>;
       default:
-        return <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">{status.toUpperCase()}</span>;
+        return <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">BOOKED</span>;
     }
   };
-
-  // Lazy loading container component
-  const LazyContainer = ({ isLoading, isEmpty, children, emptyMessage, emptyIcon }) => (
-    <div className="relative min-h-[200px]">
-      {isLoading ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
-          <p className="text-muted-foreground">Loading data...</p>
-        </div>
-      ) : isEmpty ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          {emptyIcon}
-          <h3 className="text-lg font-semibold mb-2">No data available</h3>
-          <p className="text-sm text-gray-500 text-center mb-4">{emptyMessage}</p>
-        </div>
-      ) : (
-        children
-      )}
-    </div>
-  );
 
   return (
     <div className="p-8 space-y-6">
@@ -487,12 +561,7 @@ export default function AdminDashboard() {
             </div>
             
             <div className="h-[200px] mt-4">
-              <LazyContainer
-                isLoading={isLoading}
-                isEmpty={revenueData.length === 0}
-                emptyMessage="No sales data available for the selected period"
-                emptyIcon={<BarChart3 className="w-12 h-12 mb-4 text-gray-300" />}
-              >
+              {revenueData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={revenueData}
@@ -519,7 +588,11 @@ export default function AdminDashboard() {
                     />
                   </LineChart>
                 </ResponsiveContainer>
-              </LazyContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground">No data available for the selected period</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -531,19 +604,12 @@ export default function AdminDashboard() {
               <CardTitle className="text-lg">Upcoming appointments</CardTitle>
               <CardDescription>Next 7 days</CardDescription>
             </div>
-            <Button variant="ghost" size="icon" asChild>
-              <a href="/admin/bookings">
-                <MoreHorizontal className="h-4 w-4" />
-              </a>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
           </CardHeader>
           <CardContent>
-            <LazyContainer
-              isLoading={isUpcomingLoading}
-              isEmpty={upcomingAppointments.length === 0}
-              emptyMessage="Make some appointments for schedule data to appear"
-              emptyIcon={<Calendar className="w-12 h-12 mb-4 text-gray-300" />}
-            >
+            {upcomingAppointments.length > 0 ? (
               <div className="space-y-4">
                 {upcomingAppointments.map((appointment) => {
                   const mainService = appointment.bookings.find(b => b.service)?.service;
@@ -567,7 +633,18 @@ export default function AdminDashboard() {
                   );
                 })}
               </div>
-            </LazyContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12">
+                <BarChart3 className="w-12 h-12 mb-4 text-gray-300" />
+                <h3 className="text-lg font-semibold mb-2">Your schedule is empty</h3>
+                <p className="text-sm text-gray-500 text-center mb-4">
+                  Make some appointments for schedule data to appear
+                </p>
+                <Button asChild>
+                  <a href="/admin/bookings">Book Appointment</a>
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -580,14 +657,9 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg">Appointments activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <LazyContainer
-              isLoading={isActivityLoading && appointmentsActivityPage === 0}
-              isEmpty={allAppointmentActivity.length === 0}
-              emptyMessage="No appointment activity yet"
-              emptyIcon={<BarChart3 className="w-12 h-12 mb-4 text-gray-300" />}
-            >
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                {allAppointmentActivity.map((appointment) => {
+            {appointmentsActivity.length > 0 ? (
+              <div className="space-y-4">
+                {appointmentsActivity.map((appointment) => {
                   const mainBooking = appointment.bookings[0];
                   const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
                   const price = mainBooking?.price_paid || appointment.total_price || 0;
@@ -619,14 +691,12 @@ export default function AdminDashboard() {
                     </div>
                   );
                 })}
-                {/* Load more indicator */}
-                <div ref={loadMoreRef} className="flex justify-center py-2">
-                  {isFetchingNextPage && (
-                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                  )}
-                </div>
               </div>
-            </LazyContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8">
+                <p className="text-muted-foreground">No appointment activity</p>
+              </div>
+            )}
           </CardContent>
         </Card>
         
@@ -636,45 +706,45 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg">Today's next appointments</CardTitle>
           </CardHeader>
           <CardContent>
-            <LazyContainer
-              isLoading={isTodayLoading}
-              isEmpty={todayAppointments.length === 0}
-              emptyMessage="Visit the calendar section to add some appointments"
-              emptyIcon={<Clock className="w-12 h-12 mb-4 text-gray-300" />}
-            >
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                {todayAppointments
-                  .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
-                  .map((appointment) => {
-                    const mainBooking = appointment.bookings[0];
-                    const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
-                    const price = mainBooking?.price_paid || appointment.total_price || 0;
-                    const stylist = mainBooking?.employee?.name;
-                    
-                    return (
-                      <div key={appointment.id} className="flex items-start">
-                        <div className="mr-4 text-center">
-                          <div className="font-bold">
-                            {format(new Date(appointment.start_time), "HH:mm")}
-                          </div>
-                        </div>
-                        <div className="flex flex-1 justify-between">
-                          <div>
-                            <div className="font-medium">{serviceName}</div>
-                            <div className="text-sm text-gray-500">
-                              {appointment.customer?.full_name} {stylist && `with ${stylist}`}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold">₹{price.toFixed(2)}</div>
-                            <div className="mt-1">{formatAppointmentStatus(appointment.status)}</div>
-                          </div>
+            {todayAppointments.length > 0 ? (
+              <div className="space-y-4">
+                {todayAppointments.map((appointment) => {
+                  const mainBooking = appointment.bookings[0];
+                  const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
+                  const price = mainBooking?.price_paid || appointment.total_price || 0;
+                  const stylist = mainBooking?.employee?.name;
+                  
+                  return (
+                    <div key={appointment.id} className="flex items-start">
+                      <div className="mr-4 text-center">
+                        <div className="font-bold">
+                          {format(new Date(appointment.start_time), "HH:mm")}
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="flex flex-1 justify-between">
+                        <div>
+                          <div className="font-medium">{serviceName}</div>
+                          <div className="text-sm text-gray-500">
+                            {appointment.customer?.full_name} {stylist && `with ${stylist}`}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold">₹{price.toFixed(2)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </LazyContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Clock className="w-12 h-12 mb-4 text-gray-300" />
+                <h3 className="text-lg font-semibold mb-2">No Appointments Today</h3>
+                <p className="text-sm text-gray-500 text-center mb-4">
+                  Visit the <a href="/admin/bookings" className="text-blue-500 hover:underline">calendar</a> section to add some appointments
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -687,33 +757,34 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg">Top services</CardTitle>
           </CardHeader>
           <CardContent>
-            <LazyContainer
-              isLoading={isLoading}
-              isEmpty={topServices.length === 0}
-              emptyMessage="No service data available"
-              emptyIcon={<Package className="w-12 h-12 mb-4 text-gray-300" />}
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr>
-                      <th className="text-left font-medium text-gray-500 pb-3">Service</th>
-                      <th className="text-right font-medium text-gray-500 pb-3">This month</th>
-                      <th className="text-right font-medium text-gray-500 pb-3">Last month</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topServices.map((service, index) => (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left font-medium text-gray-500 pb-3">Service</th>
+                    <th className="text-right font-medium text-gray-500 pb-3">This month</th>
+                    <th className="text-right font-medium text-gray-500 pb-3">Last month</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topServices.length > 0 ? (
+                    topServices.map((service, index) => (
                       <tr key={index} className="border-t">
                         <td className="py-3">{service.name}</td>
                         <td className="py-3 text-right">{service.thisMonth}</td>
                         <td className="py-3 text-right">{service.lastMonth}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </LazyContainer>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                        No service data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
         
@@ -723,33 +794,34 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg">Top team member</CardTitle>
           </CardHeader>
           <CardContent>
-            <LazyContainer
-              isLoading={isLoading}
-              isEmpty={topStylists.length === 0}
-              emptyMessage="No team member data available"
-              emptyIcon={<Users className="w-12 h-12 mb-4 text-gray-300" />}
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr>
-                      <th className="text-left font-medium text-gray-500 pb-3">Team member</th>
-                      <th className="text-right font-medium text-gray-500 pb-3">This month</th>
-                      <th className="text-right font-medium text-gray-500 pb-3">Last month</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topStylists.map((stylist, index) => (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left font-medium text-gray-500 pb-3">Team member</th>
+                    <th className="text-right font-medium text-gray-500 pb-3">This month</th>
+                    <th className="text-right font-medium text-gray-500 pb-3">Last month</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topStylists.length > 0 ? (
+                    topStylists.map((stylist, index) => (
                       <tr key={index} className="border-t">
                         <td className="py-3">{stylist.name}</td>
                         <td className="py-3 text-right">₹{stylist.thisMonth.toFixed(2)}</td>
                         <td className="py-3 text-right">₹{stylist.lastMonth.toFixed(2)}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </LazyContainer>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                        No team member data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -856,12 +928,12 @@ export default function AdminDashboard() {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold">Business Performance</h2>
-          <Select defaultValue="month" onValueChange={setTimeRange}>
+          <Select defaultValue="today">
             <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="This Month" />
+              <SelectValue placeholder="Today" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="day">Today</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
               <SelectItem value="week">This Week</SelectItem>
               <SelectItem value="month">This Month</SelectItem>
               <SelectItem value="year">This Year</SelectItem>
@@ -881,19 +953,17 @@ export default function AdminDashboard() {
                   <a href="#"><Info className="h-4 w-4" /></a>
                 </Button>
               </div>
-              <LazyContainer
-                isLoading={isMetricsLoading}
-                isEmpty={false}
-                emptyMessage=""
-                emptyIcon={null}
-              >
-                <div className="text-3xl font-bold mb-2">
-                  ₹{performanceMetrics.totalRevenue.toFixed(2)}
-                </div>
-                <div className="text-sm text-gray-500">
-                  Total appointments: {performanceMetrics.totalAppointments}
-                </div>
-              </LazyContainer>
+              <div className="text-3xl font-bold mb-2">
+                ₹{businessMetrics.revenue}
+              </div>
+              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.revenueChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                {parseFloat(businessMetrics.revenueChange) < 0 ? (
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                )}
+                {parseFloat(businessMetrics.revenueChange) < 0 ? businessMetrics.revenueChange : `+${businessMetrics.revenueChange}`}% vs Yesterday
+              </div>
             </CardContent>
           </Card>
           
@@ -905,24 +975,20 @@ export default function AdminDashboard() {
                   <span className="text-sm font-medium">Occupancy Rate</span>
                 </div>
                 <Button variant="ghost" size="icon" asChild>
-                  <a href="#" title="Percentage of available time slots that are booked">
-                    <Info className="h-4 w-4" />
-                  </a>
+                  <a href="#"><Info className="h-4 w-4" /></a>
                 </Button>
               </div>
-              <LazyContainer
-                isLoading={isMetricsLoading}
-                isEmpty={false}
-                emptyMessage=""
-                emptyIcon={null}
-              >
-                <div className="text-3xl font-bold mb-2">
-                  {performanceMetrics.occupancyRate.toFixed(2)}%
-                </div>
-                <div className="text-sm text-gray-500">
-                  Booked vs. available time slots
-                </div>
-              </LazyContainer>
+              <div className="text-3xl font-bold mb-2">
+                {businessMetrics.occupancyRate}%
+              </div>
+              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.occupancyChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                {parseFloat(businessMetrics.occupancyChange) < 0 ? (
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                )}
+                {parseFloat(businessMetrics.occupancyChange) < 0 ? businessMetrics.occupancyChange : `+${businessMetrics.occupancyChange}`}% vs Yesterday
+              </div>
             </CardContent>
           </Card>
           
@@ -934,24 +1000,20 @@ export default function AdminDashboard() {
                   <span className="text-sm font-medium">Returning Customer Rate</span>
                 </div>
                 <Button variant="ghost" size="icon" asChild>
-                  <a href="#" title="Percentage of customers who have made repeat bookings">
-                    <Info className="h-4 w-4" />
-                  </a>
+                  <a href="#"><Info className="h-4 w-4" /></a>
                 </Button>
               </div>
-              <LazyContainer
-                isLoading={isMetricsLoading}
-                isEmpty={false}
-                emptyMessage=""
-                emptyIcon={null}
-              >
-                <div className="text-3xl font-bold mb-2">
-                  {performanceMetrics.returningCustomerRate.toFixed(2)}%
-                </div>
-                <div className="text-sm text-gray-500">
-                  Returning vs. new customers
-                </div>
-              </LazyContainer>
+              <div className="text-3xl font-bold mb-2">
+                {businessMetrics.returningCustomerRate}%
+              </div>
+              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.returningCustomerChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? (
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                )}
+                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? businessMetrics.returningCustomerChange : `+${businessMetrics.returningCustomerChange}`}% vs Yesterday
+              </div>
             </CardContent>
           </Card>
           
@@ -967,10 +1029,10 @@ export default function AdminDashboard() {
                 </Button>
               </div>
               <div className="text-3xl font-bold mb-2">
-                ₹0.00
+                ₹{businessMetrics.tips}
               </div>
-              <div className="text-sm text-gray-500">
-                Coming soon
+              <div className="text-sm flex items-center text-gray-500">
+                -- vs Yesterday
               </div>
             </CardContent>
           </Card>
