@@ -54,6 +54,8 @@ import { AdminRoute } from "@/components/auth/AdminRoute";
 import { toast } from "sonner";
 import { StatsPanel } from "./bookings/components/StatsPanel";
 import { Appointment } from "./bookings/types";
+import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Lazy load components for better performance
 const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
@@ -95,6 +97,9 @@ export default function AdminDashboard() {
     lowStockItems: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+  
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -268,6 +273,7 @@ export default function AdminDashboard() {
           start_time, 
           end_time, 
           status,
+          total_price,
           customer:profiles (id, full_name),
           bookings (
             id,
@@ -519,6 +525,11 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleAppointmentClick = (appointment) => {
+    setSelectedAppointment(appointment);
+    setDetailsDialogOpen(true);
+  };
+
   const getTimeRangeLabel = () => {
     switch (timeRange) {
       case "week":
@@ -684,47 +695,57 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Today's next appointments</CardTitle>
+            <CardDescription>
+              Total: {todayAppointments.length} appointments
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {todayAppointments.length > 0 ? (
-              <div className="space-y-4">
-                {todayAppointments.map((appointment) => {
-                  const mainBooking = appointment.bookings[0];
-                  const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
-                  const price = mainBooking?.price_paid || appointment.total_price || 0;
-                  const stylist = mainBooking?.employee?.name;
-                  
-                  return (
-                    <div key={appointment.id} className="flex items-start">
-                      <div className="mr-4 text-center">
-                        <div className="font-bold">
-                          {format(new Date(appointment.start_time), "HH:mm")}
-                        </div>
-                      </div>
-                      <div className="flex flex-1 justify-between">
-                        <div>
-                          <div className="font-medium">{serviceName}</div>
-                          <div className="text-sm text-gray-500">
-                            {appointment.customer?.full_name} {stylist && `with ${stylist}`}
+            <ScrollArea className="h-[300px] pr-4">
+              {todayAppointments.length > 0 ? (
+                <div className="space-y-4">
+                  {todayAppointments.map((appointment) => {
+                    const mainBooking = appointment.bookings[0];
+                    const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
+                    const price = mainBooking?.price_paid || appointment.total_price || 0;
+                    const stylist = mainBooking?.employee?.name;
+                    
+                    return (
+                      <div 
+                        key={appointment.id} 
+                        className="flex items-start hover:bg-gray-50 p-2 rounded cursor-pointer transition-colors"
+                        onClick={() => handleAppointmentClick(appointment)}
+                      >
+                        <div className="mr-4 text-center">
+                          <div className="font-bold">
+                            {format(new Date(appointment.start_time), "HH:mm")}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-bold">₹{price.toFixed(2)}</div>
+                        <div className="flex flex-1 justify-between">
+                          <div>
+                            <div className="font-medium">{serviceName}</div>
+                            <div className="text-sm text-gray-500">
+                              {appointment.customer?.full_name} {stylist && `with ${stylist}`}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold">₹{price.toFixed(2)}</div>
+                            <div className="mt-1">{formatAppointmentStatus(appointment.status)}</div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Clock className="w-12 h-12 mb-4 text-gray-300" />
-                <h3 className="text-lg font-semibold mb-2">No Appointments Today</h3>
-                <p className="text-sm text-gray-500 text-center mb-4">
-                  Visit the <a href="/admin/bookings" className="text-blue-500 hover:underline">calendar</a> section to add some appointments
-                </p>
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Clock className="w-12 h-12 mb-4 text-gray-300" />
+                  <h3 className="text-lg font-semibold mb-2">No Appointments Today</h3>
+                  <p className="text-sm text-gray-500 text-center mb-4">
+                    Visit the <a href="/admin/bookings" className="text-blue-500 hover:underline">calendar</a> section to add some appointments
+                  </p>
+                </div>
+              )}
+            </ScrollArea>
           </CardContent>
         </Card>
       </div>
@@ -1013,6 +1034,13 @@ export default function AdminDashboard() {
           </Card>
         </div>
       </div>
+      
+      <AppointmentDetailsDialog 
+        appointment={selectedAppointment}
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        onUpdated={fetchTodayAppointments}
+      />
     </div>
   );
 }
