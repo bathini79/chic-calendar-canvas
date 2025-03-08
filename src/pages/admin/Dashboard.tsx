@@ -195,14 +195,7 @@ export default function AdminDashboard() {
           id, 
           start_time, 
           end_time, 
-          status,
-          customer:profiles (id, full_name),
-          bookings (
-            id,
-            service:services (id, name, duration),
-            package:packages (id, name),
-            employee:employees (id, name)
-          )
+          status
         `)
         .gte("start_time", startOfDay(today).toISOString())
         .lt("start_time", endOfDay(nextWeek).toISOString())
