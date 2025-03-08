@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { format, subDays, isToday } from "date-fns";
+import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay } from "date-fns";
 import { 
   Card, 
   CardContent, 
@@ -40,7 +40,9 @@ import {
   CartesianGrid, 
   Tooltip, 
   Legend, 
-  ResponsiveContainer 
+  ResponsiveContainer,
+  BarChart,
+  Bar
 } from "recharts";
 import { 
   Select, 
@@ -51,6 +53,11 @@ import {
 } from "@/components/ui/select";
 import { AdminRoute } from "@/components/auth/AdminRoute";
 import { toast } from "sonner";
+import { StatsPanel } from "./bookings/components/StatsPanel";
+import { Appointment } from "./bookings/types";
+
+// Lazy load components for better performance
+const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
 
 export default function AdminDashboard() {
   const [timeRange, setTimeRange] = useState("week");
@@ -61,6 +68,12 @@ export default function AdminDashboard() {
   });
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
+  const [upcomingAppointmentsChart, setUpcomingAppointmentsChart] = useState([]);
+  const [upcomingStats, setUpcomingStats] = useState({
+    total: 0,
+    confirmed: 0,
+    cancelled: 0
+  });
   const [todayAppointments, setTodayAppointments] = useState([]);
   const [appointmentsActivity, setAppointmentsActivity] = useState([]);
   const [topServices, setTopServices] = useState([]);
@@ -174,9 +187,8 @@ export default function AdminDashboard() {
   const fetchUpcomingAppointments = async () => {
     try {
       const today = new Date();
-      const nextWeek = new Date();
-      nextWeek.setDate(today.getDate() + 7);
-
+      const nextWeek = addDays(today, 7);
+      
       const { data, error } = await supabase
         .from("appointments")
         .select(`
@@ -192,13 +204,57 @@ export default function AdminDashboard() {
             employee:employees (id, name)
           )
         `)
-        .gte("start_time", today.toISOString())
-        .lte("start_time", nextWeek.toISOString())
-        .order("start_time", { ascending: true })
-        .limit(5);
+        .gte("start_time", startOfDay(today).toISOString())
+        .lt("start_time", endOfDay(nextWeek).toISOString())
+        .order("start_time", { ascending: true });
 
       if (error) throw error;
+      
       setUpcomingAppointments(data || []);
+      
+      // Create chart data for next 7 days
+      const chartData = [];
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const statusCounts = {
+        total: 0,
+        confirmed: 0,
+        cancelled: 0
+      };
+      
+      // Initialize next 7 days data
+      for (let i = 0; i < 7; i++) {
+        const currentDate = addDays(today, i);
+        const dayName = dayNames[currentDate.getDay()];
+        const dayNum = currentDate.getDate();
+        chartData.push({
+          day: `${dayName} ${dayNum}`,
+          confirmed: 0,
+          cancelled: 0,
+          date: currentDate
+        });
+      }
+      
+      // Populate data
+      data?.forEach(appointment => {
+        const appointmentDate = parseISO(appointment.start_time);
+        const dayIndex = Math.floor((appointmentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (dayIndex >= 0 && dayIndex < 7) {
+          statusCounts.total++;
+          
+          if (appointment.status === 'confirmed') {
+            chartData[dayIndex].confirmed++;
+            statusCounts.confirmed++;
+          } else if (appointment.status === 'canceled') {
+            chartData[dayIndex].cancelled++;
+            statusCounts.cancelled++;
+          }
+        }
+      });
+      
+      setUpcomingAppointmentsChart(chartData);
+      setUpcomingStats(statusCounts);
+      
     } catch (error) {
       console.error("Error fetching upcoming appointments:", error);
     }
@@ -598,55 +654,15 @@ export default function AdminDashboard() {
         </Card>
         
         {/* Upcoming Appointments */}
-        <Card>
-          <CardHeader className="flex justify-between">
-            <div>
-              <CardTitle className="text-lg">Upcoming appointments</CardTitle>
-              <CardDescription>Next 7 days</CardDescription>
-            </div>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {upcomingAppointments.length > 0 ? (
-              <div className="space-y-4">
-                {upcomingAppointments.map((appointment) => {
-                  const mainService = appointment.bookings.find(b => b.service)?.service;
-                  const stylist = appointment.bookings.find(b => b.employee)?.employee;
-                  
-                  return (
-                    <div key={appointment.id} className="flex justify-between items-start pb-4 border-b">
-                      <div>
-                        <div className="font-medium">{mainService?.name || "Appointment"}</div>
-                        <div className="text-sm text-gray-500">
-                          {format(new Date(appointment.start_time), "EEE, dd MMM yyyy HH:mm")}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {appointment.customer?.full_name}{stylist && ` with ${stylist.name}`}
-                        </div>
-                      </div>
-                      <div>
-                        {formatAppointmentStatus(appointment.status)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <BarChart3 className="w-12 h-12 mb-4 text-gray-300" />
-                <h3 className="text-lg font-semibold mb-2">Your schedule is empty</h3>
-                <p className="text-sm text-gray-500 text-center mb-4">
-                  Make some appointments for schedule data to appear
-                </p>
-                <Button asChild>
-                  <a href="/admin/bookings">Book Appointment</a>
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <React.Suspense fallback={<div className="h-[400px] flex items-center justify-center">Loading...</div>}>
+          <LazyStatsPanel 
+            stats={[]} 
+            chartData={upcomingAppointmentsChart}
+            totalBooked={upcomingStats.total}
+            confirmedCount={upcomingStats.confirmed}
+            cancelledCount={upcomingStats.cancelled}
+          />
+        </React.Suspense>
       </div>
       
       {/* Appointments Activity & Today's Appointments */}
