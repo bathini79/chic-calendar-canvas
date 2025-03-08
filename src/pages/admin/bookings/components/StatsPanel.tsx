@@ -11,6 +11,7 @@ interface Stat {
 interface ChartData {
   day: string;
   confirmed: number;
+  booked: number;
   cancelled: number;
 }
 
@@ -19,6 +20,7 @@ interface StatsPanelProps {
   chartData?: ChartData[];
   totalBooked?: number;
   confirmedCount?: number;
+  bookedCount?: number;
   cancelledCount?: number;
 }
 
@@ -27,6 +29,7 @@ export function StatsPanel({
   chartData = [], 
   totalBooked = 0, 
   confirmedCount = 0,
+  bookedCount = 0,
   cancelledCount = 0 
 }: StatsPanelProps) {
   return (
@@ -58,6 +61,7 @@ export function StatsPanel({
               <h2 className="text-3xl font-bold">{totalBooked} booked</h2>
               <div className="mt-2 space-y-1">
                 <p className="text-sm text-gray-500">Confirmed appointments <span className="font-semibold">{confirmedCount}</span></p>
+                <p className="text-sm text-gray-500">Booked appointments <span className="font-semibold">{bookedCount}</span></p>
                 <p className="text-sm text-gray-500">Cancelled appointments <span className="font-semibold">{cancelledCount}</span></p>
               </div>
             </div>
@@ -74,6 +78,7 @@ export function StatsPanel({
                   <Tooltip />
                   <Legend />
                   <Bar dataKey="confirmed" name="Confirmed" fill="#8884d8" />
+                  <Bar dataKey="booked" name="Booked" fill="#4CAF50" />
                   <Bar dataKey="cancelled" name="Cancelled" fill="#FF5353" />
                 </BarChart>
               </ResponsiveContainer>
