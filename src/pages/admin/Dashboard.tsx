@@ -1,4 +1,4 @@
-
+<lov-code>
 import React, { useState, useEffect } from "react";
 import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay } from "date-fns";
 import { 
@@ -72,6 +72,7 @@ export default function AdminDashboard() {
   const [upcomingStats, setUpcomingStats] = useState({
     total: 0,
     confirmed: 0,
+    booked: 0,
     cancelled: 0
   });
   const [todayAppointments, setTodayAppointments] = useState([]);
@@ -187,7 +188,8 @@ export default function AdminDashboard() {
   const fetchUpcomingAppointments = async () => {
     try {
       const today = new Date();
-      const nextWeek = addDays(today, 7);
+      const tomorrow = addDays(today, 1); // Start from tomorrow instead of today
+      const nextSevenDays = addDays(tomorrow, 6); // Get 7 days from tomorrow
       
       const { data, error } = await supabase
         .from("appointments")
@@ -204,8 +206,8 @@ export default function AdminDashboard() {
             employee:employees (id, name)
           )
         `)
-        .gte("start_time", startOfDay(today).toISOString())
-        .lt("start_time", endOfDay(nextWeek).toISOString())
+        .gte("start_time", startOfDay(tomorrow).toISOString())
+        .lt("start_time", endOfDay(nextSevenDays).toISOString())
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -218,17 +220,19 @@ export default function AdminDashboard() {
       const statusCounts = {
         total: 0,
         confirmed: 0,
+        booked: 0,
         cancelled: 0
       };
       
-      // Initialize next 7 days data
+      // Initialize next 7 days data starting from tomorrow
       for (let i = 0; i < 7; i++) {
-        const currentDate = addDays(today, i);
+        const currentDate = addDays(tomorrow, i);
         const dayName = dayNames[currentDate.getDay()];
         const dayNum = currentDate.getDate();
         chartData.push({
           day: `${dayName} ${dayNum}`,
           confirmed: 0,
+          booked: 0,
           cancelled: 0,
           date: currentDate
         });
@@ -237,17 +241,24 @@ export default function AdminDashboard() {
       // Populate data
       data?.forEach(appointment => {
         const appointmentDate = parseISO(appointment.start_time);
-        const dayIndex = Math.floor((appointmentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const dayDiff = Math.floor((appointmentDate.getTime() - tomorrow.getTime()) / (1000 * 60 * 60 * 24));
         
-        if (dayIndex >= 0 && dayIndex < 7) {
+        if (dayDiff >= 0 && dayDiff < 7) {
           statusCounts.total++;
           
           if (appointment.status === 'confirmed') {
-            chartData[dayIndex].confirmed++;
+            chartData[dayDiff].confirmed++;
             statusCounts.confirmed++;
           } else if (appointment.status === 'canceled') {
-            chartData[dayIndex].cancelled++;
+            chartData[dayDiff].cancelled++;
             statusCounts.cancelled++;
+          } else if (appointment.status === 'booked') {
+            chartData[dayDiff].booked++;
+            statusCounts.booked++;
+          } else {
+            // For any other status, count as booked
+            chartData[dayDiff].booked++;
+            statusCounts.booked++;
           }
         }
       });
@@ -660,6 +671,7 @@ export default function AdminDashboard() {
             chartData={upcomingAppointmentsChart}
             totalBooked={upcomingStats.total}
             confirmedCount={upcomingStats.confirmed}
+            bookedCount={upcomingStats.booked}
             cancelledCount={upcomingStats.cancelled}
           />
         </React.Suspense>
@@ -884,176 +896,4 @@ export default function AdminDashboard() {
                 {quickActions.upcomingBookings}
               </div>
               <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
-                <a href="/admin/bookings">
-                  <span>View Bookings</span>
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Today's Bookings</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-4 text-center">
-                {quickActions.todayBookings}
-              </div>
-              <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
-                <a href="/admin/bookings">
-                  <span>View Bookings</span>
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Package className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Low Stock Items</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-4 text-center text-red-500">
-                {quickActions.lowStockItems}
-              </div>
-              <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
-                <a href="/admin/inventory">
-                  <span>Order Stock</span>
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-      
-      {/* Business Performance Metrics */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Business Performance</h2>
-          <Select defaultValue="today">
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Today" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Revenue</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-2">
-                ₹{businessMetrics.revenue}
-              </div>
-              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.revenueChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                {parseFloat(businessMetrics.revenueChange) < 0 ? (
-                  <TrendingDown className="h-4 w-4 mr-1" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                )}
-                {parseFloat(businessMetrics.revenueChange) < 0 ? businessMetrics.revenueChange : `+${businessMetrics.revenueChange}`}% vs Yesterday
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Percent className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Occupancy Rate</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-2">
-                {businessMetrics.occupancyRate}%
-              </div>
-              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.occupancyChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                {parseFloat(businessMetrics.occupancyChange) < 0 ? (
-                  <TrendingDown className="h-4 w-4 mr-1" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                )}
-                {parseFloat(businessMetrics.occupancyChange) < 0 ? businessMetrics.occupancyChange : `+${businessMetrics.occupancyChange}`}% vs Yesterday
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Returning Customer Rate</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-2">
-                {businessMetrics.returningCustomerRate}%
-              </div>
-              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.returningCustomerChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? (
-                  <TrendingDown className="h-4 w-4 mr-1" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                )}
-                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? businessMetrics.returningCustomerChange : `+${businessMetrics.returningCustomerChange}`}% vs Yesterday
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <CreditCard className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Tips</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-2">
-                ₹{businessMetrics.tips}
-              </div>
-              <div className="text-sm flex items-center text-gray-500">
-                -- vs Yesterday
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
-}
+                <a href="/admin
