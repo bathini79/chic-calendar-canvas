@@ -546,7 +546,15 @@ export type Database = {
           unit_price?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_transactions_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_units: {
         Row: {
@@ -1369,7 +1377,6 @@ export type Database = {
         | "refunded"
         | "partially_refunded"
         | "noshow"
-        | "booked"
       booking_status:
         | "pending"
         | "confirmed"
