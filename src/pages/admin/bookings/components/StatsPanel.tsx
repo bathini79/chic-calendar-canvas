@@ -1,7 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AppointmentDetailsDialog } from './AppointmentDetailsDialog';
+import { Appointment } from '../types';
 
 interface Stat {
   label: string;
@@ -22,6 +24,8 @@ interface StatsPanelProps {
   confirmedCount?: number;
   bookedCount?: number;
   cancelledCount?: number;
+  appointments?: Appointment[];
+  onCheckout?: (appointment: Appointment) => void;
 }
 
 export function StatsPanel({ 
@@ -30,8 +34,19 @@ export function StatsPanel({
   totalBooked = 0, 
   confirmedCount = 0,
   bookedCount = 0,
-  cancelledCount = 0 
+  cancelledCount = 0,
+  appointments = [],
+  onCheckout
 }: StatsPanelProps) {
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+
+  const handleCheckout = (appointment: Appointment) => {
+    if (onCheckout) {
+      onCheckout(appointment);
+    }
+    setSelectedAppointment(null); // Close the dialog after checkout
+  };
+
   return (
     <div className="space-y-4">
       <div className="p-4 border-b bg-white flex space-x-4 overflow-x-auto">
@@ -90,6 +105,14 @@ export function StatsPanel({
           </CardContent>
         </Card>
       )}
+
+      {/* Add AppointmentDetailsDialog component */}
+      <AppointmentDetailsDialog
+        appointment={selectedAppointment}
+        open={!!selectedAppointment}
+        onOpenChange={() => setSelectedAppointment(null)}
+        onCheckout={handleCheckout}
+      />
     </div>
   );
 }

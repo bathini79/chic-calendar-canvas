@@ -57,7 +57,6 @@ import { Appointment } from "./bookings/types";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-// Lazy load components for better performance
 const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
 
 export default function AdminDashboard() {
@@ -560,6 +559,66 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleCheckoutFromAppointment = (appointment: Appointment) => {
+    const services: string[] = [];
+    const packages: string[] = [];
+    const stylists: Record<string, string> = {};
+    const customizedServicesMap: Record<string, string[]> = {};
+
+    const packageIdsSet = new Set<string>();
+    appointment.bookings.forEach(booking => {
+      if (booking.package_id) {
+        packageIdsSet.add(booking.package_id);
+        if (booking.employee_id) {
+          stylists[booking.package_id] = booking.employee_id;
+        }
+      }
+    });
+
+    const packageIds = Array.from(packageIdsSet);
+    packageIds.forEach(pkgId => {
+      packages.push(pkgId);
+    });
+
+    appointment.bookings.forEach(booking => {
+      if (booking.service_id) {
+        if (booking.package_id) {
+          const basePackage = packages?.find(p => p === booking.package_id);
+          if (basePackage) {
+            const pkgDetails = appointment.bookings.find(b => 
+              b.package && b.package.id === booking.package_id
+            )?.package;
+
+            if (pkgDetails) {
+              const isBaseService = pkgDetails?.package_services?.some(
+                ps => ps.service.id === booking.service_id
+              );
+
+              if (!isBaseService) {
+                if (!customizedServicesMap[booking.package_id]) {
+                  customizedServicesMap[booking.package_id] = [];
+                }
+                customizedServicesMap[booking.package_id].push(booking.service_id);
+              }
+            }
+          }
+
+          if (booking.employee_id) {
+            stylists[booking.service_id] = booking.employee_id;
+          }
+        } else {
+          services.push(booking.service_id);
+          
+          if (booking.employee_id) {
+            stylists[booking.service_id] = booking.employee_id;
+          }
+        }
+      }
+    });
+
+    window.location.href = `/admin/bookings?checkout=true&appointmentId=${appointment.id}`;
+  };
+
   return (
     <div className="p-8 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
@@ -639,6 +698,8 @@ export default function AdminDashboard() {
             confirmedCount={upcomingStats.confirmed}
             bookedCount={upcomingStats.booked}
             cancelledCount={upcomingStats.cancelled}
+            appointments={upcomingAppointments}
+            onCheckout={handleCheckoutFromAppointment}
           />
         </React.Suspense>
       </div>
@@ -1040,6 +1101,7 @@ export default function AdminDashboard() {
         open={detailsDialogOpen}
         onOpenChange={setDetailsDialogOpen}
         onUpdated={fetchTodayAppointments}
+        onCheckout={handleCheckoutFromAppointment}
       />
     </div>
   );
