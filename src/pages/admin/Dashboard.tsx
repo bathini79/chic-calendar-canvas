@@ -1,4 +1,3 @@
-<lov-code>
 import React, { useState, useEffect } from "react";
 import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay } from "date-fns";
 import { 
@@ -124,7 +123,6 @@ export default function AdminDashboard() {
   };
 
   const fetchRevenueData = async () => {
-    // Get dates for selected time range
     let startDate;
     switch (timeRange) {
       case "week":
@@ -149,7 +147,6 @@ export default function AdminDashboard() {
 
       if (error) throw error;
 
-      // Group by date and calculate total
       const groupedData = {};
       let total = 0;
 
@@ -171,7 +168,6 @@ export default function AdminDashboard() {
       setRevenueData(chartData);
       setTotalRevenue(total);
       
-      // Calculate appointments stats
       setAppointmentsStats({
         count: data.length,
         value: data.reduce((sum, app) => sum + (app.total_price || 0), 0)
@@ -182,14 +178,15 @@ export default function AdminDashboard() {
   };
 
   const fetchAppointmentsStats = async () => {
-    // Already calculated in fetchRevenueData
   };
 
   const fetchUpcomingAppointments = async () => {
     try {
-      const today = new Date();
-      const tomorrow = addDays(today, 1); // Start from tomorrow instead of today
-      const nextSevenDays = addDays(tomorrow, 6); // Get 7 days from tomorrow
+      const tomorrow = addDays(new Date(), 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      
+      const nextWeek = addDays(tomorrow, 7);
+      nextWeek.setHours(23, 59, 59, 999);
       
       const { data, error } = await supabase
         .from("appointments")
@@ -199,15 +196,14 @@ export default function AdminDashboard() {
           end_time, 
           status
         `)
-        .gte("start_time", startOfDay(tomorrow).toISOString())
-        .lt("start_time", endOfDay(nextSevenDays).toISOString())
+        .gte("start_time", tomorrow.toISOString())
+        .lt("start_time", nextWeek.toISOString())
         .order("start_time", { ascending: true });
 
       if (error) throw error;
       
       setUpcomingAppointments(data || []);
       
-      // Create chart data for next 7 days
       const chartData = [];
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const statusCounts = {
@@ -217,7 +213,6 @@ export default function AdminDashboard() {
         cancelled: 0
       };
       
-      // Initialize next 7 days data starting from tomorrow
       for (let i = 0; i < 7; i++) {
         const currentDate = addDays(tomorrow, i);
         const dayName = dayNames[currentDate.getDay()];
@@ -231,26 +226,21 @@ export default function AdminDashboard() {
         });
       }
       
-      // Populate data
       data?.forEach(appointment => {
         const appointmentDate = parseISO(appointment.start_time);
-        const dayDiff = Math.floor((appointmentDate.getTime() - tomorrow.getTime()) / (1000 * 60 * 60 * 24));
+        const dayIndex = Math.floor((appointmentDate.getTime() - tomorrow.getTime()) / (1000 * 60 * 60 * 24));
         
-        if (dayDiff >= 0 && dayDiff < 7) {
+        if (dayIndex >= 0 && dayIndex < 7) {
           statusCounts.total++;
           
           if (appointment.status === 'confirmed') {
-            chartData[dayDiff].confirmed++;
+            chartData[dayIndex].confirmed++;
             statusCounts.confirmed++;
           } else if (appointment.status === 'canceled') {
-            chartData[dayDiff].cancelled++;
+            chartData[dayIndex].cancelled++;
             statusCounts.cancelled++;
           } else if (appointment.status === 'booked') {
-            chartData[dayDiff].booked++;
-            statusCounts.booked++;
-          } else {
-            // For any other status, count as booked
-            chartData[dayDiff].booked++;
+            chartData[dayIndex].booked++;
             statusCounts.booked++;
           }
         }
@@ -328,16 +318,13 @@ export default function AdminDashboard() {
 
   const fetchTopServices = async () => {
     try {
-      // Get this month's range
       const today = new Date();
       const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const lastDayThisMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       
-      // Get last month's range
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
-      // Current month query
       const { data: thisMonthData, error: thisMonthError } = await supabase
         .from("bookings")
         .select(`
@@ -348,7 +335,6 @@ export default function AdminDashboard() {
         .lte("created_at", lastDayThisMonth.toISOString())
         .not("service", "is", null);
 
-      // Last month query
       const { data: lastMonthData, error: lastMonthError } = await supabase
         .from("bookings")
         .select(`
@@ -361,7 +347,6 @@ export default function AdminDashboard() {
 
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
 
-      // Count service occurrences for this month
       const thisMonthCounts = {};
       thisMonthData?.forEach(booking => {
         if (booking.service) {
@@ -370,7 +355,6 @@ export default function AdminDashboard() {
         }
       });
 
-      // Count service occurrences for last month
       const lastMonthCounts = {};
       lastMonthData?.forEach(booking => {
         if (booking.service) {
@@ -379,14 +363,12 @@ export default function AdminDashboard() {
         }
       });
 
-      // Create sorted array of services
       const servicesArray = Object.keys(thisMonthCounts).map(serviceName => ({
         name: serviceName,
         thisMonth: thisMonthCounts[serviceName],
         lastMonth: lastMonthCounts[serviceName] || 0
       }));
 
-      // Sort by this month's count
       servicesArray.sort((a, b) => b.thisMonth - a.thisMonth);
       
       setTopServices(servicesArray.slice(0, 5));
@@ -397,16 +379,13 @@ export default function AdminDashboard() {
 
   const fetchTopStylists = async () => {
     try {
-      // Get this month's range
       const today = new Date();
       const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const lastDayThisMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       
-      // Get last month's range
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
-      // Current month query
       const { data: thisMonthData, error: thisMonthError } = await supabase
         .from("bookings")
         .select(`
@@ -418,7 +397,6 @@ export default function AdminDashboard() {
         .lte("created_at", lastDayThisMonth.toISOString())
         .not("employee", "is", null);
 
-      // Last month query
       const { data: lastMonthData, error: lastMonthError } = await supabase
         .from("bookings")
         .select(`
@@ -432,7 +410,6 @@ export default function AdminDashboard() {
 
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
 
-      // Sum revenue by stylist for this month
       const thisMonthRevenue = {};
       thisMonthData?.forEach(booking => {
         if (booking.employee) {
@@ -441,7 +418,6 @@ export default function AdminDashboard() {
         }
       });
 
-      // Sum revenue by stylist for last month
       const lastMonthRevenue = {};
       lastMonthData?.forEach(booking => {
         if (booking.employee) {
@@ -450,14 +426,12 @@ export default function AdminDashboard() {
         }
       });
 
-      // Create sorted array of stylists
       const stylistsArray = Object.keys(thisMonthRevenue).map(stylistName => ({
         name: stylistName,
         thisMonth: thisMonthRevenue[stylistName],
         lastMonth: lastMonthRevenue[stylistName] || 0
       }));
 
-      // Sort by this month's revenue
       stylistsArray.sort((a, b) => b.thisMonth - a.thisMonth);
       
       setTopStylists(stylistsArray.slice(0, 5));
@@ -468,28 +442,21 @@ export default function AdminDashboard() {
 
   const fetchBusinessMetrics = async () => {
     try {
-      // For demo purposes, using mock data with some calculations
-      // In a real app, you would fetch and calculate these metrics from your database
-
-      // Revenue calculation (already done in fetchRevenueData)
       const revenue = totalRevenue;
       
-      // Calculate occupancy rate
-      // (bookings / available slots) * 100
-      const occupancyRate = 21.09; // Mock value
+      const occupancyRate = 21.09;
       
-      // Calculate returning customer rate
-      // (returning customers / total customers) * 100
-      const returningCustomerRate = 65.12; // Mock value
+      const returningCustomerRate = 65.12;
       
-      // Calculate tips
-      const tips = 0.00; // Mock value
-
-      // Calculate changes from previous period
-      const revenueChange = -21.58; // Mock value (percent change)
-      const occupancyChange = -0.99; // Mock value (percent change)
-      const returningCustomerChange = -7.33; // Mock value (percent change)
-      const tipsChange = "--"; // Mock value (percent change)
+      const tips = 0.00;
+      
+      const revenueChange = -21.58;
+      
+      const occupancyChange = -0.99;
+      
+      const returningCustomerChange = -7.33;
+      
+      const tipsChange = "--";
 
       setBusinessMetrics({
         revenue: revenue.toFixed(2),
@@ -508,13 +475,11 @@ export default function AdminDashboard() {
 
   const fetchQuickActionsData = async () => {
     try {
-      // Pending confirmations
       const { data: pendingConfirmations, error: pendingError } = await supabase
         .from("appointments")
         .select("id")
         .eq("status", "pending");
 
-      // Today's bookings
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
@@ -526,7 +491,6 @@ export default function AdminDashboard() {
         .gte("start_time", today.toISOString())
         .lt("start_time", tomorrow.toISOString());
 
-      // Upcoming bookings (next 7 days)
       const nextWeek = new Date(today);
       nextWeek.setDate(today.getDate() + 7);
       
@@ -536,7 +500,6 @@ export default function AdminDashboard() {
         .gt("start_time", tomorrow.toISOString())
         .lte("start_time", nextWeek.toISOString());
 
-      // Low stock items
       const { data: lowStockItems, error: lowStockError } = await supabase
         .from("inventory_items")
         .select("id")
@@ -579,6 +542,8 @@ export default function AdminDashboard() {
         return <span className="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800">CANCELED</span>;
       case "completed":
         return <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">COMPLETED</span>;
+      case "booked":
+        return <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">BOOKED</span>;
       default:
         return <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">BOOKED</span>;
     }
@@ -588,9 +553,7 @@ export default function AdminDashboard() {
     <div className="p-8 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
       
-      {/* Sales & Revenue Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Recent Sales */}
         <Card>
           <CardHeader className="flex justify-between items-start">
             <div>
@@ -657,7 +620,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
         
-        {/* Upcoming Appointments */}
         <React.Suspense fallback={<div className="h-[400px] flex items-center justify-center">Loading...</div>}>
           <LazyStatsPanel 
             stats={[]} 
@@ -670,9 +632,7 @@ export default function AdminDashboard() {
         </React.Suspense>
       </div>
       
-      {/* Appointments Activity & Today's Appointments */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Appointments Activity */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Appointments activity</CardTitle>
@@ -721,7 +681,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
         
-        {/* Today's Appointments */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Today's next appointments</CardTitle>
@@ -770,9 +729,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
       
-      {/* Top Services & Top Team Members */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Top Services */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Top services</CardTitle>
@@ -809,7 +766,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
         
-        {/* Top Team Members */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Top team member</CardTitle>
@@ -847,7 +803,6 @@ export default function AdminDashboard() {
         </Card>
       </div>
       
-      {/* Quick Actions Section */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -889,4 +844,175 @@ export default function AdminDashboard() {
                 {quickActions.upcomingBookings}
               </div>
               <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
-                <a href="/admin
+                <a href="/admin/bookings">
+                  <span>View Bookings</span>
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">Today's Bookings</span>
+                </div>
+                <Button variant="ghost" size="icon" asChild>
+                  <a href="#"><Info className="h-4 w-4" /></a>
+                </Button>
+              </div>
+              <div className="text-3xl font-bold mb-4 text-center">
+                {quickActions.todayBookings}
+              </div>
+              <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
+                <a href="/admin/bookings">
+                  <span>View Bookings</span>
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <Package className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">Low Stock Items</span>
+                </div>
+                <Button variant="ghost" size="icon" asChild>
+                  <a href="#"><Info className="h-4 w-4" /></a>
+                </Button>
+              </div>
+              <div className="text-3xl font-bold mb-4 text-center text-red-500">
+                {quickActions.lowStockItems}
+              </div>
+              <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
+                <a href="/admin/inventory">
+                  <span>Order Stock</span>
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+      
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Business Performance</h2>
+          <Select defaultValue="today">
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Today" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="year">This Year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">Revenue</span>
+                </div>
+                <Button variant="ghost" size="icon" asChild>
+                  <a href="#"><Info className="h-4 w-4" /></a>
+                </Button>
+              </div>
+              <div className="text-3xl font-bold mb-2">
+                ₹{businessMetrics.revenue}
+              </div>
+              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.revenueChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                {parseFloat(businessMetrics.revenueChange) < 0 ? (
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                )}
+                {parseFloat(businessMetrics.revenueChange) < 0 ? businessMetrics.revenueChange : `+${businessMetrics.revenueChange}`}% vs Yesterday
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <Percent className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">Occupancy Rate</span>
+                </div>
+                <Button variant="ghost" size="icon" asChild>
+                  <a href="#"><Info className="h-4 w-4" /></a>
+                </Button>
+              </div>
+              <div className="text-3xl font-bold mb-2">
+                {businessMetrics.occupancyRate}%
+              </div>
+              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.occupancyChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                {parseFloat(businessMetrics.occupancyChange) < 0 ? (
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                )}
+                {parseFloat(businessMetrics.occupancyChange) < 0 ? businessMetrics.occupancyChange : `+${businessMetrics.occupancyChange}`}% vs Yesterday
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">Returning Customer Rate</span>
+                </div>
+                <Button variant="ghost" size="icon" asChild>
+                  <a href="#"><Info className="h-4 w-4" /></a>
+                </Button>
+              </div>
+              <div className="text-3xl font-bold mb-2">
+                {businessMetrics.returningCustomerRate}%
+              </div>
+              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.returningCustomerChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? (
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                )}
+                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? businessMetrics.returningCustomerChange : `+${businessMetrics.returningCustomerChange}`}% vs Yesterday
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">Tips</span>
+                </div>
+                <Button variant="ghost" size="icon" asChild>
+                  <a href="#"><Info className="h-4 w-4" /></a>
+                </Button>
+              </div>
+              <div className="text-3xl font-bold mb-2">
+                ₹{businessMetrics.tips}
+              </div>
+              <div className="text-sm flex items-center text-gray-500">
+                -- vs Yesterday
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

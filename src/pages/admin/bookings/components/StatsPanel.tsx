@@ -78,7 +78,7 @@ export function StatsPanel({
                   <Tooltip />
                   <Legend />
                   <Bar dataKey="confirmed" name="Confirmed" fill="#8884d8" />
-                  <Bar dataKey="booked" name="Booked" fill="#4CAF50" />
+                  <Bar dataKey="booked" name="Booked" fill="#82ca9d" />
                   <Bar dataKey="cancelled" name="Cancelled" fill="#FF5353" />
                 </BarChart>
               </ResponsiveContainer>
