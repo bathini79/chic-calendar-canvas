@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
+import { format, subDays, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears } from "date-fns";
 import { 
   Card, 
   CardContent, 
@@ -10,27 +10,14 @@ import {
 } from "@/components/ui/card";
 import { 
   MoreHorizontal, 
-  BarChart3, 
   Calendar, 
   Clock, 
-  CheckCircle, 
-  XCircle, 
-  Package, 
-  Users, 
-  ArrowRight, 
-  CreditCard, 
-  Percent, 
-  User, 
-  DollarSign, 
   TrendingDown, 
   TrendingUp, 
-  Info, 
-  LucideCalendarClock, 
-  AlertCircle,
-  ChevronRight,
-  Zap
+  Percent, 
+  User, 
+  ChevronRight
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { adminSupabase, supabase } from "@/integrations/supabase/client";
 import { 
   LineChart, 
@@ -41,8 +28,6 @@ import {
   Tooltip, 
   Legend, 
   ResponsiveContainer,
-  BarChart,
-  Bar
 } from "recharts";
 import { 
   Select, 
@@ -81,7 +66,6 @@ export default function AdminDashboard() {
     booked: 0,
     cancelled: 0
   });
-  const [appointmentsActivity, setAppointmentsActivity] = useState([]);
   const [topServices, setTopServices] = useState([]);
   const [topStylists, setTopStylists] = useState([]);
   const [businessMetrics, setBusinessMetrics] = useState({
@@ -801,23 +785,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const formatAppointmentStatus = (status) => {
-    switch (status) {
-      case "confirmed":
-        return <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">CONFIRMED</span>;
-      case "pending":
-        return <span className="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">PENDING</span>;
-      case "canceled":
-        return <span className="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800">CANCELED</span>;
-      case "completed":
-        return <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">COMPLETED</span>;
-      case "booked":
-        return <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">BOOKED</span>;
-      default:
-        return <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">BOOKED</span>;
-    }
-  };
-
   return (
     <div className="p-8 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
@@ -887,7 +854,7 @@ export default function AdminDashboard() {
               </div>
             </div>
             
-            <div className="h-[300px] mt-6">
+            <div className="h-[350px] mt-6">
               {revenueData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -924,128 +891,72 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
         
-        <React.Suspense fallback={<div className="h-[400px] flex items-center justify-center">Loading...</div>}>
-          <LazyStatsPanel 
-            stats={[]} 
-            chartData={upcomingAppointmentsChart}
-            totalBooked={upcomingStats.total}
-            confirmedCount={upcomingStats.confirmed}
-            bookedCount={upcomingStats.booked}
-            cancelledCount={upcomingStats.cancelled}
-          />
-        </React.Suspense>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg">Appointments activity</CardTitle>
-            <MoreHorizontal className="h-5 w-5 text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px] pr-4">
-              {appointmentsActivity.length > 0 ? (
-                <div className="space-y-4">
-                  {appointmentsActivity.slice(0, 5).map((appointment) => {
-                    const mainBooking = appointment.bookings[0];
-                    const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
-                    const price = mainBooking?.price_paid || appointment.total_price || 0;
-                    const stylist = mainBooking?.employee?.name;
-                    const appointmentDate = new Date(appointment.start_time);
-                    
-                    return (
-                      <div 
-                        key={appointment.id} 
-                        className="flex items-start hover:bg-gray-50 p-2 rounded cursor-pointer transition-colors"
-                        onClick={() => handleAppointmentClick(appointment)}
-                      >
-                        <div className="mr-4 text-center">
-                          <div className="text-sm text-gray-500">{format(appointmentDate, "MMM")}</div>
-                          <div className="font-bold text-lg">{format(appointmentDate, "dd")}</div>
-                        </div>
-                        <div className="flex flex-1 justify-between">
-                          <div>
-                            <div className="font-medium">{serviceName}</div>
-                            <div className="text-sm text-gray-500">
-                              {appointment.customer?.full_name} {stylist && `with ${stylist}`}
+        <div className="space-y-6">
+          <React.Suspense fallback={<div className="h-[400px] flex items-center justify-center">Loading...</div>}>
+            <LazyStatsPanel 
+              stats={[]} 
+              chartData={upcomingAppointmentsChart}
+              totalBooked={upcomingStats.total}
+              confirmedCount={upcomingStats.confirmed}
+              bookedCount={upcomingStats.booked}
+              cancelledCount={upcomingStats.cancelled}
+            />
+          </React.Suspense>
+          
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-lg">Today's next appointments</CardTitle>
+              <MoreHorizontal className="h-5 w-5 text-gray-400" />
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[220px] pr-4">
+                {todayAppointmentsData.length > 0 ? (
+                  <div className="space-y-4">
+                    {todayAppointmentsData.map((appointment) => {
+                      const mainBooking = appointment.bookings[0];
+                      const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
+                      const price = mainBooking?.price_paid || appointment.total_price || 0;
+                      const stylist = mainBooking?.employee?.name;
+                      
+                      return (
+                        <div 
+                          key={appointment.id} 
+                          className="flex items-start hover:bg-gray-50 p-2 rounded cursor-pointer transition-colors"
+                          onClick={() => handleAppointmentClick(appointment)}
+                        >
+                          <div className="mr-4 text-center">
+                            <div className="font-bold">
+                              {format(new Date(appointment.start_time), "HH:mm")}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold">₹{price.toFixed(2)}</div>
-                            <div className="mt-1">{formatAppointmentStatus(appointment.status)}</div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Calendar className="w-12 h-12 mb-4 text-gray-300" />
-                  <h3 className="text-lg font-semibold mb-2">No Activity</h3>
-                  <p className="text-sm text-gray-500 text-center">
-                    No appointment activity found
-                  </p>
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg">Today's next appointments</CardTitle>
-            <MoreHorizontal className="h-5 w-5 text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px] pr-4">
-              {todayAppointmentsData.length > 0 ? (
-                <div className="space-y-4">
-                  {todayAppointmentsData.map((appointment) => {
-                    const mainBooking = appointment.bookings[0];
-                    const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
-                    const price = mainBooking?.price_paid || appointment.total_price || 0;
-                    const stylist = mainBooking?.employee?.name;
-                    
-                    return (
-                      <div 
-                        key={appointment.id} 
-                        className="flex items-start hover:bg-gray-50 p-2 rounded cursor-pointer transition-colors"
-                        onClick={() => handleAppointmentClick(appointment)}
-                      >
-                        <div className="mr-4 text-center">
-                          <div className="font-bold">
-                            {format(new Date(appointment.start_time), "HH:mm")}
-                          </div>
-                        </div>
-                        <div className="flex flex-1 justify-between">
-                          <div>
-                            <div className="font-medium">{serviceName}</div>
-                            <div className="text-sm text-gray-500">
-                              {appointment.customer?.full_name} {stylist && `with ${stylist}`}
+                          <div className="flex flex-1 justify-between">
+                            <div>
+                              <div className="font-medium">{serviceName}</div>
+                              <div className="text-sm text-gray-500">
+                                {appointment.customer?.full_name} {stylist && `with ${stylist}`}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold">₹{price.toFixed(2)}</div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold">₹{price.toFixed(2)}</div>
-                            <div className="mt-1">{formatAppointmentStatus(appointment.status)}</div>
-                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Clock className="w-12 h-12 mb-4 text-gray-300" />
-                  <h3 className="text-lg font-semibold mb-2">No Appointments Today</h3>
-                  <p className="text-sm text-gray-500 text-center mb-4">
-                    Visit the <a href="/admin/bookings" className="text-blue-500 hover:underline">calendar</a> section to add some appointments
-                  </p>
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Clock className="w-12 h-12 mb-4 text-gray-300" />
+                    <h3 className="text-lg font-semibold mb-2">No Appointments Today</h3>
+                    <p className="text-sm text-gray-500 text-center mb-4">
+                      Visit the <a href="/admin/bookings" className="text-blue-500 hover:underline">calendar</a> section to add some appointments
+                    </p>
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1177,4 +1088,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
