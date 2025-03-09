@@ -22,15 +22,7 @@ export const useAppointmentsByDate = (currentDate: Date) => {
               *,
               service:services (*),
               package:packages (*),
-              employee:employees!bookings_employee_id_fkey (
-                id,
-                name,
-                email,
-                phone,
-                photo_url,
-                employment_type,
-                status
-              )
+              employee:employees!bookings_employee_id_fkey (*)
             ),
             customer:profiles (
               id,

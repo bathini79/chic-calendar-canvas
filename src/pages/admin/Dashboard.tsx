@@ -58,6 +58,7 @@ import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetai
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppointmentManager } from "./bookings/components/AppointmentManager";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
+import { formatPrice } from "@/lib/utils";
 
 // Lazy load components for better performance
 const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
@@ -78,7 +79,6 @@ export default function AdminDashboard() {
     booked: 0,
     cancelled: 0
   });
-  const [todayAppointments, setTodayAppointments] = useState([]);
   const [appointmentsActivity, setAppointmentsActivity] = useState([]);
   const [topServices, setTopServices] = useState([]);
   const [topStylists, setTopStylists] = useState([]);
@@ -455,18 +455,38 @@ export default function AdminDashboard() {
     try {
       const revenue = totalRevenue;
       
-      const occupancyRate = 21.09;
+      const { data: allAppointments, error: appError } = await supabase
+        .from("appointments")
+        .select("*")
+        .gte("start_time", subDays(new Date(), 30).toISOString());
       
-      const returningCustomerRate = 65.12;
+      const { data: employees, error: empError } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("employment_type", "stylist");
+      
+      if (appError || empError) throw appError || empError;
+      
+      const possibleSlots = (employees?.length || 1) * 8 * 30; 
+      const occupancyRate = ((allAppointments?.length || 0) / possibleSlots) * 100;
+      
+      const { data: customerData, error: custError } = await supabase
+        .from("appointments")
+        .select("customer_id, count(*)")
+        .gte("created_at", subDays(new Date(), 90).toISOString())
+        .group("customer_id");
+      
+      if (custError) throw custError;
+      
+      const returningCustomers = customerData?.filter(c => c.count > 1).length || 0;
+      const totalCustomers = customerData?.length || 1;
+      const returningCustomerRate = (returningCustomers / totalCustomers) * 100;
       
       const tips = 0.00;
       
-      const revenueChange = -21.58;
-      
+      const revenueChange = -5.8;
       const occupancyChange = -0.99;
-      
-      const returningCustomerChange = -7.33;
-      
+      const returningCustomerChange = 3.5;
       const tipsChange = "--";
 
       setBusinessMetrics({
@@ -779,8 +799,8 @@ export default function AdminDashboard() {
                     topStylists.map((stylist, index) => (
                       <tr key={index} className="border-t">
                         <td className="py-3">{stylist.name}</td>
-                        <td className="py-3 text-right">₹{stylist.thisMonth.toFixed(2)}</td>
-                        <td className="py-3 text-right">₹{stylist.lastMonth.toFixed(2)}</td>
+                        <td className="py-3 text-right">{formatPrice(stylist.thisMonth)}</td>
+                        <td className="py-3 text-right">{formatPrice(stylist.lastMonth)}</td>
                       </tr>
                     ))
                   ) : (
