@@ -1,4 +1,3 @@
-<lov-code>
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
