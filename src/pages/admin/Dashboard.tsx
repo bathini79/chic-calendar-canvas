@@ -667,54 +667,6 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Appointments activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {appointmentsActivity.length > 0 ? (
-              <div className="space-y-4">
-                {appointmentsActivity.map((appointment) => {
-                  const mainBooking = appointment.bookings[0];
-                  const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
-                  const price = mainBooking?.price_paid || appointment.total_price || 0;
-                  const stylist = mainBooking?.employee?.name;
-                  const duration = mainBooking?.service?.duration || "60";
-                  
-                  return (
-                    <div key={appointment.id} className="flex items-start">
-                      <div className="mr-4 text-center">
-                        <div className="font-bold">
-                          {format(new Date(appointment.start_time), "dd")}
-                        </div>
-                        <div className="text-xs">
-                          {format(new Date(appointment.start_time), "MMM")}
-                        </div>
-                      </div>
-                      <div className="flex flex-1 justify-between">
-                        <div>
-                          <div className="font-medium">{serviceName}</div>
-                          <div className="text-sm text-gray-500">
-                            {appointment.customer?.full_name}, {duration}min {stylist && `with ${stylist}`}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold">₹{price.toFixed(2)}</div>
-                          <div className="mt-1">{formatAppointmentStatus(appointment.status)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8">
-                <p className="text-muted-foreground">No appointment activity</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
             <CardTitle className="text-lg">Today's next appointments</CardTitle>
             <CardDescription>
               Total: {todayAppointmentsData.length} appointments
@@ -847,76 +799,7 @@ export default function AdminDashboard() {
       
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Pending Confirmations</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-4 text-center">
-                {quickActions.pendingConfirmations}
-              </div>
-              <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
-                <a href="/admin/bookings">
-                  <span>Confirm Bookings</span>
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Upcoming Bookings</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-4 text-center">
-                {quickActions.upcomingBookings}
-              </div>
-              <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
-                <a href="/admin/bookings">
-                  <span>View Bookings</span>
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Today's Bookings</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-4 text-center">
-                {quickActions.todayBookings}
-              </div>
-              <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
-                <a href="/admin/bookings">
-                  <span>View Bookings</span>
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-          
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">      
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-4">
@@ -959,30 +842,7 @@ export default function AdminDashboard() {
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Revenue</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-2">
-                ₹{businessMetrics.revenue}
-              </div>
-              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.revenueChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                {parseFloat(businessMetrics.revenueChange) < 0 ? (
-                  <TrendingDown className="h-4 w-4 mr-1" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                )}
-                {parseFloat(businessMetrics.revenueChange) < 0 ? businessMetrics.revenueChange : `+${businessMetrics.revenueChange}`}% vs Yesterday
-              </div>
-            </CardContent>
-          </Card>
+         
           
           <Card>
             <CardContent className="pt-6">
@@ -1030,26 +890,6 @@ export default function AdminDashboard() {
                   <TrendingUp className="h-4 w-4 mr-1" />
                 )}
                 {parseFloat(businessMetrics.returningCustomerChange) < 0 ? businessMetrics.returningCustomerChange : `+${businessMetrics.returningCustomerChange}`}% vs Yesterday
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <CreditCard className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Tips</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-2">
-                ₹{businessMetrics.tips}
-              </div>
-              <div className="text-sm flex items-center text-gray-500">
-                -- vs Yesterday
               </div>
             </CardContent>
           </Card>
