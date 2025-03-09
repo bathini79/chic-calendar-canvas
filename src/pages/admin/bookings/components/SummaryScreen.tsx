@@ -3,9 +3,10 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useBooking } from '../context/BookingContext';
 import { SummaryView } from './SummaryView';
+import { SCREEN } from '../types';
 
 export const SummaryScreen: React.FC = () => {
-  const { newAppointmentId, setCurrentScreen, setNewAppointmentId, SCREEN } = useBooking();
+  const { newAppointmentId, setCurrentScreen, setNewAppointmentId } = useBooking();
 
   if (!newAppointmentId) return null;
 

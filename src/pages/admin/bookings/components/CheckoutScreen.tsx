@@ -2,6 +2,7 @@
 import React from 'react';
 import { useBooking } from '../context/BookingContext';
 import { CheckoutSection } from './CheckoutSection';
+import { DiscountType } from '../types';
 
 export const CheckoutScreen: React.FC = () => {
   const {
@@ -31,6 +32,10 @@ export const CheckoutScreen: React.FC = () => {
 
   const selectedTimeSlots = { [newAppointmentId || '']: selectedTime || '' };
 
+  const handleDiscountTypeChange = (type: string) => {
+    setDiscountType(type as DiscountType);
+  };
+
   return (
     <CheckoutSection
       appointmentId={newAppointmentId}
@@ -43,7 +48,7 @@ export const CheckoutScreen: React.FC = () => {
       discountValue={discountValue}
       paymentMethod={paymentMethod}
       notes={appointmentNotes}
-      onDiscountTypeChange={setDiscountType}
+      onDiscountTypeChange={handleDiscountTypeChange}
       onDiscountValueChange={setDiscountValue}
       onPaymentMethodChange={setPaymentMethod}
       onNotesChange={setAppointmentNotes}

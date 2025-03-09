@@ -17,7 +17,7 @@ interface BookingContextType {
   selectedDate: Date | null;
   selectedTime: string | null;
   paymentMethod: "cash" | "online";
-  discountType: DiscountType | string;
+  discountType: DiscountType;
   discountValue: number;
   appointmentNotes: string;
   customizedServices: Record<string, string[]>;
@@ -33,7 +33,7 @@ interface BookingContextType {
   setSelectedDate: (date: Date | null) => void;
   setSelectedTime: (time: string | null) => void;
   setPaymentMethod: (method: "cash" | "online") => void;
-  setDiscountType: (type: DiscountType | string) => void;
+  setDiscountType: (type: DiscountType) => void;
   setDiscountValue: (value: number) => void;
   setAppointmentNotes: (notes: string) => void;
   setCustomizedServices: (services: Record<string, string[]>) => void;
@@ -55,6 +55,7 @@ interface BookingContextType {
   // Additional data
   services: Service[] | undefined;
   packages: Package[] | undefined;
+  SCREEN: typeof SCREEN;
 }
 
 export const BookingContext = createContext<BookingContextType | undefined>(undefined);
@@ -249,6 +250,7 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({
     // Additional data
     services,
     packages,
+    SCREEN,
   };
 
   return (
