@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +20,7 @@ import {
   Trash2
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Service, Package } from "../types";
+import type { Service, Package, Customer } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -37,47 +36,63 @@ import {
   getTotalPrice, 
   getTotalDuration, 
   getFinalPrice, 
+  getServicePriceInPackage,
   calculatePackagePrice 
 } from "../utils/bookingUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAppointmentWorkflow } from "../context/AppointmentWorkflowContext";
 
 interface CheckoutSectionProps {
-  appointmentId?: string | null;
+  appointmentId?: string;
+  selectedCustomer: Customer | null;
+  selectedServices: string[];
+  selectedPackages: string[];
   services: Service[];
   packages: Package[];
+  discountType: 'none' | 'percentage' | 'fixed';
+  discountValue: number;
+  paymentMethod: 'cash' | 'online';
+  notes: string;
+  onDiscountTypeChange: (type: 'none' | 'percentage' | 'fixed') => void;
+  onDiscountValueChange: (value: number) => void;
+  onPaymentMethodChange: (method: 'cash' | 'online') => void;
+  onNotesChange: (notes: string) => void;
+  onPaymentComplete: (appointmentId?: string) => void;
+  selectedStylists: Record<string, string>;
+  selectedTimeSlots: Record<string, string>;
+  onSaveAppointment: () => Promise<string | null>;
+  onRemoveService: (serviceId: string) => void;
+  onRemovePackage: (packageId: string) => void;
+  onBackToServices: () => void;
   isExistingAppointment?: boolean;
+  customizedServices?: Record<string, string[]>;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   appointmentId,
+  selectedCustomer,
+  selectedServices,
+  selectedPackages,
   services,
   packages,
-  isExistingAppointment
+  discountType,
+  discountValue,
+  paymentMethod,
+  notes,
+  onDiscountTypeChange,
+  onDiscountValueChange,
+  onPaymentMethodChange,
+  onNotesChange,
+  onPaymentComplete,
+  selectedStylists,
+  selectedTimeSlots,
+  onSaveAppointment,
+  onRemoveService,
+  onRemovePackage,
+  onBackToServices,
+  isExistingAppointment,
+  customizedServices = {}
 }) => {
-  const {
-    selectedCustomer,
-    selectedServices,
-    selectedPackages,
-    selectedStylists,
-    selectedTime,
-    discountType,
-    discountValue,
-    paymentMethod,
-    appointmentNotes,
-    customizedServices,
-    setDiscountType,
-    setDiscountValue,
-    setPaymentMethod,
-    setAppointmentNotes,
-    handlePaymentComplete,
-    handleSaveAppointment,
-    handleRemoveService,
-    handleRemovePackage,
-    handleBackToServices,
-  } = useAppointmentWorkflow();
-
   const { data: employees } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
@@ -150,7 +165,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         packageId: null as string | null,
         stylist: selectedStylists[id],
         stylistName: getStylistName(selectedStylists[id]),
-        time: selectedTime,
+        time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
         formattedDuration: formatDuration(service.duration),
       } : null;
     }).filter(Boolean);
@@ -170,7 +185,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         packageId: null as string | null,
         stylist: selectedStylists[packageId],
         stylistName: getStylistName(selectedStylists[packageId]),
-        time: selectedTime,
+        time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''],
         formattedDuration: formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices)),
         services: [] as Array<{
           id: string;
@@ -235,7 +250,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     services, 
     packages, 
     selectedStylists, 
-    selectedTime, 
+    selectedTimeSlots, 
     appointmentId, 
     customizedServices,
     employees
@@ -247,18 +262,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         toast.error("Please select a customer");
         return;
       }
-      
-      console.log("Starting payment process");
-      const savedAppointmentId = await handleSaveAppointment();
-      
+      const savedAppointmentId = await onSaveAppointment();
       if (!savedAppointmentId) {
         toast.error("Failed to complete payment");
         return;
       }
 
-      console.log("Payment completed successfully with ID:", savedAppointmentId);
       toast.success("Payment completed successfully");
-      handlePaymentComplete(savedAppointmentId);
+      onPaymentComplete(savedAppointmentId);
     } catch (error: any) {
       console.error("Error completing payment:", error);
       toast.error(error.message || "Failed to complete payment");
@@ -273,7 +284,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             <h2 className="text-xl font-semibold">Checkout Summary</h2>
             <Button
               variant="outline"
-              onClick={handleBackToServices}
+              onClick={onBackToServices}
               className="flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />
@@ -289,7 +300,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </p>
                 <Button
                   variant="default"
-                  onClick={handleBackToServices}
+                  onClick={onBackToServices}
                   className="flex items-center gap-2"
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -338,9 +349,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => {
                               if (item.type === 'service') {
-                                handleRemoveService(item.id);
+                                onRemoveService(item.id);
                               } else {
-                                handleRemovePackage(item.id);
+                                onRemovePackage(item.id);
                               }
                             }}
                           >
@@ -422,7 +433,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           <div className="pt-6 space-y-4 mt-auto">
             <div>
               <h4 className="text-sm font-medium mb-2">Payment Method</h4>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
@@ -454,7 +465,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     <div className="flex gap-4">
                       <Select
                         value={discountType}
-                        onValueChange={setDiscountType}
+                        onValueChange={onDiscountTypeChange}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Discount type" />
@@ -475,7 +486,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           }
                           value={discountValue}
                           onChange={(e) =>
-                            setDiscountValue(Number(e.target.value))
+                            onDiscountValueChange(Number(e.target.value))
                           }
                           className="w-24"
                         />
@@ -485,8 +496,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       <h3 className="font-semibold">Notes</h3>
                       <Textarea
                         placeholder="Add appointment notes..."
-                        value={appointmentNotes}
-                        onChange={(e) => setAppointmentNotes(e.target.value)}
+                        value={notes}
+                        onChange={(e) => onNotesChange(e.target.value)}
                         rows={3}
                       />
                     </div>
