@@ -105,7 +105,7 @@ export interface Appointment {
   location?: string;
   transaction_type?: string;
   total_duration?: number;
-  refund_reason?: RefundReason;
+  refund_reason?: string;
   refunded_by?: string;
   refund_notes?: string;
   original_total_price?: number;
@@ -195,7 +195,7 @@ export interface TransactionDetails {
   status: string;
   created_at: string;
   payment_method?: string;
-  originalSale?: Appointment;
-  refunds?: Appointment[];
+  originalSale?: any;
+  refunds?: any[];
   [key: string]: any;
 }
