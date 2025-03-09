@@ -95,6 +95,10 @@ export default function AdminBookings() {
     setClickedCell(cell);
   };
 
+  const closeAppointmentSidebar = () => {
+    setIsAddAppointmentOpen(false);
+  };
+
   // This is a temporary function for the useCalendarState hook, will be replaced by the actual implementation
   function useCalendarState() {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -189,6 +193,8 @@ export default function AdminBookings() {
             employees={employees}
             services={services || []}
             packages={packages || []}
+            isOpen={isAddAppointmentOpen}
+            onClose={closeAppointmentSidebar}
           />
         </div>
       </DndProvider>

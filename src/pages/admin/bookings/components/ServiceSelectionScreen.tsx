@@ -37,17 +37,48 @@ export const ServiceSelectionScreen: React.FC<ServiceSelectionScreenProps> = ({
       return;
     }
 
-    // Check if all selected services and packages have stylists assigned
-    const isAllStylistsSelected = [...selectedServices, ...selectedPackages].every(
+    // Enhanced validation - check if all selected services and packages have stylists assigned
+    const servicesWithoutStylists = selectedServices.filter(
+      serviceId => !selectedStylists[serviceId]
+    );
+    
+    const packagesWithoutStylists = selectedPackages.filter(
+      packageId => !selectedStylists[packageId]
+    );
+
+    if (servicesWithoutStylists.length > 0 || packagesWithoutStylists.length > 0) {
+      toast.error("Please select a stylist for each service and package");
+      return;
+    }
+
+    // If all validations pass, proceed to checkout
+    handleProceedToCheckout();
+  };
+
+  const handleSave = async () => {
+    // Same validations before saving
+    if (!selectedCustomer) {
+      toast.error("Please select a customer");
+      return;
+    }
+
+    if (selectedServices.length === 0 && selectedPackages.length === 0) {
+      toast.error("Please select at least one service or package");
+      return;
+    }
+
+    // Basic stylist validation for save
+    const hasAllStylists = [...selectedServices, ...selectedPackages].every(
       itemId => !!selectedStylists[itemId]
     );
 
-    if (!isAllStylistsSelected) {
+    if (!hasAllStylists) {
       toast.error("Please select a stylist for each service/package");
       return;
     }
 
-    handleProceedToCheckout();
+    // All validations passed, save the appointment
+    await handleSaveAppointment();
   };
 
   return (
@@ -71,7 +102,7 @@ export const ServiceSelectionScreen: React.FC<ServiceSelectionScreenProps> = ({
       </div>
 
       <div className="p-6 border-t mt-auto flex justify-end gap-4">
-        <Button variant="outline" onClick={handleSaveAppointment}>
+        <Button variant="outline" onClick={handleSave}>
           Save Appointment
         </Button>
         <Button

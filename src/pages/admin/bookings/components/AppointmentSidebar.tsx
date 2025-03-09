@@ -8,18 +8,21 @@ import { Button } from "@/components/ui/button";
 import { SCREEN } from '../types';
 import { useAppointmentWorkflow } from '../context/AppointmentWorkflowContext';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
 
 interface AppointmentSidebarProps {
   employees: any[];
   services: any[];
   packages: any[];
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export const AppointmentSidebar: React.FC<AppointmentSidebarProps> = ({
   employees,
   services,
-  packages
+  packages,
+  isOpen,
+  onClose
 }) => {
   const {
     currentScreen,
@@ -27,12 +30,11 @@ export const AppointmentSidebar: React.FC<AppointmentSidebarProps> = ({
     setSelectedCustomer,
     setShowCreateForm,
     newAppointmentId,
-    isAddAppointmentOpen,
-    handleCloseAppointment,
     selectedTime,
     selectedDate,
     setCurrentScreen,
-    setNewAppointmentId
+    setNewAppointmentId,
+    handleCloseAppointment
   } = useAppointmentWorkflow();
 
   // Monitor state changes for debugging
@@ -46,10 +48,16 @@ export const AppointmentSidebar: React.FC<AppointmentSidebarProps> = ({
     setNewAppointmentId(null);
   };
 
+  // Close handler that calls the context close handler and parent onClose
+  const closeAppointment = () => {
+    handleCloseAppointment();
+    onClose();
+  };
+
   return (
     <div
       className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
-        isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
+        isOpen ? "translate-x-0" : "translate-x-full"
       }`}
     >
       <div className="flex flex-col h-full">
@@ -57,7 +65,7 @@ export const AppointmentSidebar: React.FC<AppointmentSidebarProps> = ({
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold">New Appointment</h2>
             <button
-              onClick={handleCloseAppointment}
+              onClick={closeAppointment}
               className="text-gray-500 hover:text-gray-700"
             >
               ✕
