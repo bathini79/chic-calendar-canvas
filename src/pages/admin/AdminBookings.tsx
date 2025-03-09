@@ -16,6 +16,7 @@ import { AppointmentWorkflowProvider } from "./bookings/context/AppointmentWorkf
 import { AppointmentSidebar } from "./bookings/components/AppointmentSidebar";
 import { Appointment } from "./bookings/types";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
+import { toast } from "sonner";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -36,13 +37,13 @@ export default function AdminBookings() {
   } | null>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } = useCalendarState();
-  const { data: services } = useActiveServices();
-  const { data: packages } = useActivePackages();
-  const { data: appointments = [] } = useAppointmentsByDate(currentDate);
+  const { data: services, isLoading: servicesLoading } = useActiveServices();
+  const { data: packages, isLoading: packagesLoading } = useActivePackages();
+  const { data: appointments = [], isLoading: appointmentsLoading } = useAppointmentsByDate(currentDate);
 
   const handleCheckoutFromAppointment = (appointment: Appointment) => {
     // Implementation will be handled by the AppointmentWorkflowProvider
@@ -132,6 +133,12 @@ export default function AdminBookings() {
     handleColumnClick: () => {},
     renderAppointmentBlock: () => <></>
   };
+
+  const isDataLoading = servicesLoading || packagesLoading || appointmentsLoading;
+
+  if (isDataLoading) {
+    return <div className="h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <AppointmentWorkflowProvider services={services} packages={packages}>

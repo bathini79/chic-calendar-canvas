@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { ServiceSelector } from './ServiceSelector';
 import { useAppointmentWorkflow } from '../context/AppointmentWorkflowContext';
+import { toast } from 'sonner';
 
 interface ServiceSelectionScreenProps {
   employees: any[];
@@ -21,8 +22,33 @@ export const ServiceSelectionScreen: React.FC<ServiceSelectionScreenProps> = ({
     handleProceedToCheckout,
     handleCustomServiceToggle,
     customizedServices,
-    handleSaveAppointment
+    handleSaveAppointment,
+    selectedCustomer
   } = useAppointmentWorkflow();
+
+  const handleProceed = () => {
+    if (!selectedCustomer) {
+      toast.error("Please select a customer");
+      return;
+    }
+
+    if (selectedServices.length === 0 && selectedPackages.length === 0) {
+      toast.error("Please select at least one service or package");
+      return;
+    }
+
+    // Check if all selected services and packages have stylists assigned
+    const isAllStylistsSelected = [...selectedServices, ...selectedPackages].every(
+      itemId => !!selectedStylists[itemId]
+    );
+
+    if (!isAllStylistsSelected) {
+      toast.error("Please select a stylist for each service/package");
+      return;
+    }
+
+    handleProceedToCheckout();
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -50,7 +76,7 @@ export const ServiceSelectionScreen: React.FC<ServiceSelectionScreenProps> = ({
         </Button>
         <Button
           className="bg-black text-white"
-          onClick={handleProceedToCheckout}
+          onClick={handleProceed}
         >
           Checkout
         </Button>

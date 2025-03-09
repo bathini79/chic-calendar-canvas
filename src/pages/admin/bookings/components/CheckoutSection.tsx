@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -246,12 +247,16 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         toast.error("Please select a customer");
         return;
       }
+      
+      console.log("Starting payment process");
       const savedAppointmentId = await handleSaveAppointment();
+      
       if (!savedAppointmentId) {
         toast.error("Failed to complete payment");
         return;
       }
 
+      console.log("Payment completed successfully with ID:", savedAppointmentId);
       toast.success("Payment completed successfully");
       handlePaymentComplete(savedAppointmentId);
     } catch (error: any) {

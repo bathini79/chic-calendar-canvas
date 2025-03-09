@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { SCREEN } from '../types';
 import { useAppointmentWorkflow } from '../context/AppointmentWorkflowContext';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface AppointmentSidebarProps {
   employees: any[];
@@ -33,6 +34,17 @@ export const AppointmentSidebar: React.FC<AppointmentSidebarProps> = ({
     setCurrentScreen,
     setNewAppointmentId
   } = useAppointmentWorkflow();
+
+  // Monitor state changes for debugging
+  React.useEffect(() => {
+    console.log('Current screen:', currentScreen);
+    console.log('New appointment ID:', newAppointmentId);
+  }, [currentScreen, newAppointmentId]);
+
+  const handleCreateNewAppointment = () => {
+    setCurrentScreen(SCREEN.SERVICE_SELECTION);
+    setNewAppointmentId(null);
+  };
 
   return (
     <div
@@ -91,10 +103,7 @@ export const AppointmentSidebar: React.FC<AppointmentSidebarProps> = ({
                 />
                 <div className="mt-6 flex justify-end">
                   <Button
-                    onClick={() => {
-                      setCurrentScreen(SCREEN.SERVICE_SELECTION);
-                      setNewAppointmentId(null);
-                    }}
+                    onClick={handleCreateNewAppointment}
                   >
                     Create New Appointment
                   </Button>

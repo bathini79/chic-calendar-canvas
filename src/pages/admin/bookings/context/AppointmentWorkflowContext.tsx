@@ -1,9 +1,9 @@
-
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 import { useAppointmentState } from '../hooks/useAppointmentState';
 import { SCREEN, Customer, Service, Package } from '../types';
 import { getTotalPrice, getTotalDuration } from '../utils/bookingUtils';
 import useSaveAppointment from '../hooks/useSaveAppointment';
+import { toast } from 'sonner';
 
 interface AppointmentWorkflowContextType {
   // State from useAppointmentState
@@ -113,7 +113,13 @@ export const AppointmentWorkflowProvider: React.FC<AppointmentWorkflowProviderPr
     resetState
   } = appointmentState;
 
-  const { handleSaveAppointment: saveAppointment } = useSaveAppointment({
+  useEffect(() => {
+    console.log("WorkflowContext - Current Screen:", currentScreen);
+    console.log("WorkflowContext - Selected Services:", selectedServices);
+    console.log("WorkflowContext - Selected Packages:", selectedPackages);
+  }, [currentScreen, selectedServices, selectedPackages]);
+
+  const { handleSaveAppointment: saveAppointment, isSaving } = useSaveAppointment({
     selectedDate,
     selectedTime,
     selectedCustomer,
@@ -141,11 +147,13 @@ export const AppointmentWorkflowProvider: React.FC<AppointmentWorkflowProviderPr
   };
 
   const handlePackageSelect = (packageId: string, serviceIds?: string[]) => {
-    setSelectedPackages((prev) =>
-      prev.includes(packageId)
-        ? prev.filter((id) => id !== packageId)
-        : [...prev, packageId]
-    );
+    setSelectedPackages((prev) => {
+      if (prev.includes(packageId)) {
+        return prev.filter((id) => id !== packageId);
+      } else {
+        return [...prev, packageId];
+      }
+    });
   };
 
   const handleStylistSelect = (itemId: string, stylistId: string) => {
@@ -158,11 +166,13 @@ export const AppointmentWorkflowProvider: React.FC<AppointmentWorkflowProviderPr
   const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
     const pkg = packages?.find((p) => p.id === packageId);
     if (!pkg) return;
+    
     setCustomizedServices((prev) => {
       const currentServices = prev[packageId] || [];
       const newServices = currentServices.includes(serviceId)
         ? currentServices.filter((id) => id !== serviceId)
         : [...currentServices, serviceId];
+      
       return {
         ...prev,
         [packageId]: newServices,
@@ -172,11 +182,16 @@ export const AppointmentWorkflowProvider: React.FC<AppointmentWorkflowProviderPr
 
   const handleProceedToCheckout = () => {
     if (!selectedCustomer) {
+      toast.error("Please select a customer");
       return;
     }
+    
     if (selectedServices.length === 0 && selectedPackages.length === 0) {
+      toast.error("Please select at least one service or package");
       return;
     }
+    
+    console.log("Proceeding to checkout");
     setCurrentScreen(SCREEN.CHECKOUT);
   };
 
@@ -185,9 +200,9 @@ export const AppointmentWorkflowProvider: React.FC<AppointmentWorkflowProviderPr
   };
 
   const handlePaymentComplete = (appointmentId?: string) => {
+    console.log("Payment complete, appointment ID:", appointmentId);
     setNewAppointmentId(appointmentId || null);
     setCurrentScreen(SCREEN.SUMMARY);
-    resetState();
   };
 
   const handleCloseAppointment = () => {
@@ -198,7 +213,23 @@ export const AppointmentWorkflowProvider: React.FC<AppointmentWorkflowProviderPr
   };
 
   const handleSaveAppointment = async () => {
-    return await saveAppointment();
+    try {
+      if (isSaving) {
+        toast.info("Already saving...");
+        return null;
+      }
+      
+      const appointmentId = await saveAppointment();
+      if (appointmentId) {
+        toast.success("Appointment saved successfully");
+        handlePaymentComplete(appointmentId);
+      }
+      return appointmentId;
+    } catch (error) {
+      console.error("Error saving appointment:", error);
+      toast.error("Failed to save appointment");
+      return null;
+    }
   };
 
   const handleRemoveService = (serviceId: string) => {
