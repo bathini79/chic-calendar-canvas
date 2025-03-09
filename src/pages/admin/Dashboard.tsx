@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
 import { 
@@ -108,6 +107,11 @@ export default function AdminDashboard() {
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [appointmentTime, setAppointmentTime] = useState("");
   const [employees, setEmployees] = useState([]);
+  const [lowStockItems, setLowStockItems] = useState({
+    count: 0,
+    criticalCount: 0,
+    totalItems: 0
+  });
 
   const today = new Date();
   const { data: todayAppointmentsData = [] } = useAppointmentsByDate(today);
@@ -115,6 +119,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchDashboardData();
     fetchEmployees();
+    fetchLowStockItems();
   }, [timeRange]);
 
   const fetchEmployees = async () => {
@@ -135,6 +140,28 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("Error fetching employees:", error);
       setEmployees([]);
+    }
+  };
+
+  const fetchLowStockItems = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("inventory_items")
+        .select("id, quantity, minimum_quantity");
+      
+      if (error) throw error;
+
+      const totalItems = data.length;
+      const lowStockCount = data.filter(item => item.quantity <= item.minimum_quantity).length;
+      const criticalCount = data.filter(item => item.quantity <= item.minimum_quantity * 0.5).length;
+      
+      setLowStockItems({
+        count: lowStockCount,
+        criticalCount,
+        totalItems
+      });
+    } catch (error) {
+      console.error("Error fetching low stock items:", error);
     }
   };
 
@@ -794,6 +821,29 @@ export default function AdminDashboard() {
     <div className="p-8 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
       
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="shadow-sm">
+          <CardContent className="p-4">
+            <h3 className="font-medium mb-2 text-gray-500">Total Inventory Items</h3>
+            <p className="text-2xl font-bold">{lowStockItems.totalItems}</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-sm">
+          <CardContent className="p-4">
+            <h3 className="font-medium mb-2 text-gray-500">Low Stock Items</h3>
+            <p className="text-2xl font-bold text-yellow-500">{lowStockItems.count}</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-sm">
+          <CardContent className="p-4">
+            <h3 className="font-medium mb-2 text-gray-500">Critical Stock Items</h3>
+            <p className="text-2xl font-bold text-red-500">{lowStockItems.criticalCount}</p>
+          </CardContent>
+        </Card>
+      </div>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="flex justify-between items-start">
@@ -860,7 +910,7 @@ export default function AdminDashboard() {
               </div>
             </div>
             
-            <div className="h-[200px] mt-6">
+            <div className="h-[300px] mt-6">
               {revenueData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -910,7 +960,7 @@ export default function AdminDashboard() {
       </div>
       
       <div className="grid grid-cols-1 gap-6">
-        <Card>
+        <Card className="w-full shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Today's next appointments</CardTitle>
             <CardDescription>

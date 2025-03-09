@@ -52,12 +52,12 @@ export function StatsPanel({
 
       {chartData.length > 0 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-2">
             <CardTitle className="text-lg">Upcoming appointments</CardTitle>
             <CardDescription>Next 7 days</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-6">
+            <div className="mb-4">
               <h2 className="text-3xl font-bold">{totalBooked} booked</h2>
               <div className="mt-2 space-y-1">
                 <p className="text-sm text-gray-500">Confirmed appointments <span className="font-semibold">{confirmedCount}</span></p>
@@ -66,7 +66,7 @@ export function StatsPanel({
               </div>
             </div>
             
-            <div className="h-[250px]">
+            <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={chartData}

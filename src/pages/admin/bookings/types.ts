@@ -72,6 +72,7 @@ export interface Booking {
         name: string;
         duration: number;
         selling_price?: number;
+        package_selling_price?: number;
       }
     }[];
     package_selling_price?: number;
@@ -173,6 +174,7 @@ export interface Package {
       name: string;
       duration: number;
       selling_price?: number;
+      package_selling_price?: number;
     }
   }[];
   [key: string]: any;
