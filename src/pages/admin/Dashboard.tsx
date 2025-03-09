@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
 import { 
@@ -67,7 +68,9 @@ export default function AdminDashboard() {
   const [revenueData, setRevenueData] = useState([]);
   const [appointmentsStats, setAppointmentsStats] = useState({
     count: 0,
-    value: 0
+    value: 0,
+    completed: 0,
+    completedValue: 0
   });
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
@@ -187,6 +190,8 @@ export default function AdminDashboard() {
 
       const groupedData = {};
       let total = 0;
+      let completedTotal = 0;
+      let completedCount = 0;
 
       data.forEach(appointment => {
         let date;
@@ -208,6 +213,12 @@ export default function AdminDashboard() {
         groupedData[date].sales += appointment.total_price || 0;
         groupedData[date].appointments += 1;
         total += appointment.total_price || 0;
+        
+        // Count completed appointments separately
+        if (appointment.status === 'completed') {
+          completedTotal += appointment.total_price || 0;
+          completedCount += 1;
+        }
       });
 
       const chartData = Object.values(groupedData);
@@ -216,7 +227,9 @@ export default function AdminDashboard() {
       
       setAppointmentsStats({
         count: data.length,
-        value: data.reduce((sum, app) => sum + (app.total_price || 0), 0)
+        value: data.reduce((sum, app) => sum + (app.total_price || 0), 0),
+        completed: completedCount,
+        completedValue: completedTotal
       });
     } catch (error) {
       console.error("Error fetching revenue data:", error);
@@ -612,7 +625,7 @@ export default function AdminDashboard() {
         customerCount[a.customer_id] = (customerCount[a.customer_id] || 0) + 1;
       });
       
-      const currentReturningCustomers = Object.values(customerCount).filter(count => count > 1).length;
+      const currentReturningCustomers = Object.values(customerCount).filter(count => Number(count) > 1).length;
       const currentReturningRate = (currentReturningCustomers / currentTotalCustomers) * 100;
       
       // Do the same for comparison period
@@ -624,7 +637,7 @@ export default function AdminDashboard() {
         comparisonCustomerCount[a.customer_id] = (comparisonCustomerCount[a.customer_id] || 0) + 1;
       });
       
-      const comparisonReturningCustomers = Object.values(comparisonCustomerCount).filter(count => count > 1).length;
+      const comparisonReturningCustomers = Object.values(comparisonCustomerCount).filter(count => Number(count) > 1).length;
       const comparisonReturningRate = (comparisonReturningCustomers / comparisonTotalCustomers) * 100;
       
       const returningRateChange = currentReturningRate - comparisonReturningRate;
@@ -804,31 +817,63 @@ export default function AdminDashboard() {
             </Select>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="text-3xl font-bold text-indigo-700">₹{totalRevenue.toFixed(2)}</div>
-              <div className="text-sm text-gray-600">
-                <div className="flex justify-between items-center">
-                  <span>Appointments</span>
-                  <span className="font-medium">{appointmentsStats.count}</span>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="text-sm text-gray-500 mb-1">Completed Value</div>
+                  <div className="text-xl font-bold text-green-600">₹{appointmentsStats.completedValue.toFixed(2)}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {appointmentsStats.completed} appointments
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span>Appointments value</span>
-                  <span className="font-medium">₹{appointmentsStats.value.toFixed(2)}</span>
+                
+                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="text-sm text-gray-500 mb-1">Appointment Value</div>
+                  <div className="text-xl font-bold text-blue-600">₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {appointmentsStats.count - appointmentsStats.completed} appointments
+                  </div>
                 </div>
               </div>
-              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.revenueChange) < 0 ? 'text-red-500' : 'text-green-500'} font-medium`}>
-                {parseFloat(businessMetrics.revenueChange) < 0 ? (
-                  <TrendingDown className="h-4 w-4 mr-1" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                )}
-                {parseFloat(businessMetrics.revenueChange) < 0 ? 
-                  businessMetrics.revenueChange : 
-                  `+${businessMetrics.revenueChange}`}% {getComparisonLabel()}
+              
+              <div className="grid grid-cols-2 gap-4 my-6">
+                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-medium text-gray-600">Occupancy Rate</div>
+                    <Percent className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-indigo-700">{businessMetrics.occupancyRate}%</div>
+                  <div className={`text-sm flex items-center mt-1 ${parseFloat(businessMetrics.occupancyChange) < 0 ? 'text-red-500' : 'text-green-500'} font-medium`}>
+                    {parseFloat(businessMetrics.occupancyChange) < 0 ? (
+                      <TrendingDown className="h-3 w-3 mr-1" />
+                    ) : (
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                    )}
+                    {parseFloat(businessMetrics.occupancyChange) < 0 ? businessMetrics.occupancyChange : `+${businessMetrics.occupancyChange}`}% {getComparisonLabel()}
+                  </div>
+                </div>
+                
+                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-medium text-gray-600">Returning Customer Rate</div>
+                    <User className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-indigo-700">{businessMetrics.returningCustomerRate}%</div>
+                  <div className={`text-sm flex items-center mt-1 ${parseFloat(businessMetrics.returningCustomerChange) < 0 ? 'text-red-500' : 'text-green-500'} font-medium`}>
+                    {parseFloat(businessMetrics.returningCustomerChange) < 0 ? (
+                      <TrendingDown className="h-3 w-3 mr-1" />
+                    ) : (
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                    )}
+                    {parseFloat(businessMetrics.returningCustomerChange) < 0 ? businessMetrics.returningCustomerChange : `+${businessMetrics.returningCustomerChange}`}% {getComparisonLabel()}
+                  </div>
+                </div>
               </div>
             </div>
             
-            <div className="h-[200px] mt-4">
+            <div className="h-[200px] mt-6">
               {revenueData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -843,14 +888,14 @@ export default function AdminDashboard() {
                     <Line 
                       type="monotone" 
                       dataKey="sales" 
-                      stroke="#8884d8" 
+                      stroke="#6366f1" 
                       name="Sales" 
                       dot={{ r: 4 }}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="appointments" 
-                      stroke="#82ca9d" 
+                      stroke="#10b981" 
                       name="Appointments"
                       dot={{ r: 4 }}
                     />
@@ -1008,62 +1053,6 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
-      
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Business Performance</h2>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
-          <Card className="bg-gradient-to-br from-indigo-50 to-white border-indigo-200">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Percent className="h-5 w-5 text-indigo-500" />
-                  <span className="text-sm font-medium text-indigo-700">Occupancy Rate</span>
-                </div>
-                <Button variant="ghost" size="icon" className="text-indigo-700" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-2 text-indigo-800">
-                {businessMetrics.occupancyRate}%
-              </div>
-              <div className={`text-sm flex items-center font-medium ${parseFloat(businessMetrics.occupancyChange) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {parseFloat(businessMetrics.occupancyChange) < 0 ? (
-                  <TrendingDown className="h-4 w-4 mr-1" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                )}
-                {parseFloat(businessMetrics.occupancyChange) < 0 ? businessMetrics.occupancyChange : `+${businessMetrics.occupancyChange}`}% {getComparisonLabel()}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <User className="h-5 w-5 text-purple-500" />
-                  <span className="text-sm font-medium text-purple-700">Returning Customer Rate</span>
-                </div>
-                <Button variant="ghost" size="icon" className="text-purple-700" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-2 text-purple-800">
-                {businessMetrics.returningCustomerRate}%
-              </div>
-              <div className={`text-sm flex items-center font-medium ${parseFloat(businessMetrics.returningCustomerChange) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? (
-                  <TrendingDown className="h-4 w-4 mr-1" />
-                ) : (
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                )}
-                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? businessMetrics.returningCustomerChange : `+${businessMetrics.returningCustomerChange}`}% {getComparisonLabel()}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
       
       <AppointmentDetailsDialog 

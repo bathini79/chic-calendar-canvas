@@ -19,7 +19,11 @@ export type RefundReason =
   | 'service_unavailable' 
   | 'customer_no_show' 
   | 'customer_emergency' 
-  | 'other';
+  | 'other'
+  | 'service_quality_issue'
+  | 'scheduling_error'
+  | 'health_concern'
+  | 'price_dispute';
 
 export enum SCREEN {
   SERVICE_SELECTION = "SERVICE_SELECTION",
@@ -67,8 +71,10 @@ export interface Booking {
         id: string;
         name: string;
         duration: number;
+        selling_price?: number;
       }
     }[];
+    package_selling_price?: number;
     [key: string]: any;
   };
   employee?: {
@@ -160,11 +166,13 @@ export interface Package {
   duration?: number;
   description?: string;
   status?: string;
+  package_selling_price?: number;
   package_services?: {
     service: {
       id: string;
       name: string;
       duration: number;
+      selling_price?: number;
     }
   }[];
   [key: string]: any;
@@ -174,6 +182,7 @@ export interface RefundData {
   reason: RefundReason;
   notes?: string;
   amount?: number;
+  refundedBy?: string;
 }
 
 export interface TransactionDetails {
@@ -182,5 +191,7 @@ export interface TransactionDetails {
   status: string;
   created_at: string;
   payment_method?: string;
+  originalSale?: any;
+  refunds?: any[];
   [key: string]: any;
 }
