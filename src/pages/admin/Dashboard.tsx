@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
 import { 
   Card, 
@@ -821,18 +822,9 @@ export default function AdminDashboard() {
     <div className="p-8 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="shadow-sm">
-          <CardContent className="p-4">
-            <h3 className="font-medium mb-2 text-gray-500">Low Stock Items</h3>
-            <p className="text-2xl font-bold text-yellow-500">{lowStockItems.count}</p>
-          </CardContent>
-        </Card>
-      </div>
-      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex justify-between items-start">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle className="text-lg">Recent sales</CardTitle>
               <CardDescription>{getTimeRangeLabel()}</CardDescription>
@@ -854,13 +846,12 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              <div className="text-3xl font-bold text-indigo-700">₹{appointmentsStats.completedValue.toFixed(2)}</div>
-                <span>
-                  <div className="text-xl font-bold">Appointment Value:  ₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {appointmentsStats.count - appointmentsStats.completed} appointments
-                  </div>
-                </span>              
+              <div className="text-3xl font-bold text-gray-900">₹{appointmentsStats.completedValue.toFixed(2)}</div>
+              <div>
+                <div className="text-sm text-gray-500">Appointments {appointmentsStats.count}</div>
+                <div className="text-lg font-semibold">Appointments value ₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
+              </div>
+              
               <div className="grid grid-cols-2 gap-4 my-6">
                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                   <div className="flex items-center justify-between mb-2">
@@ -911,14 +902,14 @@ export default function AdminDashboard() {
                     <Line 
                       type="monotone" 
                       dataKey="sales" 
-                      stroke="#6366f1" 
+                      stroke="#8884d8" 
                       name="Sales" 
                       dot={{ r: 4 }}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="appointments" 
-                      stroke="#10b981" 
+                      stroke="#82ca9d" 
                       name="Appointments"
                       dot={{ r: 4 }}
                     />
@@ -945,13 +936,66 @@ export default function AdminDashboard() {
         </React.Suspense>
       </div>
       
-      <div className="grid grid-cols-1 gap-6">
-        <Card className="w-full shadow-sm">
-          <CardHeader>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg">Appointments activity</CardTitle>
+            <MoreHorizontal className="h-5 w-5 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px] pr-4">
+              {appointmentsActivity.length > 0 ? (
+                <div className="space-y-4">
+                  {appointmentsActivity.slice(0, 5).map((appointment) => {
+                    const mainBooking = appointment.bookings[0];
+                    const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
+                    const price = mainBooking?.price_paid || appointment.total_price || 0;
+                    const stylist = mainBooking?.employee?.name;
+                    const appointmentDate = new Date(appointment.start_time);
+                    
+                    return (
+                      <div 
+                        key={appointment.id} 
+                        className="flex items-start hover:bg-gray-50 p-2 rounded cursor-pointer transition-colors"
+                        onClick={() => handleAppointmentClick(appointment)}
+                      >
+                        <div className="mr-4 text-center">
+                          <div className="text-sm text-gray-500">{format(appointmentDate, "MMM")}</div>
+                          <div className="font-bold text-lg">{format(appointmentDate, "dd")}</div>
+                        </div>
+                        <div className="flex flex-1 justify-between">
+                          <div>
+                            <div className="font-medium">{serviceName}</div>
+                            <div className="text-sm text-gray-500">
+                              {appointment.customer?.full_name} {stylist && `with ${stylist}`}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold">₹{price.toFixed(2)}</div>
+                            <div className="mt-1">{formatAppointmentStatus(appointment.status)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Calendar className="w-12 h-12 mb-4 text-gray-300" />
+                  <h3 className="text-lg font-semibold mb-2">No Activity</h3>
+                  <p className="text-sm text-gray-500 text-center">
+                    No appointment activity found
+                  </p>
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg">Today's next appointments</CardTitle>
-            <CardDescription>
-              Total: {todayAppointmentsData.length} appointments
-            </CardDescription>
+            <MoreHorizontal className="h-5 w-5 text-gray-400" />
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[300px] pr-4">
@@ -1078,6 +1122,37 @@ export default function AdminDashboard() {
         </Card>
       </div>
       
+      <div className="mt-6">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg">Inventory Status</CardTitle>
+            <Link to="/admin/inventory" className="text-sm text-blue-600 hover:underline flex items-center">
+              View Inventory <ChevronRight className="h-4 w-4 ml-1" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-card p-4 rounded-lg border">
+                <h3 className="font-medium mb-2 text-gray-500">Total Items</h3>
+                <p className="text-2xl font-bold">{lowStockItems.totalItems || 0}</p>
+              </div>
+              <div className="bg-card p-4 rounded-lg border">
+                <h3 className="font-medium mb-2 text-gray-500">Low Stock Items</h3>
+                <Link to="/admin/inventory" className="text-2xl font-bold text-yellow-500 hover:text-yellow-600">
+                  {lowStockItems.count || 0}
+                </Link>
+              </div>
+              <div className="bg-card p-4 rounded-lg border">
+                <h3 className="font-medium mb-2 text-gray-500">Critical Stock</h3>
+                <Link to="/admin/inventory" className="text-2xl font-bold text-red-500 hover:text-red-600">
+                  {lowStockItems.criticalCount || 0}
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
       <AppointmentDetailsDialog 
         appointment={selectedAppointment}
         open={isDetailsDialogOpen}
@@ -1102,3 +1177,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
