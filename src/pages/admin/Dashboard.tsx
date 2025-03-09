@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
 import { 
@@ -61,7 +60,6 @@ import { AppointmentManager } from "./bookings/components/AppointmentManager";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import { formatPrice } from "@/lib/utils";
 
-// Lazy load components for better performance
 const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
 
 export default function AdminDashboard() {
@@ -107,7 +105,7 @@ export default function AdminDashboard() {
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [appointmentTime, setAppointmentTime] = useState("");
   const [employees, setEmployees] = useState([]);
-  
+
   const today = new Date();
   const { data: todayAppointmentsData = [] } = useAppointmentsByDate(today);
 
@@ -193,7 +191,6 @@ export default function AdminDashboard() {
       data.forEach(appointment => {
         let date;
         if (timeRange === "today") {
-          // For today, group by hour
           date = format(new Date(appointment.created_at), "HH:mm");
         } else if (timeRange === "week") {
           date = format(new Date(appointment.created_at), "EEE");
@@ -591,28 +588,43 @@ export default function AdminDashboard() {
       // Calculate returning customer rate
       const { data: currentCustomerData, error: currentCustError } = await supabase
         .from("appointments")
-        .select("customer_id, count(*)")
+        .select("customer_id")
         .gte("created_at", startDate.toISOString())
-        .lte("created_at", endOfDay(today).toISOString())
-        .group("customer_id");
+        .lte("created_at", endOfDay(today).toISOString());
       
       if (currentCustError) throw currentCustError;
       
       const { data: comparisonCustomerData, error: compCustError } = await supabase
         .from("appointments")
-        .select("customer_id, count(*)")
+        .select("customer_id")
         .gte("created_at", comparisonStartDate.toISOString())
-        .lte("created_at", comparisonEndDate.toISOString())
-        .group("customer_id");
+        .lte("created_at", comparisonEndDate.toISOString());
       
       if (compCustError) throw compCustError;
       
-      const currentReturningCustomers = currentCustomerData?.filter(c => c.count > 1).length || 0;
-      const currentTotalCustomers = currentCustomerData?.length || 1;
+      // Count unique customers
+      const currentUniqueCustomers = new Set(currentCustomerData?.map(a => a.customer_id) || []);
+      const currentTotalCustomers = currentUniqueCustomers.size || 1;
+      
+      // Count repeat customers (those who have multiple appointments)
+      const customerCount = {};
+      currentCustomerData?.forEach(a => {
+        customerCount[a.customer_id] = (customerCount[a.customer_id] || 0) + 1;
+      });
+      
+      const currentReturningCustomers = Object.values(customerCount).filter(count => count > 1).length;
       const currentReturningRate = (currentReturningCustomers / currentTotalCustomers) * 100;
       
-      const comparisonReturningCustomers = comparisonCustomerData?.filter(c => c.count > 1).length || 0;
-      const comparisonTotalCustomers = comparisonCustomerData?.length || 1;
+      // Do the same for comparison period
+      const comparisonUniqueCustomers = new Set(comparisonCustomerData?.map(a => a.customer_id) || []);
+      const comparisonTotalCustomers = comparisonUniqueCustomers.size || 1;
+      
+      const comparisonCustomerCount = {};
+      comparisonCustomerData?.forEach(a => {
+        comparisonCustomerCount[a.customer_id] = (comparisonCustomerCount[a.customer_id] || 0) + 1;
+      });
+      
+      const comparisonReturningCustomers = Object.values(comparisonCustomerCount).filter(count => count > 1).length;
       const comparisonReturningRate = (comparisonReturningCustomers / comparisonTotalCustomers) * 100;
       
       const returningRateChange = currentReturningRate - comparisonReturningRate;
@@ -792,13 +804,19 @@ export default function AdminDashboard() {
             </Select>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="text-3xl font-bold">₹{totalRevenue.toFixed(2)}</div>
-              <div className="text-sm text-gray-500">
-                Appointments {appointmentsStats.count}<br />
-                Appointments value ₹{appointmentsStats.value.toFixed(2)}
+            <div className="space-y-4">
+              <div className="text-3xl font-bold text-indigo-700">₹{totalRevenue.toFixed(2)}</div>
+              <div className="text-sm text-gray-600">
+                <div className="flex justify-between items-center">
+                  <span>Appointments</span>
+                  <span className="font-medium">{appointmentsStats.count}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Appointments value</span>
+                  <span className="font-medium">₹{appointmentsStats.value.toFixed(2)}</span>
+                </div>
               </div>
-              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.revenueChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.revenueChange) < 0 ? 'text-red-500' : 'text-green-500'} font-medium`}>
                 {parseFloat(businessMetrics.revenueChange) < 0 ? (
                   <TrendingDown className="h-4 w-4 mr-1" />
                 ) : (
@@ -996,21 +1014,21 @@ export default function AdminDashboard() {
         <h2 className="text-xl font-semibold">Business Performance</h2>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
-          <Card>
+          <Card className="bg-gradient-to-br from-indigo-50 to-white border-indigo-200">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2">
-                  <Percent className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Occupancy Rate</span>
+                  <Percent className="h-5 w-5 text-indigo-500" />
+                  <span className="text-sm font-medium text-indigo-700">Occupancy Rate</span>
                 </div>
-                <Button variant="ghost" size="icon" asChild>
+                <Button variant="ghost" size="icon" className="text-indigo-700" asChild>
                   <a href="#"><Info className="h-4 w-4" /></a>
                 </Button>
               </div>
-              <div className="text-3xl font-bold mb-2">
+              <div className="text-3xl font-bold mb-2 text-indigo-800">
                 {businessMetrics.occupancyRate}%
               </div>
-              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.occupancyChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+              <div className={`text-sm flex items-center font-medium ${parseFloat(businessMetrics.occupancyChange) < 0 ? 'text-red-600' : 'text-green-600'}`}>
                 {parseFloat(businessMetrics.occupancyChange) < 0 ? (
                   <TrendingDown className="h-4 w-4 mr-1" />
                 ) : (
@@ -1021,21 +1039,21 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Returning Customer Rate</span>
+                  <User className="h-5 w-5 text-purple-500" />
+                  <span className="text-sm font-medium text-purple-700">Returning Customer Rate</span>
                 </div>
-                <Button variant="ghost" size="icon" asChild>
+                <Button variant="ghost" size="icon" className="text-purple-700" asChild>
                   <a href="#"><Info className="h-4 w-4" /></a>
                 </Button>
               </div>
-              <div className="text-3xl font-bold mb-2">
+              <div className="text-3xl font-bold mb-2 text-purple-800">
                 {businessMetrics.returningCustomerRate}%
               </div>
-              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.returningCustomerChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+              <div className={`text-sm flex items-center font-medium ${parseFloat(businessMetrics.returningCustomerChange) < 0 ? 'text-red-600' : 'text-green-600'}`}>
                 {parseFloat(businessMetrics.returningCustomerChange) < 0 ? (
                   <TrendingDown className="h-4 w-4 mr-1" />
                 ) : (

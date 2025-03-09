@@ -117,3 +117,70 @@ export interface Appointment {
   };
   bookings: Booking[];
 }
+
+// Add missing types that were causing build errors
+export interface Customer {
+  id: string;
+  full_name?: string;
+  email?: string;
+  phone_number?: string;
+  role?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: any;
+}
+
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  photo_url?: string;
+  employment_type: 'stylist' | 'admin';
+  status?: string;
+  [key: string]: any;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  selling_price: number;
+  duration: number;
+  description?: string;
+  category_id?: string;
+  status?: string;
+  image_urls?: string[];
+  [key: string]: any;
+}
+
+export interface Package {
+  id: string;
+  name: string;
+  price: number;
+  duration?: number;
+  description?: string;
+  status?: string;
+  package_services?: {
+    service: {
+      id: string;
+      name: string;
+      duration: number;
+    }
+  }[];
+  [key: string]: any;
+}
+
+export interface RefundData {
+  reason: RefundReason;
+  notes?: string;
+  amount?: number;
+}
+
+export interface TransactionDetails {
+  id: string;
+  amount: number;
+  status: string;
+  created_at: string;
+  payment_method?: string;
+  [key: string]: any;
+}
