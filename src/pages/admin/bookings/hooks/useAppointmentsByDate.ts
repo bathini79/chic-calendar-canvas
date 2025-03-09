@@ -44,7 +44,8 @@ export const useAppointmentsByDate = (currentDate: Date) => {
           `
           )
           .gte("start_time", startOfDay.toISOString())
-          .lte("start_time", endOfDay.toISOString());
+          .lte("start_time", endOfDay.toISOString())
+          .order("start_time", { ascending: true });
 
         if (error) {
           console.error("Error fetching appointments:", error);

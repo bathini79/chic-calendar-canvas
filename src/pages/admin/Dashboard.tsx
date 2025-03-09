@@ -56,6 +56,8 @@ import { StatsPanel } from "./bookings/components/StatsPanel";
 import { Appointment } from "./bookings/types";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AppointmentManager } from "./bookings/components/AppointmentManager";
+import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 
 // Lazy load components for better performance
 const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
@@ -99,11 +101,40 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
+  const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
+  const [appointmentTime, setAppointmentTime] = useState("");
+  const [employees, setEmployees] = useState([]);
+  
+  const today = new Date();
+  const { data: todayAppointmentsData = [] } = useAppointmentsByDate(today);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchEmployees();
   }, [timeRange]);
+
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("employment_type", "stylist");
+      if (error) throw error;
+      const employeeWithAvatar = data.map((employee) => ({
+        ...employee,
+        avatar: employee.name
+          .split(" ")
+          .map((n) => n[0])
+          .join(""),
+      }));
+      setEmployees(employeeWithAvatar);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      setEmployees([]);
+    }
+  };
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
@@ -261,33 +292,7 @@ export default function AdminDashboard() {
 
   const fetchTodayAppointments = async () => {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const { data, error } = await supabase
-        .from("appointments")
-        .select(`
-          id, 
-          start_time, 
-          end_time, 
-          status,
-          total_price,
-          customer:profiles (id, full_name),
-          bookings (
-            id,
-            service:services (id, name, duration),
-            package:packages (id, name),
-            employee:employees (id, name)
-          )
-        `)
-        .gte("start_time", today.toISOString())
-        .lt("start_time", tomorrow.toISOString())
-        .order("start_time", { ascending: true });
-
-      if (error) throw error;
-      setTodayAppointments(data || []);
+      setTodayAppointments(todayAppointmentsData || []);
     } catch (error) {
       console.error("Error fetching today's appointments:", error);
     }
@@ -527,7 +532,23 @@ export default function AdminDashboard() {
 
   const handleAppointmentClick = (appointment) => {
     setSelectedAppointment(appointment);
-    setDetailsDialogOpen(true);
+    setIsDetailsDialogOpen(true);
+  };
+
+  const handleCheckoutFromAppointment = (appointment) => {
+    setSelectedAppointment(appointment);
+    
+    const startDate = new Date(appointment.start_time);
+    setAppointmentDate(startDate);
+    setAppointmentTime(format(startDate, 'HH:mm'));
+    
+    setIsDetailsDialogOpen(false);
+    setIsAddAppointmentOpen(true);
+  };
+
+  const closeAppointmentManager = () => {
+    setIsAddAppointmentOpen(false);
+    setSelectedAppointment(null);
   };
 
   const getTimeRangeLabel = () => {
@@ -696,14 +717,14 @@ export default function AdminDashboard() {
           <CardHeader>
             <CardTitle className="text-lg">Today's next appointments</CardTitle>
             <CardDescription>
-              Total: {todayAppointments.length} appointments
+              Total: {todayAppointmentsData.length} appointments
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[300px] pr-4">
-              {todayAppointments.length > 0 ? (
+              {todayAppointmentsData.length > 0 ? (
                 <div className="space-y-4">
-                  {todayAppointments.map((appointment) => {
+                  {todayAppointmentsData.map((appointment) => {
                     const mainBooking = appointment.bookings[0];
                     const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
                     const price = mainBooking?.price_paid || appointment.total_price || 0;
@@ -1037,10 +1058,25 @@ export default function AdminDashboard() {
       
       <AppointmentDetailsDialog 
         appointment={selectedAppointment}
-        open={detailsDialogOpen}
-        onOpenChange={setDetailsDialogOpen}
+        open={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
         onUpdated={fetchTodayAppointments}
+        onCheckout={handleCheckoutFromAppointment}
+        onEdit={() => {
+          handleCheckoutFromAppointment(selectedAppointment as Appointment);
+        }}
       />
+
+      {isAddAppointmentOpen && appointmentDate && (
+        <AppointmentManager
+          isOpen={isAddAppointmentOpen}
+          onClose={closeAppointmentManager}
+          selectedDate={appointmentDate}
+          selectedTime={appointmentTime}
+          employees={employees}
+          existingAppointment={selectedAppointment}
+        />
+      )}
     </div>
   );
 }
