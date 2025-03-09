@@ -824,22 +824,8 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="shadow-sm">
           <CardContent className="p-4">
-            <h3 className="font-medium mb-2 text-gray-500">Total Inventory Items</h3>
-            <p className="text-2xl font-bold">{lowStockItems.totalItems}</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="shadow-sm">
-          <CardContent className="p-4">
             <h3 className="font-medium mb-2 text-gray-500">Low Stock Items</h3>
             <p className="text-2xl font-bold text-yellow-500">{lowStockItems.count}</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="shadow-sm">
-          <CardContent className="p-4">
-            <h3 className="font-medium mb-2 text-gray-500">Critical Stock Items</h3>
-            <p className="text-2xl font-bold text-red-500">{lowStockItems.criticalCount}</p>
           </CardContent>
         </Card>
       </div>
