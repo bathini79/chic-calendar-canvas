@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from "react";
-import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay } from "date-fns";
+import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
 import { 
   Card, 
   CardContent, 
@@ -64,7 +65,7 @@ import { formatPrice } from "@/lib/utils";
 const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
 
 export default function AdminDashboard() {
-  const [timeRange, setTimeRange] = useState("week");
+  const [timeRange, setTimeRange] = useState("today");
   const [revenueData, setRevenueData] = useState([]);
   const [appointmentsStats, setAppointmentsStats] = useState({
     count: 0,
@@ -161,6 +162,9 @@ export default function AdminDashboard() {
   const fetchRevenueData = async () => {
     let startDate;
     switch (timeRange) {
+      case "today":
+        startDate = startOfDay(today);
+        break;
       case "week":
         startDate = subDays(new Date(), 7);
         break;
@@ -171,7 +175,7 @@ export default function AdminDashboard() {
         startDate = subDays(new Date(), 365);
         break;
       default:
-        startDate = subDays(new Date(), 7);
+        startDate = startOfDay(today);
     }
 
     try {
@@ -187,7 +191,16 @@ export default function AdminDashboard() {
       let total = 0;
 
       data.forEach(appointment => {
-        const date = format(new Date(appointment.created_at), "MMM-dd");
+        let date;
+        if (timeRange === "today") {
+          // For today, group by hour
+          date = format(new Date(appointment.created_at), "HH:mm");
+        } else if (timeRange === "week") {
+          date = format(new Date(appointment.created_at), "EEE");
+        } else {
+          date = format(new Date(appointment.created_at), "MMM-dd");
+        }
+        
         if (!groupedData[date]) {
           groupedData[date] = {
             date,
@@ -214,6 +227,7 @@ export default function AdminDashboard() {
   };
 
   const fetchAppointmentsStats = async () => {
+    // Functionality moved to fetchRevenueData
   };
 
   const fetchUpcomingAppointments = async () => {
@@ -291,11 +305,8 @@ export default function AdminDashboard() {
   };
 
   const fetchTodayAppointments = async () => {
-    try {
-      setTodayAppointments(todayAppointmentsData || []);
-    } catch (error) {
-      console.error("Error fetching today's appointments:", error);
-    }
+    // Now using the useAppointmentsByDate hook which is already fetching data
+    // No need to duplicate the fetch here
   };
 
   const fetchAppointmentsActivity = async () => {
@@ -314,7 +325,7 @@ export default function AdminDashboard() {
             price_paid,
             service:services (id, name, duration),
             package:packages (id, name),
-            employee:employees (id, name)
+            employee:employees!bookings_employee_id_fkey (id, name)
           )
         `)
         .order("start_time", { ascending: false })
@@ -401,7 +412,7 @@ export default function AdminDashboard() {
         .from("bookings")
         .select(`
           price_paid,
-          employee:employees (id, name),
+          employee:employees!bookings_employee_id_fkey (id, name),
           created_at
         `)
         .gte("created_at", firstDayThisMonth.toISOString())
@@ -412,7 +423,7 @@ export default function AdminDashboard() {
         .from("bookings")
         .select(`
           price_paid,
-          employee:employees (id, name),
+          employee:employees!bookings_employee_id_fkey (id, name),
           created_at
         `)
         .gte("created_at", firstDayLastMonth.toISOString())
@@ -453,54 +464,190 @@ export default function AdminDashboard() {
 
   const fetchBusinessMetrics = async () => {
     try {
+      // Calculate revenue
       const revenue = totalRevenue;
       
-      const { data: allAppointments, error: appError } = await supabase
-        .from("appointments")
-        .select("*")
-        .gte("start_time", subDays(new Date(), 30).toISOString());
+      // Calculate occupancy rate
+      const startDate = getStartDateForTimeRange(timeRange);
+      const yesterday = subDays(today, 1);
+      const lastWeek = subDays(today, 7);
+      const lastMonth = subMonths(today, 1);
       
+      // Get available employees (stylists)
       const { data: employees, error: empError } = await supabase
         .from("employees")
         .select("*")
         .eq("employment_type", "stylist");
       
-      if (appError || empError) throw appError || empError;
+      if (empError) throw empError;
       
-      const possibleSlots = (employees?.length || 1) * 8 * 30; 
-      const occupancyRate = ((allAppointments?.length || 0) / possibleSlots) * 100;
+      // Get appointments for current period
+      const { data: currentAppointments, error: currentAppError } = await supabase
+        .from("appointments")
+        .select("*")
+        .gte("start_time", startDate.toISOString())
+        .lte("start_time", endOfDay(today).toISOString());
       
-      const { data: customerData, error: custError } = await supabase
+      if (currentAppError) throw currentAppError;
+      
+      // Get appointments for comparison period (yesterday, last week, or last month)
+      let comparisonStartDate, comparisonEndDate;
+      
+      if (timeRange === "today") {
+        comparisonStartDate = startOfDay(yesterday);
+        comparisonEndDate = endOfDay(yesterday);
+      } else if (timeRange === "week") {
+        comparisonStartDate = subDays(startDate, 7);
+        comparisonEndDate = subDays(endOfDay(today), 7);
+      } else if (timeRange === "month") {
+        comparisonStartDate = subMonths(startDate, 1);
+        comparisonEndDate = subMonths(endOfDay(today), 1);
+      } else {
+        comparisonStartDate = subYears(startDate, 1);
+        comparisonEndDate = subYears(endOfDay(today), 1);
+      }
+      
+      const { data: comparisonAppointments, error: compAppError } = await supabase
+        .from("appointments")
+        .select("*")
+        .gte("start_time", comparisonStartDate.toISOString())
+        .lte("start_time", comparisonEndDate.toISOString());
+      
+      if (compAppError) throw compAppError;
+      
+      // Calculate occupancy rates
+      const employeeCount = employees?.length || 1;
+      const workingHoursPerDay = 8; // Assuming 8 working hours per day
+      
+      let totalPossibleSlots;
+      let currentAppointmentHours = 0;
+      let comparisonAppointmentHours = 0;
+      
+      if (timeRange === "today") {
+        totalPossibleSlots = employeeCount * workingHoursPerDay;
+        
+        // Calculate actual hours booked
+        currentAppointments?.forEach(app => {
+          if (app.total_duration) {
+            currentAppointmentHours += app.total_duration / 60; // Convert minutes to hours
+          } else {
+            // Estimate 1 hour if duration not specified
+            currentAppointmentHours += 1;
+          }
+        });
+        
+        comparisonAppointments?.forEach(app => {
+          if (app.total_duration) {
+            comparisonAppointmentHours += app.total_duration / 60;
+          } else {
+            comparisonAppointmentHours += 1;
+          }
+        });
+      } else if (timeRange === "week") {
+        totalPossibleSlots = employeeCount * workingHoursPerDay * 7;
+        
+        currentAppointments?.forEach(app => {
+          if (app.total_duration) {
+            currentAppointmentHours += app.total_duration / 60;
+          } else {
+            currentAppointmentHours += 1;
+          }
+        });
+        
+        comparisonAppointments?.forEach(app => {
+          if (app.total_duration) {
+            comparisonAppointmentHours += app.total_duration / 60;
+          } else {
+            comparisonAppointmentHours += 1;
+          }
+        });
+      } else {
+        // Month or year
+        const daysInPeriod = timeRange === "month" ? 30 : 365;
+        totalPossibleSlots = employeeCount * workingHoursPerDay * daysInPeriod;
+        
+        currentAppointments?.forEach(app => {
+          if (app.total_duration) {
+            currentAppointmentHours += app.total_duration / 60;
+          } else {
+            currentAppointmentHours += 1;
+          }
+        });
+        
+        comparisonAppointments?.forEach(app => {
+          if (app.total_duration) {
+            comparisonAppointmentHours += app.total_duration / 60;
+          } else {
+            comparisonAppointmentHours += 1;
+          }
+        });
+      }
+      
+      const currentOccupancyRate = (currentAppointmentHours / totalPossibleSlots) * 100;
+      const comparisonOccupancyRate = (comparisonAppointmentHours / totalPossibleSlots) * 100;
+      
+      const occupancyRateChange = currentOccupancyRate - comparisonOccupancyRate;
+      
+      // Calculate returning customer rate
+      const { data: currentCustomerData, error: currentCustError } = await supabase
         .from("appointments")
         .select("customer_id, count(*)")
-        .gte("created_at", subDays(new Date(), 90).toISOString())
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endOfDay(today).toISOString())
         .group("customer_id");
       
-      if (custError) throw custError;
+      if (currentCustError) throw currentCustError;
       
-      const returningCustomers = customerData?.filter(c => c.count > 1).length || 0;
-      const totalCustomers = customerData?.length || 1;
-      const returningCustomerRate = (returningCustomers / totalCustomers) * 100;
+      const { data: comparisonCustomerData, error: compCustError } = await supabase
+        .from("appointments")
+        .select("customer_id, count(*)")
+        .gte("created_at", comparisonStartDate.toISOString())
+        .lte("created_at", comparisonEndDate.toISOString())
+        .group("customer_id");
       
-      const tips = 0.00;
+      if (compCustError) throw compCustError;
       
-      const revenueChange = -5.8;
-      const occupancyChange = -0.99;
-      const returningCustomerChange = 3.5;
-      const tipsChange = "--";
-
+      const currentReturningCustomers = currentCustomerData?.filter(c => c.count > 1).length || 0;
+      const currentTotalCustomers = currentCustomerData?.length || 1;
+      const currentReturningRate = (currentReturningCustomers / currentTotalCustomers) * 100;
+      
+      const comparisonReturningCustomers = comparisonCustomerData?.filter(c => c.count > 1).length || 0;
+      const comparisonTotalCustomers = comparisonCustomerData?.length || 1;
+      const comparisonReturningRate = (comparisonReturningCustomers / comparisonTotalCustomers) * 100;
+      
+      const returningRateChange = currentReturningRate - comparisonReturningRate;
+      
+      // Calculate revenue change
+      const comparisonRevenue = comparisonAppointments?.reduce((sum, app) => sum + (app.total_price || 0), 0) || 0;
+      const revenueChange = comparisonRevenue > 0 ? ((revenue - comparisonRevenue) / comparisonRevenue) * 100 : 0;
+      
       setBusinessMetrics({
         revenue: revenue.toFixed(2),
-        occupancyRate: occupancyRate.toFixed(2),
-        returningCustomerRate: returningCustomerRate.toFixed(2),
-        tips: tips.toFixed(2),
+        occupancyRate: currentOccupancyRate.toFixed(2),
+        returningCustomerRate: currentReturningRate.toFixed(2),
+        tips: "0.00", // Not implemented yet
         revenueChange: revenueChange.toFixed(2),
-        occupancyChange: occupancyChange.toFixed(2),
-        returningCustomerChange: returningCustomerChange.toFixed(2),
-        tipsChange: tipsChange
+        occupancyChange: occupancyRateChange.toFixed(2),
+        returningCustomerChange: returningRateChange.toFixed(2),
+        tipsChange: "--"
       });
     } catch (error) {
       console.error("Error calculating business metrics:", error);
+    }
+  };
+  
+  const getStartDateForTimeRange = (range) => {
+    switch (range) {
+      case "today":
+        return startOfDay(today);
+      case "week":
+        return subDays(today, 7);
+      case "month":
+        return subDays(today, 30);
+      case "year":
+        return subDays(today, 365);
+      default:
+        return startOfDay(today);
     }
   };
 
@@ -573,6 +720,8 @@ export default function AdminDashboard() {
 
   const getTimeRangeLabel = () => {
     switch (timeRange) {
+      case "today":
+        return "Today";
       case "week":
         return "Last 7 days";
       case "month":
@@ -580,7 +729,22 @@ export default function AdminDashboard() {
       case "year":
         return "Last 365 days";
       default:
-        return "Last 7 days";
+        return "Today";
+    }
+  };
+
+  const getComparisonLabel = () => {
+    switch (timeRange) {
+      case "today":
+        return "vs Yesterday";
+      case "week":
+        return "vs Last Week";
+      case "month":
+        return "vs Last Month";
+      case "year":
+        return "vs Last Year";
+      default:
+        return "vs Yesterday";
     }
   };
 
@@ -620,6 +784,7 @@ export default function AdminDashboard() {
                 <SelectValue placeholder="Select..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
                 <SelectItem value="week">Week</SelectItem>
                 <SelectItem value="month">Month</SelectItem>
                 <SelectItem value="year">Year</SelectItem>
@@ -632,6 +797,16 @@ export default function AdminDashboard() {
               <div className="text-sm text-gray-500">
                 Appointments {appointmentsStats.count}<br />
                 Appointments value ₹{appointmentsStats.value.toFixed(2)}
+              </div>
+              <div className={`text-sm flex items-center ${parseFloat(businessMetrics.revenueChange) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                {parseFloat(businessMetrics.revenueChange) < 0 ? (
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                ) : (
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                )}
+                {parseFloat(businessMetrics.revenueChange) < 0 ? 
+                  businessMetrics.revenueChange : 
+                  `+${businessMetrics.revenueChange}`}% {getComparisonLabel()}
               </div>
             </div>
             
@@ -684,7 +859,7 @@ export default function AdminDashboard() {
         </React.Suspense>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Today's next appointments</CardTitle>
@@ -818,52 +993,9 @@ export default function AdminDashboard() {
       </div>
       
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">      
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <Package className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Low Stock Items</span>
-                </div>
-                <Button variant="ghost" size="icon" asChild>
-                  <a href="#"><Info className="h-4 w-4" /></a>
-                </Button>
-              </div>
-              <div className="text-3xl font-bold mb-4 text-center text-red-500">
-                {quickActions.lowStockItems}
-              </div>
-              <Button variant="ghost" size="sm" className="w-full flex items-center justify-center text-blue-500" asChild>
-                <a href="/admin/inventory">
-                  <span>Order Stock</span>
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-      
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Business Performance</h2>
-          <Select defaultValue="today">
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Today" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <h2 className="text-xl font-semibold">Business Performance</h2>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-         
-          
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-4">
@@ -884,7 +1016,7 @@ export default function AdminDashboard() {
                 ) : (
                   <TrendingUp className="h-4 w-4 mr-1" />
                 )}
-                {parseFloat(businessMetrics.occupancyChange) < 0 ? businessMetrics.occupancyChange : `+${businessMetrics.occupancyChange}`}% vs Yesterday
+                {parseFloat(businessMetrics.occupancyChange) < 0 ? businessMetrics.occupancyChange : `+${businessMetrics.occupancyChange}`}% {getComparisonLabel()}
               </div>
             </CardContent>
           </Card>
@@ -909,7 +1041,7 @@ export default function AdminDashboard() {
                 ) : (
                   <TrendingUp className="h-4 w-4 mr-1" />
                 )}
-                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? businessMetrics.returningCustomerChange : `+${businessMetrics.returningCustomerChange}`}% vs Yesterday
+                {parseFloat(businessMetrics.returningCustomerChange) < 0 ? businessMetrics.returningCustomerChange : `+${businessMetrics.returningCustomerChange}`}% {getComparisonLabel()}
               </div>
             </CardContent>
           </Card>
