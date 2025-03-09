@@ -818,26 +818,13 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              <div className="text-3xl font-bold text-indigo-700">₹{totalRevenue.toFixed(2)}</div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                  <div className="text-sm text-gray-500 mb-1">Completed Value</div>
-                  <div className="text-xl font-bold text-green-600">₹{appointmentsStats.completedValue.toFixed(2)}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {appointmentsStats.completed} appointments
-                  </div>
-                </div>
-                
-                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                  <div className="text-sm text-gray-500 mb-1">Appointment Value</div>
-                  <div className="text-xl font-bold text-blue-600">₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
+              <div className="text-3xl font-bold text-indigo-700">₹{appointmentsStats.completedValue.toFixed(2)}</div>
+                <span>
+                  <div className="text-xl font-bold">Appointment Value:  ₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
                   <div className="text-xs text-gray-500 mt-1">
                     {appointmentsStats.count - appointmentsStats.completed} appointments
                   </div>
-                </div>
-              </div>
-              
+                </span>              
               <div className="grid grid-cols-2 gap-4 my-6">
                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                   <div className="flex items-center justify-between mb-2">
