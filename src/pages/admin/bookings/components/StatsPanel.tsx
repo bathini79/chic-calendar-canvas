@@ -3,6 +3,8 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MoreHorizontal } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 
 interface Stat {
   label: string;
@@ -23,6 +25,7 @@ interface StatsPanelProps {
   confirmedCount?: number;
   bookedCount?: number;
   cancelledCount?: number;
+  onSave?: () => void;
 }
 
 export function StatsPanel({ 
@@ -31,8 +34,15 @@ export function StatsPanel({
   totalBooked = 0, 
   confirmedCount = 0,
   bookedCount = 0,
-  cancelledCount = 0 
+  cancelledCount = 0,
+  onSave
 }: StatsPanelProps) {
+  const handleSave = () => {
+    if (onSave) {
+      onSave();
+    }
+  };
+
   return (
     <div className="space-y-4">
       {chartData.length > 0 ? (
