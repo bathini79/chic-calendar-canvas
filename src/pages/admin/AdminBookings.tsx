@@ -5,21 +5,25 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
+import { ServiceSelector } from "./bookings/components/ServiceSelector";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { formatTime, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
+import { getTotalPrice, getTotalDuration } from "./bookings/utils/bookingUtils";
+import { useAppointmentState } from "./bookings/hooks/useAppointmentState";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
+import { CheckoutSection } from "./bookings/components/CheckoutSection";
+import { SummaryView } from "./bookings/components/SummaryView";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
+import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 import { useActiveServices } from "./bookings/hooks/useActiveServices";
 import { useActivePackages } from "./bookings/hooks/useActivePackages";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import useSaveAppointment from "./bookings/hooks/useSaveAppointment";
-import { Appointment } from "./bookings/types";
-import { AppointmentWorkflowProvider } from "./bookings/context/AppointmentWorkflowContext";
-import { AppointmentSidebar } from "./bookings/components/AppointmentSidebar";
+import { Appointment, Service, Package, SCREEN } from "./bookings/types";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -27,6 +31,8 @@ const initialStats = [
   { label: "Today's Bookings", value: 5 },
   { label: "Today's Revenue", value: 1950 },
 ];
+
+type ScreenType = (typeof SCREEN)[keyof typeof SCREEN];
 
 export default function AdminBookings() {
   const [employees, setEmployees] = useState([]);
@@ -40,36 +46,60 @@ export default function AdminBookings() {
   } | null>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [currentScreen, setCurrentScreen] = useState<ScreenType>(
+    SCREEN.SERVICE_SELECTION
+  );
+  const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
-  const { data: services = [] } = useActiveServices();
-  const { data: packages = [] } = useActivePackages();
+  const { data: services } = useActiveServices();
+  const { data: packages } = useActivePackages();
   const { data: appointments = [] } = useAppointmentsByDate(currentDate);
+  const {
+    selectedCustomer,
+    setSelectedCustomer,
+    setShowCreateForm,
+    selectedServices,
+    setSelectedServices,
+    selectedPackages,
+    setSelectedPackages,
+    selectedStylists,
+    setSelectedStylists,
+    selectedDate,
+    setSelectedDate,
+    selectedTime,
+    setSelectedTime,
+    paymentMethod,
+    setPaymentMethod,
+    discountType,
+    setDiscountType,
+    discountValue,
+    setDiscountValue,
+    appointmentNotes,
+    setAppointmentNotes,
+    resetState,
+    customizedServices,
+    setCustomizedServices,
+  } = useAppointmentState();
 
-  // State for the AppointmentWorkflowProvider
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [selectedTime, setSelectedTime] = useState<string | undefined>();
-
-  // Hook for saving appointments
   const { handleSaveAppointment } = useSaveAppointment({
     selectedDate,
     selectedTime,
     selectedCustomer,
-    selectedServices: [],  // These will be managed by the context
-    selectedPackages: [],  // These will be managed by the context
+    selectedServices,
+    selectedPackages,
     services,
     packages,
-    selectedStylists: {},  // Managed by the context
-    getTotalDuration: () => 0,  // Not used directly here
-    getTotalPrice: () => 0,     // Not used directly here
-    discountType: "none",       // Managed by the context
-    discountValue: 0,           // Managed by the context
-    paymentMethod: "cash",      // Managed by the context
-    notes: "",                  // Managed by the context
-    customizedServices: {},     // Managed by the context
-    currentScreen: "SERVICE_SELECTION"  // Managed by the context
+    selectedStylists,
+    getTotalDuration,
+    getTotalPrice,
+    discountType,
+    discountValue,
+    paymentMethod,
+    notes: appointmentNotes,
+    customizedServices,
+    currentScreen
   });
 
   useEffect(() => {
@@ -120,20 +150,197 @@ export default function AdminBookings() {
     setClickedCell(cell);
   };
 
-  const handleCheckoutFromAppointment = (appointment: Appointment) => {
-    // This will be handled by the workflow context
-    setSelectedAppointment(null);
-    setIsAddAppointmentOpen(true);
+  const handleProceedToCheckout = async () => {
+    if (!selectedCustomer) {
+      toast.error("Please select a customer");
+      return;
+    }
+    if (selectedServices.length === 0 && selectedPackages.length === 0) {
+      toast.error("Please select at least one service or package");
+      return;
+    }
+    setCurrentScreen(SCREEN.CHECKOUT);
   };
 
-  // This will be used by the workflow context
-  const onHandleSaveAppointment = async () => {
+  const handleServiceSelect = (serviceId: string) => {
+    setSelectedServices((prev) =>
+      prev.includes(serviceId)
+        ? prev.filter((id) => id !== serviceId)
+        : [...prev, serviceId]
+    );
+  };
+  const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
+    const pkg = packages?.find((p) => p.id === packageId);
+    if (!pkg) return;
+    setCustomizedServices((prev) => {
+      const currentServices = prev[packageId] || [];
+      const newServices = currentServices.includes(serviceId)
+        ? currentServices.filter((id) => id !== serviceId)
+        : [...currentServices, serviceId];
+      return {
+        ...prev,
+        [packageId]: newServices,
+      };
+    });
+  };
+  const handlePackageSelect = (packageId: string) => {
+    setSelectedPackages((prev) =>
+      prev.includes(packageId)
+        ? prev.filter((id) => id !== packageId)
+        : [...prev, packageId]
+    );
+  };
+
+  const handleStylistSelect = (itemId: string, stylistId: string) => {
+    setSelectedStylists((prev) => ({
+      ...prev,
+      [itemId]: stylistId,
+    }));
+  };
+
+  const calculateSelectedItems = () => {
+    return [
+      ...selectedServices.map((id) => {
+        const service = services?.find((s) => s.id === id);
+        return service
+          ? {
+              id,
+              name: service.name,
+              price: service.selling_price,
+              type: "service" as const,
+            }
+          : null;
+      }),
+      ...selectedPackages.map((id) => {
+        const pkg = packages?.find((p) => p.id === id);
+        return pkg
+          ? {
+              id,
+              name: pkg.name,
+              price: pkg.price,
+              type: "package" as const,
+            }
+          : null;
+      }),
+    ].filter(Boolean);
+  };
+
+  const handleRemoveService = (serviceId: string) => {
+    setSelectedServices(prev => prev.filter(id => id !== serviceId));
+    const updatedStylists = { ...selectedStylists };
+    delete updatedStylists[serviceId];
+    setSelectedStylists(updatedStylists);
+  };
+
+  const handleRemovePackage = (packageId: string) => {
+    setSelectedPackages(prev => prev.filter(id => id !== packageId));
+    const updatedStylists = { ...selectedStylists };
+    delete updatedStylists[packageId];
+    setSelectedStylists(updatedStylists);
+  };
+
+  const handleBackToServices = () => {
+    setCurrentScreen(SCREEN.SERVICE_SELECTION);
+  };
+
+  const handlePaymentComplete = (appointmentId?: string) => {  
+    setNewAppointmentId(appointmentId || null);
+    setCurrentScreen(SCREEN.SUMMARY);
+    resetState();
+  };
+
+  const handleCheckoutFromAppointment = (appointment: Appointment) => {
+    const services: string[] = [];
+    const packages: string[] = [];
+    const stylists: Record<string, string> = {};
+    const customizedServicesMap: Record<string, string[]> = {};
+
+    // First collect all packages
+    const packageIdsSet = new Set<string>();
+    appointment.bookings.forEach(booking => {
+      if (booking.package_id) {
+        packageIdsSet.add(booking.package_id);
+        if (booking.employee_id) {
+          stylists[booking.package_id] = booking.employee_id;
+        }
+      }
+    });
+
+    // Add packages to the selectedPackages array
+    const packageIds = Array.from(packageIdsSet);
+    packageIds.forEach(pkgId => {
+      packages.push(pkgId);
+    });
+
+    // Now process all services
+    appointment.bookings.forEach(booking => {
+      if (booking.service_id) {
+        // If service is part of a package
+        if (booking.package_id) {
+          // Check if this service is a part of the base package or a customized one
+          const basePackage = packages?.find(p => p === booking.package_id);
+          if (basePackage) {
+            const pkgDetails = appointment.bookings.find(b => 
+              b.package && b.package.id === booking.package_id
+            )?.package;
+
+            if (pkgDetails) {
+              const isBaseService = pkgDetails?.package_services?.some(
+                ps => ps.service.id === booking.service_id
+              );
+
+              // If not in base services, it's a customized service
+              if (!isBaseService) {
+                if (!customizedServicesMap[booking.package_id]) {
+                  customizedServicesMap[booking.package_id] = [];
+                }
+                customizedServicesMap[booking.package_id].push(booking.service_id);
+              }
+            }
+          }
+
+          // Add stylist to this service if available
+          if (booking.employee_id) {
+            stylists[booking.service_id] = booking.employee_id;
+          }
+        } else {
+          // This is a standalone service, not part of any package
+          services.push(booking.service_id);
+          
+          // Add stylist to this service if available
+          if (booking.employee_id) {
+            stylists[booking.service_id] = booking.employee_id;
+          }
+        }
+      }
+    });
+
+    setNewAppointmentId(appointment.id);
+    setSelectedServices(services);
+    setSelectedPackages(packages);
+    setSelectedStylists(stylists);
+    setCustomizedServices(customizedServicesMap);
+    setPaymentMethod(appointment.payment_method || 'cash');
+    setDiscountType(appointment.discount_type || 'none');
+    setDiscountValue(appointment.discount_value || 0);
+    setAppointmentNotes(appointment.notes || '');
+    setSelectedCustomer(appointment.customer || null);
+    
+    const startDate = new Date(appointment.start_time);
+    setSelectedDate(startDate);
+    setSelectedTime(format(startDate, 'HH:mm'));
+
+    setSelectedAppointment(null);
+    setIsAddAppointmentOpen(true);
+    setCurrentScreen(SCREEN.CHECKOUT);
+  };
+
+  const onHandleSaveAppointment = async() => {
     const appointmentId = await handleSaveAppointment();
-    if (appointmentId) {
+    if(appointmentId){
       closeAddAppointment();
-      return appointmentId;
+      resetState();
     }
-    return null;
   };
 
   // This is a temporary prop for the TimeSlots component until we fix the imports
@@ -155,64 +362,169 @@ export default function AdminBookings() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <AppointmentWorkflowProvider
-        initialScreen="SERVICE_SELECTION"
-        onSaveAppointment={onHandleSaveAppointment}
-        services={services}
-        packages={packages}
-      >
-        <div className="flex flex-col h-screen bg-gray-50 relative">
-          <header className="p-4 border-b bg-white flex justify-between items-center">
-            <div className="font-bold text-xl">Define Salon</div>
-          </header>
-          <StatsPanel stats={stats} />
-          <CalendarHeader
-            currentDate={currentDate}
-            onToday={goToday}
-            onPrevious={goPrev}
-            onNext={goNext}
-          />
-          <TimeSlots
-            {...timeSlotsProps}
-          />
-          <AppointmentDetailsDialog
-            appointment={selectedAppointment}
-            open={!!selectedAppointment}
-            onOpenChange={() => setSelectedAppointment(null)}
-            onCheckout={handleCheckoutFromAppointment}
-          />
+      <div className="flex flex-col h-screen bg-gray-50 relative">
+        <header className="p-4 border-b bg-white flex justify-between items-center">
+          <div className="font-bold text-xl">Define Salon</div>
+        </header>
+        <StatsPanel stats={stats} />
+        <CalendarHeader
+          currentDate={currentDate}
+          onToday={goToday}
+          onPrevious={goPrev}
+          onNext={goNext}
+        />
+        <TimeSlots
+          {...timeSlotsProps}
+        />
+        <AppointmentDetailsDialog
+          appointment={selectedAppointment}
+          open={!!selectedAppointment}
+          onOpenChange={() => setSelectedAppointment(null)}
+          onCheckout={handleCheckoutFromAppointment}
+        />
 
-          {clickedCell && (
+        {clickedCell && (
+          <div
+            className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
+            style={{
+              left: clickedCell.x,
+              top: clickedCell.y,
+            }}
+          >
+            <div className="bg-black px-4 py-2 text-sm font-medium text-white">
+              {formatTime(clickedCell.time)}
+            </div>
             <div
-              className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
-              style={{
-                left: clickedCell.x,
-                top: clickedCell.y,
-              }}
+              className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={openAddAppointment}
             >
-              <div className="bg-black px-4 py-2 text-sm font-medium text-white">
-                {formatTime(clickedCell.time)}
+              <CalendarIcon className="h-4 w-4 text-gray-600" />
+              <span className="text-gray-700">Add Appointment</span>
+            </div>
+          </div>
+        )}
+
+        <div
+          className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
+            isAddAppointmentOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="flex flex-col h-full">
+            <div className="p-6 border-b flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold">New Appointment</h2>
+                <button
+                  onClick={closeAddAppointment}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
               </div>
-              <div
-                className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={openAddAppointment}
-              >
-                <CalendarIcon className="h-4 w-4 text-gray-600" />
-                <span className="text-gray-700">Add Appointment</span>
+              {clickedCell && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {format(currentDate, "MMMM d, yyyy")} at{" "}
+                  {formatTime(clickedCell.time)}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-1 min-h-0">
+              <div className="w-[30%] border-r">
+                <SelectCustomer
+                  selectedCustomer={selectedCustomer}
+                  setSelectedCustomer={setSelectedCustomer}
+                  setShowCreateForm={setShowCreateForm}
+                />
+              </div>
+
+              <div className="w-[70%] flex flex-col h-full">
+                {currentScreen === SCREEN.SERVICE_SELECTION && (
+                  <div className="flex flex-col h-full">
+                    <div className="p-6 flex-shrink-0">
+                      <h3 className="text-lg font-semibold">Select Services</h3>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto px-6">
+                      <ServiceSelector
+                        onServiceSelect={handleServiceSelect}
+                        onPackageSelect={handlePackageSelect}
+                        onStylistSelect={handleStylistSelect}
+                        selectedServices={selectedServices}
+                        selectedPackages={selectedPackages}
+                        selectedStylists={selectedStylists}
+                        stylists={employees}
+                        onCustomPackage={handleCustomServiceToggle}
+                        customizedServices={customizedServices}
+                      />
+                    </div>
+
+                    <div className="p-6 border-t mt-auto flex justify-end gap-4">
+                      <Button variant="outline" onClick={onHandleSaveAppointment}>
+                        Save Appointment
+                      </Button>
+                      <Button
+                        className="bg-black text-white"
+                        onClick={handleProceedToCheckout}
+                      >
+                        Checkout
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {currentScreen === SCREEN.CHECKOUT && (
+                  <CheckoutSection
+                    appointmentId={newAppointmentId}
+                    selectedCustomer={selectedCustomer}
+                    selectedServices={selectedServices}
+                    selectedPackages={selectedPackages}
+                    services={services || []}
+                    packages={packages || []}
+                    discountType={discountType}
+                    discountValue={discountValue}
+                    paymentMethod={paymentMethod}
+                    notes={appointmentNotes}
+                    onDiscountTypeChange={setDiscountType}
+                    onDiscountValueChange={setDiscountValue}
+                    onPaymentMethodChange={setPaymentMethod}
+                    onNotesChange={setAppointmentNotes}
+                    onPaymentComplete={handlePaymentComplete}
+                    selectedStylists={selectedStylists}
+                    selectedTimeSlots={{ [newAppointmentId || '']: selectedTime }}
+                    onSaveAppointment={handleSaveAppointment}
+                    onRemoveService={handleRemoveService}
+                    onRemovePackage={handleRemovePackage}
+                    onBackToServices={handleBackToServices}
+                    customizedServices={customizedServices}
+                    isExistingAppointment={false}
+                  />
+                )}
+
+                {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
+                  <div className="p-6">
+                    <h3 className="text-xl font-semibold mb-6">
+                      Appointment Summary
+                    </h3>
+                    <SummaryView
+                      appointmentId={newAppointmentId}
+                    />
+                    <div className="mt-6 flex justify-end">
+                      <Button
+                        onClick={() => {
+                          setCurrentScreen(SCREEN.SERVICE_SELECTION);
+                          setNewAppointmentId(null);
+                        }}
+                      >
+                        Create New Appointment
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-
-          <AppointmentSidebar
-            employees={employees}
-            services={services}
-            packages={packages}
-            onSaveAppointment={onHandleSaveAppointment}
-            isOpen={isAddAppointmentOpen}
-            onClose={closeAddAppointment}
-          />
+          </div>
         </div>
-      </AppointmentWorkflowProvider>
+      </div>
     </DndProvider>
   );
 }

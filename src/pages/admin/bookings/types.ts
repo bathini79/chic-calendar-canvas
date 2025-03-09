@@ -122,5 +122,3 @@ export const SCREEN = {
   CHECKOUT: "CHECKOUT",
   SUMMARY: "SUMMARY"
 } as const;
-
-export type ScreenType = (typeof SCREEN)[keyof typeof SCREEN];
