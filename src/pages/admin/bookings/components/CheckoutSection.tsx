@@ -20,7 +20,7 @@ import {
   Trash2
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Service, Package, Customer } from "../types";
+import type { Service, Package } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -36,63 +36,47 @@ import {
   getTotalPrice, 
   getTotalDuration, 
   getFinalPrice, 
-  getServicePriceInPackage,
   calculatePackagePrice 
 } from "../utils/bookingUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAppointmentWorkflow } from "../context/AppointmentWorkflowContext";
 
 interface CheckoutSectionProps {
-  appointmentId?: string;
-  selectedCustomer: Customer | null;
-  selectedServices: string[];
-  selectedPackages: string[];
+  appointmentId?: string | null;
   services: Service[];
   packages: Package[];
-  discountType: 'none' | 'percentage' | 'fixed';
-  discountValue: number;
-  paymentMethod: 'cash' | 'online';
-  notes: string;
-  onDiscountTypeChange: (type: 'none' | 'percentage' | 'fixed') => void;
-  onDiscountValueChange: (value: number) => void;
-  onPaymentMethodChange: (method: 'cash' | 'online') => void;
-  onNotesChange: (notes: string) => void;
-  onPaymentComplete: (appointmentId?: string) => void;
-  selectedStylists: Record<string, string>;
-  selectedTimeSlots: Record<string, string>;
-  onSaveAppointment: () => Promise<string | null>;
-  onRemoveService: (serviceId: string) => void;
-  onRemovePackage: (packageId: string) => void;
-  onBackToServices: () => void;
   isExistingAppointment?: boolean;
-  customizedServices?: Record<string, string[]>;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   appointmentId,
-  selectedCustomer,
-  selectedServices,
-  selectedPackages,
   services,
   packages,
-  discountType,
-  discountValue,
-  paymentMethod,
-  notes,
-  onDiscountTypeChange,
-  onDiscountValueChange,
-  onPaymentMethodChange,
-  onNotesChange,
-  onPaymentComplete,
-  selectedStylists,
-  selectedTimeSlots,
-  onSaveAppointment,
-  onRemoveService,
-  onRemovePackage,
-  onBackToServices,
-  isExistingAppointment,
-  customizedServices = {}
+  isExistingAppointment
 }) => {
+  const {
+    selectedCustomer,
+    selectedServices,
+    selectedPackages,
+    selectedStylists,
+    selectedTime,
+    discountType,
+    discountValue,
+    paymentMethod,
+    appointmentNotes,
+    customizedServices,
+    setDiscountType,
+    setDiscountValue,
+    setPaymentMethod,
+    setAppointmentNotes,
+    handlePaymentComplete,
+    handleSaveAppointment,
+    handleRemoveService,
+    handleRemovePackage,
+    handleBackToServices,
+  } = useAppointmentWorkflow();
+
   const { data: employees } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
@@ -165,7 +149,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         packageId: null as string | null,
         stylist: selectedStylists[id],
         stylistName: getStylistName(selectedStylists[id]),
-        time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
+        time: selectedTime,
         formattedDuration: formatDuration(service.duration),
       } : null;
     }).filter(Boolean);
@@ -185,7 +169,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         packageId: null as string | null,
         stylist: selectedStylists[packageId],
         stylistName: getStylistName(selectedStylists[packageId]),
-        time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''],
+        time: selectedTime,
         formattedDuration: formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices)),
         services: [] as Array<{
           id: string;
@@ -250,7 +234,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     services, 
     packages, 
     selectedStylists, 
-    selectedTimeSlots, 
+    selectedTime, 
     appointmentId, 
     customizedServices,
     employees
@@ -262,14 +246,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         toast.error("Please select a customer");
         return;
       }
-      const savedAppointmentId = await onSaveAppointment();
+      const savedAppointmentId = await handleSaveAppointment();
       if (!savedAppointmentId) {
         toast.error("Failed to complete payment");
         return;
       }
 
       toast.success("Payment completed successfully");
-      onPaymentComplete(savedAppointmentId);
+      handlePaymentComplete(savedAppointmentId);
     } catch (error: any) {
       console.error("Error completing payment:", error);
       toast.error(error.message || "Failed to complete payment");
@@ -284,7 +268,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             <h2 className="text-xl font-semibold">Checkout Summary</h2>
             <Button
               variant="outline"
-              onClick={onBackToServices}
+              onClick={handleBackToServices}
               className="flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />
@@ -300,7 +284,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </p>
                 <Button
                   variant="default"
-                  onClick={onBackToServices}
+                  onClick={handleBackToServices}
                   className="flex items-center gap-2"
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -349,9 +333,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => {
                               if (item.type === 'service') {
-                                onRemoveService(item.id);
+                                handleRemoveService(item.id);
                               } else {
-                                onRemovePackage(item.id);
+                                handleRemovePackage(item.id);
                               }
                             }}
                           >
@@ -433,7 +417,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           <div className="pt-6 space-y-4 mt-auto">
             <div>
               <h4 className="text-sm font-medium mb-2">Payment Method</h4>
-              <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
@@ -465,7 +449,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     <div className="flex gap-4">
                       <Select
                         value={discountType}
-                        onValueChange={onDiscountTypeChange}
+                        onValueChange={setDiscountType}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Discount type" />
@@ -486,7 +470,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           }
                           value={discountValue}
                           onChange={(e) =>
-                            onDiscountValueChange(Number(e.target.value))
+                            setDiscountValue(Number(e.target.value))
                           }
                           className="w-24"
                         />
@@ -496,8 +480,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       <h3 className="font-semibold">Notes</h3>
                       <Textarea
                         placeholder="Add appointment notes..."
-                        value={notes}
-                        onChange={(e) => onNotesChange(e.target.value)}
+                        value={appointmentNotes}
+                        onChange={(e) => setAppointmentNotes(e.target.value)}
                         rows={3}
                       />
                     </div>

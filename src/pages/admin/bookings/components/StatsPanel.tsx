@@ -15,6 +15,13 @@ interface ChartData {
   cancelled: number;
 }
 
+interface Appointment {
+  id: string;
+  customer_id: string;
+  start_time: string;
+  // Additional fields as needed
+}
+
 interface StatsPanelProps {
   stats: Stat[];
   chartData?: ChartData[];
@@ -22,6 +29,8 @@ interface StatsPanelProps {
   confirmedCount?: number;
   bookedCount?: number;
   cancelledCount?: number;
+  upcomingAppointments?: Appointment[];
+  onAppointmentClick?: (appointment: Appointment) => void;
 }
 
 export function StatsPanel({ 
@@ -30,7 +39,9 @@ export function StatsPanel({
   totalBooked = 0, 
   confirmedCount = 0,
   bookedCount = 0,
-  cancelledCount = 0 
+  cancelledCount = 0,
+  upcomingAppointments = [],
+  onAppointmentClick
 }: StatsPanelProps) {
   return (
     <div className="space-y-4">
@@ -64,6 +75,23 @@ export function StatsPanel({
                 <p className="text-sm text-gray-500">Booked appointments <span className="font-semibold">{bookedCount}</span></p>
                 <p className="text-sm text-gray-500">Cancelled appointments <span className="font-semibold">{cancelledCount}</span></p>
               </div>
+              
+              {upcomingAppointments && upcomingAppointments.length > 0 && onAppointmentClick && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium mb-2">Today's Appointments:</h3>
+                  <div className="space-y-2">
+                    {upcomingAppointments.map((appointment) => (
+                      <div 
+                        key={appointment.id}
+                        className="p-2 border rounded cursor-pointer hover:bg-gray-50"
+                        onClick={() => onAppointmentClick(appointment)}
+                      >
+                        <div className="text-sm">{new Date(appointment.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="h-[250px]">
