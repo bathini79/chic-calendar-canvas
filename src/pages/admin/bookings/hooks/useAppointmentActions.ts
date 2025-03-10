@@ -2,7 +2,10 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, Booking, RefundData, RefundReason, TransactionDetails } from '../types';
+import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
+
+// Define the RefundReason type to match what's expected in the database
+type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
 
 interface SelectedItem {
   id: string;
@@ -84,8 +87,8 @@ export function useAppointmentActions() {
           id: originalSale.id,
           amount: originalSale.total_price,
           status: originalSale.status,
-          created_at: originalSale.created_at,
           payment_method: originalSale.payment_method,
+          created_at: originalSale.created_at,
           originalSale,
           refunds: refunds || []
         };
@@ -113,8 +116,8 @@ export function useAppointmentActions() {
           id: appointment.id,
           amount: appointment.total_price,
           status: appointment.status,
-          created_at: appointment.created_at,
           payment_method: appointment.payment_method,
+          created_at: appointment.created_at,
           originalSale: appointment,
           refunds: refunds || []
         };

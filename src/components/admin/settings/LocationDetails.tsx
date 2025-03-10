@@ -36,11 +36,23 @@ interface Location {
   };
 }
 
+interface ReceiptSettingsFormData {
+  prefix: string;
+  next_number: number;
+}
+
 export function LocationDetails() {
   const { locationId } = useParams<{ locationId: string }>();
   const [location, setLocation] = useState<Location | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editDialogMode, setEditDialogMode] = useState<"full" | "contact" | "receipt">("full");
+  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettingsFormData>({
+    prefix: "",
+    next_number: 1
+  });
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [hoursDialogOpen, setHoursDialogOpen] = useState(false);
   
   const fetchLocationDetails = async () => {
     if (!locationId) return;
@@ -56,14 +68,6 @@ export function LocationDetails() {
         
       if (error) throw error;
       
-      // Fetch location hours
-      const { data: hoursData, error: hoursError } = await supabase
-        .from("location_hours")
-        .select("*")
-        .eq("location_id", locationId);
-        
-      if (hoursError) throw hoursError;
-      
       // Fetch receipt settings
       const { data: receiptData, error: receiptError } = await supabase
         .from("receipt_settings")
@@ -75,19 +79,21 @@ export function LocationDetails() {
         throw receiptError;
       }
       
-      // Map database hours to the LocationHours interface
-      const mappedHours = hoursData?.map((hour: any) => ({
-        day_of_week: hour.day_of_week,
-        open_time: hour.open_time || "",
-        close_time: hour.close_time || "",
-        is_closed: hour.is_closed
-      })) || [];
-      
-      setLocation({
+      // Map database information to the Location interface
+      const mappedLocation: Location = {
         ...locationData,
-        hours: mappedHours,
+        hours: [], // We'll implement this later
         receipt_settings: receiptData || { prefix: "", next_number: 1 }
-      });
+      };
+      
+      setLocation(mappedLocation);
+      
+      if (receiptData) {
+        setReceiptSettings({
+          prefix: receiptData.prefix || "",
+          next_number: receiptData.next_number || 1
+        });
+      }
     } catch (error: any) {
       toast.error("Failed to load location details: " + error.message);
       console.error(error);
@@ -100,9 +106,60 @@ export function LocationDetails() {
     fetchLocationDetails();
   }, [locationId]);
   
+  const handleEditLocation = (mode: "full" | "contact" | "receipt" = "full") => {
+    setEditDialogMode(mode);
+    setEditDialogOpen(true);
+  };
+  
   const handleEditSuccess = () => {
     fetchLocationDetails();
     setEditDialogOpen(false);
+    setReceiptDialogOpen(false);
+  };
+  
+  const handleSaveReceiptSettings = async () => {
+    if (!locationId) return;
+    
+    try {
+      // Check if receipt settings already exist
+      const { data, error: checkError } = await supabase
+        .from("receipt_settings")
+        .select("id")
+        .eq("location_id", locationId);
+        
+      if (checkError) throw checkError;
+      
+      if (data && data.length > 0) {
+        // Update existing settings
+        const { error } = await supabase
+          .from("receipt_settings")
+          .update({
+            prefix: receiptSettings.prefix,
+            next_number: receiptSettings.next_number
+          })
+          .eq("location_id", locationId);
+          
+        if (error) throw error;
+      } else {
+        // Create new settings
+        const { error } = await supabase
+          .from("receipt_settings")
+          .insert({
+            location_id: locationId,
+            prefix: receiptSettings.prefix,
+            next_number: receiptSettings.next_number
+          });
+          
+        if (error) throw error;
+      }
+      
+      toast.success("Receipt settings updated successfully");
+      fetchLocationDetails();
+      setReceiptDialogOpen(false);
+    } catch (error: any) {
+      toast.error("Failed to update receipt settings: " + error.message);
+      console.error(error);
+    }
   };
   
   if (isLoading) {
@@ -121,7 +178,7 @@ export function LocationDetails() {
     location.country
   ].filter(Boolean).join(", ");
   
-  // Generate business hours display
+  // Generate business hours display for placeholder
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   
   return (
@@ -140,7 +197,7 @@ export function LocationDetails() {
       
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">{location.name}</h1>
-        <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
+        <Button variant="outline" onClick={() => handleEditLocation()}>
           <Edit2 className="h-4 w-4 mr-2" />
           Edit Location
         </Button>
@@ -173,7 +230,7 @@ export function LocationDetails() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Contact details</CardTitle>
-            <Button variant="ghost" size="sm" className="text-primary" onClick={() => setEditDialogOpen(true)}>
+            <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation("contact")}>
               Edit
             </Button>
           </CardHeader>
@@ -191,24 +248,23 @@ export function LocationDetails() {
           </CardContent>
         </Card>
         
-        {/* Business Types */}
+        {/* Billing Details */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Business types</CardTitle>
-            <Button variant="ghost" size="sm" className="text-primary">
+            <CardTitle>Billing details for client sales</CardTitle>
+            <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation()}>
               Edit
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="text-sm text-muted-foreground">Main</div>
-                <div>Hair Salon</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Additional</div>
-                <div className="text-muted-foreground italic">None set</div>
-              </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              These details will appear on the client's sale receipt for sales from this location.
+            </p>
+            
+            <div className="space-y-2">
+              <div className="font-medium">Company details</div>
+              <div>{location.name}</div>
+              <div>{fullAddress}</div>
             </div>
           </CardContent>
         </Card>
@@ -218,7 +274,7 @@ export function LocationDetails() {
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Location</CardTitle>
-          <Button variant="ghost" size="sm" className="text-primary" onClick={() => setEditDialogOpen(true)}>
+          <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation()}>
             Edit
           </Button>
         </CardHeader>
@@ -242,21 +298,19 @@ export function LocationDetails() {
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Opening hours</CardTitle>
-          <Button variant="ghost" size="sm" className="text-primary">
+          <Button variant="ghost" size="sm" className="text-primary" onClick={() => setHoursDialogOpen(true)}>
             Edit
           </Button>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
-            Opening hours for these locations are default working hours for your team and will be visible to your clients. 
+            Opening hours for this location are default working hours for your team and will be visible to your clients. 
             You can amend business closed periods for events like Bank Holidays in Settings.
           </p>
           
           <div className="grid grid-cols-7 gap-2">
             {daysOfWeek.map((day) => {
-              const dayData = location.hours?.find(h => h.day_of_week.toLowerCase() === day.toLowerCase());
-              const isClosed = dayData?.is_closed || !dayData;
-              
+              // Using placeholder data until we implement hours
               return (
                 <div 
                   key={day} 
@@ -265,44 +319,27 @@ export function LocationDetails() {
                   }`}
                 >
                   <div className="font-medium mb-2">{day}</div>
-                  {isClosed ? (
+                  {day === "Sunday" ? (
                     <div className="text-muted-foreground">Closed</div>
                   ) : (
                     <>
-                      <div>{dayData?.open_time || "10:00am"}</div>
+                      <div>{day === "Saturday" ? "9:00 AM" : "9:00 AM"}</div>
                       <div className="text-muted-foreground">-</div>
-                      <div>{dayData?.close_time || (day === "Saturday" ? "5:00pm" : "7:00pm")}</div>
+                      <div>{day === "Saturday" ? "5:00 PM" : "7:00 PM"}</div>
                     </>
                   )}
                 </div>
               );
             })}
           </div>
+          
+          <div className="mt-4 text-muted-foreground text-sm text-center">
+            <p>Hours functionality will be fully implemented in the upcoming update.</p>
+          </div>
         </CardContent>
       </Card>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Billing Details */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Billing details for clients sale</CardTitle>
-            <Button variant="ghost" size="sm" className="text-primary">
-              Edit
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              These details will appear on the client's sale receipt for sales from this location.
-            </p>
-            
-            <div className="space-y-2">
-              <div className="font-medium">Company details</div>
-              <div>{location.name}</div>
-              <div>{fullAddress}</div>
-            </div>
-          </CardContent>
-        </Card>
-        
         {/* Tax Defaults */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -319,7 +356,7 @@ export function LocationDetails() {
             <div className="space-y-4">
               <div>
                 <div className="font-medium">Services</div>
-                <div>gst (5%)</div>
+                <div>GST (5%)</div>
               </div>
               <div>
                 <div className="font-medium">Products</div>
@@ -328,36 +365,106 @@ export function LocationDetails() {
             </div>
           </CardContent>
         </Card>
+        
+        {/* Receipt Sequencing */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Receipt sequencing</CardTitle>
+            <Button variant="ghost" size="sm" className="text-primary" onClick={() => setReceiptDialogOpen(true)}>
+              Edit
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <div className="text-sm text-muted-foreground">Receipt No. Prefix</div>
+                <div>{location.receipt_settings?.prefix || "-"}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Next receipt number</div>
+                <div>{location.receipt_settings?.next_number || "1"}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
       
-      {/* Receipt Sequencing */}
-      <Card className="mt-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Receipt sequencing</CardTitle>
-          <Button variant="ghost" size="sm" className="text-primary">
-            Edit
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <div className="text-sm text-muted-foreground">Receipt No. Prefix</div>
-              <div>{location.receipt_settings?.prefix || "-"}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Next receipt number</div>
-              <div>{location.receipt_settings?.next_number || "1"}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
+      {/* Main Location Dialog */}
       <LocationDialog
         isOpen={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
         locationId={locationId}
         onSuccess={handleEditSuccess}
+        mode={editDialogMode}
       />
+      
+      {/* Receipt Settings Dialog */}
+      {receiptDialogOpen && (
+        <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Edit Receipt Settings</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="prefix">Receipt No. Prefix</Label>
+                <Input
+                  id="prefix"
+                  value={receiptSettings.prefix}
+                  onChange={(e) => setReceiptSettings(prev => ({ ...prev, prefix: e.target.value }))}
+                  placeholder="e.g. INV-"
+                />
+                <p className="text-xs text-muted-foreground">
+                  This will appear before the receipt number (e.g., INV-0001)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="next_number">Next Receipt Number</Label>
+                <Input
+                  id="next_number"
+                  type="number"
+                  min="1"
+                  value={receiptSettings.next_number}
+                  onChange={(e) => setReceiptSettings(prev => ({ ...prev, next_number: parseInt(e.target.value) || 1 }))}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReceiptDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveReceiptSettings}>
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      
+      {/* Hours Dialog - Placeholder */}
+      {hoursDialogOpen && (
+        <Dialog open={hoursDialogOpen} onOpenChange={setHoursDialogOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit Opening Hours</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-center text-muted-foreground">
+                Hours functionality will be implemented in an upcoming update.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setHoursDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
+
+// Add the missing imports
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
