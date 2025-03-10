@@ -75,9 +75,17 @@ export function LocationDetails() {
         throw receiptError;
       }
       
+      // Map database hours to the LocationHours interface
+      const mappedHours = hoursData?.map((hour: any) => ({
+        day_of_week: hour.day_of_week,
+        open_time: hour.open_time || "",
+        close_time: hour.close_time || "",
+        is_closed: hour.is_closed
+      })) || [];
+      
       setLocation({
         ...locationData,
-        hours: hoursData || [],
+        hours: mappedHours,
         receipt_settings: receiptData || { prefix: "", next_number: 1 }
       });
     } catch (error: any) {

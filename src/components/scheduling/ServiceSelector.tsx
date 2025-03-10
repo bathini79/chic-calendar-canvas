@@ -46,6 +46,22 @@ interface ServiceSelectorProps {
   onStylistSelect: (serviceId: string, stylistId: string) => void;
 }
 
+interface PackageGroup {
+  package: Package;
+  cartItemId: string;
+  services: PackageService[];
+}
+
+interface ServiceGroup {
+  cartItemId: string;
+  service: Service;
+}
+
+interface GroupedItems {
+  packages: Record<string, PackageGroup>;
+  services: ServiceGroup[];
+}
+
 export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
   // Query for additional services that might be customized in packages
   const { data: services } = useQuery({
@@ -76,7 +92,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
   });
 
   // Group items by package and standalone services
-  const groupedItems = items.reduce((acc: any, item) => {
+  const groupedItems = items.reduce((acc: GroupedItems, item) => {
     if (item.package_id && item.package) {
       const packageServices: PackageService[] = [];
       
@@ -110,15 +126,8 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     }
     return acc;
   }, { 
-    packages: {} as Record<string, {
-      package: Package;
-      cartItemId: string;
-      services: PackageService[];
-    }>, 
-    services: [] as Array<{
-      cartItemId: string;
-      service: Service;
-    }> 
+    packages: {} as Record<string, PackageGroup>, 
+    services: [] as ServiceGroup[] 
   });
 
   // Get the price for a service, prioritizing package_selling_price if available

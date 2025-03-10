@@ -48,12 +48,14 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess }: Locat
     if (locationId && isOpen) {
       setIsFetching(true);
       
-      supabase
-        .from("locations")
-        .select("*")
-        .eq("id", locationId)
-        .single()
-        .then(({ data, error }) => {
+      const fetchLocationData = async () => {
+        try {
+          const { data, error } = await supabase
+            .from("locations")
+            .select("*")
+            .eq("id", locationId)
+            .single();
+            
           if (error) {
             toast.error("Failed to fetch location data");
             console.error(error);
@@ -70,10 +72,14 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess }: Locat
               is_active: data.is_active !== false,
             });
           }
-        })
-        .finally(() => {
+        } catch (error) {
+          console.error("Error fetching location:", error);
+        } finally {
           setIsFetching(false);
-        });
+        }
+      };
+      
+      fetchLocationData();
     }
   }, [locationId, isOpen]);
 

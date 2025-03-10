@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
+import { Appointment, Booking, RefundData, RefundReason, TransactionDetails } from '../types';
 
 interface SelectedItem {
   id: string;
@@ -79,7 +79,13 @@ export function useAppointmentActions() {
 
         if (refundsError) throw refundsError;
 
+        // Create TransactionDetails with all required properties
         return {
+          id: originalSale.id,
+          amount: originalSale.total_price,
+          status: originalSale.status,
+          created_at: originalSale.created_at,
+          payment_method: originalSale.payment_method,
           originalSale,
           refunds: refunds || []
         };
@@ -102,7 +108,13 @@ export function useAppointmentActions() {
 
         if (refundsError) throw refundsError;
 
+        // Create TransactionDetails with all required properties
         return {
+          id: appointment.id,
+          amount: appointment.total_price,
+          status: appointment.status,
+          created_at: appointment.created_at,
+          payment_method: appointment.payment_method,
           originalSale: appointment,
           refunds: refunds || []
         };
@@ -133,6 +145,21 @@ export function useAppointmentActions() {
 
       if (appointmentError) throw appointmentError;
 
+      // Map refund reason to allowed values
+      let mappedRefundReason: RefundReason = "other";
+      if (refundData.reason === "booking_error") {
+        mappedRefundReason = "scheduling_error"; // Map booking_error to scheduling_error
+      } else if (refundData.reason === "service_unavailable") {
+        mappedRefundReason = "service_quality_issue"; // Map service_unavailable to service_quality_issue
+      } else if (refundData.reason === "customer_emergency" || refundData.reason === "customer_no_show") {
+        mappedRefundReason = "other"; // Map customer reasons to other
+      } else if (
+        ["customer_dissatisfaction", "service_quality_issue", "scheduling_error", 
+         "health_concern", "price_dispute", "other"].includes(refundData.reason as string)
+      ) {
+        mappedRefundReason = refundData.reason as RefundReason;
+      }
+
       // Create a refund transaction
       const { data: refundAppointment, error: refundError } = await supabase
         .from('appointments')
@@ -142,7 +169,7 @@ export function useAppointmentActions() {
           transaction_type: 'refund',
           original_appointment_id: appointmentId,
           refunded_by: refundData.refundedBy,
-          refund_reason: refundData.reason,
+          refund_reason: mappedRefundReason,
           refund_notes: refundData.notes,
           total_price: 0, // Will be updated after processing bookings
           start_time: originalAppointment.start_time,
@@ -158,7 +185,7 @@ export function useAppointmentActions() {
         .from('bookings')
         .update({
           status: 'refunded',
-          refund_reason: refundData.reason,
+          refund_reason: mappedRefundReason,
           refund_notes: refundData.notes,
           refunded_by: refundData.refundedBy,
           refunded_at: new Date().toISOString()
