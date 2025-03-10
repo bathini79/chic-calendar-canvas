@@ -1,45 +1,131 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
+import { Upload, X, Camera } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BusinessDetails {
+  id?: string;
   name: string;
   country: string;
   currency: string;
   phone: string;
-  logo: string | null;
-  externalLinks: {
-    facebook: string;
-    twitter: string;
-    instagram: string;
-    website: string;
-  }
+  logo_url: string | null;
+  facebook_url: string;
+  twitter_url: string;
+  instagram_url: string;
+  website_url: string;
 }
 
 export function BusinessDetailsForm() {
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails>({
     name: "Beauty Salon",
     country: "India",
     currency: "INR",
     phone: "+91 98765 43210",
-    logo: null,
-    externalLinks: {
-      facebook: "",
-      twitter: "",
-      instagram: "",
-      website: ""
-    }
+    logo_url: null,
+    facebook_url: "",
+    twitter_url: "",
+    instagram_url: "",
+    website_url: ""
   });
 
-  const handleSave = () => {
-    setIsEditing(false);
-    // In a real app, we would save the data to the backend here
+  useEffect(() => {
+    const fetchBusinessDetails = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("business_details")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (error && error.code !== "PGRST116") { // Not found error is ok for first time
+          throw error;
+        }
+
+        if (data) {
+          setBusinessDetails({
+            id: data.id,
+            name: data.name || "Beauty Salon",
+            country: data.country || "India",
+            currency: data.currency || "INR",
+            phone: data.phone || "",
+            logo_url: data.logo_url,
+            facebook_url: data.facebook_url || "",
+            twitter_url: data.twitter_url || "",
+            instagram_url: data.instagram_url || "",
+            website_url: data.website_url || ""
+          });
+        }
+      } catch (error: any) {
+        toast.error("Failed to load business details: " + error.message);
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBusinessDetails();
+  }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      if (businessDetails.id) {
+        // Update existing record
+        const { error } = await supabase
+          .from("business_details")
+          .update({
+            name: businessDetails.name,
+            country: businessDetails.country,
+            currency: businessDetails.currency,
+            phone: businessDetails.phone,
+            logo_url: businessDetails.logo_url,
+            facebook_url: businessDetails.facebook_url,
+            twitter_url: businessDetails.twitter_url,
+            instagram_url: businessDetails.instagram_url,
+            website_url: businessDetails.website_url
+          })
+          .eq("id", businessDetails.id);
+
+        if (error) throw error;
+      } else {
+        // Create new record
+        const { error } = await supabase
+          .from("business_details")
+          .insert([{
+            name: businessDetails.name,
+            country: businessDetails.country,
+            currency: businessDetails.currency,
+            phone: businessDetails.phone,
+            logo_url: businessDetails.logo_url,
+            facebook_url: businessDetails.facebook_url,
+            twitter_url: businessDetails.twitter_url,
+            instagram_url: businessDetails.instagram_url,
+            website_url: businessDetails.website_url
+          }]);
+
+        if (error) throw error;
+      }
+
+      toast.success("Business details saved successfully");
+      setIsEditing(false);
+    } catch (error: any) {
+      toast.error("Failed to save business details: " + error.message);
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleChange = (field: keyof BusinessDetails, value: string) => {
@@ -49,31 +135,63 @@ export function BusinessDetailsForm() {
     }));
   };
 
-  const handleExternalLinkChange = (field: keyof typeof businessDetails.externalLinks, value: string) => {
-    setBusinessDetails(prev => ({
-      ...prev,
-      externalLinks: {
-        ...prev.externalLinks,
-        [field]: value
-      }
-    }));
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // In a real app, we would upload the file to a storage service
-      // and get back a URL to store in businessDetails.logo
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size should be less than 5MB");
+      return;
+    }
+
+    try {
+      // First check if storage bucket exists, if not, we'll use a different approach
+      const timestamp = new Date().getTime();
+      const filePath = `business-logos/${timestamp}-${file.name}`;
+
+      // Use FileReader as a fallback to handle the image on the client side
       const reader = new FileReader();
       reader.onloadend = () => {
         setBusinessDetails(prev => ({
           ...prev,
-          logo: reader.result as string
+          logo_url: reader.result as string
         }));
       };
       reader.readAsDataURL(file);
+    } catch (error: any) {
+      toast.error("Failed to upload logo: " + error.message);
+      console.error(error);
     }
   };
+
+  const handleRemoveLogo = () => {
+    setBusinessDetails(prev => ({
+      ...prev,
+      logo_url: null
+    }));
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Business Info</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center items-center p-8">
+            Loading business details...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -97,30 +215,64 @@ export function BusinessDetailsForm() {
           {!isEditing ? (
             <Button onClick={() => setIsEditing(true)}>Edit</Button>
           ) : (
-            <Button onClick={handleSave}>Save</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
           )}
         </CardHeader>
         <CardContent>
           {isEditing ? (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
                 <Label htmlFor="logo">Business Logo</Label>
-                <div className="mt-2">
-                  {businessDetails.logo && (
-                    <div className="mb-2">
+                <div className="mt-2 flex flex-col items-center gap-4">
+                  {businessDetails.logo_url ? (
+                    <div className="relative">
                       <img 
-                        src={businessDetails.logo} 
+                        src={businessDetails.logo_url} 
                         alt="Business Logo" 
-                        className="h-16 w-16 object-cover rounded-md" 
+                        className="h-24 w-24 object-cover rounded-md" 
                       />
+                      <button 
+                        onClick={handleRemoveLogo}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full"
+                        type="button"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-24 w-24 bg-muted rounded-md flex items-center justify-center">
+                        <Camera className="h-10 w-10 text-muted-foreground" />
+                      </div>
+                      <span className="text-sm text-muted-foreground">No logo uploaded</span>
                     </div>
                   )}
-                  <Input
-                    id="logo"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                  />
+                  
+                  <div className="w-full">
+                    <div className="relative">
+                      <Input
+                        id="logo"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => document.getElementById('logo')?.click()}
+                        type="button"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {businessDetails.logo_url ? "Change Logo" : "Upload Logo"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Recommended: PNG or JPG, 512x512 pixels or larger. Max file size 5MB.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -183,35 +335,35 @@ export function BusinessDetailsForm() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {businessDetails.logo && (
-                <div className="col-span-2 mb-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {businessDetails.logo_url && (
+                <div className="col-span-2 mb-2 flex justify-center md:justify-start">
                   <img 
-                    src={businessDetails.logo} 
+                    src={businessDetails.logo_url} 
                     alt="Business Logo" 
-                    className="h-16 w-16 object-cover rounded-md" 
+                    className="h-24 w-24 object-cover rounded-md shadow-md" 
                   />
                 </div>
               )}
               
               <div>
                 <div className="text-sm text-muted-foreground">Business name</div>
-                <div>{businessDetails.name}</div>
+                <div className="font-medium">{businessDetails.name}</div>
               </div>
 
               <div>
                 <div className="text-sm text-muted-foreground">Country</div>
-                <div>{businessDetails.country}</div>
+                <div className="font-medium">{businessDetails.country}</div>
               </div>
 
               <div>
                 <div className="text-sm text-muted-foreground">Currency</div>
-                <div>{businessDetails.currency}</div>
+                <div className="font-medium">{businessDetails.currency}</div>
               </div>
 
               <div>
                 <div className="text-sm text-muted-foreground">Phone Number</div>
-                <div>{businessDetails.phone}</div>
+                <div className="font-medium">{businessDetails.phone || "Not set"}</div>
               </div>
             </div>
           )}
@@ -229,8 +381,8 @@ export function BusinessDetailsForm() {
                 <Label htmlFor="facebook">Facebook</Label>
                 <Input
                   id="facebook"
-                  value={businessDetails.externalLinks.facebook}
-                  onChange={(e) => handleExternalLinkChange('facebook', e.target.value)}
+                  value={businessDetails.facebook_url}
+                  onChange={(e) => handleChange('facebook_url', e.target.value)}
                   className="mt-1"
                   placeholder="https://facebook.com/yourbusiness"
                 />
@@ -240,8 +392,8 @@ export function BusinessDetailsForm() {
                 <Label htmlFor="twitter">X (Twitter)</Label>
                 <Input
                   id="twitter"
-                  value={businessDetails.externalLinks.twitter}
-                  onChange={(e) => handleExternalLinkChange('twitter', e.target.value)}
+                  value={businessDetails.twitter_url}
+                  onChange={(e) => handleChange('twitter_url', e.target.value)}
                   className="mt-1"
                   placeholder="https://twitter.com/yourbusiness"
                 />
@@ -251,8 +403,8 @@ export function BusinessDetailsForm() {
                 <Label htmlFor="instagram">Instagram</Label>
                 <Input
                   id="instagram"
-                  value={businessDetails.externalLinks.instagram}
-                  onChange={(e) => handleExternalLinkChange('instagram', e.target.value)}
+                  value={businessDetails.instagram_url}
+                  onChange={(e) => handleChange('instagram_url', e.target.value)}
                   className="mt-1"
                   placeholder="https://instagram.com/yourbusiness"
                 />
@@ -262,8 +414,8 @@ export function BusinessDetailsForm() {
                 <Label htmlFor="website">Website</Label>
                 <Input
                   id="website"
-                  value={businessDetails.externalLinks.website}
-                  onChange={(e) => handleExternalLinkChange('website', e.target.value)}
+                  value={businessDetails.website_url}
+                  onChange={(e) => handleChange('website_url', e.target.value)}
                   className="mt-1"
                   placeholder="https://yourbusiness.com"
                 />
@@ -274,12 +426,12 @@ export function BusinessDetailsForm() {
               <div>
                 <div className="text-sm text-muted-foreground">Facebook</div>
                 <div>
-                  {businessDetails.externalLinks.facebook ? (
-                    <a href={businessDetails.externalLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-primary">
-                      {businessDetails.externalLinks.facebook}
+                  {businessDetails.facebook_url ? (
+                    <a href={businessDetails.facebook_url} target="_blank" rel="noopener noreferrer" className="text-primary">
+                      {businessDetails.facebook_url}
                     </a>
                   ) : (
-                    <span className="text-primary cursor-pointer">Add</span>
+                    <span className="text-muted-foreground">Not set</span>
                   )}
                 </div>
               </div>
@@ -287,12 +439,12 @@ export function BusinessDetailsForm() {
               <div>
                 <div className="text-sm text-muted-foreground">X (Twitter)</div>
                 <div>
-                  {businessDetails.externalLinks.twitter ? (
-                    <a href={businessDetails.externalLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-primary">
-                      {businessDetails.externalLinks.twitter}
+                  {businessDetails.twitter_url ? (
+                    <a href={businessDetails.twitter_url} target="_blank" rel="noopener noreferrer" className="text-primary">
+                      {businessDetails.twitter_url}
                     </a>
                   ) : (
-                    <span className="text-primary cursor-pointer">Add</span>
+                    <span className="text-muted-foreground">Not set</span>
                   )}
                 </div>
               </div>
@@ -300,12 +452,12 @@ export function BusinessDetailsForm() {
               <div>
                 <div className="text-sm text-muted-foreground">Instagram</div>
                 <div>
-                  {businessDetails.externalLinks.instagram ? (
-                    <a href={businessDetails.externalLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-primary">
-                      {businessDetails.externalLinks.instagram}
+                  {businessDetails.instagram_url ? (
+                    <a href={businessDetails.instagram_url} target="_blank" rel="noopener noreferrer" className="text-primary">
+                      {businessDetails.instagram_url}
                     </a>
                   ) : (
-                    <span className="text-primary cursor-pointer">Add</span>
+                    <span className="text-muted-foreground">Not set</span>
                   )}
                 </div>
               </div>
@@ -313,12 +465,12 @@ export function BusinessDetailsForm() {
               <div>
                 <div className="text-sm text-muted-foreground">Website</div>
                 <div>
-                  {businessDetails.externalLinks.website ? (
-                    <a href={businessDetails.externalLinks.website} target="_blank" rel="noopener noreferrer" className="text-primary">
-                      {businessDetails.externalLinks.website}
+                  {businessDetails.website_url ? (
+                    <a href={businessDetails.website_url} target="_blank" rel="noopener noreferrer" className="text-primary">
+                      {businessDetails.website_url}
                     </a>
                   ) : (
-                    <span className="text-primary cursor-pointer">Add</span>
+                    <span className="text-muted-foreground">Not set</span>
                   )}
                 </div>
               </div>

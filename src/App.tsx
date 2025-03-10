@@ -58,6 +58,7 @@ export default function App() {
             <Route path="inventory" element={<Inventory />} />
             <Route path="settings" element={<Settings />} />
             <Route path="settings/business-setup" element={<BusinessSetup />} />
+            <Route path="settings/business-setup/*" element={<BusinessSetup />} />
           </Route>
         </Routes>
       </DndProvider>
