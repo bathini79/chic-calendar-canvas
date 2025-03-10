@@ -202,6 +202,51 @@ export type Database = {
           },
         ]
       }
+      business_details: {
+        Row: {
+          country: string | null
+          created_at: string | null
+          currency: string | null
+          facebook_url: string | null
+          id: string
+          instagram_url: string | null
+          logo_url: string | null
+          name: string
+          phone: string | null
+          twitter_url: string | null
+          updated_at: string | null
+          website_url: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          facebook_url?: string | null
+          id?: string
+          instagram_url?: string | null
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          twitter_url?: string | null
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          facebook_url?: string | null
+          id?: string
+          instagram_url?: string | null
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          twitter_url?: string | null
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string
@@ -616,33 +661,48 @@ export type Database = {
       locations: {
         Row: {
           address: string | null
+          city: string | null
+          country: string | null
           created_at: string
           email: string | null
           id: string
+          is_active: boolean | null
           name: string
           phone: string | null
+          state: string | null
           status: Database["public"]["Enums"]["location_status"] | null
           updated_at: string
+          zip_code: string | null
         }
         Insert: {
           address?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           id?: string
+          is_active?: boolean | null
           name: string
           phone?: string | null
+          state?: string | null
           status?: Database["public"]["Enums"]["location_status"] | null
           updated_at?: string
+          zip_code?: string | null
         }
         Update: {
           address?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           id?: string
+          is_active?: boolean | null
           name?: string
           phone?: string | null
+          state?: string | null
           status?: Database["public"]["Enums"]["location_status"] | null
           updated_at?: string
+          zip_code?: string | null
         }
         Relationships: []
       }
@@ -923,6 +983,41 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      receipt_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          location_id: string | null
+          next_number: number | null
+          prefix: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          location_id?: string | null
+          next_number?: number | null
+          prefix?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          location_id?: string | null
+          next_number?: number | null
+          prefix?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipt_settings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]

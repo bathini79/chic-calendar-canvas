@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ChevronLeft, Edit2 } from "lucide-react";
-import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { LocationDialog } from "./LocationDialog";
 
 interface LocationHours {
   day_of_week: string;
@@ -39,55 +40,62 @@ export function LocationDetails() {
   const { locationId } = useParams<{ locationId: string }>();
   const [location, setLocation] = useState<Location | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { data: locationsData } = useSupabaseCrud("locations");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  
+  const fetchLocationDetails = async () => {
+    if (!locationId) return;
+    
+    try {
+      setIsLoading(true);
+      // Fetch location data
+      const { data: locationData, error } = await supabase
+        .from("locations")
+        .select("*")
+        .eq("id", locationId)
+        .single();
+        
+      if (error) throw error;
+      
+      // Fetch location hours
+      const { data: hoursData, error: hoursError } = await supabase
+        .from("location_hours")
+        .select("*")
+        .eq("location_id", locationId);
+        
+      if (hoursError) throw hoursError;
+      
+      // Fetch receipt settings
+      const { data: receiptData, error: receiptError } = await supabase
+        .from("receipt_settings")
+        .select("*")
+        .eq("location_id", locationId)
+        .single();
+        
+      if (receiptError && receiptError.code !== "PGRST116") { // Not found is ok
+        throw receiptError;
+      }
+      
+      setLocation({
+        ...locationData,
+        hours: hoursData || [],
+        receipt_settings: receiptData || { prefix: "", next_number: 1 }
+      });
+    } catch (error: any) {
+      toast.error("Failed to load location details: " + error.message);
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   useEffect(() => {
-    const fetchLocationDetails = async () => {
-      if (!locationId) return;
-      
-      try {
-        const { data: locationData, error } = await supabase
-          .from("locations")
-          .select("*")
-          .eq("id", locationId)
-          .single();
-          
-        if (error) throw error;
-        
-        // Fetch location hours
-        const { data: hoursData, error: hoursError } = await supabase
-          .from("location_hours")
-          .select("*")
-          .eq("location_id", locationId);
-          
-        if (hoursError) throw hoursError;
-        
-        // Fetch receipt settings
-        const { data: receiptData, error: receiptError } = await supabase
-          .from("receipt_settings")
-          .select("*")
-          .eq("location_id", locationId)
-          .single();
-          
-        if (receiptError && receiptError.code !== "PGRST116") { // Not found is ok
-          throw receiptError;
-        }
-        
-        setLocation({
-          ...locationData,
-          hours: hoursData,
-          receipt_settings: receiptData || { prefix: "", next_number: 1 }
-        });
-      } catch (error: any) {
-        toast.error("Failed to load location details: " + error.message);
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
     fetchLocationDetails();
   }, [locationId]);
+  
+  const handleEditSuccess = () => {
+    fetchLocationDetails();
+    setEditDialogOpen(false);
+  };
   
   if (isLoading) {
     return <div className="p-8 text-center">Loading location details...</div>;
@@ -124,9 +132,9 @@ export function LocationDetails() {
       
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">{location.name}</h1>
-        <Button variant="outline">
+        <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
           <Edit2 className="h-4 w-4 mr-2" />
-          Options
+          Edit Location
         </Button>
       </div>
       
@@ -157,7 +165,7 @@ export function LocationDetails() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Contact details</CardTitle>
-            <Button variant="ghost" size="sm" className="text-primary">
+            <Button variant="ghost" size="sm" className="text-primary" onClick={() => setEditDialogOpen(true)}>
               Edit
             </Button>
           </CardHeader>
@@ -202,7 +210,7 @@ export function LocationDetails() {
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Location</CardTitle>
-          <Button variant="ghost" size="sm" className="text-primary">
+          <Button variant="ghost" size="sm" className="text-primary" onClick={() => setEditDialogOpen(true)}>
             Edit
           </Button>
         </CardHeader>
@@ -335,6 +343,13 @@ export function LocationDetails() {
           </div>
         </CardContent>
       </Card>
+      
+      <LocationDialog
+        isOpen={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        locationId={locationId}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 }

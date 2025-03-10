@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
 import { Upload, X, Camera } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 interface BusinessDetails {
@@ -152,11 +151,7 @@ export function BusinessDetailsForm() {
     }
 
     try {
-      // First check if storage bucket exists, if not, we'll use a different approach
-      const timestamp = new Date().getTime();
-      const filePath = `business-logos/${timestamp}-${file.name}`;
-
-      // Use FileReader as a fallback to handle the image on the client side
+      // Use FileReader to handle the image on the client side
       const reader = new FileReader();
       reader.onloadend = () => {
         setBusinessDetails(prev => ({
