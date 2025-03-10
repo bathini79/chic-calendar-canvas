@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { AdminRoute } from "@/components/auth/AdminRoute";
@@ -15,6 +16,8 @@ import Auth from "./pages/Auth";
 import UnifiedScheduling from "./pages/customer/UnifiedScheduling";
 import BookingConfirmation from "./pages/customer/BookingConfirmation";
 import AdminBookings from "./pages/admin/AdminBookings";
+import Settings from "./pages/admin/Settings";
+import BusinessSetup from "./pages/admin/settings/BusinessSetup";
 
 // 1) Import DnD
 import { DndProvider } from "react-dnd";
@@ -53,6 +56,8 @@ export default function App() {
             <Route path="services" element={<AdminServices />} />
             <Route path="staff" element={<Staff />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="settings/business-setup" element={<BusinessSetup />} />
           </Route>
         </Routes>
       </DndProvider>

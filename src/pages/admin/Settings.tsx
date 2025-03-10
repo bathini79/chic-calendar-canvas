@@ -1,0 +1,133 @@
+
+import React from "react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { SettingsIcon, Globe, Tag, Building, Users, FileText, CreditCard } from "lucide-react";
+import { Link } from "react-router-dom";
+
+export default function Settings() {
+  return (
+    <div className="container py-6 max-w-6xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Workspace settings</h1>
+        <p className="text-muted-foreground">Manage settings for your business.</p>
+      </div>
+
+      <Tabs defaultValue="settings" className="mb-6">
+        <TabsList>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="online">Online presence</TabsTrigger>
+          <TabsTrigger value="marketing">Marketing</TabsTrigger>
+          <TabsTrigger value="other">Other</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <Link to="/admin/settings/business-setup">
+          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="pt-6">
+              <div className="flex flex-col h-full">
+                <div className="mb-4">
+                  <Building className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold">Business setup</h3>
+                <p className="text-muted-foreground text-sm">
+                  Customize business details, manage locations, and client referral sources.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Card className="h-full">
+          <CardContent className="pt-6">
+            <div className="flex flex-col h-full">
+              <div className="mb-4">
+                <Globe className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold">Scheduling</h3>
+              <p className="text-muted-foreground text-sm">
+                Set your availability, manage bookable resources and online booking preferences.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="h-full">
+          <CardContent className="pt-6">
+            <div className="flex flex-col h-full">
+              <div className="mb-4">
+                <Tag className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold">Sales</h3>
+              <p className="text-muted-foreground text-sm">
+                Configure payment methods, taxes, receipts, service charges and gift cards.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="h-full">
+          <CardContent className="pt-6">
+            <div className="flex flex-col h-full">
+              <div className="mb-4">
+                <Building className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold">Billing</h3>
+              <p className="text-muted-foreground text-sm">
+                Manage invoices, text messages, add-ons and billing.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="h-full">
+          <CardContent className="pt-6">
+            <div className="flex flex-col h-full">
+              <div className="mb-4">
+                <Users className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold">Team</h3>
+              <p className="text-muted-foreground text-sm">
+                Manage permissions, compensation and time-off.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="h-full">
+          <CardContent className="pt-6">
+            <div className="flex flex-col h-full">
+              <div className="mb-4">
+                <FileText className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold">Forms</h3>
+              <p className="text-muted-foreground text-sm">
+                Configure templates for client forms.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="h-full">
+          <CardContent className="pt-6">
+            <div className="flex flex-col h-full">
+              <div className="mb-4">
+                <CreditCard className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold">Payments</h3>
+              <p className="text-muted-foreground text-sm">
+                Configure payment methods, terminals and your payment policy.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Online presence</h2>
+        {/* Online presence section can be expanded in the future */}
+      </div>
+    </div>
+  );
+}
