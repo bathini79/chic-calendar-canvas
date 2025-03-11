@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,6 +7,9 @@ import { ChevronLeft, Edit2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { LocationDialog } from "./LocationDialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 interface LocationHours {
   day_of_week: string;
@@ -334,7 +336,7 @@ export function LocationDetails() {
           </div>
           
           <div className="mt-4 text-muted-foreground text-sm text-center">
-            <p>Hours functionality will be fully implemented in the upcoming update.</p>
+            <p>Hours functionality will be implemented in the upcoming update.</p>
           </div>
         </CardContent>
       </Card>
@@ -464,7 +466,3 @@ export function LocationDetails() {
     </div>
   );
 }
-
-// Add the missing imports
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
