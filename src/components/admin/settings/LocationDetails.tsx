@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,8 +11,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TimeInput } from "@/components/ui/time-input";
 
 interface LocationHours {
   day_of_week: number;
@@ -60,7 +57,6 @@ export function LocationDetails() {
     next_number: 1
   });
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
-  const [hoursDialogOpen, setHoursDialogOpen] = useState(false);
   const [locationHours, setLocationHours] = useState<LocationHours[]>([]);
   
   const fetchLocationDetails = async () => {
@@ -68,7 +64,6 @@ export function LocationDetails() {
     
     try {
       setIsLoading(true);
-      // Fetch location data
       const { data: locationData, error } = await supabase
         .from("locations")
         .select("*")
@@ -77,7 +72,6 @@ export function LocationDetails() {
         
       if (error) throw error;
       
-      // Fetch location hours
       const { data: hoursData, error: hoursError } = await supabase
         .from("location_hours")
         .select("*")
@@ -85,7 +79,6 @@ export function LocationDetails() {
         
       if (hoursError) throw hoursError;
       
-      // Fetch receipt settings
       const { data: receiptData, error: receiptError } = await supabase
         .from("receipt_settings")
         .select("*")
@@ -96,7 +89,6 @@ export function LocationDetails() {
         throw receiptError;
       }
       
-      // Map database information to the Location interface
       const mappedLocation: Location = {
         ...locationData,
         hours: hoursData || [],
@@ -133,14 +125,12 @@ export function LocationDetails() {
     fetchLocationDetails();
     setEditDialogOpen(false);
     setReceiptDialogOpen(false);
-    setHoursDialogOpen(false);
   };
   
   const handleSaveReceiptSettings = async () => {
     if (!locationId) return;
     
     try {
-      // Check if receipt settings already exist
       const { data, error: checkError } = await supabase
         .from("receipt_settings")
         .select("id")
@@ -149,7 +139,6 @@ export function LocationDetails() {
       if (checkError) throw checkError;
       
       if (data && data.length > 0) {
-        // Update existing settings
         const { error } = await supabase
           .from("receipt_settings")
           .update({
@@ -160,7 +149,6 @@ export function LocationDetails() {
           
         if (error) throw error;
       } else {
-        // Create new settings
         const { error } = await supabase
           .from("receipt_settings")
           .insert({
@@ -181,73 +169,6 @@ export function LocationDetails() {
     }
   };
 
-  // Initialize location hours with default values for all days of the week
-  const initializeLocationHours = () => {
-    const daysOfWeek = [0, 1, 2, 3, 4, 5, 6]; // Sunday = 0, Monday = 1, ..., Saturday = 6
-    
-    // If we already have hours, use them
-    if (locationHours.length > 0) return;
-    
-    // Create default hours for each day
-    const defaultHours: LocationHours[] = daysOfWeek.map(day => ({
-      day_of_week: day,
-      start_time: day === 0 ? '10:00' : '09:00', // Sunday starts later
-      end_time: day === 0 ? '16:00' : '18:00',   // Sunday ends earlier
-      is_closed: day === 0, // Sunday is closed by default
-    }));
-    
-    setLocationHours(defaultHours);
-  };
-
-  // Handle opening the hours dialog
-  const handleEditHours = () => {
-    initializeLocationHours();
-    setHoursDialogOpen(true);
-  };
-
-  // Update a specific day's hours
-  const updateDayHours = (dayIndex: number, field: keyof LocationHours, value: any) => {
-    setLocationHours(prev => 
-      prev.map((day, index) => 
-        index === dayIndex ? { ...day, [field]: value } : day
-      )
-    );
-  };
-
-  // Save location hours
-  const handleSaveHours = async () => {
-    if (!locationId) return;
-
-    try {
-      // First, delete any existing hours
-      const { error: deleteError } = await supabase
-        .from("location_hours")
-        .delete()
-        .eq("location_id", locationId);
-
-      if (deleteError) throw deleteError;
-
-      // Then insert the new hours
-      const hoursToInsert = locationHours.map(hour => ({
-        ...hour,
-        location_id: locationId
-      }));
-
-      const { error: insertError } = await supabase
-        .from("location_hours")
-        .insert(hoursToInsert);
-
-      if (insertError) throw insertError;
-
-      toast.success("Business hours updated successfully");
-      fetchLocationDetails();
-      setHoursDialogOpen(false);
-    } catch (error: any) {
-      toast.error("Failed to update business hours: " + error.message);
-      console.error(error);
-    }
-  };
-  
   if (isLoading) {
     return <div className="p-8 text-center">Loading location details...</div>;
   }
@@ -264,7 +185,6 @@ export function LocationDetails() {
     location.country
   ].filter(Boolean).join(", ");
   
-  // Generate business hours display based on actual data
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   
   return (
@@ -289,7 +209,6 @@ export function LocationDetails() {
         </Button>
       </div>
       
-      {/* Get your business online section */}
       <Card className="mb-8 bg-primary text-primary-foreground">
         <CardContent className="pt-6 pb-8">
           <div className="flex items-center justify-between">
@@ -304,7 +223,6 @@ export function LocationDetails() {
               </Button>
             </div>
             <div className="hidden md:block">
-              {/* Placeholder for an illustration */}
               <div className="w-48 h-48 bg-primary-foreground/20 rounded-md"></div>
             </div>
           </div>
@@ -312,7 +230,6 @@ export function LocationDetails() {
       </Card>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Contact Details */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Contact details</CardTitle>
@@ -334,7 +251,6 @@ export function LocationDetails() {
           </CardContent>
         </Card>
         
-        {/* Billing Details */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Billing details for client sales</CardTitle>
@@ -356,7 +272,6 @@ export function LocationDetails() {
         </Card>
       </div>
       
-      {/* Location */}
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Location</CardTitle>
@@ -371,7 +286,6 @@ export function LocationDetails() {
               <div>{fullAddress}</div>
             </div>
             <div className="aspect-video bg-muted rounded-md w-full">
-              {/* Placeholder for map */}
               <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                 Map view would be displayed here
               </div>
@@ -380,11 +294,10 @@ export function LocationDetails() {
         </CardContent>
       </Card>
       
-      {/* Opening Hours */}
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Opening hours</CardTitle>
-          <Button variant="ghost" size="sm" className="text-primary" onClick={handleEditHours}>
+          <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation()}>
             Edit
           </Button>
         </CardHeader>
@@ -396,7 +309,6 @@ export function LocationDetails() {
           
           <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
             {daysOfWeek.map((day, index) => {
-              // Find the hours for this day
               const dayHours = location.hours?.find(h => h.day_of_week === index);
               const isClosed = dayHours?.is_closed || false;
               
@@ -425,7 +337,6 @@ export function LocationDetails() {
       </Card>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Tax Defaults */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Tax defaults</CardTitle>
@@ -451,7 +362,6 @@ export function LocationDetails() {
           </CardContent>
         </Card>
         
-        {/* Receipt Sequencing */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Receipt sequencing</CardTitle>
@@ -474,7 +384,6 @@ export function LocationDetails() {
         </Card>
       </div>
       
-      {/* Main Location Dialog */}
       <LocationDialog
         isOpen={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
@@ -483,7 +392,6 @@ export function LocationDetails() {
         mode={editDialogMode}
       />
       
-      {/* Receipt Settings Dialog */}
       {receiptDialogOpen && (
         <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
           <DialogContent className="sm:max-w-[500px]">
@@ -519,74 +427,6 @@ export function LocationDetails() {
                 Cancel
               </Button>
               <Button onClick={handleSaveReceiptSettings}>
-                Save
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-      
-      {/* Hours Dialog */}
-      {hoursDialogOpen && (
-        <Dialog open={hoursDialogOpen} onOpenChange={setHoursDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Edit Opening Hours</DialogTitle>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              {daysOfWeek.map((day, index) => {
-                const currentDayHours = locationHours.find(h => h.day_of_week === index) || {
-                  day_of_week: index,
-                  start_time: "09:00",
-                  end_time: "18:00",
-                  is_closed: index === 0 // Sunday closed by default
-                };
-                
-                return (
-                  <div key={day} className="grid grid-cols-1 gap-4 p-4 border rounded-md">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-medium">{day}</Label>
-                      <div className="flex items-center space-x-2">
-                        <Label htmlFor={`closed-${index}`} className="text-sm">Closed</Label>
-                        <Switch 
-                          id={`closed-${index}`}
-                          checked={!!locationHours[index]?.is_closed}
-                          onCheckedChange={(checked) => updateDayHours(index, 'is_closed', checked)}
-                        />
-                      </div>
-                    </div>
-                    
-                    {!locationHours[index]?.is_closed && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`start-time-${index}`}>Open</Label>
-                          <Input
-                            id={`start-time-${index}`}
-                            type="time"
-                            value={locationHours[index]?.start_time || "09:00"}
-                            onChange={(e) => updateDayHours(index, 'start_time', e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`end-time-${index}`}>Close</Label>
-                          <Input
-                            id={`end-time-${index}`}
-                            type="time"
-                            value={locationHours[index]?.end_time || "18:00"}
-                            onChange={(e) => updateDayHours(index, 'end_time', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setHoursDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveHours}>
                 Save
               </Button>
             </DialogFooter>

@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { TimeInput } from "@/components/ui/time-input";
 
 interface LocationDialogProps {
   isOpen: boolean;
@@ -30,6 +31,15 @@ interface LocationFormData {
   is_active: boolean;
 }
 
+interface LocationHours {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_closed: boolean;
+  id?: string;
+  location_id?: string;
+}
+
 export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = "full" }: LocationDialogProps) {
   const [formData, setFormData] = useState<LocationFormData>({
     name: "",
@@ -44,6 +54,26 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [locationHours, setLocationHours] = useState<LocationHours[]>([]);
+
+  // Initialize location hours with default values for all days of the week
+  const initializeLocationHours = () => {
+    const daysOfWeek = [0, 1, 2, 3, 4, 5, 6]; // Sunday = 0, Monday = 1, ..., Saturday = 6
+    
+    // If we already have hours with values, use them
+    if (locationHours.length > 0) return;
+    
+    // Create default hours for each day
+    const defaultHours: LocationHours[] = daysOfWeek.map(day => ({
+      day_of_week: day,
+      start_time: day === 0 ? '10:00' : '09:00', // Sunday starts later
+      end_time: day === 0 ? '16:00' : '18:00',   // Sunday ends earlier
+      is_closed: day === 0, // Sunday is closed by default
+    }));
+    
+    setLocationHours(defaultHours);
+  };
 
   // Fetch location data if editing
   useEffect(() => {
@@ -73,6 +103,20 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
               phone: data.phone || "",
               is_active: data.is_active !== false,
             });
+
+            // Fetch location hours
+            const { data: hoursData, error: hoursError } = await supabase
+              .from("location_hours")
+              .select("*")
+              .eq("location_id", locationId);
+                
+            if (hoursError) {
+              console.error("Error fetching location hours:", hoursError);
+            } else if (hoursData && hoursData.length > 0) {
+              setLocationHours(hoursData);
+            } else {
+              initializeLocationHours();
+            }
           }
         } catch (error) {
           console.error("Error fetching location:", error);
@@ -82,6 +126,9 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
       };
       
       fetchLocationData();
+    } else if (isOpen) {
+      // Initialize hours for new location
+      initializeLocationHours();
     }
   }, [locationId, isOpen]);
 
@@ -101,6 +148,7 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
           is_active: true,
         });
       }
+      setCurrentStep(1);
     }
   }, [isOpen, locationId]);
 
@@ -111,52 +159,103 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
     }));
   };
 
-  const handleSubmit = async () => {
-    // Validate based on the current mode
-    if (mode === "full" && (!formData.name || !formData.address)) {
-      toast.error("Please fill in all required fields");
-      return;
-    } else if (mode === "contact" && (!formData.email && !formData.phone)) {
-      toast.error("Please fill in at least one contact method");
-      return;
-    }
+  // Update a specific day's hours
+  const updateDayHours = (dayIndex: number, field: keyof LocationHours, value: any) => {
+    setLocationHours(prev => 
+      prev.map((day, index) => 
+        index === dayIndex ? { ...day, [field]: value } : day
+      )
+    );
+  };
 
+  const validateCurrentStep = () => {
+    if (currentStep === 1) {
+      return formData.name && (formData.email || formData.phone);
+    } else if (currentStep === 2) {
+      return formData.address;
+    }
+    return true;
+  };
+
+  const handleSubmit = async () => {
     setIsLoading(true);
 
     try {
-      let updatedData: Partial<LocationFormData> = {};
+      let locationId;
       
-      // Only update the relevant fields based on mode
-      if (mode === "full") {
-        updatedData = formData;
-      } else if (mode === "contact") {
-        updatedData = {
-          email: formData.email,
-          phone: formData.phone
-        };
-      } else if (mode === "receipt") {
-        // Receipt sequencing is handled separately in LocationDetails
-        onClose();
-        return;
-      }
-      
-      if (locationId) {
-        // Update existing location
+      if (mode !== "full") {
+        // Handle contact or receipt edit mode
+        let updatedData: Partial<LocationFormData> = {};
+        
+        if (mode === "contact") {
+          updatedData = {
+            email: formData.email,
+            phone: formData.phone
+          };
+        }
+        
         const { error } = await supabase
           .from("locations")
           .update(updatedData)
           .eq("id", locationId);
 
         if (error) throw error;
-        toast.success("Location updated successfully");
+        
       } else {
-        // Create new location
-        const { error } = await supabase
-          .from("locations")
-          .insert([formData]);
+        // Handle full form submission
+        if (!formData.name) {
+          toast.error("Location name is required");
+          setIsLoading(false);
+          return;
+        }
 
-        if (error) throw error;
-        toast.success("Location created successfully");
+        let response;
+        if (locationId) {
+          // Update existing location
+          response = await supabase
+            .from("locations")
+            .update(formData)
+            .eq("id", locationId);
+          
+          if (response.error) throw response.error;
+          locationId = locationId;
+        } else {
+          // Create new location
+          response = await supabase
+            .from("locations")
+            .insert([formData])
+            .select();
+
+          if (response.error) throw response.error;
+          if (response.data && response.data.length > 0) {
+            locationId = response.data[0].id;
+          }
+        }
+
+        // Save location hours
+        if (locationId) {
+          // First, delete any existing hours
+          const { error: deleteError } = await supabase
+            .from("location_hours")
+            .delete()
+            .eq("location_id", locationId);
+
+          if (deleteError) throw deleteError;
+
+          // Then insert the new hours
+          const hoursToInsert = locationHours.map(hour => ({
+            ...hour,
+            location_id: locationId
+          }));
+
+          const { error: insertError } = await supabase
+            .from("location_hours")
+            .insert(hoursToInsert);
+
+          if (insertError) throw insertError;
+        }
+
+        toast.success(locationId ? "Location updated successfully" : "Location created successfully");
       }
 
       if (onSuccess) onSuccess();
@@ -175,169 +274,266 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
     return locationId ? "Edit Location" : "Add Location";
   };
 
+  const renderStepContent = () => {
+    if (isFetching) {
+      return <div className="py-4 text-center">Loading location data...</div>;
+    }
+
+    if (mode === "contact") {
+      return (
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleChange("email", e.target.value)}
+              placeholder="Location email address"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              value={formData.phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
+              placeholder="Contact number"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    if (mode === "full") {
+      // Multi-step form
+      switch (currentStep) {
+        case 1: // Contact Information
+          return (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Location Name*</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => handleChange("name", e.target.value)}
+                  placeholder="e.g. Main Salon"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleChange("email", e.target.value)}
+                  placeholder="Location email address"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => handleChange("phone", e.target.value)}
+                  placeholder="Contact number"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2 mt-6">
+                <Checkbox
+                  id="is_active"
+                  checked={formData.is_active}
+                  onCheckedChange={(checked) => handleChange("is_active", checked)}
+                />
+                <Label htmlFor="is_active">Location is active</Label>
+              </div>
+            </div>
+          );
+        
+        case 2: // Address Information
+          return (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="address">Address*</Label>
+                <Input
+                  id="address"
+                  value={formData.address}
+                  onChange={(e) => handleChange("address", e.target.value)}
+                  placeholder="Street address"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={formData.city}
+                    onChange={(e) => handleChange("city", e.target.value)}
+                    placeholder="City"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    value={formData.state}
+                    onChange={(e) => handleChange("state", e.target.value)}
+                    placeholder="State/Province"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="zip_code">Postal Code</Label>
+                  <Input
+                    id="zip_code"
+                    value={formData.zip_code}
+                    onChange={(e) => handleChange("zip_code", e.target.value)}
+                    placeholder="Postal/Zip code"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Select
+                    value={formData.country}
+                    onValueChange={(value) => handleChange("country", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="India">India</SelectItem>
+                      <SelectItem value="United States">United States</SelectItem>
+                      <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                      <SelectItem value="Canada">Canada</SelectItem>
+                      <SelectItem value="Australia">Australia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          );
+        
+        case 3: // Opening Hours
+          return (
+            <div className="py-4 space-y-4">
+              <p className="text-sm text-muted-foreground mb-4">
+                Set operating hours for this location. These will be the default working hours for your team and visible to clients.
+              </p>
+              
+              {locationHours.map((day, index) => {
+                const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                return (
+                  <div key={index} className="grid grid-cols-1 gap-4 p-4 border rounded-md">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-medium">{daysOfWeek[day.day_of_week]}</Label>
+                      <div className="flex items-center space-x-2">
+                        <Label htmlFor={`closed-${index}`} className="text-sm">Closed</Label>
+                        <Checkbox 
+                          id={`closed-${index}`}
+                          checked={day.is_closed}
+                          onCheckedChange={(checked) => updateDayHours(index, 'is_closed', !!checked)}
+                        />
+                      </div>
+                    </div>
+                    
+                    {!day.is_closed && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`start-time-${index}`}>Open</Label>
+                          <Input
+                            id={`start-time-${index}`}
+                            type="time"
+                            value={day.start_time}
+                            onChange={(e) => updateDayHours(index, 'start_time', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`end-time-${index}`}>Close</Label>
+                          <Input
+                            id={`end-time-${index}`}
+                            type="time"
+                            value={day.end_time}
+                            onChange={(e) => updateDayHours(index, 'end_time', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        
+        default:
+          return null;
+      }
+    }
+
+    return null;
+  };
+
+  const totalSteps = 3;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className={mode === "full" ? "w-full max-w-4xl h-[90vh] overflow-auto" : "sm:max-w-[500px]"}>
         <DialogHeader className="flex flex-row items-center">
-          {mode === "full" && (
-            <Button variant="ghost" size="sm" onClick={onClose} className="mr-2">
+          {mode === "full" && currentStep > 1 && (
+            <Button variant="ghost" size="sm" onClick={() => setCurrentStep(prev => prev - 1)} className="mr-2">
               <ChevronLeft className="h-4 w-4" />
             </Button>
           )}
           <DialogTitle>{getDialogTitle()}</DialogTitle>
         </DialogHeader>
 
-        {isFetching ? (
-          <div className="py-4 text-center">Loading location data...</div>
-        ) : (
-          <>
-            {mode === "full" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Location Name*</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => handleChange("name", e.target.value)}
-                      placeholder="e.g. Main Salon"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address*</Label>
-                    <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => handleChange("address", e.target.value)}
-                      placeholder="Street address"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={formData.city}
-                        onChange={(e) => handleChange("city", e.target.value)}
-                        placeholder="City"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="state">State</Label>
-                      <Input
-                        id="state"
-                        value={formData.state}
-                        onChange={(e) => handleChange("state", e.target.value)}
-                        placeholder="State/Province"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="zip_code">Postal Code</Label>
-                      <Input
-                        id="zip_code"
-                        value={formData.zip_code}
-                        onChange={(e) => handleChange("zip_code", e.target.value)}
-                        placeholder="Postal/Zip code"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="country">Country</Label>
-                      <Select
-                        value={formData.country}
-                        onValueChange={(value) => handleChange("country", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select country" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="India">India</SelectItem>
-                          <SelectItem value="United States">United States</SelectItem>
-                          <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                          <SelectItem value="Canada">Canada</SelectItem>
-                          <SelectItem value="Australia">Australia</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleChange("email", e.target.value)}
-                      placeholder="Location email address"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => handleChange("phone", e.target.value)}
-                      placeholder="Contact number"
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-2 mt-6">
-                    <Checkbox
-                      id="is_active"
-                      checked={formData.is_active}
-                      onCheckedChange={(checked) => handleChange("is_active", checked)}
-                    />
-                    <Label htmlFor="is_active">Location is active</Label>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {mode === "contact" && (
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
-                    placeholder="Location email address"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => handleChange("phone", e.target.value)}
-                    placeholder="Contact number"
-                  />
-                </div>
-              </div>
-            )}
-          </>
-        )}
+        {renderStepContent()}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isLoading || isFetching}>
-            {isLoading ? "Saving..." : "Save"}
-          </Button>
+          {mode === "full" && (
+            <div className="w-full flex justify-between items-center mb-4">
+              <div className="flex space-x-2">
+                {Array.from({ length: totalSteps }).map((_, i) => (
+                  <div 
+                    key={i}
+                    className={`h-2 w-8 rounded-full ${currentStep === i + 1 ? 'bg-primary' : 'bg-gray-300'}`}
+                  />
+                ))}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Step {currentStep} of {totalSteps}
+              </div>
+            </div>
+          )}
+          
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={isLoading}>
+              Cancel
+            </Button>
+            
+            {mode === "full" && currentStep < totalSteps ? (
+              <Button 
+                onClick={() => setCurrentStep(prev => prev + 1)} 
+                disabled={!validateCurrentStep() || isLoading}
+              >
+                Next <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button onClick={handleSubmit} disabled={isLoading || isFetching}>
+                {isLoading ? "Saving..." : "Save"}
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
