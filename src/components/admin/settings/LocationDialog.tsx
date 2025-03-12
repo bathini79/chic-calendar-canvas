@@ -16,7 +16,7 @@ interface LocationDialogProps {
   onClose: () => void;
   locationId?: string;
   onSuccess?: () => void;
-  mode?: "full" | "contact" | "receipt";
+  mode?: "full" | "contact" | "receipt" | "billing" | "location";
 }
 
 interface LocationFormData {
@@ -183,24 +183,39 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
     try {
       let locationId;
       
-      if (mode !== "full") {
-        // Handle contact or receipt edit mode
-        let updatedData: Partial<LocationFormData> = {};
-        
-        if (mode === "contact") {
-          updatedData = {
+      if (mode === "contact") {
+        // Handle contact edit mode
+        const { error } = await supabase
+          .from("locations")
+          .update({
             email: formData.email,
             phone: formData.phone
-          };
+          })
+          .eq("id", locationId);
+
+        if (error) throw error;
+      } else if (mode === "billing" || mode === "location") {
+        // Handle billing or location edit mode
+        const updateData: Partial<LocationFormData> = {};
+        
+        if (mode === "billing") {
+          updateData.name = formData.name;
+        }
+        
+        if (mode === "location") {
+          updateData.address = formData.address;
+          updateData.city = formData.city;
+          updateData.state = formData.state;
+          updateData.zip_code = formData.zip_code;
+          updateData.country = formData.country;
         }
         
         const { error } = await supabase
           .from("locations")
-          .update(updatedData)
+          .update(updateData)
           .eq("id", locationId);
 
         if (error) throw error;
-        
       } else {
         // Handle full form submission
         if (!formData.name) {
@@ -271,6 +286,8 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
   const getDialogTitle = () => {
     if (mode === "contact") return "Edit Contact Details";
     if (mode === "receipt") return "Edit Receipt Settings";
+    if (mode === "billing") return "Edit Billing Details";
+    if (mode === "location") return "Edit Location";
     return locationId ? "Edit Location" : "Add Location";
   };
 
@@ -301,6 +318,92 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
               onChange={(e) => handleChange("phone", e.target.value)}
               placeholder="Contact number"
             />
+          </div>
+        </div>
+      );
+    }
+
+    if (mode === "billing") {
+      return (
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Company Name</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => handleChange("name", e.target.value)}
+              placeholder="Company name"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    if (mode === "location") {
+      return (
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="address">Address*</Label>
+            <Input
+              id="address"
+              value={formData.address}
+              onChange={(e) => handleChange("address", e.target.value)}
+              placeholder="Street address"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                value={formData.city}
+                onChange={(e) => handleChange("city", e.target.value)}
+                placeholder="City"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="state">State</Label>
+              <Input
+                id="state"
+                value={formData.state}
+                onChange={(e) => handleChange("state", e.target.value)}
+                placeholder="State/Province"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="zip_code">Postal Code</Label>
+              <Input
+                id="zip_code"
+                value={formData.zip_code}
+                onChange={(e) => handleChange("zip_code", e.target.value)}
+                placeholder="Postal/Zip code"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="country">Country</Label>
+              <Select
+                value={formData.country}
+                onValueChange={(value) => handleChange("country", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="India">India</SelectItem>
+                  <SelectItem value="United States">United States</SelectItem>
+                  <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                  <SelectItem value="Canada">Canada</SelectItem>
+                  <SelectItem value="Australia">Australia</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       );

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -51,7 +52,7 @@ export function LocationDetails() {
   const [location, setLocation] = useState<Location | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editDialogMode, setEditDialogMode] = useState<"full" | "contact" | "receipt">("full");
+  const [editDialogMode, setEditDialogMode] = useState<"full" | "contact" | "receipt" | "billing" | "location">("full");
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettingsFormData>({
     prefix: "",
     next_number: 1
@@ -116,7 +117,7 @@ export function LocationDetails() {
     fetchLocationDetails();
   }, [locationId]);
   
-  const handleEditLocation = (mode: "full" | "contact" | "receipt" = "full") => {
+  const handleEditLocation = (mode: "full" | "contact" | "receipt" | "billing" | "location" = "full") => {
     setEditDialogMode(mode);
     setEditDialogOpen(true);
   };
@@ -254,7 +255,7 @@ export function LocationDetails() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Billing details for client sales</CardTitle>
-            <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation()}>
+            <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation("billing")}>
               Edit
             </Button>
           </CardHeader>
@@ -275,7 +276,7 @@ export function LocationDetails() {
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Location</CardTitle>
-          <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation()}>
+          <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation("location")}>
             Edit
           </Button>
         </CardHeader>
