@@ -53,19 +53,21 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <Card className="h-full">
-          <CardContent className="pt-6">
-            <div className="flex flex-col h-full">
-              <div className="mb-4">
-                <Tag className="h-6 w-6 text-primary" />
+        <Link to="/admin/settings/sales">
+          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="pt-6">
+              <div className="flex flex-col h-full">
+                <div className="mb-4">
+                  <Tag className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold">Sales</h3>
+                <p className="text-muted-foreground text-sm">
+                  Configure payment methods, taxes, coupons, loyalty program and memberships.
+                </p>
               </div>
-              <h3 className="text-lg font-semibold">Sales</h3>
-              <p className="text-muted-foreground text-sm">
-                Configure payment methods, taxes, receipts, service charges and gift cards.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card className="h-full">
           <CardContent className="pt-6">
