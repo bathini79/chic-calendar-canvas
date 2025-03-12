@@ -19,6 +19,7 @@ import AdminBookings from "./pages/admin/AdminBookings";
 import Settings from "./pages/admin/Settings";
 import BusinessSetup from "./pages/admin/settings/BusinessSetup";
 import Sales from "./pages/admin/settings/Sales";
+import Reports from "./pages/admin/Reports";
 
 // 1) Import DnD
 import { DndProvider } from "react-dnd";
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="services" element={<AdminServices />} />
             <Route path="staff" element={<Staff />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
             <Route path="settings/business-setup" element={<BusinessSetup />} />
             <Route path="settings/business-setup/*" element={<BusinessSetup />} />

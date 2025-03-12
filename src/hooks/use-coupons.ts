@@ -33,8 +33,15 @@ export function useCoupons() {
         .order("code");
 
       if (error) throw error;
-      setCoupons(data || []);
-      return data;
+      
+      // Make sure to cast the data to the Coupon type
+      const typedCoupons = data?.map(coupon => ({
+        ...coupon,
+        discount_type: coupon.discount_type as "percentage" | "fixed"
+      })) || [];
+      
+      setCoupons(typedCoupons);
+      return typedCoupons;
     } catch (error: any) {
       toast.error(`Error fetching coupons: ${error.message}`);
       return [];
