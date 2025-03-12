@@ -12,7 +12,6 @@ import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminServices from "@/pages/admin/AdminServices";
 import Staff from "@/pages/admin/Staff";
 import Inventory from "@/pages/admin/Inventory";
-import Sales from "@/pages/admin/Sales";
 import Auth from "./pages/Auth";
 import UnifiedScheduling from "./pages/customer/UnifiedScheduling";
 import BookingConfirmation from "./pages/customer/BookingConfirmation";
@@ -57,7 +56,6 @@ export default function App() {
             <Route path="services" element={<AdminServices />} />
             <Route path="staff" element={<Staff />} />
             <Route path="inventory" element={<Inventory />} />
-            <Route path="sales" element={<Sales />} />
             <Route path="settings" element={<Settings />} />
             <Route path="settings/business-setup" element={<BusinessSetup />} />
             <Route path="settings/business-setup/*" element={<BusinessSetup />} />
