@@ -329,6 +329,75 @@ export type Database = {
         }
         Relationships: []
       }
+      coupon_services: {
+        Row: {
+          coupon_id: string
+          created_at: string | null
+          service_id: string
+        }
+        Insert: {
+          coupon_id: string
+          created_at?: string | null
+          service_id: string
+        }
+        Update: {
+          coupon_id?: string
+          created_at?: string | null
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_services_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupons: {
+        Row: {
+          apply_to_all: boolean | null
+          code: string
+          created_at: string | null
+          description: string | null
+          discount_type: string
+          discount_value: number
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          apply_to_all?: boolean | null
+          code: string
+          created_at?: string | null
+          description?: string | null
+          discount_type: string
+          discount_value: number
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          apply_to_all?: boolean | null
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       employee_availability: {
         Row: {
           created_at: string
@@ -823,6 +892,36 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_methods: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          is_enabled: boolean | null
+          is_system: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_enabled?: boolean | null
+          is_system?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_enabled?: boolean | null
+          is_system?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           admin_created: boolean | null
@@ -1306,6 +1405,33 @@ export type Database = {
           phone?: string | null
           status?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      tax_rates: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          percentage: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          percentage: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          percentage?: number
+          updated_at?: string | null
         }
         Relationships: []
       }
