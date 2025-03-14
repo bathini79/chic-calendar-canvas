@@ -2,7 +2,7 @@
 import React from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { SettingsIcon, Globe, Tag, Building, Users, FileText, CreditCard } from "lucide-react";
+import { SettingsIcon, Globe, Tag, Building, Users, FileText, CreditCard, Gift, Award } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function Settings() {
@@ -63,6 +63,38 @@ export default function Settings() {
                 <h3 className="text-lg font-semibold">Sales</h3>
                 <p className="text-muted-foreground text-sm">
                   Configure payment methods, taxes, coupons, loyalty program and memberships.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/admin/settings/memberships">
+          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="pt-6">
+              <div className="flex flex-col h-full">
+                <div className="mb-4">
+                  <Gift className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold">Memberships</h3>
+                <p className="text-muted-foreground text-sm">
+                  Create and manage membership plans with different benefits and discounts.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/admin/settings/loyalty-program">
+          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="pt-6">
+              <div className="flex flex-col h-full">
+                <div className="mb-4">
+                  <Award className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold">Loyalty Program</h3>
+                <p className="text-muted-foreground text-sm">
+                  Configure loyalty points, cashback rewards, and redemption options.
                 </p>
               </div>
             </CardContent>

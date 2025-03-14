@@ -775,6 +775,102 @@ export type Database = {
         }
         Relationships: []
       }
+      loyalty_program_settings: {
+        Row: {
+          applicable_packages: string[] | null
+          applicable_services: string[] | null
+          apply_to_all: boolean | null
+          cashback_validity_days: number | null
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          min_billing_amount: number | null
+          min_redemption_points: number
+          point_value: number
+          points_per_spend: number
+          points_validity_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          applicable_packages?: string[] | null
+          applicable_services?: string[] | null
+          apply_to_all?: boolean | null
+          cashback_validity_days?: number | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          min_billing_amount?: number | null
+          min_redemption_points?: number
+          point_value?: number
+          points_per_spend?: number
+          points_validity_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          applicable_packages?: string[] | null
+          applicable_services?: string[] | null
+          apply_to_all?: boolean | null
+          cashback_validity_days?: number | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          min_billing_amount?: number | null
+          min_redemption_points?: number
+          point_value?: number
+          points_per_spend?: number
+          points_validity_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      memberships: {
+        Row: {
+          applicable_packages: string[] | null
+          applicable_services: string[] | null
+          created_at: string | null
+          description: string | null
+          discount_type: string
+          discount_value: number
+          id: string
+          max_discount_value: number | null
+          min_billing_amount: number | null
+          name: string
+          updated_at: string | null
+          validity_period: number
+          validity_unit: string
+        }
+        Insert: {
+          applicable_packages?: string[] | null
+          applicable_services?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          discount_type: string
+          discount_value: number
+          id?: string
+          max_discount_value?: number | null
+          min_billing_amount?: number | null
+          name: string
+          updated_at?: string | null
+          validity_period: number
+          validity_unit: string
+        }
+        Update: {
+          applicable_packages?: string[] | null
+          applicable_services?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          max_discount_value?: number | null
+          min_billing_amount?: number | null
+          name?: string
+          updated_at?: string | null
+          validity_period?: number
+          validity_unit?: string
+        }
+        Relationships: []
+      }
       package_categories: {
         Row: {
           category_id: string
