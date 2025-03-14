@@ -1,23 +1,107 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ArrowRight } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import Memberships from "./Memberships";
+import LoyaltyProgram from "./LoyaltyProgram";
+
+// Placeholder components for sections without dedicated pages
+const PaymentMethods = () => (
+  <div className="bg-muted/50 p-6 rounded-lg">
+    <h1 className="text-2xl font-bold mb-4">Payment Methods</h1>
+    <p className="text-muted-foreground">
+      Configure payment methods for your business here.
+    </p>
+  </div>
+);
+
+const TaxRates = () => (
+  <div className="bg-muted/50 p-6 rounded-lg">
+    <h1 className="text-2xl font-bold mb-4">Tax Rates</h1>
+    <p className="text-muted-foreground">
+      Configure tax rates for your business here.
+    </p>
+  </div>
+);
+
+const Coupons = () => (
+  <div className="bg-muted/50 p-6 rounded-lg">
+    <h1 className="text-2xl font-bold mb-4">Coupons</h1>
+    <p className="text-muted-foreground">
+      Manage discount coupons for your business here.
+    </p>
+  </div>
+);
+
+const GiftCards = () => (
+  <div className="bg-muted/50 p-6 rounded-lg">
+    <h1 className="text-2xl font-bold mb-4">Gift Cards</h1>
+    <p className="text-muted-foreground">
+      Manage gift cards for your business here.
+    </p>
+  </div>
+);
 
 export default function Sales() {
   const location = useLocation();
-  const path = location.pathname;
+  const navigate = useNavigate();
   
-  const [activeSection, setActiveSection] = useState<string>(
-    path.includes('memberships') ? "memberships" : 
-    path.includes('loyalty-program') ? "loyalty-program" : 
-    path.includes('payment-methods') ? "payment-methods" : 
-    path.includes('tax-rates') ? "tax-rates" :
-    path.includes('coupons') ? "coupons" :
-    path.includes('gift-cards') ? "gift-cards" : "payment-methods"
-  );
+  // Extract the current section from URL path or default to payment-methods
+  const [activeSection, setActiveSection] = useState<string>("payment-methods");
+  
+  // Update active section whenever location changes
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.includes('memberships')) {
+      setActiveSection("memberships");
+    } else if (path.includes('loyalty-program')) {
+      setActiveSection("loyalty-program");
+    } else if (path.includes('payment-methods')) {
+      setActiveSection("payment-methods");
+    } else if (path.includes('tax-rates')) {
+      setActiveSection("tax-rates");
+    } else if (path.includes('coupons')) {
+      setActiveSection("coupons");
+    } else if (path.includes('gift-cards')) {
+      setActiveSection("gift-cards");
+    }
+  }, [location]);
+
+  // Handle section changes
+  const handleSectionChange = (section: string) => {
+    setActiveSection(section);
+    // Update URL to reflect the section but stay on the same page
+    navigate(`/admin/settings/sales/${section}`, { replace: true });
+  };
+
+  // Render the appropriate component based on active section
+  const renderContent = () => {
+    switch (activeSection) {
+      case "memberships":
+        return <Memberships />;
+      case "loyalty-program":
+        return <LoyaltyProgram />;
+      case "payment-methods":
+        return <PaymentMethods />;
+      case "tax-rates":
+        return <TaxRates />;
+      case "coupons":
+        return <Coupons />;
+      case "gift-cards":
+        return <GiftCards />;
+      default:
+        return (
+          <div className="bg-muted/50 p-6 rounded-lg flex flex-col items-center justify-center min-h-[300px]">
+            <p className="text-muted-foreground text-center">
+              Select a sales configuration option from the sidebar to get started.
+            </p>
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="container py-6 max-w-6xl">
@@ -42,51 +126,39 @@ export default function Sales() {
               </div>
               <div 
                 className={`px-4 py-2 cursor-pointer ${activeSection === "payment-methods" ? "bg-accent" : ""}`}
-                onClick={() => setActiveSection("payment-methods")}
+                onClick={() => handleSectionChange("payment-methods")}
               >
-                <Link to="/admin/settings/sales/payment-methods" className="block">
-                  <span>Payment methods</span>
-                </Link>
+                <span>Payment methods</span>
               </div>
               <div 
                 className={`px-4 py-2 cursor-pointer ${activeSection === "tax-rates" ? "bg-accent" : ""}`}
-                onClick={() => setActiveSection("tax-rates")}
+                onClick={() => handleSectionChange("tax-rates")}
               >
-                <Link to="/admin/settings/sales/tax-rates" className="block">
-                  <span>Tax rates</span>
-                </Link>
+                <span>Tax rates</span>
               </div>
               <div 
                 className={`px-4 py-2 cursor-pointer ${activeSection === "coupons" ? "bg-accent" : ""}`}
-                onClick={() => setActiveSection("coupons")}
+                onClick={() => handleSectionChange("coupons")}
               >
-                <Link to="/admin/settings/sales/coupons" className="block">
-                  <span>Coupons</span>
-                </Link>
+                <span>Coupons</span>
               </div>
               <div 
                 className={`px-4 py-2 cursor-pointer ${activeSection === "memberships" ? "bg-accent" : ""}`}
-                onClick={() => setActiveSection("memberships")}
+                onClick={() => handleSectionChange("memberships")}
               >
-                <Link to="/admin/settings/sales/memberships" className="block">
-                  <span>Memberships</span>
-                </Link>
+                <span>Memberships</span>
               </div>
               <div 
                 className={`px-4 py-2 cursor-pointer ${activeSection === "loyalty-program" ? "bg-accent" : ""}`}
-                onClick={() => setActiveSection("loyalty-program")}
+                onClick={() => handleSectionChange("loyalty-program")}
               >
-                <Link to="/admin/settings/sales/loyalty-program" className="block">
-                  <span>Loyalty program</span>
-                </Link>
+                <span>Loyalty program</span>
               </div>
               <div 
                 className={`px-4 py-2 cursor-pointer ${activeSection === "gift-cards" ? "bg-accent" : ""}`}
-                onClick={() => setActiveSection("gift-cards")}
+                onClick={() => handleSectionChange("gift-cards")}
               >
-                <Link to="/admin/settings/sales/gift-cards" className="block">
-                  <span>Gift cards</span>
-                </Link>
+                <span>Gift cards</span>
               </div>
 
               <Separator className="my-4" />
@@ -109,14 +181,7 @@ export default function Sales() {
         </div>
 
         <div className="md:col-span-3">
-          <Outlet />
-          {path === "/admin/settings/sales" && (
-            <div className="bg-muted/50 p-6 rounded-lg flex flex-col items-center justify-center min-h-[300px]">
-              <p className="text-muted-foreground text-center">
-                Select a sales configuration option from the sidebar to get started.
-              </p>
-            </div>
-          )}
+          {renderContent()}
         </div>
       </div>
     </div>
