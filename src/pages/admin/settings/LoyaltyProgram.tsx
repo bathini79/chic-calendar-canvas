@@ -30,6 +30,8 @@ import { AlertCircle, CalendarDays, Coins, DollarSign, Heart, Info, Save, Star }
 import { useLoyaltyProgram, type LoyaltyProgramFormValues } from "@/hooks/use-loyalty-program";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 
 const loyaltyProgramSchema = z.object({
   enabled: z.boolean().default(false),
@@ -45,6 +47,7 @@ const loyaltyProgramSchema = z.object({
 });
 
 export default function LoyaltyProgram() {
+  const { toast } = useToast();
   const { settings, isLoading, fetchSettings, updateSettings } = useLoyaltyProgram();
   const [services, setServices] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
@@ -122,8 +125,18 @@ export default function LoyaltyProgram() {
     
     try {
       await updateSettings(values as LoyaltyProgramFormValues);
+      toast({
+        title: "Success",
+        description: "Loyalty program settings saved successfully",
+        variant: "default",
+      });
     } catch (error) {
       console.error("Error saving loyalty program settings:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save loyalty program settings",
+        variant: "destructive",
+      });
     }
   };
 
@@ -151,316 +164,363 @@ export default function LoyaltyProgram() {
     return <div className="container py-6">Loading loyalty program settings...</div>;
   }
 
-  return (
-    <div className="container py-6">
-      <h1 className="text-2xl font-bold mb-6">Loyalty Program Settings</h1>
-      
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Star className="mr-2 h-5 w-5 text-yellow-500" />
-            Loyalty Program Configuration
-          </CardTitle>
-          <CardDescription>
-            Configure how your loyalty program works for your customers
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="enabled"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Enable Loyalty Program</FormLabel>
-                      <FormDescription>
-                        Turn on the loyalty program for your customers
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+  // Watch for changes to apply_to_all to show/hide dialogs appropriately
+  const applyToAll = form.watch("apply_to_all");
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-6">
-                  <div className="flex items-center mb-2">
-                    <Coins className="mr-2 h-5 w-5 text-primary" />
-                    <h3 className="text-lg font-medium">Points Configuration</h3>
-                  </div>
-                
-                  <FormField
-                    control={form.control}
-                    name="points_per_spend"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Points Per Spend (₹)</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} />
-                        </FormControl>
+  return (
+    <TooltipProvider>
+      <div className="container py-6">
+        <h1 className="text-2xl font-bold mb-6">Loyalty Program Settings</h1>
+        
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Star className="mr-2 h-5 w-5 text-yellow-500" />
+              Loyalty Program Configuration
+            </CardTitle>
+            <CardDescription>
+              Configure how your loyalty program works for your customers
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="enabled"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">Enable Loyalty Program</FormLabel>
                         <FormDescription>
-                          Number of points awarded for every ₹1 spent
+                          Turn on the loyalty program for your customers
                         </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="point_value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Point Value (₹)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Monetary value of each loyalty point
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="min_redemption_points"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Minimum Redemption Points</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Minimum points required for redemption
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <div className="space-y-6">
-                  <div className="flex items-center mb-2">
-                    <CalendarDays className="mr-2 h-5 w-5 text-primary" />
-                    <h3 className="text-lg font-medium">Validity Configuration</h3>
-                  </div>
-                
-                  <FormField
-                    control={form.control}
-                    name="points_validity_days"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Points Validity (Days)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            {...field} 
-                            value={field.value === null ? "" : field.value}
-                            onChange={(e) => {
-                              field.onChange(e.target.value === "" ? null : Number(e.target.value));
-                            }}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Number of days before points expire (leave empty for no expiration)
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="cashback_validity_days"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cashback Validity (Days)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            {...field} 
-                            value={field.value === null ? "" : field.value}
-                            onChange={(e) => {
-                              field.onChange(e.target.value === "" ? null : Number(e.target.value));
-                            }}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Number of days before cashback expires (leave empty for no expiration)
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="min_billing_amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Minimum Billing Amount (₹)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            {...field} 
-                            value={field.value === null ? "" : field.value}
-                            onChange={(e) => {
-                              field.onChange(e.target.value === "" ? null : Number(e.target.value));
-                            }}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Minimum bill amount for points to be awarded (leave empty for no minimum)
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-              
-              <Alert className="mt-6">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Applicability</AlertTitle>
-                <AlertDescription>
-                  Choose whether to apply loyalty program to all services and packages or select specific ones.
-                </AlertDescription>
-              </Alert>
-              
-              <FormField
-                control={form.control}
-                name="apply_to_all"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Apply to All Services & Packages</FormLabel>
-                      <FormDescription>
-                        Turn off to select specific services and packages
-                      </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-6">
+                    <div className="flex items-center mb-2">
+                      <Coins className="mr-2 h-5 w-5 text-primary" />
+                      <h3 className="text-lg font-medium">Points Configuration</h3>
                     </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {!form.watch("apply_to_all") && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                  <div>
-                    <FormLabel>Applicable Services</FormLabel>
-                    <Dialog open={showServicesDialog} onOpenChange={setShowServicesDialog}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          type="button" 
-                          className="w-full mt-2"
-                        >
-                          Select Services ({selectedServices.length})
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Select Services</DialogTitle>
-                          <DialogDescription>
-                            Choose the services that earn loyalty points.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <ScrollArea className="h-[300px] w-full rounded-md border p-4">
-                          {services.map((service) => (
-                            <div key={service.id} className="flex items-center space-x-2 mb-2">
-                              <Checkbox
-                                id={`service-${service.id}`}
-                                checked={selectedServices.includes(service.id)}
-                                onCheckedChange={() => handleServiceSelection(service.id)}
-                              />
-                              <label
-                                htmlFor={`service-${service.id}`}
-                                className="flex items-center justify-between w-full text-sm font-medium leading-none cursor-pointer"
-                              >
-                                <span>{service.name}</span>
-                                <Badge variant="secondary">₹{service.selling_price}</Badge>
-                              </label>
-                            </div>
-                          ))}
-                        </ScrollArea>
-                        <DialogFooter>
-                          <Button type="button" onClick={() => setShowServicesDialog(false)}>
-                            Done
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                  
+                    <FormField
+                      control={form.control}
+                      name="points_per_spend"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center space-x-2">
+                            <FormLabel>Points Per Spend (₹)</FormLabel>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">Number of points awarded for every ₹1 spent by customers</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <FormControl>
+                            <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="point_value"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center space-x-2">
+                            <FormLabel>Point Value (₹)</FormLabel>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">The monetary value of each loyalty point when redeemed</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <FormControl>
+                            <Input type="number" step="0.01" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="min_redemption_points"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center space-x-2">
+                            <FormLabel>Minimum Redemption Points</FormLabel>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">Minimum points required before a customer can redeem them</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <FormControl>
+                            <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                   
-                  <div>
-                    <FormLabel>Applicable Packages</FormLabel>
-                    <Dialog open={showPackagesDialog} onOpenChange={setShowPackagesDialog}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          type="button" 
-                          className="w-full mt-2"
-                        >
-                          Select Packages ({selectedPackages.length})
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Select Packages</DialogTitle>
-                          <DialogDescription>
-                            Choose the packages that earn loyalty points.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <ScrollArea className="h-[300px] w-full rounded-md border p-4">
-                          {packages.map((pkg) => (
-                            <div key={pkg.id} className="flex items-center space-x-2 mb-2">
-                              <Checkbox
-                                id={`package-${pkg.id}`}
-                                checked={selectedPackages.includes(pkg.id)}
-                                onCheckedChange={() => handlePackageSelection(pkg.id)}
-                              />
-                              <label
-                                htmlFor={`package-${pkg.id}`}
-                                className="flex items-center justify-between w-full text-sm font-medium leading-none cursor-pointer"
-                              >
-                                <span>{pkg.name}</span>
-                                <Badge variant="secondary">₹{pkg.price}</Badge>
-                              </label>
-                            </div>
-                          ))}
-                        </ScrollArea>
-                        <DialogFooter>
-                          <Button type="button" onClick={() => setShowPackagesDialog(false)}>
-                            Done
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                  <div className="space-y-6">
+                    <div className="flex items-center mb-2">
+                      <CalendarDays className="mr-2 h-5 w-5 text-primary" />
+                      <h3 className="text-lg font-medium">Validity Configuration</h3>
+                    </div>
+                  
+                    <FormField
+                      control={form.control}
+                      name="points_validity_days"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center space-x-2">
+                            <FormLabel>Points Validity (Days)</FormLabel>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">Number of days before points expire. Leave empty for no expiration.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              {...field} 
+                              value={field.value === null ? "" : field.value}
+                              onChange={(e) => {
+                                field.onChange(e.target.value === "" ? null : Number(e.target.value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="cashback_validity_days"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center space-x-2">
+                            <FormLabel>Cashback Validity (Days)</FormLabel>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">Number of days before cashback expires. Leave empty for no expiration.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              {...field} 
+                              value={field.value === null ? "" : field.value}
+                              onChange={(e) => {
+                                field.onChange(e.target.value === "" ? null : Number(e.target.value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="min_billing_amount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center space-x-2">
+                            <FormLabel>Minimum Billing Amount (₹)</FormLabel>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">Minimum bill amount for points to be awarded. Leave empty for no minimum.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              {...field} 
+                              value={field.value === null ? "" : field.value}
+                              onChange={(e) => {
+                                field.onChange(e.target.value === "" ? null : Number(e.target.value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </div>
-              )}
-              
-              <Button type="submit" className="mt-6">
-                <Save className="mr-2 h-4 w-4" />
-                Save Settings
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
+                
+                <Alert className="mt-6">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Applicability</AlertTitle>
+                  <AlertDescription>
+                    Choose whether to apply loyalty program to all services and packages or select specific ones.
+                  </AlertDescription>
+                </Alert>
+                
+                <FormField
+                  control={form.control}
+                  name="apply_to_all"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">Apply to All Services & Packages</FormLabel>
+                        <FormDescription>
+                          Turn off to select specific services and packages
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
+                {!applyToAll && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div>
+                      <FormLabel>Applicable Services</FormLabel>
+                      <Dialog open={showServicesDialog} onOpenChange={setShowServicesDialog}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            type="button" 
+                            className="w-full mt-2"
+                          >
+                            Select Services ({selectedServices.length})
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Select Services</DialogTitle>
+                            <DialogDescription>
+                              Choose the services that earn loyalty points.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+                            {services.map((service) => (
+                              <div key={service.id} className="flex items-center space-x-2 mb-2">
+                                <Checkbox
+                                  id={`service-${service.id}`}
+                                  checked={selectedServices.includes(service.id)}
+                                  onCheckedChange={() => handleServiceSelection(service.id)}
+                                />
+                                <label
+                                  htmlFor={`service-${service.id}`}
+                                  className="flex items-center justify-between w-full text-sm font-medium leading-none cursor-pointer"
+                                >
+                                  <span>{service.name}</span>
+                                  <Badge variant="secondary">₹{service.selling_price}</Badge>
+                                </label>
+                              </div>
+                            ))}
+                          </ScrollArea>
+                          <DialogFooter>
+                            <Button type="button" onClick={() => setShowServicesDialog(false)}>
+                              Done
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                    
+                    <div>
+                      <FormLabel>Applicable Packages</FormLabel>
+                      <Dialog open={showPackagesDialog} onOpenChange={setShowPackagesDialog}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            type="button" 
+                            className="w-full mt-2"
+                          >
+                            Select Packages ({selectedPackages.length})
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Select Packages</DialogTitle>
+                            <DialogDescription>
+                              Choose the packages that earn loyalty points.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+                            {packages.map((pkg) => (
+                              <div key={pkg.id} className="flex items-center space-x-2 mb-2">
+                                <Checkbox
+                                  id={`package-${pkg.id}`}
+                                  checked={selectedPackages.includes(pkg.id)}
+                                  onCheckedChange={() => handlePackageSelection(pkg.id)}
+                                />
+                                <label
+                                  htmlFor={`package-${pkg.id}`}
+                                  className="flex items-center justify-between w-full text-sm font-medium leading-none cursor-pointer"
+                                >
+                                  <span>{pkg.name}</span>
+                                  <Badge variant="secondary">₹{pkg.price}</Badge>
+                                </label>
+                              </div>
+                            ))}
+                          </ScrollArea>
+                          <DialogFooter>
+                            <Button type="button" onClick={() => setShowPackagesDialog(false)}>
+                              Done
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                )}
+                
+                <Button type="submit" className="mt-6">
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Settings
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
+    </TooltipProvider>
   );
 }

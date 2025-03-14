@@ -25,7 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash, Check, X, PercentIcon, DollarSign } from "lucide-react";
+import { Plus, Pencil, Trash, Check, X, PercentIcon, DollarSign, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useMemberships, type Membership, type MembershipFormValues } from "@/hooks/use-memberships";
 import { toast } from "sonner";
@@ -53,6 +53,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const membershipFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -206,6 +207,9 @@ export default function Memberships() {
       }
     });
   };
+
+  // Watch for changes to apply_to_all to show/hide dialogs appropriately
+  const applyToAll = form.watch("apply_to_all");
 
   return (
     <div className="container py-6">
@@ -373,17 +377,27 @@ export default function Memberships() {
                     </FormItem>
                   )}
                 />
-                {!form.watch("apply_to_all") && (
+                {!applyToAll && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <FormLabel>Applicable Services</FormLabel>
-                      <Button variant="outline" className="w-full mt-2" onClick={() => setShowServicesDialog(true)}>
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-2" 
+                        onClick={() => setShowServicesDialog(true)}
+                        type="button"
+                      >
                         Select Services ({selectedServices.length})
                       </Button>
                     </div>
                     <div>
                       <FormLabel>Applicable Packages</FormLabel>
-                      <Button variant="outline" className="w-full mt-2" onClick={() => setShowPackagesDialog(true)}>
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-2" 
+                        onClick={() => setShowPackagesDialog(true)}
+                        type="button"
+                      >
                         Select Packages ({selectedPackages.length})
                       </Button>
                     </div>
