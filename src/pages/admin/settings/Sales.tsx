@@ -20,6 +20,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription as FormDescriptionComponent,
   FormField,
   FormItem,
   FormLabel,
@@ -31,7 +32,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { useTaxRates, type TaxRate } from "@/hooks/use-tax-rates";
 import { toast } from "sonner";
-import { Trash, Pencil, Plus, X, Check, PercentIcon, DollarSign } from "lucide-react";
+import { Trash, Pencil, Plus, X, Check, PercentIcon, DollarSign, Gift, Award } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -56,8 +57,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCoupons, type Coupon } from "@/hooks/use-coupons";
 import { supabase } from "@/integrations/supabase/client";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
+import { Link } from "react-router-dom";
 
-// Payment Method type
+const FormDescription = FormDescriptionComponent;
+
 type PaymentMethod = {
   id: string;
   name: string;
@@ -68,7 +71,6 @@ type PaymentMethod = {
   updated_at?: string;
 };
 
-// Forms schema definitions
 const taxRateFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   percentage: z.coerce.number().min(0, "Percentage must be a positive number"),
@@ -90,17 +92,14 @@ const couponFormSchema = z.object({
 });
 
 export default function Sales() {
-  // Tax Rates Section
   const { taxRates, isLoading: isTaxRatesLoading, fetchTaxRates, createTaxRate, updateTaxRate, deleteTaxRate } = useTaxRates();
   const [openTaxDialog, setOpenTaxDialog] = useState(false);
   const [editingTaxRate, setEditingTaxRate] = useState<TaxRate | null>(null);
 
-  // Payment Methods Section
   const { data: paymentMethods = [], isLoading: isPaymentMethodsLoading, create: createPaymentMethod, update: updatePaymentMethod, refetch: fetchPaymentMethods } = useSupabaseCrud<'payment_methods'>('payment_methods');
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
 
-  // Coupons Section
   const { coupons, isLoading: isCouponsLoading, fetchCoupons, createCoupon, updateCoupon, deleteCoupon, getCouponServices, saveCouponServices } = useCoupons();
   const [openCouponDialog, setOpenCouponDialog] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -108,7 +107,6 @@ export default function Sales() {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [showServicesDialog, setShowServicesDialog] = useState(false);
 
-  // Fetch data on component mount
   useEffect(() => {
     fetchTaxRates();
     fetchPaymentMethods();
@@ -123,7 +121,6 @@ export default function Sales() {
     }
   };
 
-  // TAX RATES FORM
   const taxForm = useForm<z.infer<typeof taxRateFormSchema>>({
     resolver: zodResolver(taxRateFormSchema),
     defaultValues: {
@@ -155,9 +152,9 @@ export default function Sales() {
   const onTaxSubmit = async (values: z.infer<typeof taxRateFormSchema>) => {
     try {
       if (editingTaxRate) {
-        await updateTaxRate(editingTaxRate.id, values);
+        await updateTaxRate(editingTaxRate.id, values as Omit<TaxRate, "id">);
       } else {
-        await createTaxRate(values);
+        await createTaxRate(values as Omit<TaxRate, "id">);
       }
       setOpenTaxDialog(false);
     } catch (error) {
@@ -177,7 +174,6 @@ export default function Sales() {
     }
   };
 
-  // PAYMENT METHODS FORM
   const paymentForm = useForm<z.infer<typeof paymentMethodFormSchema>>({
     resolver: zodResolver(paymentMethodFormSchema),
     defaultValues: {
@@ -208,7 +204,6 @@ export default function Sales() {
 
   const onPaymentSubmit = async (values: z.infer<typeof paymentMethodFormSchema>) => {
     try {
-      // Fix: Ensure required properties are provided
       const paymentMethodData: Omit<PaymentMethod, "id"> = {
         name: values.name,
         is_enabled: values.is_enabled,
@@ -234,7 +229,6 @@ export default function Sales() {
     }
   };
 
-  // COUPONS FORM
   const couponForm = useForm<z.infer<typeof couponFormSchema>>({
     resolver: zodResolver(couponFormSchema),
     defaultValues: {
@@ -278,14 +272,13 @@ export default function Sales() {
       let couponId;
       
       if (editingCoupon) {
-        await updateCoupon(editingCoupon.id, values);
+        await updateCoupon(editingCoupon.id, values as Omit<Coupon, "id">);
         couponId = editingCoupon.id;
       } else {
-        const newCoupon = await createCoupon(values);
+        const newCoupon = await createCoupon(values as Omit<Coupon, "id">);
         couponId = newCoupon.id;
       }
       
-      // If not applying to all services, save the selected services
       if (!values.apply_to_all) {
         await saveCouponServices(couponId, selectedServices);
       }
@@ -326,7 +319,9 @@ export default function Sales() {
           <TabsTrigger value="tax-rates">Tax Rates</TabsTrigger>
           <TabsTrigger value="payment-methods">Payment Methods</TabsTrigger>
           <TabsTrigger value="coupons">Coupons</TabsTrigger>
+          <TabsTrigger value="loyalty-memberships">Loyalty & Memberships</TabsTrigger>
         </TabsList>
+        
         <TabsContent value="tax-rates" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold tracking-tight">Tax Rates</h2>
@@ -447,6 +442,7 @@ export default function Sales() {
             </div>
           )}
         </TabsContent>
+        
         <TabsContent value="payment-methods" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold tracking-tight">Payment Methods</h2>
@@ -576,6 +572,7 @@ export default function Sales() {
             </div>
           )}
         </TabsContent>
+        
         <TabsContent value="coupons" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold tracking-tight">Coupons</h2>
@@ -786,7 +783,44 @@ export default function Sales() {
             </div>
           )}
         </TabsContent>
+        
+        <TabsContent value="loyalty-memberships" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Link to="/admin/settings/sales/memberships">
+              <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="pt-6">
+                  <div className="flex flex-col h-full">
+                    <div className="mb-4">
+                      <Gift className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold">Memberships</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Create and manage membership plans with different benefits and discounts.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+            
+            <Link to="/admin/settings/sales/loyalty-program">
+              <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="pt-6">
+                  <div className="flex flex-col h-full">
+                    <div className="mb-4">
+                      <Award className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold">Loyalty Program</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Configure loyalty points, cashback rewards, and redemption options.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
+

@@ -66,8 +66,8 @@ export default function App() {
             <Route path="settings/business-setup/*" element={<BusinessSetup />} />
             <Route path="settings/sales" element={<Sales />} />
             <Route path="settings/sales/*" element={<Sales />} />
-            <Route path="settings/memberships" element={<Memberships />} />
-            <Route path="settings/loyalty-program" element={<LoyaltyProgram />} />
+            <Route path="settings/sales/memberships" element={<Memberships />} />
+            <Route path="settings/sales/loyalty-program" element={<LoyaltyProgram />} />
           </Route>
         </Routes>
       </DndProvider>

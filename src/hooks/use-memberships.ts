@@ -34,7 +34,15 @@ export function useMemberships() {
         .order('name');
 
       if (error) throw error;
-      setMemberships(data || []);
+      
+      // Properly type cast the data to ensure validity_unit is correctly typed
+      const typedData = data?.map(item => ({
+        ...item,
+        validity_unit: item.validity_unit as 'days' | 'months',
+        discount_type: item.discount_type as 'percentage' | 'fixed'
+      })) as Membership[];
+      
+      setMemberships(typedData || []);
     } catch (error: any) {
       toast.error(`Error fetching memberships: ${error.message}`);
       console.error("Error fetching memberships:", error);
@@ -52,9 +60,16 @@ export function useMemberships() {
         .single();
 
       if (error) throw error;
+      
+      const typedData = {
+        ...data,
+        validity_unit: data.validity_unit as 'days' | 'months',
+        discount_type: data.discount_type as 'percentage' | 'fixed'
+      } as Membership;
+      
       toast.success("Membership created successfully");
       await fetchMemberships();
-      return data;
+      return typedData;
     } catch (error: any) {
       toast.error(`Error creating membership: ${error.message}`);
       console.error("Error creating membership:", error);
@@ -72,9 +87,16 @@ export function useMemberships() {
         .single();
 
       if (error) throw error;
+      
+      const typedData = {
+        ...data,
+        validity_unit: data.validity_unit as 'days' | 'months',
+        discount_type: data.discount_type as 'percentage' | 'fixed'
+      } as Membership;
+      
       toast.success("Membership updated successfully");
       await fetchMemberships();
-      return data;
+      return typedData;
     } catch (error: any) {
       toast.error(`Error updating membership: ${error.message}`);
       console.error("Error updating membership:", error);
