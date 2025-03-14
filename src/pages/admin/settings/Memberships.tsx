@@ -54,6 +54,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const membershipFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -75,8 +76,8 @@ export default function Memberships() {
   const [packages, setPackages] = useState<any[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
-  const [showServicesDialog, setShowServicesDialog] = useState(false);
-  const [showPackagesDialog, setShowPackagesDialog] = useState(false);
+  const [showSelectionDialog, setShowSelectionDialog] = useState(false);
+  const [selectionTabValue, setSelectionTabValue] = useState("services");
 
   const form = useForm<z.infer<typeof membershipFormSchema>>({
     resolver: zodResolver(membershipFormSchema),
@@ -93,6 +94,9 @@ export default function Memberships() {
     },
   });
 
+  // Watch for changes to apply_to_all
+  const applyToAll = form.watch("apply_to_all");
+
   useEffect(() => {
     fetchMemberships();
     fetchServices();
@@ -100,7 +104,7 @@ export default function Memberships() {
   }, []);
 
   const fetchServices = async () => {
-    const { data } = await supabase.from("services").select("id, name, selling_price").order("name");
+    const { data } = await supabase.from("services").select("id, name, selling_price, category_id").order("name");
     if (data) {
       setServices(data);
     }
@@ -165,11 +169,12 @@ export default function Memberships() {
 
       if (editingMembership) {
         await updateMembership(editingMembership.id, membershipData);
+        toast.success("Membership updated successfully");
       } else {
         await createMembership(membershipData);
+        toast.success("Membership created successfully");
       }
       setOpenMembershipDialog(false);
-      toast.success("Membership saved successfully");
     } catch (error) {
       console.error("Error saving membership:", error);
       toast.error("Failed to save membership");
@@ -208,8 +213,24 @@ export default function Memberships() {
     });
   };
 
-  // Watch for changes to apply_to_all to show/hide dialogs appropriately
-  const applyToAll = form.watch("apply_to_all");
+  const handleOpenSelectionDialog = () => {
+    if (!applyToAll) {
+      setShowSelectionDialog(true);
+    }
+  };
+
+  // Group services by category_id
+  const servicesByCategory = React.useMemo(() => {
+    const grouped: Record<string, any[]> = {};
+    services.forEach(service => {
+      const categoryId = service.category_id || 'uncategorized';
+      if (!grouped[categoryId]) {
+        grouped[categoryId] = [];
+      }
+      grouped[categoryId].push(service);
+    });
+    return grouped;
+  }, [services]);
 
   return (
     <div className="container py-6">
@@ -363,7 +384,7 @@ export default function Memberships() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <FormLabel className="text-sm">Apply to All Services & Packages</FormLabel>
+                        <FormLabel className="text-sm">Apply to all services</FormLabel>
                         <FormDescription>
                           Apply this membership to all services and packages.
                         </FormDescription>
@@ -378,29 +399,20 @@ export default function Memberships() {
                   )}
                 />
                 {!applyToAll && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <FormLabel>Applicable Services</FormLabel>
-                      <Button 
-                        variant="outline" 
-                        className="w-full mt-2" 
-                        onClick={() => setShowServicesDialog(true)}
-                        type="button"
-                      >
-                        Select Services ({selectedServices.length})
-                      </Button>
-                    </div>
-                    <div>
-                      <FormLabel>Applicable Packages</FormLabel>
-                      <Button 
-                        variant="outline" 
-                        className="w-full mt-2" 
-                        onClick={() => setShowPackagesDialog(true)}
-                        type="button"
-                      >
-                        Select Packages ({selectedPackages.length})
-                      </Button>
-                    </div>
+                  <div>
+                    <FormItem>
+                      <FormLabel>Include services and packages</FormLabel>
+                      <FormControl>
+                        <Button 
+                          variant="outline" 
+                          className="w-full mt-2" 
+                          onClick={handleOpenSelectionDialog}
+                          type="button"
+                        >
+                          Select services ({selectedServices.length}) and packages ({selectedPackages.length})
+                        </Button>
+                      </FormControl>
+                    </FormItem>
                   </div>
                 )}
                 <DialogFooter>
@@ -462,65 +474,71 @@ export default function Memberships() {
         </Table>
       </div>
 
-      {/* Services Selection Dialog */}
-      <Dialog open={showServicesDialog} onOpenChange={setShowServicesDialog}>
-        <DialogContent className="sm:max-w-md">
+      {/* Combined Services and Packages Selection Dialog */}
+      <Dialog open={showSelectionDialog} onOpenChange={setShowSelectionDialog}>
+        <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
-            <DialogTitle>Select Services</DialogTitle>
+            <DialogTitle>Select Services and Packages</DialogTitle>
             <DialogDescription>
-              Choose the services to which this membership applies.
+              Choose the services and packages to which this membership applies.
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="h-[300px] w-full rounded-md border">
-            {services.map((service) => (
-              <div key={service.id} className="p-2">
-                <label htmlFor={`service-${service.id}`} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`service-${service.id}`}
-                    checked={selectedServices.includes(service.id)}
-                    onCheckedChange={() => handleServiceSelection(service.id)}
-                  />
-                  <span>{service.name}</span>
-                  <Badge variant="secondary">₹{service.selling_price}</Badge>
-                </label>
-              </div>
-            ))}
-          </ScrollArea>
+          
+          <Tabs defaultValue="services" value={selectionTabValue} onValueChange={setSelectionTabValue}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="services">Services ({selectedServices.length})</TabsTrigger>
+              <TabsTrigger value="packages">Packages ({selectedPackages.length})</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="services">
+              <ScrollArea className="h-[400px] w-full rounded-md border p-4">
+                {Object.entries(servicesByCategory).map(([categoryId, categoryServices]) => (
+                  <div key={categoryId} className="mb-6">
+                    <h3 className="font-medium mb-2">{categoryId === 'uncategorized' ? 'Other Services' : categoryId}</h3>
+                    <div className="space-y-2">
+                      {categoryServices.map((service) => (
+                        <div key={service.id} className="p-2 border rounded-md">
+                          <label htmlFor={`service-${service.id}`} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`service-${service.id}`}
+                              checked={selectedServices.includes(service.id)}
+                              onCheckedChange={() => handleServiceSelection(service.id)}
+                            />
+                            <span className="flex-grow">{service.name}</span>
+                            <Badge variant="secondary">₹{service.selling_price}</Badge>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </ScrollArea>
+            </TabsContent>
+            
+            <TabsContent value="packages">
+              <ScrollArea className="h-[400px] w-full rounded-md border p-4">
+                <div className="space-y-2">
+                  {packages.map((pkg) => (
+                    <div key={pkg.id} className="p-2 border rounded-md">
+                      <label htmlFor={`package-${pkg.id}`} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`package-${pkg.id}`}
+                          checked={selectedPackages.includes(pkg.id)}
+                          onCheckedChange={() => handlePackageSelection(pkg.id)}
+                        />
+                        <span className="flex-grow">{pkg.name}</span>
+                        <Badge variant="secondary">₹{pkg.price}</Badge>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+          
           <DialogFooter>
-            <Button onClick={() => setShowServicesDialog(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Packages Selection Dialog */}
-      <Dialog open={showPackagesDialog} onOpenChange={setShowPackagesDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Select Packages</DialogTitle>
-            <DialogDescription>
-              Choose the packages to which this membership applies.
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="h-[300px] w-full rounded-md border">
-            {packages.map((pkg) => (
-              <div key={pkg.id} className="p-2">
-                <label htmlFor={`package-${pkg.id}`} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`package-${pkg.id}`}
-                    checked={selectedPackages.includes(pkg.id)}
-                    onCheckedChange={() => handlePackageSelection(pkg.id)}
-                  />
-                  <span>{pkg.name}</span>
-                  <Badge variant="secondary">₹{pkg.price}</Badge>
-                </label>
-              </div>
-            ))}
-          </ScrollArea>
-          <DialogFooter>
-            <Button onClick={() => setShowPackagesDialog(false)}>
-              Close
+            <Button onClick={() => setShowSelectionDialog(false)}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
