@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import {
   Card,
@@ -495,7 +496,7 @@ export default function Memberships() {
                   <Checkbox
                     id={`package-${pkg.id}`}
                     checked={selectedPackages.includes(pkg.id)}
-                    onCheckedChange={() => handlePackageSelection(package.id)}
+                    onCheckedChange={() => handlePackageSelection(pkg.id)}
                   />
                   <span>{pkg.name}</span>
                   <Badge variant="secondary">₹{pkg.price}</Badge>
