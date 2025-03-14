@@ -1,6 +1,6 @@
 
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, Users, Calendar, Package2, Home, Settings, Tag, BarChart2 } from "lucide-react";
+import { LayoutGrid, Users, Calendar, Package2, Home, Settings, BarChart2 } from "lucide-react";
 
 export function AppSidebar() {
   return (
@@ -84,19 +84,6 @@ export function AppSidebar() {
         >
           <BarChart2 className="w-5 h-5" />
           <span>Reports</span>
-        </NavLink>
-        <NavLink
-          to="/admin/settings/sales"
-          className={({ isActive }) =>
-            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`
-          }
-        >
-          <Tag className="w-5 h-5" />
-          <span>Sales</span>
         </NavLink>
         <NavLink
           to="/admin/settings"

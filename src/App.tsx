@@ -20,6 +20,8 @@ import Settings from "./pages/admin/Settings";
 import BusinessSetup from "./pages/admin/settings/BusinessSetup";
 import Sales from "./pages/admin/settings/Sales";
 import Reports from "./pages/admin/Reports";
+import Memberships from "./pages/admin/settings/Memberships";
+import LoyaltyProgram from "./pages/admin/settings/LoyaltyProgram";
 
 // 1) Import DnD
 import { DndProvider } from "react-dnd";
@@ -63,7 +65,8 @@ export default function App() {
             <Route path="settings/business-setup" element={<BusinessSetup />} />
             <Route path="settings/business-setup/*" element={<BusinessSetup />} />
             <Route path="settings/sales" element={<Sales />} />
-            <Route path="settings/sales/*" element={<Sales />} />
+            <Route path="settings/sales/memberships" element={<Memberships />} />
+            <Route path="settings/sales/loyalty" element={<LoyaltyProgram />} />
           </Route>
         </Routes>
       </DndProvider>
