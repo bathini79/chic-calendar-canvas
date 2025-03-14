@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Card, 
@@ -20,6 +19,7 @@ import {
   CreditCard, 
   Search
 } from "lucide-react";
+import { DailyRevenue } from "@/components/admin/reports/DailyRevenue";
 
 const reportCategories = [
   {
@@ -90,7 +90,6 @@ export default function Reports() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   
-  // Filter reports based on search query and active category
   const filteredReports = reportCategories
     .filter(category => activeCategory === "all" || category.id === activeCategory)
     .flatMap(category => 
@@ -144,6 +143,11 @@ export default function Reports() {
           </div>
           
           <TabsContent value="all" className="mt-6">
+            {activeCategory === "all" && searchQuery === "" && (
+              <div className="mb-6">
+                <DailyRevenue />
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredReports.map(report => (
                 <ReportCard 

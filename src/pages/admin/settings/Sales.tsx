@@ -1,906 +1,792 @@
-
 import React, { useState, useEffect } from "react";
-import { Link, Routes, Route, useLocation } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ArrowRight, Plus, Trash2, CreditCard, Percent, Tag } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { useTaxRates, type TaxRate } from "@/hooks/use-tax-rates";
+import { toast } from "sonner";
+import { Trash, Pencil, Plus, X, Check, PercentIcon, DollarSign } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useCoupons, type Coupon } from "@/hooks/use-coupons";
 import { supabase } from "@/integrations/supabase/client";
-import { useTaxRates, TaxRate } from "@/hooks/use-tax-rates";
-import { usePaymentMethods, PaymentMethod } from "@/hooks/use-payment-methods";
-import { useCoupons, Coupon } from "@/hooks/use-coupons";
-import { useActiveServices } from "@/pages/admin/bookings/hooks/useActiveServices";
+import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 
-// Tax rate form schema
-const taxRateSchema = z.object({
-  name: z.string().min(1, "Tax name is required"),
-  percentage: z.string().refine(val => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
-    message: "Percentage must be a positive number",
-  }),
+// Payment Method type
+type PaymentMethod = {
+  id: string;
+  name: string;
+  is_enabled: boolean;
+  is_default?: boolean;
+  is_system?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+// Forms schema definitions
+const taxRateFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  percentage: z.coerce.number().min(0, "Percentage must be a positive number"),
+  is_default: z.boolean().optional(),
 });
 
-// Payment method form schema
-const paymentMethodSchema = z.object({
-  name: z.string().min(1, "Payment method name is required"),
+const paymentMethodFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
   is_enabled: z.boolean().default(true),
+  is_default: z.boolean().optional(),
 });
 
-// Coupon form schema
-const couponSchema = z.object({
-  code: z.string().min(1, "Coupon code is required"),
+const couponFormSchema = z.object({
+  code: z.string().min(1, "Code is required"),
   description: z.string().optional(),
   discount_type: z.enum(["percentage", "fixed"]),
-  discount_value: z.string().refine(val => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
-    message: "Discount value must be a positive number",
-  }),
+  discount_value: z.coerce.number().min(0, "Value must be a positive number"),
   apply_to_all: z.boolean().default(true),
 });
 
-// Component for Tax Rates section
-const TaxRatesSection = () => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingTax, setEditingTax] = useState<TaxRate | null>(null);
-  const { taxRates, isLoading, fetchTaxRates, createTaxRate, updateTaxRate, deleteTaxRate } = useTaxRates();
+export default function Sales() {
+  // Tax Rates Section
+  const { taxRates, isLoading: isTaxRatesLoading, fetchTaxRates, createTaxRate, updateTaxRate, deleteTaxRate } = useTaxRates();
+  const [openTaxDialog, setOpenTaxDialog] = useState(false);
+  const [editingTaxRate, setEditingTaxRate] = useState<TaxRate | null>(null);
 
+  // Payment Methods Section
+  const { data: paymentMethods = [], isLoading: isPaymentMethodsLoading, create: createPaymentMethod, update: updatePaymentMethod, refetch: fetchPaymentMethods } = useSupabaseCrud<'payment_methods'>('payment_methods');
+  const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
+
+  // Coupons Section
+  const { coupons, isLoading: isCouponsLoading, fetchCoupons, createCoupon, updateCoupon, deleteCoupon, getCouponServices, saveCouponServices } = useCoupons();
+  const [openCouponDialog, setOpenCouponDialog] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+  const [services, setServices] = useState<any[]>([]);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [showServicesDialog, setShowServicesDialog] = useState(false);
+
+  // Fetch data on component mount
   useEffect(() => {
     fetchTaxRates();
-  }, []);
-
-  const form = useForm<z.infer<typeof taxRateSchema>>({
-    resolver: zodResolver(taxRateSchema),
-    defaultValues: {
-      name: "",
-      percentage: "",
-    },
-  });
-
-  const resetForm = () => {
-    form.reset({
-      name: "",
-      percentage: "",
-    });
-    setEditingTax(null);
-  };
-
-  const openAddDialog = () => {
-    resetForm();
-    setIsDialogOpen(true);
-  };
-
-  const openEditDialog = (tax: TaxRate) => {
-    setEditingTax(tax);
-    form.reset({
-      name: tax.name,
-      percentage: tax.percentage.toString(),
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteTax = async (id: string) => {
-    try {
-      await deleteTaxRate(id);
-    } catch (error) {
-      // Error is already handled in the hook
-    }
-  };
-
-  const onSubmit = async (values: z.infer<typeof taxRateSchema>) => {
-    try {
-      const taxData = {
-        name: values.name,
-        percentage: parseFloat(values.percentage),
-      };
-
-      if (editingTax) {
-        await updateTaxRate(editingTax.id, taxData);
-      } else {
-        await createTaxRate(taxData);
-      }
-      setIsDialogOpen(false);
-      resetForm();
-    } catch (error) {
-      // Error is already handled in the hook
-    }
-  };
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-xl">Tax Rates</CardTitle>
-        <Button onClick={openAddDialog} size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          Add Tax
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground mb-4">
-          Set up tax rates for services and products.
-        </p>
-
-        {isLoading ? (
-          <div className="flex justify-center p-4">Loading tax rates...</div>
-        ) : taxRates.length === 0 ? (
-          <div className="mt-4 p-8 border rounded-lg border-dashed text-center text-muted-foreground">
-            No tax rates configured yet. Add your first tax rate to get started.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {taxRates.map((tax) => (
-              <div 
-                key={tax.id} 
-                className="flex items-center justify-between p-4 border rounded-lg"
-              >
-                <div>
-                  <h3 className="font-medium">{tax.name}</h3>
-                  <p className="text-sm text-muted-foreground">{tax.percentage}%</p>
-                </div>
-                <div className="flex space-x-2">
-                  <Button variant="ghost" size="sm" onClick={() => openEditDialog(tax)}>
-                    Edit
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteTax(tax.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>{editingTax ? "Edit tax rate" : "Add new tax"}</DialogTitle>
-              <DialogDescription>
-                Set the tax name and percentage rate. To apply this to your products and
-                services, adjust your tax defaults settings.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tax name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., GST, VAT" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="percentage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tax rate (%)</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            placeholder="e.g., 18"
-                            {...field}
-                          />
-                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                            %
-                          </div>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter className="pt-4">
-                  <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Component for Payment Methods section
-const PaymentMethodsSection = () => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
-  const { paymentMethods, isLoading, fetchPaymentMethods, createPaymentMethod, updatePaymentMethod, deletePaymentMethod } = usePaymentMethods();
-
-  useEffect(() => {
     fetchPaymentMethods();
+    fetchCoupons();
+    fetchServices();
   }, []);
 
-  const form = useForm<z.infer<typeof paymentMethodSchema>>({
-    resolver: zodResolver(paymentMethodSchema),
+  const fetchServices = async () => {
+    const { data } = await supabase.from("services").select("id, name, selling_price").order("name");
+    if (data) {
+      setServices(data);
+    }
+  };
+
+  // TAX RATES FORM
+  const taxForm = useForm<z.infer<typeof taxRateFormSchema>>({
+    resolver: zodResolver(taxRateFormSchema),
     defaultValues: {
       name: "",
-      is_enabled: true,
+      percentage: 0,
+      is_default: false,
     },
   });
 
-  const resetForm = () => {
-    form.reset({
+  const handleOpenTaxDialog = (taxRate?: TaxRate) => {
+    if (taxRate) {
+      setEditingTaxRate(taxRate);
+      taxForm.reset({
+        name: taxRate.name,
+        percentage: taxRate.percentage,
+        is_default: taxRate.is_default,
+      });
+    } else {
+      setEditingTaxRate(null);
+      taxForm.reset({
+        name: "",
+        percentage: 0,
+        is_default: false,
+      });
+    }
+    setOpenTaxDialog(true);
+  };
+
+  const onTaxSubmit = async (values: z.infer<typeof taxRateFormSchema>) => {
+    try {
+      if (editingTaxRate) {
+        await updateTaxRate(editingTaxRate.id, values);
+      } else {
+        await createTaxRate(values);
+      }
+      setOpenTaxDialog(false);
+    } catch (error) {
+      console.error("Error saving tax rate:", error);
+    }
+  };
+
+  const handleDeleteTaxRate = async (id: string) => {
+    if (confirm("Are you sure you want to delete this tax rate?")) {
+      try {
+        await deleteTaxRate(id);
+        toast.success("Tax rate deleted successfully");
+      } catch (error) {
+        console.error("Error deleting tax rate:", error);
+        toast.error("Failed to delete tax rate");
+      }
+    }
+  };
+
+  // PAYMENT METHODS FORM
+  const paymentForm = useForm<z.infer<typeof paymentMethodFormSchema>>({
+    resolver: zodResolver(paymentMethodFormSchema),
+    defaultValues: {
       name: "",
       is_enabled: true,
-    });
-    setEditingMethod(null);
+      is_default: false,
+    },
+  });
+
+  const handleOpenPaymentDialog = (paymentMethod?: PaymentMethod) => {
+    if (paymentMethod) {
+      setEditingPaymentMethod(paymentMethod);
+      paymentForm.reset({
+        name: paymentMethod.name,
+        is_enabled: paymentMethod.is_enabled,
+        is_default: paymentMethod.is_default,
+      });
+    } else {
+      setEditingPaymentMethod(null);
+      paymentForm.reset({
+        name: "",
+        is_enabled: true,
+        is_default: false,
+      });
+    }
+    setOpenPaymentDialog(true);
   };
 
-  const openAddDialog = () => {
-    resetForm();
-    setIsDialogOpen(true);
+  const onPaymentSubmit = async (values: z.infer<typeof paymentMethodFormSchema>) => {
+    try {
+      // Fix: Ensure required properties are provided
+      const paymentMethodData: Omit<PaymentMethod, "id"> = {
+        name: values.name,
+        is_enabled: values.is_enabled,
+        is_default: values.is_default,
+      };
+      
+      if (editingPaymentMethod) {
+        await updatePaymentMethod(editingPaymentMethod.id, paymentMethodData);
+      } else {
+        await createPaymentMethod(paymentMethodData);
+      }
+      setOpenPaymentDialog(false);
+    } catch (error) {
+      console.error("Error saving payment method:", error);
+    }
   };
 
-  const openEditDialog = (method: PaymentMethod) => {
-    setEditingMethod(method);
-    form.reset({
-      name: method.name,
-      is_enabled: method.is_enabled,
-    });
-    setIsDialogOpen(true);
-  };
-
-  const togglePaymentMethod = async (id: string, isEnabled: boolean) => {
+  const handleTogglePaymentMethod = async (id: string, isEnabled: boolean) => {
     try {
       await updatePaymentMethod(id, { is_enabled: !isEnabled });
     } catch (error) {
-      // Error is already handled in the hook
+      console.error("Error toggling payment method:", error);
     }
   };
 
-  const handleDeleteMethod = async (id: string) => {
-    try {
-      await deletePaymentMethod(id);
-    } catch (error) {
-      // Error is already handled in the hook
-    }
-  };
-
-  const onSubmit = async (values: z.infer<typeof paymentMethodSchema>) => {
-    try {
-      if (editingMethod) {
-        await updatePaymentMethod(editingMethod.id, values);
-      } else {
-        await createPaymentMethod(values);
-      }
-      setIsDialogOpen(false);
-      resetForm();
-    } catch (error) {
-      // Error is already handled in the hook
-    }
-  };
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-xl">Payment Methods</CardTitle>
-        <Button onClick={openAddDialog} size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          Add Payment Method
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground mb-4">
-          Configure the payment methods your business accepts from customers.
-        </p>
-
-        {isLoading ? (
-          <div className="flex justify-center p-4">Loading payment methods...</div>
-        ) : paymentMethods.length === 0 ? (
-          <div className="mt-4 p-8 border rounded-lg border-dashed text-center text-muted-foreground">
-            No payment methods configured yet. Add your first payment method to get started.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {paymentMethods.map((method) => (
-              <div 
-                key={method.id} 
-                className="flex items-center justify-between p-4 border rounded-lg"
-              >
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <h3 className="font-medium">{method.name}</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {method.is_enabled ? 'Enabled' : 'Disabled'}
-                      {method.is_system && ' • System default'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch 
-                    checked={method.is_enabled} 
-                    onCheckedChange={() => togglePaymentMethod(method.id, method.is_enabled)}
-                    disabled={method.is_system && method.is_default}
-                  />
-                  <Button variant="ghost" size="sm" onClick={() => openEditDialog(method)} disabled={method.is_system}>
-                    Edit
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleDeleteMethod(method.id)}
-                    disabled={method.is_system}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>{editingMethod ? "Edit payment method" : "Add payment method"}</DialogTitle>
-              <DialogDescription>
-                Configure the payment methods your business accepts from customers.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Payment method name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Credit Card, PayPal" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="is_enabled"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5">
-                        <FormLabel>Enabled</FormLabel>
-                        <FormDescription>
-                          Allow customers to use this payment method
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch 
-                          checked={field.value} 
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter className="pt-4">
-                  <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Component for Coupons section
-const CouponsSection = () => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [serviceSheet, setServiceSheet] = useState(false);
-  const [selectedServices, setSelectedServices] = useState<any[]>([]);
-  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
-  const { coupons, isLoading, fetchCoupons, createCoupon, updateCoupon, deleteCoupon, getCouponServices, saveCouponServices } = useCoupons();
-  const { data: services = [] } = useActiveServices();
-  
-  useEffect(() => {
-    fetchCoupons();
-  }, []);
-
-  const form = useForm<z.infer<typeof couponSchema>>({
-    resolver: zodResolver(couponSchema),
+  // COUPONS FORM
+  const couponForm = useForm<z.infer<typeof couponFormSchema>>({
+    resolver: zodResolver(couponFormSchema),
     defaultValues: {
       code: "",
       description: "",
       discount_type: "percentage",
-      discount_value: "",
+      discount_value: 0,
       apply_to_all: true,
     },
   });
 
-  const resetForm = () => {
-    form.reset({
-      code: "",
-      description: "",
-      discount_type: "percentage",
-      discount_value: "",
-      apply_to_all: true,
-    });
-    setSelectedServices([]);
-    setEditingCoupon(null);
-  };
-
-  const openAddDialog = () => {
-    resetForm();
-    setIsDialogOpen(true);
-  };
-
-  const openEditDialog = async (coupon: Coupon) => {
-    setEditingCoupon(coupon);
-    form.reset({
-      code: coupon.code,
-      description: coupon.description || "",
-      discount_type: coupon.discount_type,
-      discount_value: coupon.discount_value.toString(),
-      apply_to_all: coupon.apply_to_all,
-    });
-    
-    if (!coupon.apply_to_all) {
-      const couponServicesData = await getCouponServices(coupon.id);
-      const serviceIds = couponServicesData.map(item => item.service_id);
-      const selectedServicesList = services.filter(service => serviceIds.includes(service.id));
-      setSelectedServices(selectedServicesList);
+  const handleOpenCouponDialog = async (coupon?: Coupon) => {
+    if (coupon) {
+      setEditingCoupon(coupon);
+      const couponServices = await getCouponServices(coupon.id);
+      setSelectedServices(couponServices.map(cs => cs.service_id));
+      
+      couponForm.reset({
+        code: coupon.code,
+        description: coupon.description || "",
+        discount_type: coupon.discount_type,
+        discount_value: coupon.discount_value,
+        apply_to_all: coupon.apply_to_all,
+      });
+    } else {
+      setEditingCoupon(null);
+      setSelectedServices([]);
+      couponForm.reset({
+        code: "",
+        description: "",
+        discount_type: "percentage",
+        discount_value: 0,
+        apply_to_all: true,
+      });
     }
-    
-    setIsDialogOpen(true);
+    setOpenCouponDialog(true);
   };
 
-  const handleDeleteCoupon = async (id: string) => {
+  const onCouponSubmit = async (values: z.infer<typeof couponFormSchema>) => {
     try {
-      await deleteCoupon(id);
-    } catch (error) {
-      // Error is already handled in the hook
-    }
-  };
-
-  const toggleServiceSelection = (service: any) => {
-    setSelectedServices(prev => {
-      if (prev.some(s => s.id === service.id)) {
-        return prev.filter(s => s.id !== service.id);
-      } else {
-        return [...prev, service];
-      }
-    });
-  };
-
-  const openServiceSelection = () => {
-    setServiceSheet(true);
-  };
-
-  const closeServiceSelection = () => {
-    setServiceSheet(false);
-  };
-
-  const onSubmit = async (values: z.infer<typeof couponSchema>) => {
-    try {
-      const couponData = {
-        code: values.code,
-        description: values.description || undefined,
-        discount_type: values.discount_type,
-        discount_value: parseFloat(values.discount_value),
-        apply_to_all: values.apply_to_all,
-      };
-
       let couponId;
       
       if (editingCoupon) {
-        const updatedCoupon = await updateCoupon(editingCoupon.id, couponData);
+        await updateCoupon(editingCoupon.id, values);
         couponId = editingCoupon.id;
       } else {
-        const newCoupon = await createCoupon(couponData);
+        const newCoupon = await createCoupon(values);
         couponId = newCoupon.id;
       }
       
-      if (!values.apply_to_all && couponId) {
-        const serviceIds = selectedServices.map(service => service.id);
-        await saveCouponServices(couponId, serviceIds);
+      // If not applying to all services, save the selected services
+      if (!values.apply_to_all) {
+        await saveCouponServices(couponId, selectedServices);
       }
       
-      setIsDialogOpen(false);
-      resetForm();
+      setOpenCouponDialog(false);
     } catch (error) {
-      // Error is already handled in the hook
+      console.error("Error saving coupon:", error);
     }
   };
 
+  const handleDeleteCoupon = async (id: string) => {
+    if (confirm("Are you sure you want to delete this coupon?")) {
+      try {
+        await deleteCoupon(id);
+        toast.success("Coupon deleted successfully");
+      } catch (error) {
+        console.error("Error deleting coupon:", error);
+        toast.error("Failed to delete coupon");
+      }
+    }
+  };
+
+  const handleServiceSelection = async (serviceId: string) => {
+    setSelectedServices(current => {
+      const isSelected = current.includes(serviceId);
+      if (isSelected) {
+        return current.filter(id => id !== serviceId);
+      } else {
+        return [...current, serviceId];
+      }
+    });
+  };
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-xl">Coupons</CardTitle>
-        <Button onClick={openAddDialog} size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          Add Coupon
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground mb-4">
-          Create and manage discount coupons for your customers.
-        </p>
-
-        {isLoading ? (
-          <div className="flex justify-center p-4">Loading coupons...</div>
-        ) : coupons.length === 0 ? (
-          <div className="mt-4 p-8 border rounded-lg border-dashed text-center text-muted-foreground">
-            No coupons created yet. Add your first coupon to get started.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {coupons.map((coupon) => (
-              <div 
-                key={coupon.id} 
-                className="flex items-center justify-between p-4 border rounded-lg"
-              >
-                <div className="flex items-center gap-2">
-                  <Tag className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <h3 className="font-medium">{coupon.code}</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {coupon.discount_type === 'percentage' ? 
-                        `${coupon.discount_value}% off` : 
-                        `₹${coupon.discount_value} off`}
-                      {coupon.description && ` • ${coupon.description}`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <Button variant="ghost" size="sm" onClick={() => openEditDialog(coupon)}>
-                    Edit
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteCoupon(coupon.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>{editingCoupon ? "Edit coupon" : "Add new coupon"}</DialogTitle>
-              <DialogDescription>
-                Create discount coupons for your customers. Coupons can be applied to specific services or all services.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="code"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Coupon code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., SUMMER20" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Customers will enter this code to apply the discount.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description (optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Summer promotion" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="discount_type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Discount type</FormLabel>
-                        <FormControl>
-                          <select 
-                            className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-                            {...field}
-                          >
-                            <option value="percentage">Percentage (%)</option>
-                            <option value="fixed">Fixed amount (₹)</option>
-                          </select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="discount_value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Discount value</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              min="0"
-                              step={form.watch("discount_type") === "percentage" ? "1" : "0.01"}
-                              placeholder={form.watch("discount_type") === "percentage" ? "e.g., 20" : "e.g., 100"}
-                              {...field}
-                            />
-                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                              {form.watch("discount_type") === "percentage" ? "%" : "₹"}
-                            </div>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="apply_to_all"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5">
-                        <FormLabel>Apply discount to</FormLabel>
-                        <FormDescription>
-                          Choose which services this coupon applies to
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <select 
-                          className="flex h-9 w-[180px] rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium"
-                          value={field.value ? "all" : "custom"}
-                          onChange={(e) => field.onChange(e.target.value === "all")}
-                        >
-                          <option value="all">All services</option>
-                          <option value="custom">Selected services</option>
-                        </select>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                {!form.watch("apply_to_all") && (
-                  <div className="flex flex-row items-center justify-between rounded-lg border p-3">
-                    <div className="space-y-0.5">
-                      <FormLabel>Selected services</FormLabel>
-                      <FormDescription>
-                        {selectedServices.length === 0 
-                          ? "No services selected" 
-                          : `${selectedServices.length} service${selectedServices.length === 1 ? "" : "s"} selected`}
-                      </FormDescription>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={openServiceSelection}
-                    >
-                      Select Services
-                    </Button>
-                  </div>
-                )}
-
-                <DialogFooter className="pt-4">
-                  <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-
-        <Sheet open={serviceSheet} onOpenChange={setServiceSheet}>
-          <SheetContent className="sm:max-w-md">
-            <SheetHeader>
-              <SheetTitle>Select Services</SheetTitle>
-              <SheetDescription>
-                Choose which services this coupon can be applied to.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="py-6">
-              <div className="space-y-4">
-                {services.map(service => (
-                  <div 
-                    key={service.id} 
-                    className="flex items-center space-x-2"
-                  >
-                    <Checkbox 
-                      id={`service-${service.id}`}
-                      checked={selectedServices.some(s => s.id === service.id)}
-                      onCheckedChange={() => toggleServiceSelection(service)}
+    <div className="container py-6">
+      <Tabs defaultValue="tax-rates" className="w-full space-y-4">
+        <TabsList>
+          <TabsTrigger value="tax-rates">Tax Rates</TabsTrigger>
+          <TabsTrigger value="payment-methods">Payment Methods</TabsTrigger>
+          <TabsTrigger value="coupons">Coupons</TabsTrigger>
+        </TabsList>
+        <TabsContent value="tax-rates" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold tracking-tight">Tax Rates</h2>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="primary">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Tax Rate
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>{editingTaxRate ? "Edit Tax Rate" : "Create Tax Rate"}</DialogTitle>
+                  <DialogDescription>
+                    {editingTaxRate ? "Update an existing tax rate." : "Add a new tax rate to your business."}
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...taxForm}>
+                  <form onSubmit={taxForm.handleSubmit(onTaxSubmit)} className="space-y-4">
+                    <FormField
+                      control={taxForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Tax Rate Name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    <label
-                      htmlFor={`service-${service.id}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {service.name}
-                    </label>
-                  </div>
-                ))}
-
-                {services.length === 0 && (
-                  <div className="text-center text-muted-foreground">
-                    No services available
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="outline" onClick={closeServiceSelection}>
-                Cancel
-              </Button>
-              <Button onClick={closeServiceSelection}>
-                Done
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Placeholder components for loyalty and memberships sections
-const LoyaltyProgramSection = () => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Loyalty Program</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-muted-foreground">
-        Configure your customer loyalty program to reward repeat customers.
-      </p>
-      <div className="mt-4 p-8 border rounded-lg border-dashed text-center text-muted-foreground">
-        Loyalty program not configured yet. Set up your loyalty program to get started.
-      </div>
-    </CardContent>
-  </Card>
-);
-
-const MembershipsSection = () => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Memberships</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-muted-foreground">
-        Create and manage membership plans for your customers.
-      </p>
-      <div className="mt-4 p-8 border rounded-lg border-dashed text-center text-muted-foreground">
-        No membership plans created yet. Add your first membership plan to get started.
-      </div>
-    </CardContent>
-  </Card>
-);
-
-export default function Sales() {
-  const location = useLocation();
-  const [activeSection, setActiveSection] = useState<string>(
-    location.pathname.includes('payment-methods') ? "payment-methods" :
-    location.pathname.includes('tax-rates') ? "tax-rates" :
-    location.pathname.includes('coupons') ? "coupons" :
-    location.pathname.includes('loyalty-program') ? "loyalty-program" :
-    location.pathname.includes('memberships') ? "memberships" : "payment-methods"
-  );
-
-  return (
-    <div className="container py-6 max-w-6xl">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" size="sm" asChild className="mr-2">
-          <Link to="/admin/settings">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back
-          </Link>
-        </Button>
-        <div className="text-sm text-muted-foreground">
-          Workspace settings • Sales
-        </div>
-      </div>
-
-      <Routes>
-        <Route path="/" element={
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="md:col-span-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Sales</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div 
-                    className={`px-4 py-2 cursor-pointer ${activeSection === "payment-methods" ? "bg-accent" : ""}`}
-                    onClick={() => setActiveSection("payment-methods")}
-                  >
-                    <span>Payment methods</span>
-                  </div>
-                  <div 
-                    className={`px-4 py-2 cursor-pointer ${activeSection === "tax-rates" ? "bg-accent" : ""}`}
-                    onClick={() => setActiveSection("tax-rates")}
-                  >
-                    <span>Tax rates</span>
-                  </div>
-                  <div 
-                    className={`px-4 py-2 cursor-pointer ${activeSection === "coupons" ? "bg-accent" : ""}`}
-                    onClick={() => setActiveSection("coupons")}
-                  >
-                    <span>Coupons</span>
-                  </div>
-                  <div 
-                    className={`px-4 py-2 cursor-pointer ${activeSection === "loyalty-program" ? "bg-accent" : ""}`}
-                    onClick={() => setActiveSection("loyalty-program")}
-                  >
-                    <span>Loyalty program</span>
-                  </div>
-                  <div 
-                    className={`px-4 py-2 cursor-pointer ${activeSection === "memberships" ? "bg-accent" : ""}`}
-                    onClick={() => setActiveSection("memberships")}
-                  >
-                    <span>Memberships</span>
-                  </div>
-
-                  <Separator className="my-4" />
-                  <div className="px-4 py-2 font-medium">Shortcuts</div>
-
-                  <div className="px-4 py-2 flex justify-between items-center cursor-pointer">
-                    <span>Invoices</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                  <div className="px-4 py-2 flex justify-between items-center cursor-pointer">
-                    <span>Receipts</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                  <div className="px-4 py-2 flex justify-between items-center cursor-pointer">
-                    <span>Gift cards</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="md:col-span-3">
-              {activeSection === "payment-methods" && <PaymentMethodsSection />}
-              {activeSection === "tax-rates" && <TaxRatesSection />}
-              {activeSection === "coupons" && <CouponsSection />}
-              {activeSection === "loyalty-program" && <LoyaltyProgramSection />}
-              {activeSection === "memberships" && <MembershipsSection />}
-            </div>
+                    <FormField
+                      control={taxForm.control}
+                      name="percentage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Percentage</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0.00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={taxForm.control}
+                      name="is_default"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-sm">Set as Default</FormLabel>
+                            <FormDescription>
+                              This tax rate will be automatically applied to all new services and products.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button type="submit">
+                        {editingTaxRate ? "Update" : "Create"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </div>
-        } />
-      </Routes>
+          {isTaxRatesLoading ? (
+            <p>Loading tax rates...</p>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Name</TableHead>
+                    <TableHead>Percentage</TableHead>
+                    <TableHead>Default</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {taxRates?.map((taxRate) => (
+                    <TableRow key={taxRate.id}>
+                      <TableCell className="font-medium">{taxRate.name}</TableCell>
+                      <TableCell>{taxRate.percentage}%</TableCell>
+                      <TableCell>{taxRate.is_default ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenTaxDialog(taxRate)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteTaxRate(taxRate.id)}>
+                            <Trash className="w-4 h-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {taxRates?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center">
+                        No tax rates found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+        <TabsContent value="payment-methods" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold tracking-tight">Payment Methods</h2>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="primary">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Payment Method
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>{editingPaymentMethod ? "Edit Payment Method" : "Create Payment Method"}</DialogTitle>
+                  <DialogDescription>
+                    {editingPaymentMethod ? "Update an existing payment method." : "Add a new payment method to your business."}
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...paymentForm}>
+                  <form onSubmit={paymentForm.handleSubmit(onPaymentSubmit)} className="space-y-4">
+                    <FormField
+                      control={paymentForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Payment Method Name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={paymentForm.control}
+                      name="is_enabled"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-sm">Enabled</FormLabel>
+                            <FormDescription>
+                              Enable or disable this payment method.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={paymentForm.control}
+                      name="is_default"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-sm">Set as Default</FormLabel>
+                            <FormDescription>
+                              This payment method will be automatically selected for new bookings.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button type="submit">
+                        {editingPaymentMethod ? "Update" : "Create"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+          {isPaymentMethodsLoading ? (
+            <p>Loading payment methods...</p>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Name</TableHead>
+                    <TableHead>Enabled</TableHead>
+                    <TableHead>Default</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paymentMethods?.map((paymentMethod) => (
+                    <TableRow key={paymentMethod.id}>
+                      <TableCell className="font-medium">{paymentMethod.name}</TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={paymentMethod.is_enabled}
+                          onCheckedChange={() => handleTogglePaymentMethod(paymentMethod.id, paymentMethod.is_enabled)}
+                          disabled={paymentMethod.is_system}
+                        />
+                      </TableCell>
+                      <TableCell>{paymentMethod.is_default ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenPaymentDialog(paymentMethod)} disabled={paymentMethod.is_system}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {paymentMethods?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center">
+                        No payment methods found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+        <TabsContent value="coupons" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold tracking-tight">Coupons</h2>
+            <Dialog open={openCouponDialog} onOpenChange={setOpenCouponDialog}>
+              <DialogTrigger asChild>
+                <Button variant="primary">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Coupon
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[525px]">
+                <DialogHeader>
+                  <DialogTitle>{editingCoupon ? "Edit Coupon" : "Create Coupon"}</DialogTitle>
+                  <DialogDescription>
+                    {editingCoupon ? "Update an existing coupon." : "Create a new coupon for your customers."}
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...couponForm}>
+                  <form onSubmit={couponForm.handleSubmit(onCouponSubmit)} className="space-y-4">
+                    <FormField
+                      control={couponForm.control}
+                      name="code"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Code</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Coupon Code" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={couponForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="Coupon Description" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={couponForm.control}
+                      name="discount_type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Discount Type</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select discount type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="percentage">Percentage <PercentIcon className="w-4 h-4 ml-2" /></SelectItem>
+                              <SelectItem value="fixed">Fixed <DollarSign className="w-4 h-4 ml-2" /></SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={couponForm.control}
+                      name="discount_value"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Discount Value</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0.00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={couponForm.control}
+                      name="apply_to_all"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-sm">Apply to All Services</FormLabel>
+                            <FormDescription>
+                              Apply this coupon to all services.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    {!couponForm.watch("apply_to_all") && (
+                      <FormField
+                        control={couponForm.control}
+                        name="services"
+                        render={() => (
+                          <FormItem>
+                            <FormLabel>Select Services</FormLabel>
+                            <FormControl>
+                              <Dialog open={showServicesDialog} onOpenChange={setShowServicesDialog}>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline">
+                                    Select Services
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px]">
+                                  <DialogHeader>
+                                    <DialogTitle>Select Services</DialogTitle>
+                                    <DialogDescription>
+                                      Choose the services to which this coupon will apply.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <ScrollArea className="h-[300px] w-full rounded-md border">
+                                    {services.map((service) => (
+                                      <div key={service.id} className="p-2">
+                                        <label
+                                          htmlFor={`service-${service.id}`}
+                                          className="flex items-center space-x-2"
+                                        >
+                                          <Checkbox
+                                            id={`service-${service.id}`}
+                                            checked={selectedServices.includes(service.id)}
+                                            onCheckedChange={() => handleServiceSelection(service.id)}
+                                          />
+                                          <span>{service.name}</span>
+                                          <Badge variant="secondary">₹{service.selling_price}</Badge>
+                                        </label>
+                                      </div>
+                                    ))}
+                                  </ScrollArea>
+                                  <DialogFooter>
+                                    <Button onClick={() => setShowServicesDialog(false)}>
+                                      Close
+                                    </Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    <DialogFooter>
+                      <Button type="submit">
+                        {editingCoupon ? "Update" : "Create"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+          {isCouponsLoading ? (
+            <p>Loading coupons...</p>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Code</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Discount</TableHead>
+                    <TableHead>Applies To</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {coupons?.map((coupon) => (
+                    <TableRow key={coupon.id}>
+                      <TableCell className="font-medium">{coupon.code}</TableCell>
+                      <TableCell>{coupon.description}</TableCell>
+                      <TableCell>
+                        {coupon.discount_type === "percentage" ? `${coupon.discount_value}%` : `₹${coupon.discount_value}`}
+                      </TableCell>
+                      <TableCell>{coupon.apply_to_all ? "All Services" : "Selected Services"}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenCouponDialog(coupon)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteCoupon(coupon.id)}>
+                            <Trash className="w-4 h-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {coupons?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">
+                        No coupons found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
