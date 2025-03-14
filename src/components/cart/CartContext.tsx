@@ -1,309 +1,95 @@
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+// Add location selection to CartContext
+import React, { createContext, useContext, useState, ReactNode } from "react";
 
-type CartItem = {
+interface CartItem {
   id: string;
-  service_id?: string;
-  package_id?: string;
-  status: 'pending' | 'scheduled' | 'removed';
-  customized_services?: string[];
-  service?: {
-    id: string;
-    name: string;
-    selling_price: number;
-    duration: number;
-    original_price?: number;
-  };
-  package?: {
-    id: string;
-    name: string;
-    price: number;
-    duration: number;
-    package_services: Array<{
-      service: {
-        id: string;
-        name: string;
-        selling_price: number;
-        duration: number;
-      };
-      package_selling_price?: number;
-    }>;
-  };
-  selling_price: number;
+  name: string;
+  price: number;
   duration?: number;
-};
+  type: 'service' | 'package';
+  service?: any;
+  package?: any;
+}
 
-type CartContextType = {
+interface CartContextType {
   items: CartItem[];
-  addToCart: (serviceId?: string, packageId?: string, options?: { 
-    customized_services?: string[],
-    selling_price?: number,
-    duration?: number
-  }) => Promise<void>;
-  removeFromCart: (itemId: string) => Promise<void>;
-  isLoading: boolean;
-  setCartOpen: (open: boolean) => void;
-  selectedDate: Date | null;
-  setSelectedDate: (date: Date | null) => void;
+  addItem: (item: CartItem) => void;
+  removeItem: (itemId: string) => void;
+  clearCart: () => void;
   selectedTimeSlots: Record<string, string>;
   setSelectedTimeSlots: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  selectedDate: Date | null;
+  setSelectedDate: React.Dispatch<React.SetStateAction<Date | null>>;
   selectedStylists: Record<string, string>;
   setSelectedStylists: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  getTotalPrice: () => number;
-  getTotalDuration: () => number;
-};
+  selectedLocation: string; // Add selectedLocation field
+  setSelectedLocation: React.Dispatch<React.SetStateAction<string>>; // Add setSelectedLocation method
+}
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
+export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [cartOpen, setCartOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<Record<string, string>>({});
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
-  const [allServices, setAllServices] = useState<any[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>(""); // Add state for selected location
 
-  useEffect(() => {
-    fetchCartItems();
-    fetchAllServices();
-
-    const channel = supabase
-      .channel('cart-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'cart_items',
-        },
-        () => {
-          fetchCartItems();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const fetchAllServices = async () => {
-    const { data, error } = await supabase
-      .from('services')
-      .select('*')
-      .eq('status', 'active');
-      
-    if (error) {
-      console.error('Error fetching services:', error);
-      return;
-    }
+  const addItem = (item: CartItem) => {
+    // Check if item already exists
+    const existingItem = items.find((i) => i.id === item.id);
+    if (existingItem) return;
     
-    if (data) {
-      setAllServices(data);
-    }
+    setItems([...items, item]);
   };
 
-  const fetchCartItems = async () => {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) {
-      setIsLoading(false);
-      return;
-    }
-
-    const { data: cartItems, error } = await supabase
-      .from('cart_items')
-      .select(`
-        *,
-        service:services(
-          id,
-          name,
-          selling_price,
-          duration,
-          original_price
-        ),
-        package:packages!cart_items_package_id_fkey(
-          id,
-          name,
-          price,
-          duration,
-          package_services(
-            service:services(
-              id,
-              name,
-              selling_price,
-              duration
-            ),
-            package_selling_price
-          )
-        )
-      `)
-      .eq('status', 'pending')
-      .eq('customer_id', session.session.user.id);
-
-    if (error) {
-      toast.error("Error fetching cart items");
-      return;
-    }
-
-    const typedCartItems = cartItems as CartItem[];
-    setItems(typedCartItems);
-    setIsLoading(false);
+  const removeItem = (itemId: string) => {
+    setItems(items.filter((item) => item.id !== itemId));
+    
+    // Also remove from selected time slots and stylists
+    const updatedTimeSlots = { ...selectedTimeSlots };
+    delete updatedTimeSlots[itemId];
+    setSelectedTimeSlots(updatedTimeSlots);
+    
+    const updatedStylists = { ...selectedStylists };
+    delete updatedStylists[itemId];
+    setSelectedStylists(updatedStylists);
   };
 
-  const calculateItemPrice = (item: CartItem): number => {
-    if (item.service) {
-      return item.service.selling_price;
-    } else if (item.package) {
-      // If we have a pre-calculated selling_price, use it
-      if (item.selling_price) {
-        return item.selling_price;
-      }
-      
-      let totalPrice = item.package.price;
-
-      // Add prices for customized services
-      if (item.customized_services?.length && allServices.length > 0) {
-        item.customized_services.forEach(serviceId => {
-          // Check if this service is not already in the package
-          const isInPackage = item.package?.package_services.some(ps => ps.service.id === serviceId);
-          if (!isInPackage) {
-            // Find the service in the complete list of all services
-            const customService = allServices.find(s => s.id === serviceId);
-            if (customService) {
-              totalPrice += customService.selling_price;
-            }
-          }
-        });
-      }
-
-      return totalPrice;
-    }
-    return 0;
-  };
-
-  const calculateItemDuration = (item: CartItem): number => {
-    if (item.service) {
-      return item.service.duration;
-    } else if (item.package) {
-      // If we have a pre-calculated duration, use it
-      if (item.duration) {
-        return item.duration;
-      }
-      
-      let totalDuration = 0;
-
-      // Add base package services duration
-      item.package.package_services.forEach(ps => {
-        totalDuration += ps.service.duration;
-      });
-
-      // Add duration for customized services
-      if (item.customized_services?.length && allServices.length > 0) {
-        item.customized_services.forEach(serviceId => {
-          // Check if this service is not already in the package
-          const isInPackage = item.package?.package_services.some(ps => ps.service.id === serviceId);
-          if (!isInPackage) {
-            // Find the service in the complete list of all services
-            const customService = allServices.find(s => s.id === serviceId);
-            if (customService) {
-              totalDuration += customService.duration;
-            }
-          }
-        });
-      }
-
-      return totalDuration;
-    }
-    return 0;
-  };
-
-  const getTotalPrice = () => {
-    return items.reduce((total, item) => total + calculateItemPrice(item), 0);
-  };
-
-  const getTotalDuration = () => {
-    return items.reduce((total, item) => total + calculateItemDuration(item), 0);
-  };
-
-  const addToCart = async (
-    serviceId?: string, 
-    packageId?: string, 
-    options?: { 
-      customized_services?: string[], 
-      selling_price?: number,
-      duration?: number
-    }
-  ) => {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) {
-      toast.error("Please sign in to add items to cart");
-      return;
-    }
-
-    const cartItem = {
-      service_id: serviceId,
-      package_id: packageId,
-      status: 'pending' as const,
-      customer_id: session.session.user.id,
-      customized_services: options?.customized_services || [],
-      selling_price: options?.selling_price || 0,
-      duration: options?.duration || 0
-    };
-
-    const { error } = await supabase
-      .from('cart_items')
-      .insert([cartItem]);
-
-    if (error) {
-      toast.error("Error adding item to cart");
-      return;
-    }
-
-    await fetchCartItems();
-  };
-
-  const removeFromCart = async (itemId: string) => {
-    const { error } = await supabase
-      .from('cart_items')
-      .update({ status: 'removed' })
-      .eq('id', itemId);
-
-    if (error) {
-      toast.error("Error removing item from cart");
-      return;
-    }
-
-    await fetchCartItems();
+  const clearCart = () => {
+    setItems([]);
+    setSelectedTimeSlots({});
+    setSelectedStylists({});
+    setSelectedDate(null);
   };
 
   return (
-    <CartContext.Provider value={{ 
-      items, 
-      addToCart, 
-      removeFromCart, 
-      isLoading, 
-      setCartOpen,
-      selectedDate,
-      setSelectedDate,
-      selectedTimeSlots,
-      setSelectedTimeSlots,
-      selectedStylists,
-      setSelectedStylists,
-      getTotalPrice,
-      getTotalDuration
-    }}>
+    <CartContext.Provider
+      value={{
+        items,
+        addItem,
+        removeItem,
+        clearCart,
+        selectedTimeSlots,
+        setSelectedTimeSlots,
+        selectedDate,
+        setSelectedDate,
+        selectedStylists,
+        setSelectedStylists,
+        selectedLocation,  // Add to context values
+        setSelectedLocation  // Add to context values
+      }}
+    >
       {children}
     </CartContext.Provider>
   );
 }
 
-export const useCart = () => {
+export function useCart() {
   const context = useContext(CartContext);
   if (context === undefined) {
-    throw new Error('useCart must be used within a CartProvider');
+    throw new Error("useCart must be used within a CartProvider");
   }
   return context;
-};
+}

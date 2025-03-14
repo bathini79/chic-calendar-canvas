@@ -1,68 +1,101 @@
-
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { AvatarGroup } from "@/components/ui/avatar-group";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-
-interface Service {
-  id: string;
-  name: string;
-  duration: number;
-  selling_price: number;
-}
-
-interface PackageService {
-  service: Service;
-  package_selling_price?: number;
-}
-
-interface Package {
-  id: string;
-  name: string;
-  package_services: PackageService[];
-  duration: number;
-  price: number;
-}
-
-interface CartItem {
-  id: string;
-  service_id?: string;
-  package_id?: string;
-  service?: Service;
-  package?: Package;
-  customized_services?: string[];
-  selling_price: number;
-}
-
-interface Employee {
-  id: string;
-  name: string;
-}
+import { Clock, Users } from "lucide-react";
 
 interface ServiceSelectorProps {
-  items: CartItem[];
+  items: any[];
   selectedStylists: Record<string, string>;
   onStylistSelect: (serviceId: string, stylistId: string) => void;
+  locationId?: string;
 }
 
-interface PackageGroup {
-  package: Package;
-  cartItemId: string;
-  services: PackageService[];
-}
+export function ServiceSelector({
+  items,
+  selectedStylists,
+  onStylistSelect,
+  locationId
+}: ServiceSelectorProps) {
+  const [itemsWithServices, setItemsWithServices] = useState<any[]>([]);
 
-interface ServiceGroup {
-  cartItemId: string;
-  service: Service;
-}
+  const { data: employees, isLoading: isLoadingEmployees } = useQuery({
+    queryKey: ["employees", locationId],
+    queryFn: async () => {
+      let query = supabase
+        .from("employees")
+        .select(`
+          *,
+          employee_skills!inner(service_id),
+          employee_locations(location_id)
+        `)
+        .eq("status", "active")
+        .eq("employment_type", "stylist");
+      
+      if (locationId) {
+        query = query.contains('employee_locations', [{ location_id: locationId }]);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!locationId
+  });
 
-interface GroupedItems {
-  packages: Record<string, PackageGroup>;
-  services: ServiceGroup[];
-}
+  useEffect(() => {
+    const processItems = async () => {
+      const processedItems = items.map((item) => {
+        let availableStylists: any[] = [];
+        
+        if (item.type === "service" && employees) {
+          availableStylists = employees.filter((employee) =>
+            employee.employee_skills.some(
+              (skill: any) => skill.service_id === item.service.id
+            )
+          );
+        } else if (item.type === "package" && employees) {
+          const packageServiceIds = item.package.package_services?.map(
+            (ps: any) => ps.service.id
+          ) || [];
+          
+          if (packageServiceIds.length > 0) {
+            availableStylists = employees.filter((employee) => {
+              const employeeServiceIds = employee.employee_skills.map(
+                (skill: any) => skill.service_id
+              );
+              return packageServiceIds.every((serviceId: string) =>
+                employeeServiceIds.includes(serviceId)
+              );
+            });
+          }
+        }
 
-export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
+        return {
+          ...item,
+          stylists: availableStylists,
+        };
+      });
+
+      setItemsWithServices(processedItems);
+    };
+
+    if (items.length > 0 && employees) {
+      processItems();
+    }
+  }, [items, employees]);
+
   // Query for additional services that might be customized in packages
   const { data: services } = useQuery({
     queryKey: ['services'],
@@ -92,16 +125,14 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
   });
 
   // Group items by package and standalone services
-  const groupedItems = items.reduce((acc: GroupedItems, item) => {
+  const groupedItems = itemsWithServices.reduce((acc: GroupedItems, item) => {
     if (item.package_id && item.package) {
       const packageServices: PackageService[] = [];
       
-      // Add regular package services
       if (item.package.package_services) {
         packageServices.push(...item.package.package_services);
       }
       
-      // Add customized services
       if (item.customized_services?.length && services) {
         const customizedServiceObjects = item.customized_services
           .map(serviceId => {
@@ -130,7 +161,6 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     services: [] as ServiceGroup[] 
   });
 
-  // Get the price for a service, prioritizing package_selling_price if available
   const getServicePrice = (service: Service, packageService?: PackageService): number => {
     if (packageService && packageService.package_selling_price !== undefined && packageService.package_selling_price !== null) {
       return packageService.package_selling_price;
@@ -144,7 +174,6 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
         <CardTitle className="text-lg">Select Stylists</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Render Package Services */}
         {Object.entries(groupedItems.packages).map(([packageId, packageData]) => (
           <div key={packageId} className="space-y-4">
             <div className="font-semibold text-lg">
@@ -152,17 +181,14 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
             </div>
             <div className="space-y-3 pl-4">
               {packageData.services.map((ps: PackageService) => {
-                // Determine if this is a package service with package_selling_price
                 const isPackageService = packageData.package.package_services.some(
                   basePs => basePs.service.id === ps.service.id
                 );
                 
-                // Get the corresponding base package service if exists
                 const basePackageService = isPackageService 
                   ? packageData.package.package_services.find(basePs => basePs.service.id === ps.service.id)
                   : undefined;
                 
-                // Calculate the display price
                 const displayPrice = getServicePrice(ps.service, basePackageService);
                 
                 return (
@@ -200,7 +226,6 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
           </div>
         ))}
 
-        {/* Render Individual Services */}
         {groupedItems.services.length > 0 && (
           <div className="space-y-4">
             <div className="font-semibold text-lg">

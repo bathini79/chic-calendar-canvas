@@ -1,3 +1,4 @@
+
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +14,7 @@ import { ServiceMultiSelect } from "@/components/packages/ServiceMultiSelect";
 import { ImageUploadSection } from "@/components/packages/form/ImageUploadSection";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -30,6 +36,7 @@ const formSchema = z.object({
   status: z.enum(['active', 'inactive']).default('active'),
   employment_type: z.enum(['stylist', 'operations']).default('stylist'),
   skills: z.array(z.string()).min(1, "At least one skill is required"),
+  locations: z.array(z.string()).min(1, "At least one location is required"),
 });
 
 type StaffFormData = z.infer<typeof formSchema>;
@@ -44,6 +51,9 @@ export function StaffForm({ initialData, onSubmit, onCancel }: StaffFormProps) {
   const [images, setImages] = useState<string[]>(
     initialData?.photo_url ? [initialData.photo_url] : []
   );
+  const [selectedLocations, setSelectedLocations] = useState<string[]>(
+    initialData?.employee_locations?.map((l: any) => l.location_id) || []
+  );
 
   const form = useForm<StaffFormData>({
     resolver: zodResolver(formSchema),
@@ -55,8 +65,29 @@ export function StaffForm({ initialData, onSubmit, onCancel }: StaffFormProps) {
       status: initialData?.status || 'active',
       employment_type: initialData?.employment_type || 'stylist',
       skills: initialData?.employee_skills?.map((s: any) => s.service.id) || [],
+      locations: selectedLocations,
     },
   });
+
+  // Fetch locations
+  const { data: locations } = useQuery({
+    queryKey: ['locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Update form when selected locations change
+  useEffect(() => {
+    form.setValue('locations', selectedLocations);
+  }, [selectedLocations, form]);
 
   const handleFormSubmit = (data: StaffFormData) => {
     const updatedData = {
@@ -64,6 +95,16 @@ export function StaffForm({ initialData, onSubmit, onCancel }: StaffFormProps) {
       photo_url: images[0] || null,
     };
     onSubmit(updatedData);
+  };
+
+  const handleLocationChange = (locationId: string) => {
+    setSelectedLocations(prev => {
+      if (prev.includes(locationId)) {
+        return prev.filter(id => id !== locationId);
+      } else {
+        return [...prev, locationId];
+      }
+    });
   };
 
   return (
@@ -155,6 +196,40 @@ export function StaffForm({ initialData, onSubmit, onCancel }: StaffFormProps) {
                   <SelectItem value="operations">Operations</SelectItem>
                 </SelectContent>
               </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="locations"
+          render={() => (
+            <FormItem>
+              <FormLabel>Locations *</FormLabel>
+              <FormControl>
+                <div className="border border-input rounded-md p-4 space-y-2">
+                  {locations?.length ? (
+                    locations.map((location) => (
+                      <div key={location.id} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`location-${location.id}`}
+                          checked={selectedLocations.includes(location.id)}
+                          onCheckedChange={() => handleLocationChange(location.id)}
+                        />
+                        <Label 
+                          htmlFor={`location-${location.id}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {location.name}
+                        </Label>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-muted-foreground text-sm">No locations available</div>
+                  )}
+                </div>
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

@@ -1,4 +1,6 @@
 
+// Just the beginning section of the file needs to update to include locationId
+
 import { useState, useCallback } from "react";
 import { format, addMinutes } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +36,7 @@ interface UseSaveAppointmentProps {
   notes: string;
   customizedServices?: Record<string, string[]>;
   currentScreen?: string;
+  locationId?: string;  // Add locationId parameter
 }
 
 const useSaveAppointment = ({
@@ -52,7 +55,8 @@ const useSaveAppointment = ({
   paymentMethod,
   notes,
   customizedServices = {},
-  currentScreen
+  currentScreen,
+  locationId  // Include locationId in params
 }: UseSaveAppointmentProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -130,6 +134,7 @@ const useSaveAppointment = ({
           discount_value: discountValue,
           payment_method: paymentMethod,
           notes: notes,
+          location: locationId,  // Add location to appointment
         })
         .select()
         .single();

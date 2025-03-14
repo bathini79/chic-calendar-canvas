@@ -1,11 +1,12 @@
-// AdminBookings.tsx - Main container component
+
+// Import and export the updated AdminBookings component
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { formatTime, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
@@ -14,6 +15,14 @@ import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import { Appointment } from "./bookings/types";
 import { AppointmentManager } from "./bookings/components/AppointmentManager";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { useQuery } from "@tanstack/react-query";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -36,18 +45,49 @@ export default function AdminBookings() {
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
-  const { data: appointments = [] } = useAppointmentsByDate(currentDate);
+  const { data: appointments = [] } = useAppointmentsByDate(currentDate, selectedLocationId);
+  
+  // Fetch locations
+  const { data: locations = [] } = useQuery({
+    queryKey: ['locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  useEffect(() => {
+    // If no location is selected yet but we have locations, select the first one by default
+    if (!selectedLocationId && locations.length > 0) {
+      setSelectedLocationId(locations[0].id);
+    }
+  }, [locations, selectedLocationId]);
 
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const { data, error } = await supabase
+        const query = supabase
           .from("employees")
-          .select("*")
+          .select("*, employee_locations(location_id)")
           .eq("employment_type", "stylist");
+        
+        // Filter by location if one is selected
+        if (selectedLocationId) {
+          query.contains('employee_locations', [{ location_id: selectedLocationId }]);
+        }
+        
+        const { data, error } = await query;
+        
         if (error) throw error;
         const employeeWithAvatar = data.map((employee) => ({
           ...employee,
@@ -64,7 +104,7 @@ export default function AdminBookings() {
     };
 
     fetchEmployees();
-  }, []);
+  }, [selectedLocationId]);
 
   const openAddAppointment = () => {
     if (clickedCell) {
@@ -126,6 +166,25 @@ export default function AdminBookings() {
       <div className="flex flex-col h-screen bg-gray-50 relative">
         <header className="p-4 border-b bg-white flex justify-between items-center">
           <div className="font-bold text-xl">Define Salon</div>
+          
+          <div className="flex items-center space-x-2">
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            <Select 
+              value={selectedLocationId} 
+              onValueChange={setSelectedLocationId}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select location" />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map(location => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </header>
         <StatsPanel stats={stats} />
         <CalendarHeader
@@ -174,10 +233,10 @@ export default function AdminBookings() {
             selectedTime={appointmentTime}
             employees={employees}
             existingAppointment={selectedAppointment}
+            locationId={selectedLocationId}
           />
         )}
       </div>
     </DndProvider>
   );
 }
-
