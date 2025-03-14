@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AvatarGroup } from "@/components/ui/avatar-group";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
@@ -13,6 +12,35 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Clock, Users } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+
+interface Service {
+  id: string;
+  name: string;
+  duration: number;
+  selling_price: number;
+}
+
+interface PackageService {
+  service: Service;
+  package_selling_price?: number;
+}
+
+interface PackageGroup {
+  package: any;
+  cartItemId: string;
+  services: PackageService[];
+}
+
+interface ServiceGroup {
+  cartItemId: string;
+  service: Service;
+}
+
+interface GroupedItems {
+  packages: Record<string, PackageGroup>;
+  services: ServiceGroup[];
+}
 
 interface ServiceSelectorProps {
   items: any[];
@@ -29,7 +57,7 @@ export function ServiceSelector({
 }: ServiceSelectorProps) {
   const [itemsWithServices, setItemsWithServices] = useState<any[]>([]);
 
-  const { data: employees, isLoading: isLoadingEmployees } = useQuery({
+  const { data: employees } = useQuery({
     queryKey: ["employees", locationId],
     queryFn: async () => {
       let query = supabase
@@ -51,7 +79,7 @@ export function ServiceSelector({
       if (error) throw error;
       return data || [];
     },
-    enabled: !!locationId
+    enabled: true
   });
 
   useEffect(() => {
@@ -96,7 +124,6 @@ export function ServiceSelector({
     }
   }, [items, employees]);
 
-  // Query for additional services that might be customized in packages
   const { data: services } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -110,21 +137,6 @@ export function ServiceSelector({
     enabled: items.some(item => item.customized_services?.length > 0)
   });
 
-  const { data: employees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('employment_type', 'stylist')
-        .eq('status', 'active');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Group items by package and standalone services
   const groupedItems = itemsWithServices.reduce((acc: GroupedItems, item) => {
     if (item.package_id && item.package) {
       const packageServices: PackageService[] = [];
