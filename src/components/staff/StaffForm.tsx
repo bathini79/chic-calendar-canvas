@@ -14,7 +14,7 @@ import { ServiceMultiSelect } from "@/components/packages/ServiceMultiSelect";
 import { ImageUploadSection } from "@/components/packages/form/ImageUploadSection";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -45,27 +45,48 @@ interface StaffFormProps {
   initialData?: any;
   onSubmit: (data: StaffFormData) => void;
   onCancel: () => void;
+  employeeId?: string;
 }
 
-export function StaffForm({ initialData, onSubmit, onCancel }: StaffFormProps) {
-  const [images, setImages] = useState<string[]>(
-    initialData?.photo_url ? [initialData.photo_url] : []
-  );
-  const [selectedLocations, setSelectedLocations] = useState<string[]>(
-    initialData?.employee_locations?.map((l: any) => l.location_id) || []
-  );
+export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: StaffFormProps) {
+  const [images, setImages] = useState<string[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch employee data if editing
+  const { data: employeeData } = useQuery({
+    queryKey: ['employee', employeeId],
+    queryFn: async () => {
+      if (!employeeId) return null;
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .select(`
+          *,
+          employee_skills(service_id),
+          employee_locations(location_id)
+        `)
+        .eq('id', employeeId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employeeId
+  });
 
   const form = useForm<StaffFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: initialData?.name || '',
-      email: initialData?.email || '',
-      phone: initialData?.phone || '',
-      photo_url: initialData?.photo_url || '',
-      status: initialData?.status || 'active',
-      employment_type: initialData?.employment_type || 'stylist',
-      skills: initialData?.employee_skills?.map((s: any) => s.service.id) || [],
-      locations: selectedLocations,
+      name: '',
+      email: '',
+      phone: '',
+      photo_url: '',
+      status: 'active',
+      employment_type: 'stylist',
+      skills: [],
+      locations: [],
     },
   });
 
@@ -84,10 +105,38 @@ export function StaffForm({ initialData, onSubmit, onCancel }: StaffFormProps) {
     },
   });
 
+  // Initialize form with employee data when it's loaded
+  useEffect(() => {
+    if (employeeData) {
+      form.reset({
+        name: employeeData.name || '',
+        email: employeeData.email || '',
+        phone: employeeData.phone || '',
+        photo_url: employeeData.photo_url || '',
+        status: employeeData.status || 'active',
+        employment_type: employeeData.employment_type || 'stylist',
+        skills: employeeData.employee_skills?.map((s: any) => s.service_id) || [],
+        locations: employeeData.employee_locations?.map((l: any) => l.location_id) || [],
+      });
+      
+      if (employeeData.photo_url) {
+        setImages([employeeData.photo_url]);
+      }
+      
+      setSelectedSkills(employeeData.employee_skills?.map((s: any) => s.service_id) || []);
+      setSelectedLocations(employeeData.employee_locations?.map((l: any) => l.location_id) || []);
+    }
+  }, [employeeData, form]);
+
   // Update form when selected locations change
   useEffect(() => {
     form.setValue('locations', selectedLocations);
   }, [selectedLocations, form]);
+
+  // Update form when selected skills change
+  useEffect(() => {
+    form.setValue('skills', selectedSkills);
+  }, [selectedSkills, form]);
 
   const handleFormSubmit = (data: StaffFormData) => {
     const updatedData = {
@@ -245,10 +294,10 @@ export function StaffForm({ initialData, onSubmit, onCancel }: StaffFormProps) {
                 <ServiceMultiSelect
                   selectedServices={field.value}
                   onServiceSelect={(serviceId) => {
-                    field.onChange([...field.value, serviceId]);
+                    setSelectedSkills([...field.value, serviceId]);
                   }}
                   onServiceRemove={(serviceId) => {
-                    field.onChange(field.value.filter(id => id !== serviceId));
+                    setSelectedSkills(field.value.filter(id => id !== serviceId));
                   }}
                 />
               </FormControl>
@@ -262,7 +311,7 @@ export function StaffForm({ initialData, onSubmit, onCancel }: StaffFormProps) {
             Cancel
           </Button>
           <Button type="submit">
-            {initialData ? 'Update Staff Member' : 'Create Staff Member'}
+            {employeeId ? 'Update Staff Member' : 'Create Staff Member'}
           </Button>
         </div>
       </form>

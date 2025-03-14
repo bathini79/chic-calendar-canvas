@@ -1,4 +1,6 @@
-// AppointmentManager.tsx - Reusable component for appointment management
+
+// First line replaces the existing first lines
+// This component now takes locationId as a prop
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ interface AppointmentManagerProps {
   selectedTime: string;
   employees: any[];
   existingAppointment?: Appointment | null;
+  locationId?: string;
 }
 
 export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
@@ -29,7 +32,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   selectedDate,
   selectedTime,
   employees,
-  existingAppointment
+  existingAppointment,
+  locationId
 }) => {
   const [currentScreen, setCurrentScreen] = useState(
     SCREEN.SERVICE_SELECTION
@@ -181,7 +185,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     paymentMethod,
     notes: appointmentNotes,
     customizedServices,
-    currentScreen
+    currentScreen,
+    locationId // Pass the locationId to the hook
   });
 
   const handleProceedToCheckout = async () => {
@@ -319,6 +324,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                     stylists={employees}
                     onCustomPackage={handleCustomServiceToggle}
                     customizedServices={customizedServices}
+                    locationId={locationId} // Pass the locationId to ServiceSelector
                   />
                 </div>
 
@@ -361,6 +367,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                 onBackToServices={handleBackToServices}
                 customizedServices={customizedServices}
                 isExistingAppointment={!!existingAppointment}
+                locationId={locationId}
               />
             )}
 

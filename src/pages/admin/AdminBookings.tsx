@@ -1,5 +1,5 @@
 
-// Import and export the updated AdminBookings component
+// Fixing the AdminBookings component to handle locations correctly
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -76,14 +76,18 @@ export default function AdminBookings() {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const query = supabase
+        let query = supabase
           .from("employees")
-          .select("*, employee_locations(location_id)")
-          .eq("employment_type", "stylist");
+          .select(`
+            *,
+            employee_locations(location_id)
+          `)
+          .eq("employment_type", "stylist")
+          .eq("status", "active");
         
         // Filter by location if one is selected
         if (selectedLocationId) {
-          query.contains('employee_locations', [{ location_id: selectedLocationId }]);
+          query = query.contains('employee_locations', [{ location_id: selectedLocationId }]);
         }
         
         const { data, error } = await query;
@@ -144,23 +148,6 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(true);
   };
 
-  // This is a temporary prop for the TimeSlots component until we fix the imports
-  const timeSlotsProps = {
-    employees,
-    formatTime,
-    TOTAL_HOURS,
-    currentDate,
-    nowPosition,
-    isSameDay,
-    appointments,
-    setSelectedAppointment,
-    setClickedCell: handleCellClick,
-    hourLabels: [],
-    PIXELS_PER_HOUR: 60,
-    handleColumnClick: () => {},
-    renderAppointmentBlock: () => <></>
-  };
-
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -194,7 +181,19 @@ export default function AdminBookings() {
           onNext={goNext}
         />
         <TimeSlots
-          {...timeSlotsProps}
+          employees={employees}
+          formatTime={formatTime}
+          TOTAL_HOURS={TOTAL_HOURS}
+          currentDate={currentDate}
+          nowPosition={nowPosition}
+          isSameDay={isSameDay}
+          appointments={appointments}
+          setSelectedAppointment={setSelectedAppointment}
+          setClickedCell={handleCellClick}
+          hourLabels={[]}
+          PIXELS_PER_HOUR={60}
+          handleColumnClick={() => {}}
+          renderAppointmentBlock={() => <></>}
         />
         
         <AppointmentDetailsDialog

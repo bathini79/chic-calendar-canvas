@@ -1,8 +1,4 @@
 
-// Import and export the updated StaffDialog component that uses StaffForm
-// The component stays largely the same, but when handling form submission,
-// it needs to save employee locations to a new join table
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,6 +111,7 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
         <StaffForm 
           onSubmit={handleFormSubmit} 
           onCancel={() => onOpenChange(false)} 
+          employeeId={employeeId}
         />
       </DialogContent>
     </Dialog>

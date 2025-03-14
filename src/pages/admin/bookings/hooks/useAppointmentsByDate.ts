@@ -19,7 +19,7 @@ export function useAppointmentsByDate(date: Date, locationId?: string) {
             *,
             service:services(*),
             package:packages(*),
-            employee:employees(*)
+            employee:employees!bookings_employee_id_fkey(*)
           )
         `)
         .gte('start_time', start)
