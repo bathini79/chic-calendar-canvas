@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Card, 
@@ -16,10 +17,13 @@ import {
   Heart, 
   Bell, 
   Calendar, 
-  CreditCard, 
-  Search
+  Search,
+  ArrowLeft
 } from "lucide-react";
 import { DailyRevenue } from "@/components/admin/reports/DailyRevenue";
+import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const reportCategories = [
   {
@@ -89,6 +93,19 @@ const reportCategories = [
 export default function Reports() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
+  const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  
+  const { data: locations = [] } = useQuery({
+    queryKey: ['locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name');
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
   
   const filteredReports = reportCategories
     .filter(category => activeCategory === "all" || category.id === activeCategory)
@@ -104,85 +121,130 @@ export default function Reports() {
       }))
     );
   
+  const handleReportClick = (reportId: string) => {
+    if (expandedReport === reportId) {
+      setExpandedReport(null);
+    } else {
+      setExpandedReport(reportId);
+    }
+  };
+
+  const renderReportContent = () => {
+    if (expandedReport === "daily-revenue") {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setExpandedReport(null)}
+              className="mr-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+            <h2 className="text-2xl font-bold">Daily Revenue Report</h2>
+          </div>
+          <DailyRevenue expanded={true} locations={locations} />
+        </div>
+      );
+    }
+    
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredReports.map(report => (
+          <ReportCard 
+            key={`${report.categoryId}-${report.id}`}
+            title={report.name}
+            description={report.description}
+            category={report.categoryName}
+            icon={report.categoryIcon}
+            onClick={() => handleReportClick(report.id)}
+          />
+        ))}
+      </div>
+    );
+  };
+  
   return (
     <div className="container py-6">
       <div className="flex flex-col space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search reports..."
-              className="w-full pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-        
-        <Tabs defaultValue="all" value={activeCategory} onValueChange={setActiveCategory}>
-          <div className="border-b">
-            <TabsList className="h-10">
-              <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                All Reports
-              </TabsTrigger>
-              {reportCategories.map(category => (
-                <TabsTrigger 
-                  key={category.id} 
-                  value={category.id}
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                >
-                  <div className="flex items-center gap-2">
-                    {category.icon}
-                    <span>{category.name}</span>
-                  </div>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-          
-          <TabsContent value="all" className="mt-6">
-            {activeCategory === "all" && searchQuery === "" && (
-              <div className="mb-6">
-                <DailyRevenue />
-              </div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredReports.map(report => (
-                <ReportCard 
-                  key={`${report.categoryId}-${report.id}`}
-                  title={report.name}
-                  description={report.description}
-                  category={report.categoryName}
-                  icon={report.categoryIcon}
+        {!expandedReport && (
+          <>
+            <div className="flex items-center justify-between">
+              <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+              <div className="relative w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search reports..."
+                  className="w-full pl-8"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
-              ))}
-            </div>
-          </TabsContent>
-          
-          {reportCategories.map(category => (
-            <TabsContent key={category.id} value={category.id} className="mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {category.reports
-                  .filter(report => 
-                    report.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                    report.description.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map(report => (
-                    <ReportCard 
-                      key={report.id}
-                      title={report.name}
-                      description={report.description}
-                      category={category.name}
-                      icon={category.icon}
-                    />
-                  ))
-                }
               </div>
-            </TabsContent>
-          ))}
-        </Tabs>
+            </div>
+            
+            <Tabs defaultValue="all" value={activeCategory} onValueChange={setActiveCategory}>
+              <div className="border-b">
+                <TabsList className="h-10">
+                  <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    All Reports
+                  </TabsTrigger>
+                  {reportCategories.map(category => (
+                    <TabsTrigger 
+                      key={category.id} 
+                      value={category.id}
+                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    >
+                      <div className="flex items-center gap-2">
+                        {category.icon}
+                        <span>{category.name}</span>
+                      </div>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+              
+              <TabsContent value="all" className="mt-6">
+                {activeCategory === "all" && searchQuery === "" && !expandedReport && (
+                  <div className="mb-6">
+                    <DailyRevenue onExpand={() => handleReportClick("daily-revenue")} locations={locations} />
+                  </div>
+                )}
+                {renderReportContent()}
+              </TabsContent>
+              
+              {reportCategories.map(category => (
+                <TabsContent key={category.id} value={category.id} className="mt-6">
+                  {expandedReport ? (
+                    renderReportContent()
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {category.reports
+                        .filter(report => 
+                          report.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          report.description.toLowerCase().includes(searchQuery.toLowerCase())
+                        )
+                        .map(report => (
+                          <ReportCard 
+                            key={report.id}
+                            title={report.name}
+                            description={report.description}
+                            category={category.name}
+                            icon={category.icon}
+                            onClick={() => handleReportClick(report.id)}
+                          />
+                        ))
+                      }
+                    </div>
+                  )}
+                </TabsContent>
+              ))}
+            </Tabs>
+          </>
+        )}
+        
+        {expandedReport && renderReportContent()}
       </div>
     </div>
   );
@@ -193,11 +255,16 @@ interface ReportCardProps {
   description: string;
   category: string;
   icon: React.ReactNode;
+  onClick?: () => void;
 }
 
-function ReportCard({ title, description, category, icon }: ReportCardProps) {
+function ReportCard({ title, description, category, icon, onClick }: ReportCardProps) {
+  if (title === "Daily Revenue") {
+    return <DailyRevenue onExpand={onClick} />;
+  }
+  
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-all cursor-pointer">
+    <Card className="overflow-hidden hover:shadow-md transition-all cursor-pointer" onClick={onClick}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

@@ -7,6 +7,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { DollarSign, CreditCard, Wallet } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { MetricCard } from '@/components/admin/dashboard/MetricCard';
 
 type RevenueBreakdown = {
   cash: number;
@@ -18,11 +19,18 @@ type RevenueBreakdown = {
   collected: number;
 };
 
-export function DailyRevenue() {
+interface DailyRevenueProps {
+  expanded?: boolean;
+  onExpand?: () => void;
+  locations?: { id: string, name: string }[];
+}
+
+export function DailyRevenue({ expanded = false, onExpand, locations = [] }: DailyRevenueProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
 
   const { data: revenue, isLoading } = useQuery({
-    queryKey: ['daily-revenue', format(selectedDate, 'yyyy-MM-dd')],
+    queryKey: ['daily-revenue', format(selectedDate, 'yyyy-MM-dd'), selectedLocation],
     queryFn: async () => {
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
@@ -30,12 +38,13 @@ export function DailyRevenue() {
       const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('appointments')
         .select(`
           id,
           total_price,
           payment_method,
+          location,
           bookings (
             price_paid,
             original_price
@@ -44,6 +53,12 @@ export function DailyRevenue() {
         .gte('start_time', startOfDay.toISOString())
         .lte('start_time', endOfDay.toISOString())
         .eq('status', 'completed');
+
+      if (selectedLocation !== "all") {
+        query = query.eq('location', selectedLocation);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -93,88 +108,126 @@ export function DailyRevenue() {
     }
   });
 
-  const RevenueCard = ({ title, amount, icon: Icon, description }: { 
-    title: string;
-    amount: number;
-    icon: React.ComponentType<any>;
-    description?: string;
-  }) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">₹{amount.toFixed(2)}</div>
-        {description && (
-          <p className="text-xs text-muted-foreground">{description}</p>
-        )}
-      </CardContent>
-    </Card>
-  );
+  const handleFilterChange = (locationId: string, timePeriod: string) => {
+    setSelectedLocation(locationId);
+  };
 
-  const LoadingCard = () => (
-    <Card>
-      <CardHeader className="pb-2">
-        <Skeleton className="h-4 w-[150px]" />
-      </CardHeader>
-      <CardContent>
-        <Skeleton className="h-8 w-[100px]" />
-      </CardContent>
-    </Card>
-  );
+  if (!expanded) {
+    return (
+      <Card 
+        className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
+        onClick={onExpand}
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Financial Overview</p>
+            </div>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <CardTitle className="text-xl">Daily Revenue</CardTitle>
+          <CardDescription>Includes tips, outstanding balances, and collected payments</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-40 flex items-center justify-center bg-muted/30 rounded-md">
+            <p className="text-muted-foreground text-center">
+              Preview data will appear here
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Daily Revenue</h2>
-          <p className="text-muted-foreground">
-            Financial overview for {format(selectedDate, 'MMMM d, yyyy')}
-          </p>
-        </div>
-        <Calendar
-          mode="single"
-          selected={selectedDate}
-          onSelect={(date) => date && setSelectedDate(date)}
-          className="rounded-md border"
-        />
+      <div className="flex flex-col space-y-2">
+        <h2 className="text-2xl font-bold tracking-tight">Daily Revenue</h2>
+        <p className="text-muted-foreground">
+          Financial overview for {format(selectedDate, 'MMMM d, yyyy')}
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <MetricCard
+          title="Daily Revenue"
+          locations={locations}
+          timePeriods={[
+            { value: "today", label: "Today" },
+            { value: "yesterday", label: "Yesterday" },
+            { value: "7days", label: "Last 7 days" },
+            { value: "30days", label: "Last 30 days" },
+          ]}
+          onFilterChange={handleFilterChange}
+          defaultLocation={selectedLocation}
+        >
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={(date) => date && setSelectedDate(date)}
+            className="rounded-md border"
+          />
+        </MetricCard>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {isLoading ? (
-          <>
-            <LoadingCard />
-            <LoadingCard />
-            <LoadingCard />
-            <LoadingCard />
-          </>
+          Array(4).fill(0).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-[150px]" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-[100px]" />
+              </CardContent>
+            </Card>
+          ))
         ) : (
           <>
-            <RevenueCard
-              title="Total Revenue"
-              amount={revenue?.total || 0}
-              icon={DollarSign}
-              description="Total revenue for the day"
-            />
-            <RevenueCard
-              title="Collected Payments"
-              amount={revenue?.collected || 0}
-              icon={Wallet}
-              description="Successfully collected payments"
-            />
-            <RevenueCard
-              title="Outstanding Balance"
-              amount={revenue?.outstanding || 0}
-              icon={CreditCard}
-              description="Pending payments to be collected"
-            />
-            <RevenueCard
-              title="Tips Collected"
-              amount={revenue?.tips || 0}
-              icon={DollarSign}
-              description="Additional tips received"
-            />
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">₹{revenue?.total.toFixed(2) || '0.00'}</div>
+                <p className="text-xs text-muted-foreground">Total revenue for the day</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Collected Payments</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">₹{revenue?.collected.toFixed(2) || '0.00'}</div>
+                <p className="text-xs text-muted-foreground">Successfully collected payments</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">₹{revenue?.outstanding.toFixed(2) || '0.00'}</div>
+                <p className="text-xs text-muted-foreground">Pending payments to be collected</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Tips Collected</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">₹{revenue?.tips.toFixed(2) || '0.00'}</div>
+                <p className="text-xs text-muted-foreground">Additional tips received</p>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
