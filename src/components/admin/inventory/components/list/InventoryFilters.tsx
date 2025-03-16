@@ -16,10 +16,13 @@ interface InventoryFiltersProps {
   setSelectedCategory: (value: string) => void;
   selectedStatus: string;
   setSelectedStatus: (value: string) => void;
+  selectedLocation: string;
+  setSelectedLocation: (value: string) => void;
   onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   showLowStock: boolean;
   setShowLowStock: (value: boolean) => void;
   categories?: Category[];
+  locations?: Array<{ id: string; name: string }>;
 }
 
 export function InventoryFilters({
@@ -27,10 +30,14 @@ export function InventoryFilters({
   setSelectedCategory,
   selectedStatus,
   setSelectedStatus,
+  selectedLocation,
+  setSelectedLocation,
   onSearchChange,
   showLowStock,
   setShowLowStock,
   categories,
+  Locations,
+  locations
 }: InventoryFiltersProps) {
   return (
     <div className="flex flex-wrap gap-4 items-center">
@@ -65,6 +72,25 @@ export function InventoryFilters({
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="w-[200px]">
+        <Select
+          value={selectedLocation}
+          onValueChange={setSelectedLocation}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Filter by location" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {locations?.map((location) => (
+              <SelectItem key={location.id} value={location.id}>
+                {location.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

@@ -3,36 +3,37 @@ import { Input } from "@/components/ui/input";
 
 interface QuantitySectionProps {
   register: any;
+  index: number;
 }
 
-export function QuantitySection({ register }: QuantitySectionProps) {
+export function QuantitySection({ register, index }: QuantitySectionProps) {
   return (
     <div className="grid grid-cols-3 gap-4">
       <div>
-        <label htmlFor="quantity" className="text-sm font-medium">Quantity</label>
+        <label htmlFor={`quantity-${index}`} className="text-sm font-medium">Quantity</label>
         <Input
-          id="quantity"
+          id={`quantity-${index}`}
           type="number"
           min="0"
-          {...register("quantity", { valueAsNumber: true })}
+          {...register(`locationItems.${index}.quantity`, { valueAsNumber: true })}
         />
       </div>
       <div>
-        <label htmlFor="minimumQuantity" className="text-sm font-medium">Minimum Quantity</label>
+        <label htmlFor={`minimumQuantity-${index}`} className="text-sm font-medium">Minimum Quantity</label>
         <Input
-          id="minimumQuantity"
+          id={`minimumQuantity-${index}`}
           type="number"
           min="0"
-          {...register("minimum_quantity", { valueAsNumber: true })}
+          {...register(`locationItems.${index}.minimum_quantity`, { valueAsNumber: true })}
         />
       </div>
       <div>
-        <label htmlFor="maxQuantity" className="text-sm font-medium">Maximum Quantity</label>
+        <label htmlFor={`maxQuantity-${index}`} className="text-sm font-medium">Maximum Quantity</label>
         <Input
-          id="maxQuantity"
+          id={`maxQuantity-${index}`}
           type="number"
           min="0"
-          {...register("max_quantity", { valueAsNumber: true })}
+          {...register(`locationItems.${index}.max_quantity`, { valueAsNumber: true })}
         />
       </div>
     </div>

@@ -6,22 +6,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import debounce from "lodash/debounce";
-import { Database } from "@/integrations/supabase/types";
 import { InventoryFilters } from "./list/InventoryFilters";
 import { InventoryTable } from "./list/InventoryTable";
-
-type InventoryItem = Database['public']['Tables']['inventory_items']['Row'] & {
-  inventory_items_categories: Array<{ category_id: string }>;
-  categories: string[];
-};
+import { InventoryLocationItem } from "../types";
 
 export function ItemsList() {
   const { remove } = useSupabaseCrud('inventory_items');
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [displayItems, setDisplayItems] = useState<InventoryItem[]>([]);
+  const [displayItems, setDisplayItems] = useState<any[]>([]);
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
   const [showLowStock, setShowLowStock] = useState(false);
   const queryClient = useQueryClient();
@@ -39,40 +35,102 @@ export function ItemsList() {
     },
   });
 
-  const { data: items, refetch } = useQuery({
-    queryKey: ['inventory_items', selectedCategory, selectedStatus, searchQuery, showLowStock],
+  const { data: locations = [] } = useQuery({
+    queryKey: ['locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: items = [], refetch } = useQuery({
+    queryKey: ['inventory_items_with_locations', selectedCategory, selectedStatus, selectedLocation, searchQuery, showLowStock],
     queryFn: async () => {
       let query = supabase
         .from('inventory_items')
         .select(`
           *,
-          inventory_items_categories (
-            category_id
+          inventory_location_items!inner(
+            id,
+            location_id,
+            quantity,
+            minimum_quantity,
+            max_quantity,
+            unit_price,
+            supplier_id,
+            status,
+            categories
           )
         `);
-
-      if (selectedStatus !== "all") {
-        query = query.eq('status', selectedStatus);
-      }
 
       if (searchQuery) {
         query = query.ilike('name', `%${searchQuery}%`);
       }
 
-      if (showLowStock) {
-        // Compare quantity with minimum_quantity column
-        query = query.filter('quantity', 'lte', 'minimum_quantity');
-      }
-
       const { data, error } = await query;
-      
       if (error) throw error;
-      return (data || []).map((item: InventoryItem) => ({
-        ...item,
-        categories: item.inventory_items_categories.map(ic => ic.category_id)
-      }));
-    },
+
+      // Transform the data to group location items by item
+      const itemsMap = {};
+      data.forEach(item => {
+        if (!itemsMap[item.id]) {
+          itemsMap[item.id] = {
+            ...item,
+            location_items: []
+          };
+        }
+        
+        const locationItem = item.inventory_location_items;
+        itemsMap[item.id].location_items.push(locationItem);
+      });
+
+      return Object.values(itemsMap);
+    }
   });
+
+  // Filter items based on selected location and status
+  useEffect(() => {
+    if (items) {
+      let filtered = [...items];
+      
+      // Filter by location
+      if (selectedLocation !== "all") {
+        filtered = filtered.filter(item => 
+          item.location_items.some(li => li.location_id === selectedLocation)
+        );
+      }
+      
+      // Filter by category
+      if (selectedCategory !== "all") {
+        filtered = filtered.filter(item => 
+          item.location_items.some(li => 
+            li.categories && li.categories.includes(selectedCategory)
+          )
+        );
+      }
+      
+      // Filter by status
+      if (selectedStatus !== "all") {
+        filtered = filtered.filter(item => 
+          item.location_items.some(li => li.status === selectedStatus)
+        );
+      }
+      
+      // Filter by low stock
+      if (showLowStock) {
+        filtered = filtered.filter(item => 
+          item.location_items.some(li => li.quantity <= li.minimum_quantity)
+        );
+      }
+      
+      setDisplayItems(filtered);
+    }
+  }, [items, selectedLocation, selectedCategory, selectedStatus, showLowStock]);
 
   const { data: suppliers } = useQuery({
     queryKey: ['suppliers'],
@@ -86,20 +144,6 @@ export function ItemsList() {
     },
   });
 
-  useEffect(() => {
-    if (items) {
-      if (selectedCategory === "all") {
-        setDisplayItems(items);
-      } else {
-        setDisplayItems(
-          items.filter(item => 
-            item.categories.includes(selectedCategory)
-          )
-        );
-      }
-    }
-  }, [items, selectedCategory]);
-
   const handleDeleteItem = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this item?')) {
       await remove(id);
@@ -107,16 +151,17 @@ export function ItemsList() {
     }
   };
 
-  const handleStatusChange = async (itemId: string, newStatus: "active" | "inactive") => {
+  const handleStatusChange = async (itemId: string, locationId: string, newStatus: "active" | "inactive") => {
     try {
       const { error } = await supabase
-        .from('inventory_items')
+        .from('inventory_location_items')
         .update({ status: newStatus })
-        .eq('id', itemId);
+        .eq('item_id', itemId)
+        .eq('location_id', locationId);
 
       if (error) throw error;
 
-      await queryClient.invalidateQueries({ queryKey: ['inventory_items'] });
+      await queryClient.invalidateQueries({ queryKey: ['inventory_items_with_locations'] });
       toast.success(`Status updated to ${newStatus}`);
       setEditingStatus(null);
     } catch (error: any) {
@@ -128,6 +173,10 @@ export function ItemsList() {
     setSearchQuery(value);
   }, 300);
 
+  const handleEditItem = (item: any) => {
+    setEditingItem(item);
+  };
+
   return (
     <div className="space-y-4">
       <InventoryFilters
@@ -135,10 +184,13 @@ export function ItemsList() {
         setSelectedCategory={setSelectedCategory}
         selectedStatus={selectedStatus}
         setSelectedStatus={setSelectedStatus}
-        onSearchChange={debouncedSearch}
+        selectedLocation={selectedLocation}
+        setSelectedLocation={setSelectedLocation}
+        onSearchChange={(e) => debouncedSearch(e.target.value)}
         showLowStock={showLowStock}
         setShowLowStock={setShowLowStock}
         categories={categories}
+        locations={locations}
       />
 
       <div className="bg-card rounded-lg">
@@ -146,11 +198,13 @@ export function ItemsList() {
           items={displayItems}
           categories={categories}
           suppliers={suppliers}
+          locations={locations}
+          selectedLocation={selectedLocation}
           editingStatus={editingStatus}
           onStatusEdit={setEditingStatus}
           onStatusChange={handleStatusChange}
           onCancelEdit={() => setEditingStatus(null)}
-          onEditItem={setEditingItem}
+          onEditItem={handleEditItem}
           onDeleteItem={handleDeleteItem}
         />
       </div>
