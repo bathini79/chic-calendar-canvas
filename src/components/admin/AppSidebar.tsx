@@ -1,104 +1,93 @@
 
-import { NavLink } from "react-router-dom";
-import { LayoutGrid, Users, Calendar, Package2, Home, Settings, BarChart2 } from "lucide-react";
+import React from "react";
+import { Link, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import {
+  BarChart,
+  Calendar,
+  CreditCard,
+  Home,
+  Package,
+  Settings,
+  Scissors,
+  Users,
+  FileBarChart,
+  DollarSign,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const sidebarNavItems = [
+  {
+    title: "Dashboard",
+    href: "/admin",
+    icon: <Home className="mr-2 h-4 w-4" />,
+  },
+  {
+    title: "Bookings",
+    href: "/admin/bookings",
+    icon: <Calendar className="mr-2 h-4 w-4" />,
+  },
+  {
+    title: "Services",
+    href: "/admin/services",
+    icon: <Scissors className="mr-2 h-4 w-4" />,
+  },
+  {
+    title: "Staff",
+    href: "/admin/staff",
+    icon: <Users className="mr-2 h-4 w-4" />,
+  },
+  {
+    title: "Inventory",
+    href: "/admin/inventory",
+    icon: <Package className="mr-2 h-4 w-4" />,
+  },
+  {
+    title: "Reports",
+    href: "/admin/reports",
+    icon: <FileBarChart className="mr-2 h-4 w-4" />,
+  },
+  {
+    title: "Financial Dashboard",
+    href: "/admin/financial-dashboard",
+    icon: <DollarSign className="mr-2 h-4 w-4" />,
+  },
+  {
+    title: "Settings",
+    href: "/admin/settings",
+    icon: <Settings className="mr-2 h-4 w-4" />,
+  },
+];
 
 export function AppSidebar() {
+  const { pathname } = useLocation();
+
   return (
-    <aside className="w-64 bg-background border-r min-h-screen p-4">
-      <nav className="space-y-2">
-        <NavLink
-          to="/admin"
-          end
-          className={({ isActive }) =>
-            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`
-          }
-        >
-          <Home className="w-5 h-5" />
-          <span>Dashboard</span>
-        </NavLink>
-        <NavLink
-          to="/admin/bookings"
-          className={({ isActive }) =>
-            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`
-          }
-        >
-          <Calendar className="w-5 h-5" />
-          <span>Bookings</span>
-        </NavLink>
-        <NavLink
-          to="/admin/services"
-          className={({ isActive }) =>
-            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`
-          }
-        >
-          <LayoutGrid className="w-5 h-5" />
-          <span>Services</span>
-        </NavLink>
-        <NavLink
-          to="/admin/staff"
-          className={({ isActive }) =>
-            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`
-          }
-        >
-          <Users className="w-5 h-5" />
-          <span>Staff</span>
-        </NavLink>
-        <NavLink
-          to="/admin/inventory"
-          className={({ isActive }) =>
-            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`
-          }
-        >
-          <Package2 className="w-5 h-5" />
-          <span>Inventory</span>
-        </NavLink>
-        <NavLink
-          to="/admin/reports"
-          className={({ isActive }) =>
-            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`
-          }
-        >
-          <BarChart2 className="w-5 h-5" />
-          <span>Reports</span>
-        </NavLink>
-        <NavLink
-          to="/admin/settings"
-          className={({ isActive }) =>
-            `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              isActive
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`
-          }
-        >
-          <Settings className="w-5 h-5" />
-          <span>Settings</span>
-        </NavLink>
-      </nav>
-    </aside>
+    <div className="flex h-screen w-[240px] flex-col border-r">
+      <div className="flex h-14 items-center px-6 border-b">
+        <Link to="/admin" className="flex items-center">
+          <CreditCard className="h-6 w-6" />
+          <span className="ml-2 text-lg font-semibold">Beauty SaaS</span>
+        </Link>
+      </div>
+      <ScrollArea className="flex-1">
+        <nav className="grid items-start px-2 py-4">
+          {sidebarNavItems.map((item, index) => (
+            <Link to={item.href} key={index}>
+              <Button
+                variant={pathname === item.href ? "secondary" : "ghost"}
+                className={cn("w-full justify-start", {
+                  "bg-muted": pathname === item.href,
+                })}
+              >
+                {item.icon}
+                {item.title}
+              </Button>
+            </Link>
+          ))}
+        </nav>
+      </ScrollArea>
+    </div>
   );
 }

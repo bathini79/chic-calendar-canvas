@@ -398,6 +398,83 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_configs: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean | null
+          is_favorite: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_favorite?: boolean | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_favorite?: boolean | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      dashboard_widgets: {
+        Row: {
+          config: Json
+          created_at: string
+          dashboard_id: string
+          id: string
+          position: number
+          size: string
+          title: string
+          updated_at: string
+          widget_type: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          dashboard_id: string
+          id?: string
+          position: number
+          size?: string
+          title: string
+          updated_at?: string
+          widget_type: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          dashboard_id?: string
+          id?: string
+          position?: number
+          size?: string
+          title?: string
+          updated_at?: string
+          widget_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_widgets_dashboard_id_fkey"
+            columns: ["dashboard_id"]
+            isOneToOne: false
+            referencedRelation: "dashboard_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_availability: {
         Row: {
           created_at: string
@@ -502,6 +579,42 @@ export type Database = {
           photo_url?: string | null
           status?: Database["public"]["Enums"]["employee_status"] | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      financial_reports: {
+        Row: {
+          config: Json
+          created_at: string
+          description: string | null
+          id: string
+          is_favorite: boolean | null
+          name: string
+          report_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name: string
+          report_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name?: string
+          report_type?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
