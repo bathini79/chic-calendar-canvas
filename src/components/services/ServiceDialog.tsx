@@ -75,7 +75,7 @@ export function ServiceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogTitle>
-          {initialData ? 'Edit Service' : 'Create New Service'}
+          {initialData?.id ? 'Edit Service' : 'Create New Service'}
         </DialogTitle>
         <ServiceForm 
           initialData={serviceData} 

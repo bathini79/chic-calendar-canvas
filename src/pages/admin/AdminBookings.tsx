@@ -1,242 +1,273 @@
-
-import React, { useState, useEffect } from "react";
-import { DndProvider } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
-import { supabase } from "@/integrations/supabase/client";
-import { CalendarHeader } from "./bookings/components/CalendarHeader";
-import { StatsPanel } from "./bookings/components/StatsPanel";
-import { MapPin, Calendar as CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { formatTime, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
-import { useCalendarState } from "./bookings/hooks/useCalendarState";
-import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
-import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
-import { AppointmentManager } from "./bookings/components/AppointmentManager";
-import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
-import { Appointment } from "./bookings/types";
-
-const initialStats = [
-  { label: "Pending Confirmation", value: 0 },
-  { label: "Upcoming Bookings", value: 11 },
-  { label: "Today's Bookings", value: 5 },
-  { label: "Today's Revenue", value: 1950 },
-];
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FullCalendar } from '@fullcalendar/react';
+import { Button } from '@/components/ui/button';
+import { CalendarHeader } from './bookings/components/CalendarHeader';
+import { AppointmentManager } from './bookings/components/AppointmentManager';
+import { Appointment } from './bookings/types';
+import { AppointmentDetailsDialog } from './bookings/components/AppointmentDetailsDialog';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { TimeSlots } from './bookings/components/TimeSlots';
 
 export default function AdminBookings() {
-  const [employees, setEmployees] = useState([]);
-  const [stats] = useState(initialStats);
-  const [clickedCell, setClickedCell] = useState<{
-    employeeId: string;
-    time: number;
-    x: number;
-    y: number;
-    date?: Date;
-  } | null>(null);
-  const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
+  const [selectedAppointmentDate, setSelectedAppointmentDate] = useState<Date>(new Date());
+  const [selectedAppointmentTime, setSelectedAppointmentTime] = useState<string>('09:00');
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [locations, setLocations] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedTime, setSelectedTime] = useState<string>('');
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [appointmentTime, setAppointmentTime] = useState("");
-  const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
-  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
-  const { currentDate, nowPosition, goToday, goPrev, goNext } =
-    useCalendarState();
-  const { data: appointments = [] } = useAppointmentsByDate(currentDate, selectedLocationId);
-  
-  // Fetch locations
-  const { data: locations = [] } = useQuery({
-    queryKey: ['locations'],
-    queryFn: async () => {
+  // Fetch locations on component mount
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
+  // Fetch employees and appointments when location changes
+  useEffect(() => {
+    if (selectedLocation) {
+      fetchEmployees();
+      fetchAppointments();
+    }
+  }, [selectedLocation]);
+
+  const fetchLocations = async () => {
+    try {
       const { data, error } = await supabase
         .from('locations')
         .select('*')
-        .eq('is_active', true)
+        .eq('status', 'active')
         .order('name');
-      
+
       if (error) throw error;
-      return data || [];
-    },
-  });
-
-  useEffect(() => {
-    // If no location is selected yet but we have locations, select the first one by default
-    if (!selectedLocationId && locations.length > 0) {
-      setSelectedLocationId(locations[0].id);
-    }
-  }, [locations, selectedLocationId]);
-
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        if (!selectedLocationId) {
-          setEmployees([]);
-          return;
-        }
-        
-        // Fetch employees with their assigned locations
-        const { data, error } = await supabase
-          .from("employees")
-          .select(`
-            *,
-            employee_locations!inner(location_id)
-          `)
-          .eq("employment_type", "stylist")
-          .eq("status", "active")
-          .eq("employee_locations.location_id", selectedLocationId);
-        
-        if (error) throw error;
-        
-        const employeeWithAvatar = data.map((employee) => ({
-          ...employee,
-          avatar: employee.name
-            .split(" ")
-            .map((n) => n[0])
-            .join(""),
-        }));
-        
-        setEmployees(employeeWithAvatar);
-      } catch (error) {
-        console.error("Error fetching employees:", error);
-        setEmployees([]);
+      
+      setLocations(data || []);
+      
+      // Select the first location by default if available
+      if (data && data.length > 0) {
+        setSelectedLocation(data[0].id);
       }
-    };
-
-    fetchEmployees();
-  }, [selectedLocationId]);
-
-  const openAddAppointment = () => {
-    if (clickedCell) {
-      // Extract hours and minutes from the time value
-      const hours = Math.floor(clickedCell.time);
-      const minutes = Math.round((clickedCell.time - hours) * 60);
-      
-      // Format time as HH:MM
-      const timeString = `${hours.toString().padStart(2, "0")}:${minutes
-        .toString()
-        .padStart(2, "0")}`;
-      
-      setAppointmentTime(timeString);
-      setAppointmentDate(clickedCell.date || currentDate);
-      setIsAddAppointmentOpen(true);
-      setClickedCell(null);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
     }
   };
 
-  const closeAddAppointment = () => {
-    setIsAddAppointmentOpen(false);
+  const fetchEmployees = async () => {
+    try {
+      if (!selectedLocation) return;
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .select(`
+          *,
+          employee_locations!inner(location_id)
+        `)
+        .eq('employee_locations.location_id', selectedLocation)
+        .eq('status', 'active')
+        .order('name');
+
+      if (error) throw error;
+      
+      setEmployees(data || []);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    }
+  };
+
+  const fetchAppointments = async () => {
+    try {
+      if (!selectedLocation) return;
+      
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customer:profiles!appointments_customer_id_fkey(*),
+          bookings(
+            *,
+            service:services(*),
+            package:packages(*),
+            employee:employees!bookings_employee_id_fkey(*)
+          )
+        `)
+        .eq('location', selectedLocation)
+        .gte('start_time', new Date(new Date().setDate(new Date().getDate() - 14)).toISOString())
+        .lte('start_time', new Date(new Date().setDate(new Date().getDate() + 30)).toISOString())
+        .order('start_time');
+
+      if (error) throw error;
+      
+      setAppointments(data as Appointment[]);
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+    }
+  };
+
+  const handleCreateAppointment = () => {
     setSelectedAppointment(null);
+    setShowCreateForm(true);
   };
 
-  const handleCellClick = (cell: { employeeId: string; time: number; x: number; y: number; date: Date }) => {
-    setClickedCell(cell);
+  const handleAppointmentClick = (info: any) => {
+    const appointmentId = info.event.id;
+    const appointment = appointments.find(a => a.id === appointmentId);
+    
+    if (appointment) {
+      setSelectedAppointment(appointment);
+      setShowDetailsDialog(true);
+    }
   };
 
-  const handleCheckoutFromAppointment = (appointment: Appointment) => {
-    setSelectedAppointment(appointment);
+  const handleDetailsClose = (refresh?: boolean) => {
+    setShowDetailsDialog(false);
+    if (refresh) {
+      fetchAppointments();
+    }
+  };
+
+  const handleAppointmentCreated = () => {
+    setShowCreateForm(false);
+    fetchAppointments();
+  };
+
+  const renderAppointments = () => {
+    if (!appointments.length) return [];
     
-    // Set the appointment date and time from the existing appointment
-    const startDate = new Date(appointment.start_time);
-    setAppointmentDate(startDate);
-    setAppointmentTime(format(startDate, 'HH:mm'));
-    
-    setIsAddAppointmentOpen(true);
+    return appointments.map(appointment => {
+      let title = `${appointment.customer?.full_name || 'No Customer'}`;
+      if (appointment.bookings && appointment.bookings.length > 0) {
+        title += ` - ${appointment.bookings.length} service(s)`;
+      }
+      
+      // Determine color based on status
+      let backgroundColor;
+      switch (appointment.status) {
+        case 'completed':
+          backgroundColor = '#4caf50';
+          break;
+        case 'canceled':
+        case 'voided':
+          backgroundColor = '#f44336';
+          break;
+        case 'pending':
+          backgroundColor = '#ff9800';
+          break;
+        case 'confirmed':
+          backgroundColor = '#2196f3';
+          break;
+        case 'noshow':
+          backgroundColor = '#9c27b0';
+          break;
+        case 'refunded':
+        case 'partially_refunded':
+          backgroundColor = '#795548';
+          break;
+        default:
+          backgroundColor = '#607d8b';
+      }
+      
+      return {
+        id: appointment.id,
+        title,
+        start: appointment.start_time,
+        end: appointment.end_time,
+        backgroundColor,
+        borderColor: backgroundColor,
+        textColor: '#ffffff',
+        extendedProps: {
+          status: appointment.status,
+          price: appointment.total_price
+        }
+      };
+    });
   };
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="flex flex-col h-screen bg-gray-50 relative">
-        <header className="p-4 border-b bg-white flex justify-between items-center">
-          <div className="font-bold text-xl">Define Salon</div>
-          
-          <div className="flex items-center space-x-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <Select 
-              value={selectedLocationId} 
-              onValueChange={setSelectedLocationId}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select location" />
-              </SelectTrigger>
-              <SelectContent>
+    <div className="container mx-auto p-4">
+      <div className="mb-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Appointments</h1>
+          <div className="flex gap-4 items-center">
+            {locations.length > 0 && (
+              <select
+                className="px-3 py-2 border rounded-md"
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+              >
                 {locations.map(location => (
-                  <SelectItem key={location.id} value={location.id}>
+                  <option key={location.id} value={location.id}>
                     {location.name}
-                  </SelectItem>
+                  </option>
                 ))}
-              </SelectContent>
-            </Select>
+              </select>
+            )}
+            <Button onClick={handleCreateAppointment}>
+              <CalendarIcon className="h-4 w-4 mr-2" /> New Appointment
+            </Button>
           </div>
-        </header>
-        <StatsPanel stats={stats} />
-        <CalendarHeader
-          currentDate={currentDate}
-          onToday={goToday}
-          onPrevious={goPrev}
-          onNext={goNext}
-        />
-        <TimeSlots
-          employees={employees}
-          formatTime={formatTime}
-          TOTAL_HOURS={TOTAL_HOURS}
-          currentDate={currentDate}
-          nowPosition={nowPosition}
-          isSameDay={isSameDay}
-          appointments={appointments}
-          setSelectedAppointment={setSelectedAppointment}
-          setClickedCell={handleCellClick}
-          hourLabels={[]}
-          PIXELS_PER_HOUR={60}
-          handleColumnClick={() => {}}
-          renderAppointmentBlock={() => <></>}
-        />
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-0">
+            <CardTitle>Calendar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div style={{ height: 'calc(100vh - 300px)' }}>
+              <FullCalendar
+                plugins={[]}
+                initialView="timeGridWeek"
+                headerToolbar={false}
+                events={renderAppointments()}
+                eventClick={handleAppointmentClick}
+                height="100%"
+              />
+            </div>
+          </CardContent>
+        </Card>
         
+        <Card>
+          <CardHeader className="pb-0">
+            <CardTitle>Today's Schedule</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+              <TimeSlots
+                appointments={appointments.filter(a => 
+                  new Date(a.start_time).toDateString() === new Date().toDateString()
+                )}
+                onCreateClick={handleCreateAppointment}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {showCreateForm && (
+        <AppointmentManager
+          onClose={() => setShowCreateForm(false)}
+          selectedDate={selectedDate}
+          selectedTime={selectedTime}
+          employees={employees}
+          onAppointmentCreated={handleAppointmentCreated}
+          locationId={selectedLocation}
+        />
+      )}
+      
+      {showDetailsDialog && selectedAppointment && (
         <AppointmentDetailsDialog
           appointment={selectedAppointment}
-          open={!!selectedAppointment && !isAddAppointmentOpen}
-          onOpenChange={() => setSelectedAppointment(null)}
-          onCheckout={handleCheckoutFromAppointment}
+          onClose={handleDetailsClose}
         />
-
-        {clickedCell && (
-          <div
-            className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
-            style={{
-              left: clickedCell.x,
-              top: clickedCell.y,
-            }}
-          >
-            <div className="bg-black px-4 py-2 text-sm font-medium text-white">
-              {formatTime(clickedCell.time)}
-            </div>
-            <div
-              className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={openAddAppointment}
-            >
-              <CalendarIcon className="h-4 w-4 text-gray-600" />
-              <span className="text-gray-700">Add Appointment</span>
-            </div>
-          </div>
-        )}
-
-        {isAddAppointmentOpen && appointmentDate && (
-          <AppointmentManager
-            isOpen={isAddAppointmentOpen}
-            onClose={closeAddAppointment}
-            selectedDate={appointmentDate}
-            selectedTime={appointmentTime}
-            employees={employees}
-            existingAppointment={selectedAppointment}
-            locationId={selectedLocationId}
-          />
-        )}
-      </div>
-    </DndProvider>
+      )}
+    </div>
   );
 }

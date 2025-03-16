@@ -19,7 +19,22 @@ export function useActiveServices(locationId?: string) {
 
       // If locationId is provided, filter services that are available at this location
       if (locationId) {
-        query = query.contains('service_locations', [{location_id: locationId}]);
+        const { data: serviceIds, error: serviceIdsError } = await supabase
+          .from('service_locations')
+          .select('service_id')
+          .eq('location_id', locationId);
+          
+        if (serviceIdsError) {
+          console.error("Error fetching service locations:", serviceIdsError);
+          throw serviceIdsError;
+        }
+        
+        if (serviceIds && serviceIds.length > 0) {
+          query = query.in('id', serviceIds.map(s => s.service_id));
+        } else {
+          // Return empty array if no services found for this location
+          return [];
+        }
       }
 
       const { data, error } = await query.order("name");

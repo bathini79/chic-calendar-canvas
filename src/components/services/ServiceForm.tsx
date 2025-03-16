@@ -1,480 +1,321 @@
 
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { CategoryMultiSelect } from "@/components/categories/CategoryMultiSelect";
-import { useState, useEffect } from "react";
-import { Image, X } from "lucide-react";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import * as z from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { Checkbox } from "@/components/ui/checkbox";
-
-const formSchema = z.object({
-  name: z.string().min(1, "Service name is required"),
-  categories: z.array(z.string()).min(1, "At least one category is required"),
-  original_price: z.number().min(0, "Price must be greater than or equal to 0"),
-  selling_price: z.number().min(0, "Price must be greater than or equal to 0"),
-  duration: z.number().min(1, "Duration must be at least 1 minute"),
-  description: z.string().optional(),
-  image_urls: z.array(z.string()).optional(),
-  gender: z.enum(['all', 'male', 'female']).default('all'),
-  locations: z.array(z.string()),
-});
-
-type ServiceFormData = z.infer<typeof formSchema>;
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { CategoryMultiSelect } from '../categories/CategoryMultiSelect';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 
 interface ServiceFormProps {
   initialData?: any;
-  onSuccess: () => void;
-  onCancel: () => void;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
 export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormProps) {
-  const queryClient = useQueryClient();
+  const [name, setName] = useState(initialData?.name || '');
+  const [description, setDescription] = useState(initialData?.description || '');
+  const [originalPrice, setOriginalPrice] = useState<number>(initialData?.original_price || 0);
+  const [sellingPrice, setSellingPrice] = useState<number>(initialData?.selling_price || 0);
+  const [duration, setDuration] = useState<number>(initialData?.duration || 30);
+  const [gender, setGender] = useState(initialData?.gender || 'all');
+  const [status, setStatus] = useState(initialData?.status || 'active');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     initialData?.categories?.map((cat: any) => cat.id) || []
   );
-  const [selectedLocations, setSelectedLocations] = useState<string[]>(
-    initialData?.service_locations?.map((loc: any) => loc.location_id) || []
-  );
-  const [uploading, setUploading] = useState(false);
-  const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
+  const [loading, setLoading] = useState(false);
+  const [locations, setLocations] = useState<Array<{id: string, name: string}>>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
 
-  // Fetch all locations
-  const { data: locations } = useQuery({
-    queryKey: ['locations'],
-    queryFn: async () => {
+  const isEditing = !!initialData?.id;
+
+  useEffect(() => {
+    // Fetch locations when component mounts
+    fetchLocations();
+    
+    // If editing an existing service, fetch its assigned locations
+    if (isEditing) {
+      fetchServiceLocations();
+    }
+  }, [isEditing]);
+
+  const fetchLocations = async () => {
+    try {
       const { data, error } = await supabase
         .from('locations')
-        .select('*')
-        .eq('status', 'active')
-        .order('name');
+        .select('id, name')
+        .eq('status', 'active');
       
       if (error) throw error;
-      return data;
-    },
-  });
-
-  const form = useForm<ServiceFormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: initialData?.name || '',
-      categories: selectedCategories,
-      original_price: initialData?.original_price || 0,
-      selling_price: initialData?.selling_price || 0,
-      duration: initialData?.duration || 0,
-      description: initialData?.description || '',
-      image_urls: images,
-      gender: initialData?.gender || 'all',
-      locations: selectedLocations,
-    },
-  });
-
-  // Effect to update form when initialData changes
-  useEffect(() => {
-    if (initialData) {
-      const serviceLocations = initialData?.service_locations?.map((sl: any) => sl.location_id) || [];
-      setSelectedLocations(serviceLocations);
-      form.setValue('locations', serviceLocations);
-    }
-  }, [initialData, form]);
-
-  const handleCategorySelect = (categoryId: string) => {
-    const newCategories = [...selectedCategories, categoryId];
-    setSelectedCategories(newCategories);
-    form.setValue('categories', newCategories);
-  };
-
-  const handleCategoryRemove = (categoryId: string) => {
-    const newCategories = selectedCategories.filter(id => id !== categoryId);
-    setSelectedCategories(newCategories);
-    form.setValue('categories', newCategories);
-  };
-
-  const handleLocationToggle = (locationId: string) => {
-    let newLocations: string[];
-    if (selectedLocations.includes(locationId)) {
-      newLocations = selectedLocations.filter(id => id !== locationId);
-    } else {
-      newLocations = [...selectedLocations, locationId];
-    }
-    setSelectedLocations(newLocations);
-    form.setValue('locations', newLocations);
-  };
-
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-    try {
-      const newImages = [...images];
-
-      for (const file of files) {
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${crypto.randomUUID()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('services')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('services')
-          .getPublicUrl(filePath);
-
-        newImages.push(publicUrl);
+      
+      setLocations(data || []);
+      
+      // If creating a new service, select all locations by default
+      if (!isEditing) {
+        setSelectedLocations(data?.map(loc => loc.id) || []);
       }
-
-      setImages(newImages);
-      form.setValue('image_urls', newImages);
-      toast.success('Images uploaded successfully');
     } catch (error: any) {
-      toast.error('Error uploading images');
-    } finally {
-      setUploading(false);
+      console.error('Error fetching locations:', error);
+      toast.error('Failed to load locations');
     }
   };
 
-  const removeImage = (index: number) => {
-    const newImages = images.filter((_, i) => i !== index);
-    setImages(newImages);
-    form.setValue('image_urls', newImages);
+  const fetchServiceLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('service_locations')
+        .select('location_id')
+        .eq('service_id', initialData.id);
+      
+      if (error) throw error;
+      
+      setSelectedLocations(data?.map(item => item.location_id) || []);
+    } catch (error: any) {
+      console.error('Error fetching service locations:', error);
+      toast.error('Failed to load service locations');
+    }
   };
 
-  const onSubmit = async (data: ServiceFormData) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!name) {
+      toast.error('Service name is required');
+      return;
+    }
+    
+    if (sellingPrice <= 0) {
+      toast.error('Selling price must be greater than 0');
+      return;
+    }
+    
+    if (duration <= 0) {
+      toast.error('Duration must be greater than 0');
+      return;
+    }
+
+    if (selectedLocations.length === 0) {
+      toast.error('Please select at least one location');
+      return;
+    }
+    
     try {
-      if (initialData?.id) {
+      setLoading(true);
+      
+      const serviceData = {
+        name,
+        description,
+        original_price: originalPrice,
+        selling_price: sellingPrice,
+        duration,
+        gender,
+        status
+      };
+      
+      // Create/update the service record
+      let serviceResult;
+      if (isEditing) {
         // Update existing service
-        const { error: serviceError } = await supabase
+        serviceResult = await supabase
           .from('services')
-          .update({
-            name: data.name,
-            original_price: data.original_price,
-            selling_price: data.selling_price,
-            duration: data.duration,
-            description: data.description,
-            image_urls: data.image_urls,
-            gender: data.gender,
-          })
-          .eq('id', initialData.id);
-
-        if (serviceError) throw serviceError;
-
-        // Delete existing category relationships
-        const { error: deleteError } = await supabase
-          .from('services_categories')
-          .delete()
-          .eq('service_id', initialData.id);
-
-        if (deleteError) throw deleteError;
-
-        // Insert new category relationships
-        const { error: categoriesError } = await supabase
-          .from('services_categories')
-          .insert(
-            data.categories.map(categoryId => ({
-              service_id: initialData.id,
-              category_id: categoryId,
-            }))
-          );
-
-        if (categoriesError) throw categoriesError;
-
-        // Delete existing location relationships
-        const { error: deleteLocationError } = await supabase
-          .from('service_locations')
-          .delete()
-          .eq('service_id', initialData.id);
-
-        if (deleteLocationError) throw deleteLocationError;
-
-        // Insert new location relationships
-        if (data.locations.length > 0) {
-          const { error: locationsError } = await supabase
-            .from('service_locations')
-            .insert(
-              data.locations.map(locationId => ({
-                service_id: initialData.id,
-                location_id: locationId,
-              }))
-            );
-
-          if (locationsError) throw locationsError;
-        }
-
+          .update(serviceData)
+          .eq('id', initialData.id)
+          .select();
       } else {
         // Create new service
-        const { data: newService, error: serviceError } = await supabase
+        serviceResult = await supabase
           .from('services')
-          .insert({
-            name: data.name,
-            original_price: data.original_price,
-            selling_price: data.selling_price,
-            duration: data.duration,
-            description: data.description,
-            image_urls: data.image_urls,
-            gender: data.gender,
-          })
-          .select()
-          .single();
-
-        if (serviceError) throw serviceError;
-
-        // Insert category relationships
+          .insert(serviceData)
+          .select();
+      }
+      
+      if (serviceResult.error) throw serviceResult.error;
+      
+      const service = serviceResult.data[0];
+      
+      // Handle categories
+      if (selectedCategories.length > 0) {
+        // Remove existing category associations if editing
+        if (isEditing) {
+          await supabase
+            .from('services_categories')
+            .delete()
+            .eq('service_id', service.id);
+        }
+        
+        // Create category associations
+        const categoryRecords = selectedCategories.map(categoryId => ({
+          service_id: service.id,
+          category_id: categoryId
+        }));
+        
         const { error: categoriesError } = await supabase
           .from('services_categories')
-          .insert(
-            data.categories.map(categoryId => ({
-              service_id: newService.id,
-              category_id: categoryId,
-            }))
-          );
-
+          .insert(categoryRecords);
+        
         if (categoriesError) throw categoriesError;
-
-        // Insert location relationships
-        if (data.locations.length > 0) {
-          const { error: locationsError } = await supabase
-            .from('service_locations')
-            .insert(
-              data.locations.map(locationId => ({
-                service_id: newService.id,
-                location_id: locationId,
-              }))
-            );
-
-          if (locationsError) throw locationsError;
-        }
       }
-
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      toast.success(`Service ${initialData ? 'updated' : 'created'} successfully`);
-      onSuccess();
+      
+      // Handle locations - first delete existing ones if editing
+      if (isEditing) {
+        const { error: deleteLocError } = await supabase
+          .from('service_locations')
+          .delete()
+          .eq('service_id', service.id);
+        
+        if (deleteLocError) throw deleteLocError;
+      }
+      
+      // Insert new location associations
+      if (selectedLocations.length > 0) {
+        const locationRecords = selectedLocations.map(locId => ({
+          service_id: service.id,
+          location_id: locId
+        }));
+        
+        const { error: locationsError } = await supabase
+          .from('service_locations')
+          .insert(locationRecords);
+        
+        if (locationsError) throw locationsError;
+      }
+      
+      toast.success(`Service ${isEditing ? 'updated' : 'created'} successfully`);
+      if (onSuccess) onSuccess();
+      
     } catch (error: any) {
-      toast.error(error.message);
+      console.error('Error saving service:', error);
+      toast.error(error.message || 'Failed to save service');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Service Name *</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="categories"
-          render={() => (
-            <FormItem>
-              <FormLabel>Categories *</FormLabel>
-              <FormControl>
-                <CategoryMultiSelect
-                  selectedCategories={selectedCategories}
-                  onCategorySelect={handleCategorySelect}
-                  onCategoryRemove={handleCategoryRemove}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="locations"
-          render={() => (
-            <FormItem>
-              <FormLabel>Locations *</FormLabel>
-              <FormControl>
-                <div className="space-y-2">
-                  {locations?.map((location) => (
-                    <div key={location.id} className="flex items-center space-x-2">
-                      <Checkbox 
-                        id={`location-${location.id}`}
-                        checked={selectedLocations.includes(location.id)}
-                        onCheckedChange={() => handleLocationToggle(location.id)}
-                      />
-                      <label 
-                        htmlFor={`location-${location.id}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {location.name}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="gender"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Gender *</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select gender" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="all">All Genders</SelectItem>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="original_price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Original Price (₹) *</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="selling_price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Selling Price (₹) *</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+    <form onSubmit={handleSubmit} className="space-y-6 py-2">
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="name">Service Name</Label>
+          <Input
+            id="name"
+            placeholder="Enter service name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
           />
         </div>
-
-        <FormField
-          control={form.control}
-          name="duration"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Duration (minutes) *</FormLabel>
-              <FormControl>
-                <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="image_urls"
-          render={() => (
-            <FormItem>
-              <FormLabel>Images</FormLabel>
-              <FormControl>
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-4">
-                    {images.map((url, index) => (
-                      <div key={url} className="relative group">
-                        <img
-                          src={url}
-                          alt={`Service image ${index + 1}`}
-                          className="w-24 h-24 object-cover rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="relative"
-                      disabled={uploading}
-                    >
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleImageUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <Image className="h-4 w-4 mr-2" />
-                      {uploading ? 'Uploading...' : 'Upload Images'}
-                    </Button>
-                  </div>
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="flex justify-end gap-2">
+        
+        <div>
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            placeholder="Enter service description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+          />
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="original-price">Original Price (₹)</Label>
+            <Input
+              id="original-price"
+              type="number"
+              min="0"
+              placeholder="0.00"
+              value={originalPrice}
+              onChange={(e) => setOriginalPrice(parseFloat(e.target.value) || 0)}
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="selling-price">Selling Price (₹)</Label>
+            <Input
+              id="selling-price"
+              type="number"
+              min="0"
+              placeholder="0.00"
+              value={sellingPrice}
+              onChange={(e) => setSellingPrice(parseFloat(e.target.value) || 0)}
+              required
+            />
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="duration">Duration (minutes)</Label>
+            <Input
+              id="duration"
+              type="number"
+              min="1"
+              placeholder="30"
+              value={duration}
+              onChange={(e) => setDuration(parseInt(e.target.value) || 30)}
+              required
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="gender">Gender</Label>
+            <Select value={gender} onValueChange={setGender}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select gender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        <div>
+          <Label>Categories</Label>
+          <CategoryMultiSelect 
+            selectedValues={selectedCategories} 
+            onChange={setSelectedCategories} 
+          />
+        </div>
+        
+        <div>
+          <Label>Locations</Label>
+          <MultiSelect
+            options={locations.map(loc => ({ label: loc.name, value: loc.id }))}
+            selected={selectedLocations}
+            onChange={setSelectedLocations}
+            placeholder="Select locations"
+            className="w-full"
+          />
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Switch 
+            id="status" 
+            checked={status === 'active'}
+            onCheckedChange={(checked) => setStatus(checked ? 'active' : 'inactive')}
+          />
+          <Label htmlFor="status">Active</Label>
+        </div>
+      </div>
+      
+      <div className="flex justify-end space-x-2">
+        {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit">
-            {initialData ? 'Update Service' : 'Create Service'}
-          </Button>
-        </div>
-      </form>
-    </Form>
+        )}
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Service'}
+        </Button>
+      </div>
+    </form>
   );
 }

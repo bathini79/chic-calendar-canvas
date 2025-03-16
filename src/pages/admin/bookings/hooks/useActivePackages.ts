@@ -22,7 +22,22 @@ export function useActivePackages(locationId?: string) {
 
       // If locationId is provided, filter packages that are available at this location
       if (locationId) {
-        query = query.contains('package_locations', [{location_id: locationId}]);
+        const { data: packageIds, error: packageIdsError } = await supabase
+          .from('package_locations')
+          .select('package_id')
+          .eq('location_id', locationId);
+          
+        if (packageIdsError) {
+          console.error("Error fetching package locations:", packageIdsError);
+          throw packageIdsError;
+        }
+        
+        if (packageIds && packageIds.length > 0) {
+          query = query.in('id', packageIds.map(p => p.package_id));
+        } else {
+          // Return empty array if no packages found for this location
+          return [];
+        }
       }
 
       const { data, error } = await query.order("name");

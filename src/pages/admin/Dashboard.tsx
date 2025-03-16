@@ -818,6 +818,10 @@ export default function AdminDashboard() {
     }
   };
 
+  const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
+  const [selectedAppointmentDate, setSelectedAppointmentDate] = useState<Date | null>(null);
+  const [selectedAppointmentTime, setSelectedAppointmentTime] = useState("");
+
   return (
     <div className="p-8 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
@@ -1122,14 +1126,24 @@ export default function AdminDashboard() {
         }}
       />
 
-      {isAddAppointmentOpen && appointmentDate && (
+      {isAddAppointmentOpen && (
         <AppointmentManager
-          isOpen={isAddAppointmentOpen}
           onClose={closeAppointmentManager}
           selectedDate={appointmentDate}
           selectedTime={appointmentTime}
           employees={employees}
-          existingAppointment={selectedAppointment}
+          onAppointmentCreated={() => fetchAppointments()}
+        />
+      )}
+
+      {isAppointmentFormOpen && (
+        <AppointmentManager
+          onClose={() => setIsAppointmentFormOpen(false)}
+          selectedDate={selectedAppointmentDate}
+          selectedTime={selectedAppointmentTime}
+          employees={employees}
+          onAppointmentCreated={() => fetchAppointments()}
+          locationId={selectedLocation}
         />
       )}
     </div>

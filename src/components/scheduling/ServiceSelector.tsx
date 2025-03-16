@@ -1,284 +1,283 @@
 
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Clock, Users } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-
-interface Service {
-  id: string;
-  name: string;
-  duration: number;
-  selling_price: number;
-}
-
-interface PackageService {
-  service: Service;
-  package_selling_price?: number;
-}
-
-interface PackageGroup {
-  package: any;
-  cartItemId: string;
-  services: PackageService[];
-}
-
-interface ServiceGroup {
-  cartItemId: string;
-  service: Service;
-}
-
-interface GroupedItems {
-  packages: Record<string, PackageGroup>;
-  services: ServiceGroup[];
-}
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Service, Package } from '@/pages/admin/bookings/types';
+import { useActiveServices } from '@/pages/admin/bookings/hooks/useActiveServices';
+import { useActivePackages } from '@/pages/admin/bookings/hooks/useActivePackages';
+import { Search, Clock, Plus, Check } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCart } from '@/components/cart/CartContext';
 
 interface ServiceSelectorProps {
-  items: any[];
-  selectedStylists: Record<string, string>;
-  onStylistSelect: (serviceId: string, stylistId: string) => void;
+  onServiceSelect?: (serviceId: string) => void;
+  onPackageSelect?: (packageId: string) => void;
+  onStylistSelect?: (itemId: string, stylistId: string) => void;
+  selectedServices?: string[];
+  selectedPackages?: string[];
+  stylists?: any[];
+  selectedStylists?: Record<string, string>;
   locationId?: string;
 }
 
 export function ServiceSelector({
-  items,
-  selectedStylists,
+  onServiceSelect,
+  onPackageSelect,
   onStylistSelect,
+  selectedServices = [],
+  selectedPackages = [],
+  stylists = [],
+  selectedStylists = {},
   locationId
 }: ServiceSelectorProps) {
-  const [itemsWithServices, setItemsWithServices] = useState<any[]>([]);
-
-  const { data: employees } = useQuery({
-    queryKey: ["employees", locationId],
-    queryFn: async () => {
-      let query = supabase
-        .from("employees")
-        .select(`
-          *,
-          employee_skills!inner(service_id),
-          employee_locations(location_id)
-        `)
-        .eq("status", "active")
-        .eq("employment_type", "stylist");
-      
-      if (locationId) {
-        // Proper query using the employee_locations junction table
-        query = query.contains('employee_locations', [{ location_id: locationId }]);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: true
-  });
-
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('services');
+  const { data: services = [], isLoading: isLoadingServices } = useActiveServices(locationId);
+  const { data: packages = [], isLoading: isLoadingPackages } = useActivePackages(locationId);
+  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
+  const [filteredPackages, setFilteredPackages] = useState<Package[]>([]);
+  const { cartItems } = useCart ? useCart() : { cartItems: [] };
+  
+  // Filter services and packages based on search query
   useEffect(() => {
-    const processItems = async () => {
-      const processedItems = items.map((item) => {
-        let availableStylists: any[] = [];
-        
-        if (item.type === "service" && employees) {
-          availableStylists = employees.filter((employee) =>
-            employee.employee_skills.some(
-              (skill: any) => skill.service_id === item.service.id
-            )
-          );
-        } else if (item.type === "package" && employees) {
-          const packageServiceIds = item.package.package_services?.map(
-            (ps: any) => ps.service.id
-          ) || [];
-          
-          if (packageServiceIds.length > 0) {
-            availableStylists = employees.filter((employee) => {
-              const employeeServiceIds = employee.employee_skills.map(
-                (skill: any) => skill.service_id
-              );
-              return packageServiceIds.every((serviceId: string) =>
-                employeeServiceIds.includes(serviceId)
-              );
-            });
-          }
-        }
-
-        return {
-          ...item,
-          stylists: availableStylists,
-        };
-      });
-
-      setItemsWithServices(processedItems);
-    };
-
-    if (items.length > 0 && employees) {
-      processItems();
+    if (services) {
+      const filtered = services.filter((service: Service) =>
+        service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        service.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredServices(filtered);
     }
-  }, [items, employees]);
+    
+    if (packages) {
+      const filtered = packages.filter((pkg: Package) =>
+        pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pkg.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredPackages(filtered);
+    }
+  }, [searchQuery, services, packages]);
 
-  const { data: services } = useQuery({
-    queryKey: ['services'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*');
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: items.some(item => item.customized_services?.length > 0)
-  });
+  const handleServiceSelect = (serviceId: string) => {
+    if (onServiceSelect) {
+      onServiceSelect(serviceId);
+    }
+  };
 
-  const groupedItems = itemsWithServices.reduce((acc: GroupedItems, item) => {
-    if (item.package_id && item.package) {
-      const packageServices: PackageService[] = [];
-      
-      if (item.package.package_services) {
-        packageServices.push(...item.package.package_services);
+  const handlePackageSelect = (packageId: string) => {
+    if (onPackageSelect) {
+      onPackageSelect(packageId);
+    }
+  };
+
+  const handleStylistChange = (itemId: string, stylistId: string) => {
+    if (onStylistSelect) {
+      onStylistSelect(itemId, stylistId);
+    }
+  };
+
+  // Helper function to check if an item is in cart
+  const isItemInCart = (id: string, itemType: 'package' | 'service') => {
+    if (!cartItems || !cartItems.length) return false;
+    
+    return cartItems.some((item: any) => {
+      if (itemType === 'package') {
+        return item.package?.id === id;
+      } else {
+        return item.service?.id === id;
       }
-      
-      if (item.customized_services?.length && services) {
-        const customizedServiceObjects = item.customized_services
-          .map(serviceId => {
-            const service = services.find(s => s.id === serviceId);
-            return service ? { service } : null;
-          })
-          .filter(Boolean) as PackageService[];
-        
-        packageServices.push(...customizedServiceObjects);
+    });
+  };
+  
+  // Function to get cart item ID for an item
+  const getCartItemId = (id: string, itemType: 'package' | 'service') => {
+    if (!cartItems || !cartItems.length) return null;
+    
+    const cartItem = cartItems.find((item: any) => {
+      if (itemType === 'package') {
+        return item.package?.id === id;
+      } else {
+        return item.service?.id === id;
       }
-
-      acc.packages[item.package_id] = {
-        package: item.package,
-        cartItemId: item.id,
-        services: packageServices
-      };
-    } else if (item.service) {
-      acc.services.push({
-        cartItemId: item.id,
-        service: item.service
-      });
-    }
-    return acc;
-  }, { 
-    packages: {} as Record<string, PackageGroup>, 
-    services: [] as ServiceGroup[] 
-  });
-
-  const getServicePrice = (service: Service, packageService?: PackageService): number => {
-    if (packageService && packageService.package_selling_price !== undefined && packageService.package_selling_price !== null) {
-      return packageService.package_selling_price;
-    }
-    return service.selling_price;
+    });
+    
+    return cartItem ? cartItem.id : null;
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Select Stylists</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {Object.entries(groupedItems.packages).map(([packageId, packageData]) => (
-          <div key={packageId} className="space-y-4">
-            <div className="font-semibold text-lg">
-              {packageData.package.name}
+    <div className="flex flex-col h-full">
+      <div className="mb-4 relative">
+        <Input
+          placeholder="Search services or packages..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+        <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+      </div>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <TabsList className="grid grid-cols-2">
+          <TabsTrigger value="services">Services</TabsTrigger>
+          <TabsTrigger value="packages">Packages</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="services" className="flex-1 overflow-auto">
+          {isLoadingServices ? (
+            <div className="flex justify-center items-center h-40">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-            <div className="space-y-3 pl-4">
-              {packageData.services.map((ps: PackageService) => {
-                const isPackageService = packageData.package.package_services.some(
-                  basePs => basePs.service.id === ps.service.id
-                );
-                
-                const basePackageService = isPackageService 
-                  ? packageData.package.package_services.find(basePs => basePs.service.id === ps.service.id)
-                  : undefined;
-                
-                const displayPrice = getServicePrice(ps.service, basePackageService);
-                
-                return (
-                  <div 
-                    key={`${packageData.cartItemId}-${ps.service.id}`}
-                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{ps.service.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {ps.service.duration} minutes • ₹{displayPrice}
+          ) : filteredServices.length === 0 ? (
+            <div className="text-center py-6 text-gray-500">
+              No services found. Try adjusting your search.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredServices.map((service) => (
+                <div
+                  key={service.id}
+                  className={`p-4 border rounded-lg hover:shadow-md transition-shadow ${
+                    selectedServices.includes(service.id) ? 'bg-primary/10 border-primary' : ''
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium">{service.name}</h3>
+                      <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                        {service.description || 'No description available'}
                       </p>
                     </div>
-                    <Select 
-                      value={selectedStylists[ps.service.id] || ''} 
-                      onValueChange={(value) => onStylistSelect(ps.service.id, value)}
+                    <div className="flex flex-col items-end ml-2">
+                      <span className="font-medium">₹{service.selling_price}</span>
+                      <div className="flex items-center text-sm text-gray-500 mt-1">
+                        <Clock className="h-3 w-3 mr-1" />
+                        <span>{service.duration} min</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 flex justify-between items-center">
+                    {stylists && stylists.length > 0 && (
+                      <Select
+                        value={selectedStylists[service.id] || ''}
+                        onValueChange={(value) => handleStylistChange(service.id, value)}
+                        disabled={!selectedServices.includes(service.id)}
+                      >
+                        <SelectTrigger className="w-40 h-8 text-xs">
+                          <SelectValue placeholder="Select stylist" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stylists.map((stylist) => (
+                            <SelectItem key={stylist.id} value={stylist.id}>
+                              {stylist.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    
+                    <Button
+                      variant={selectedServices.includes(service.id) ? "default" : "outline"}
+                      size="sm"
+                      className="ml-auto"
+                      onClick={() => handleServiceSelect(service.id)}
                     >
-                      <SelectTrigger className="w-full sm:w-[200px]">
-                        <SelectValue placeholder="Select stylist" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="any">Any Available Stylist</SelectItem>
-                        {employees?.map((employee) => (
-                          <SelectItem key={employee.id} value={employee.id}>
-                            {employee.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      {selectedServices.includes(service.id) ? (
+                        <>
+                          <Check className="h-4 w-4 mr-1" /> Selected
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-1" /> Select
+                        </>
+                      )}
+                    </Button>
                   </div>
-                );
-              })}
-            </div>
-            <Separator className="my-4" />
-          </div>
-        ))}
-
-        {groupedItems.services.length > 0 && (
-          <div className="space-y-4">
-            <div className="font-semibold text-lg">
-              Individual Services
-            </div>
-            <div className="space-y-3">
-              {groupedItems.services.map(({ cartItemId, service }) => (
-                <div 
-                  key={cartItemId}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{service.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {service.duration} minutes • ₹{service.selling_price}
-                    </p>
-                  </div>
-                  <Select 
-                    value={selectedStylists[service.id] || ''} 
-                    onValueChange={(value) => onStylistSelect(service.id, value)}
-                  >
-                    <SelectTrigger className="w-full sm:w-[200px]">
-                      <SelectValue placeholder="Select stylist" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="any">Any Available Stylist</SelectItem>
-                      {employees?.map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="packages" className="flex-1 overflow-auto">
+          {isLoadingPackages ? (
+            <div className="flex justify-center items-center h-40">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : filteredPackages.length === 0 ? (
+            <div className="text-center py-6 text-gray-500">
+              No packages found. Try adjusting your search.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredPackages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className={`p-4 border rounded-lg hover:shadow-md transition-shadow ${
+                    selectedPackages.includes(pkg.id) ? 'bg-primary/10 border-primary' : ''
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium">{pkg.name}</h3>
+                      <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                        {pkg.description || 'No description available'}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end ml-2">
+                      <span className="font-medium">₹{pkg.price}</span>
+                      {pkg.duration && (
+                        <div className="flex items-center text-sm text-gray-500 mt-1">
+                          <Clock className="h-3 w-3 mr-1" />
+                          <span>{pkg.duration} min</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 flex justify-between items-center">
+                    {stylists && stylists.length > 0 && (
+                      <Select
+                        value={selectedStylists[pkg.id] || ''}
+                        onValueChange={(value) => handleStylistChange(pkg.id, value)}
+                        disabled={!selectedPackages.includes(pkg.id)}
+                      >
+                        <SelectTrigger className="w-40 h-8 text-xs">
+                          <SelectValue placeholder="Select stylist" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stylists.map((stylist) => (
+                            <SelectItem key={stylist.id} value={stylist.id}>
+                              {stylist.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    
+                    <Button
+                      variant={selectedPackages.includes(pkg.id) ? "default" : "outline"}
+                      size="sm"
+                      className="ml-auto"
+                      onClick={() => handlePackageSelect(pkg.id)}
+                    >
+                      {selectedPackages.includes(pkg.id) ? (
+                        <>
+                          <Check className="h-4 w-4 mr-1" /> Selected
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-1" /> Select
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

@@ -1053,6 +1053,39 @@ export type Database = {
           },
         ]
       }
+      package_locations: {
+        Row: {
+          created_at: string
+          location_id: string
+          package_id: string
+        }
+        Insert: {
+          created_at?: string
+          location_id: string
+          package_id: string
+        }
+        Update: {
+          created_at?: string
+          location_id?: string
+          package_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_locations_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       package_services: {
         Row: {
           package_id: string
@@ -1445,6 +1478,39 @@ export type Database = {
           },
           {
             foreignKeyName: "service_inventory_requirements_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_locations: {
+        Row: {
+          created_at: string
+          location_id: string
+          service_id: string
+        }
+        Insert: {
+          created_at?: string
+          location_id: string
+          service_id: string
+        }
+        Update: {
+          created_at?: string
+          location_id?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_locations_service_id_fkey"
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"

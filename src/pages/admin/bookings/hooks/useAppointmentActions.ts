@@ -85,10 +85,10 @@ export function useAppointmentActions() {
         // Create TransactionDetails with all required properties
         return {
           id: originalSale.id,
-          amount: originalSale.total_price,
           status: originalSale.status,
           payment_method: originalSale.payment_method,
           created_at: originalSale.created_at,
+          total_price: originalSale.total_price,
           originalSale,
           refunds: refunds || []
         };
@@ -114,10 +114,10 @@ export function useAppointmentActions() {
         // Create TransactionDetails with all required properties
         return {
           id: appointment.id,
-          amount: appointment.total_price,
           status: appointment.status,
           payment_method: appointment.payment_method,
           created_at: appointment.created_at,
+          total_price: appointment.total_price,
           originalSale: appointment,
           refunds: refunds || []
         };
@@ -176,7 +176,8 @@ export function useAppointmentActions() {
           refund_notes: refundData.notes,
           total_price: 0, // Will be updated after processing bookings
           start_time: originalAppointment.start_time,
-          end_time: originalAppointment.end_time
+          end_time: originalAppointment.end_time,
+          location: originalAppointment.location // Use the same location as the original appointment
         })
         .select()
         .single();
