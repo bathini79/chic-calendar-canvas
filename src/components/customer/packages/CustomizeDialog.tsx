@@ -6,7 +6,7 @@ import { ServicesList } from "./ServicesList";
 import { useCart } from "@/components/cart/CartContext";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
-import { calculateTotal, calculateDuration } from "@/pages/admin/bookings/utils/bookingUtils";
+import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
 
 interface CustomizeDialogProps {
   open: boolean;
@@ -76,9 +76,8 @@ export function CustomizeDialog({
       );
 
       // Calculate the final package price and duration
-      const customizedServices = { [selectedPackage.id]: additionalServices };
-      const calculatedPrice = calculateTotal([], [selectedPackage.id], [], [selectedPackage], customizedServices);
-      const calculatedDuration = calculateDuration([], [selectedPackage.id], [], [selectedPackage], customizedServices);
+      const calculatedPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
+      const calculatedDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
       // Add the package with updated customizations
       await addToCart(undefined, selectedPackage?.id, {
@@ -100,15 +99,13 @@ export function CustomizeDialog({
     serviceId => !selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId)
   );
   
-  const customizedServices = { [selectedPackage?.id]: additionalServices };
-  
   const calculatedTotalPrice = externalTotalPrice !== undefined 
     ? externalTotalPrice 
-    : calculateTotal([], [selectedPackage?.id], [], [selectedPackage], customizedServices);
+    : calculatePackagePrice(selectedPackage, additionalServices, localServices);
   
   const calculatedTotalDuration = externalTotalDuration !== undefined
     ? externalTotalDuration
-    : calculateDuration([], [selectedPackage?.id], [], [selectedPackage], customizedServices);
+    : calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
   if (!selectedPackage) return null;
 

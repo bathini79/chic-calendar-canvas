@@ -1,181 +1,181 @@
 
-import { useMemo, useState } from "react";
-import { format, addMinutes } from "date-fns";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Employee } from "@/pages/admin/bookings/types";
+import { getAppointmentStatusColor } from "@/pages/admin/bookings/utils/bookingUtils";
+import {
+  START_HOUR,
+  PIXELS_PER_HOUR,
+  hourLabels,
+} from "@/pages/admin/bookings/utils/timeUtils";
+import { Flag } from "lucide-react";
+import React from "react";
+import { Appointment, Booking, Employee } from "@/pages/admin/bookings/types";
 
 interface TimeSlotsProps {
-  date: Date;
-  services: any[];
-  packages: any[];
-  selectedServices: string[];
-  selectedPackages: string[];
-  availableStylists: Employee[];
-  selectedStylists: Record<string, string>;
-  onTimeSelect: (time: string) => void;
-  customizedServices: Record<string, string[]>;
-  locationId?: string;
-  openingHours?: {
-    start: string;
-    end: string;
-  };
+  employees: Employee[];
+  hourLabels: number[];
+  formatTime: (hr: number) => string;
+  TOTAL_HOURS: number;
+  PIXELS_PER_HOUR: number;
+  handleColumnClick: (e: React.MouseEvent, empId: string) => void;
+  currentDate: Date;
+  nowPosition: number | null;
+  isSameDay: (date1: Date, date2: Date) => boolean;
+  appointments: Appointment[];
+  renderAppointmentBlock: (
+    appointment: Appointment,
+    booking: Booking
+  ) => JSX.Element | null;
+  setSelectedAppointment: (appointment: Appointment) => void;
+  setClickedCell: (cell: {
+    employeeId: string;
+    time: number;
+    x: number;
+    y: number;
+    date: Date;
+  }) => void;
 }
 
-export const TimeSlots = ({
-  date,
-  services,
-  packages,
-  selectedServices,
-  selectedPackages,
-  availableStylists,
-  selectedStylists,
-  onTimeSelect,
-  customizedServices,
-  locationId,
-  openingHours = { start: "09:00", end: "21:00" }
-}: TimeSlotsProps) => {
-  const [selectedEmployee, setSelectedEmployee] = useState<string>("");
-  const [timeSlotInterval, setTimeSlotInterval] = useState(30); // minutes
+const TimeSlots: React.FC<TimeSlotsProps> = ({
+  employees,
+  formatTime,
+  TOTAL_HOURS,
+  nowPosition,
+  isSameDay,
+  appointments,
+  setSelectedAppointment,
+  setClickedCell,
+  currentDate,
+}) => {
+  const handleColumnClick = (e: React.MouseEvent, empId: string) => {
+    if (e.target !== e.currentTarget) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    let clickedTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
+    clickedTime = Math.round(clickedTime * 4) / 4;
 
-  const getServiceDuration = (serviceId: string) => {
-    const service = services.find(s => s.id === serviceId);
-    return service ? service.duration : 0;
+    setClickedCell({
+      employeeId: empId,
+      time: clickedTime,
+      x: e.pageX + 10,
+      y: e.pageY - 20,
+      date: currentDate,
+    });
   };
 
-  const getPackageDuration = (packageId: string) => {
-    const pkg = packages.find(p => p.id === packageId);
-    if (!pkg) return 0;
+  const renderAppointmentBlock = (appointment: Appointment, booking: Booking) => {
+    // Don't render cancelled or voided appointments
+    if (appointment.status === 'canceled' || appointment.status === 'voided' || !booking.id) return null;
     
-    let duration = 0;
-    // Add duration for base package services
-    pkg.package_services?.forEach((ps: any) => {
-      duration += ps.service.duration || 0;
-    });
-    
-    // Add duration for customized services if any
-    const customServices = customizedServices[packageId] || [];
-    customServices.forEach(serviceId => {
-      // Only add duration if it's not part of the base package
-      const isInBasePackage = pkg.package_services?.some((ps: any) => ps.service.id === serviceId);
-      if (!isInBasePackage) {
-        duration += getServiceDuration(serviceId);
-      }
-    });
-    
-    return duration;
-  };
+    const isNoShow = appointment.status === 'noshow';
+    const statusColor = isNoShow 
+      ? 'bg-red-100 border-red-300 text-red-700'
+      : getAppointmentStatusColor(appointment.status);
+      
+    const duration = booking.service?.duration || booking.package?.duration || 60;
+    const startTime = new Date(booking.start_time);
+    const startHour = startTime.getHours() + startTime.getMinutes() / 60;
 
-  const totalDuration = useMemo(() => {
-    let duration = 0;
-    selectedServices.forEach(serviceId => {
-      duration += getServiceDuration(serviceId);
-    });
-    selectedPackages.forEach(packageId => {
-      duration += getPackageDuration(packageId);
-    });
-    return duration;
-  }, [selectedServices, selectedPackages, customizedServices]);
+    const topPositionPx = (startHour - START_HOUR) * PIXELS_PER_HOUR;
+    const heightPx = (duration / 60) * PIXELS_PER_HOUR;
 
-  // Generate time slots based on opening hours
-  const timeSlots = useMemo(() => {
-    const slots = [];
-    const [startHour, startMinute] = openingHours.start.split(":").map(Number);
-    const [endHour, endMinute] = openingHours.end.split(":").map(Number);
-    
-    const startTime = new Date(date);
-    startTime.setHours(startHour, startMinute, 0, 0);
-    
-    const endTime = new Date(date);
-    endTime.setHours(endHour, endMinute, 0, 0);
-    
-    // Subtract total service duration from end time to ensure last slot fits
-    const adjustedEndTime = new Date(endTime.getTime() - totalDuration * 60000);
-    
-    let currentTime = new Date(startTime);
-    
-    while (currentTime <= adjustedEndTime) {
-      slots.push(format(currentTime, "HH:mm"));
-      currentTime = addMinutes(currentTime, timeSlotInterval);
-    }
-    
-    return slots;
-  }, [date, openingHours, timeSlotInterval, totalDuration]);
-
-  // Filter stylists based on location
-  const locationStylists = availableStylists.filter(stylist => {
-    // Filter logic would go here when we implement location-based filtering
-    return true;
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Select Employee (Optional)</label>
-          <Select
-            value={selectedEmployee}
-            onValueChange={setSelectedEmployee}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Any employee" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Any employee</SelectItem>
-              {locationStylists.map((stylist) => (
-                <SelectItem key={stylist.id} value={stylist.id}>
-                  <div className="flex items-center gap-2">
-                    {stylist.photo_url && (
-                      <img
-                        src={stylist.photo_url}
-                        alt={stylist.name}
-                        className="w-5 h-5 rounded-full object-cover"
-                      />
-                    )}
-                    <span>{stylist.name}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Time Slot Interval</label>
-          <Select
-            value={timeSlotInterval.toString()}
-            onValueChange={(value) => setTimeSlotInterval(parseInt(value))}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="15">15 minutes</SelectItem>
-              <SelectItem value="30">30 minutes</SelectItem>
-              <SelectItem value="60">1 hour</SelectItem>
-            </SelectContent>
-          </Select>
+    return (
+      <div
+        key={booking.id}
+        className={`absolute left-2 right-2 rounded border ${statusColor} cursor-pointer z-10 overflow-hidden`}
+        style={{
+          top: `${topPositionPx}px`,
+          height: `${heightPx}px`,
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedAppointment(appointment);
+        }}
+      >
+        {isNoShow && (
+          <div className="absolute -top-2 -left-2 bg-red-100 rounded-full p-1 border border-red-300">
+            <Flag className="h-4 w-4 text-red-600" />
+          </div>
+        )}
+        <div className="p-2 text-xs">
+          <div className="font-medium truncate">
+            {appointment.customer?.full_name || 'No name'}
+          </div>
+          <div className="truncate text-gray-600">
+            {booking.service?.name || booking.package?.name || 'Unnamed service'}
+          </div>
         </div>
       </div>
+    );
+  };
 
-      <div>
-        <h3 className="text-sm font-medium mb-2">Available Time Slots</h3>
-        <ScrollArea className="h-[200px] rounded-md border p-2">
-          <div className="grid grid-cols-3 gap-2">
-            {timeSlots.map((time) => (
-              <Button
-                key={time}
-                variant="outline"
-                className="text-sm py-1 px-2 h-auto"
-                onClick={() => onTimeSelect(time)}
-              >
-                {time}
-              </Button>
-            ))}
+  return (
+    <div className="flex-1 overflow-auto">
+      <div className="flex">
+        <div className="w-16 border-r" />
+        {employees.map((emp: Employee) => (
+          <div
+            key={emp.id}
+            className="flex-1 border-r flex items-center justify-center p-2"
+          >
+            <div className="flex flex-col items-center space-y-1">
+              <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
+                {emp.avatar}
+              </div>
+              <div className="text-xs font-medium text-gray-700">
+                {emp.name}
+              </div>
+            </div>
           </div>
-        </ScrollArea>
+        ))}
+      </div>
+
+      <div className="flex">
+        <div className="w-16 border-r">
+          {hourLabels.map((hr) => (
+            <div
+              key={hr}
+              className="h-[60px] flex items-center justify-end pr-1 text-[10px] text-gray-700 font-bold border-b"
+            >
+              {formatTime(hr)}
+            </div>
+          ))}
+        </div>
+
+        {employees.map((emp: Employee) => (
+          <div
+            key={emp.id}
+            className="flex-1 border-r relative"
+            style={{
+              minWidth: "150px",
+              height: TOTAL_HOURS * PIXELS_PER_HOUR,
+            }}
+            onClick={(e) => handleColumnClick(e, emp.id)}
+          >
+            {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="absolute left-0 right-0 border-b"
+                style={{ top: idx * 15 }}
+              />
+            ))}
+
+            {nowPosition !== null && isSameDay(currentDate, new Date()) && (
+              <div
+                className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
+                style={{ top: nowPosition }}
+              />
+            )}
+
+            {appointments.map((appointment) =>
+              appointment.bookings.map((booking) => {
+                if (booking.employee?.id !== emp.id) return null;
+                return renderAppointmentBlock(appointment, booking);
+              })
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
 };
+
+export default TimeSlots;

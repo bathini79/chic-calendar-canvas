@@ -1,6 +1,8 @@
 
 import React, { useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useActiveServices } from "../hooks/useActiveServices";
 import { useActivePackages } from "../hooks/useActivePackages";
 import { Button } from "@/components/ui/button";
@@ -16,7 +18,6 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Service, Package } from "../types";
 
 interface ServiceSelectorProps {
   onServiceSelect: (serviceId: string) => void;
@@ -60,34 +61,24 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   );
 
   // Group services by category
-  const servicesByCategory: Record<string, Service[]> = {};
+  const servicesByCategory: Record<string, typeof services> = {};
   filteredServices.forEach((service) => {
-    let categoryName = "Uncategorized";
-    
-    if (service.category && service.category.length > 0 && service.category[0].category) {
-      categoryName = service.category[0].category.name;
-    }
-    
+    const categoryName = service.category?.name || "Uncategorized";
     if (!servicesByCategory[categoryName]) {
       servicesByCategory[categoryName] = [];
     }
-    servicesByCategory[categoryName].push(service as Service);
+    servicesByCategory[categoryName].push(service);
   });
 
   // Group packages by category
-  const packagesByCategory: Record<string, Package[]> = {};
+  const packagesByCategory: Record<string, typeof packages> = {};
   filteredPackages.forEach((pkg) => {
     // Use the first category or "Uncategorized"
-    let categoryName = "Uncategorized";
-    
-    if (pkg.categories && pkg.categories.length > 0 && pkg.categories[0].category) {
-      categoryName = pkg.categories[0].category.name;
-    }
-    
+    const categoryName = pkg.categories?.length ? pkg.categories[0]?.name : "Uncategorized";
     if (!packagesByCategory[categoryName]) {
       packagesByCategory[categoryName] = [];
     }
-    packagesByCategory[categoryName].push(pkg as Package);
+    packagesByCategory[categoryName].push(pkg);
   });
 
   if (isServicesLoading || isPackagesLoading) {

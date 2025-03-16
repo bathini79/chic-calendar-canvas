@@ -1,4 +1,3 @@
-
 import {
   Select,
   SelectContent,
@@ -14,24 +13,17 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface CategoryMultiSelectProps {
-  // Original props
-  selectedCategories?: string[];
-  onCategorySelect?: (categoryId: string) => void;
-  onCategoryRemove?: (categoryId: string) => void;
+  selectedCategories: string[];
+  onCategorySelect: (categoryId: string) => void;
+  onCategoryRemove: (categoryId: string) => void;
   maxSelections?: number;
-  
-  // New props used in ServiceForm
-  selectedValues?: string[];
-  onChange?: (values: string[]) => void;
 }
 
 export function CategoryMultiSelect({
-  selectedCategories = [],
+  selectedCategories,
   onCategorySelect,
   onCategoryRemove,
   maxSelections,
-  selectedValues = [],
-  onChange,
 }: CategoryMultiSelectProps) {
   const { data: categories } = useQuery({
     queryKey: ['categories'],
@@ -46,31 +38,12 @@ export function CategoryMultiSelect({
     },
   });
 
-  // Use the appropriate selected values based on which prop was provided
-  const selected = selectedValues.length > 0 ? selectedValues : selectedCategories;
-
-  const handleCategorySelect = (categoryId: string) => {
-    if (onChange) {
-      onChange([...selected, categoryId]);
-    } else if (onCategorySelect) {
-      onCategorySelect(categoryId);
-    }
-  };
-
-  const handleCategoryRemove = (categoryId: string) => {
-    if (onChange) {
-      onChange(selected.filter(id => id !== categoryId));
-    } else if (onCategoryRemove) {
-      onCategoryRemove(categoryId);
-    }
-  };
-
-  const isSelectionDisabled = maxSelections ? selected.length >= maxSelections : false;
+  const isSelectionDisabled = maxSelections ? selectedCategories.length >= maxSelections : false;
 
   return (
     <div className="space-y-2">
       <Select 
-        onValueChange={handleCategorySelect}
+        onValueChange={onCategorySelect}
         disabled={isSelectionDisabled}
       >
         <SelectTrigger>
@@ -82,7 +55,7 @@ export function CategoryMultiSelect({
               <SelectItem 
                 key={category.id} 
                 value={category.id}
-                disabled={selected.includes(category.id)}
+                disabled={selectedCategories.includes(category.id)}
               >
                 {category.name}
               </SelectItem>
@@ -91,14 +64,14 @@ export function CategoryMultiSelect({
         </SelectContent>
       </Select>
       <div className="flex flex-wrap gap-2">
-        {categories?.filter(category => selected.includes(category.id)).map((category) => (
+        {categories?.filter(category => selectedCategories.includes(category.id)).map((category) => (
           <Badge key={category.id} variant="secondary">
             {category.name}
             <Button
               variant="ghost"
               size="icon"
               className="h-4 w-4 ml-1 hover:bg-transparent"
-              onClick={() => handleCategoryRemove(category.id)}
+              onClick={() => onCategoryRemove(category.id)}
             >
               <X className="h-3 w-3" />
             </Button>

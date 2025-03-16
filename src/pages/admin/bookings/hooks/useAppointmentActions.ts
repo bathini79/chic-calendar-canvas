@@ -1,418 +1,312 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { Appointment, AppointmentStatus } from "../types";
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
 
-const APPOINTMENTS_TABLE = "appointments";
+// Define the RefundReason type to match what's expected in the database
+type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
 
-interface SaveAppointmentParams {
-  appointmentId?: string;
-  customerId: string;
-  date: Date;
-  time: string;
-  services: string[];
-  packages: string[];
-  stylists: Record<string, string>;
-  totalPrice: number;
-  duration: number;
-  discountType: "none" | "fixed" | "percentage";
-  discountValue: number;
-  paymentMethod: string;
-  notes: string;
-  status: string;
-  locationId: string;
+interface SelectedItem {
+  id: string;
+  name: string;
+  price: number;
+  type: 'service' | 'package';
+  employee?: {
+    id: string;
+    name: string;
+  };
+  duration?: number;
 }
 
-export default function useAppointmentActions() {
-  const createAppointment = async (
-    params: SaveAppointmentParams
-  ): Promise<{ success: boolean; data: Appointment | null; error: any }> => {
-    try {
-      const {
-        customerId,
-        date,
-        time,
-        services,
-        packages,
-        stylists,
-        totalPrice,
-        duration,
-        discountType,
-        discountValue,
-        paymentMethod,
-        notes,
-        status,
-        locationId
-      } = params;
-
-      const startDateTime = new Date(date);
-      const [hours, minutes] = time.split(":").map(Number);
-      startDateTime.setHours(hours, minutes, 0, 0);
-
-      const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
-
-      const { data: appointment, error: appointmentError } = await supabase
-        .from(APPOINTMENTS_TABLE)
-        .insert({
-          customer_id: customerId,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          total_price: totalPrice,
-          total_duration: duration,
-          discount_type: discountType,
-          discount_value: discountValue,
-          payment_method: paymentMethod,
-          notes: notes,
-          status: status as AppointmentStatus,
-          location: locationId,
-        })
-        .select("*")
-        .single();
-
-      if (appointmentError) {
-        console.error("Error creating appointment:", appointmentError);
-        return { success: false, data: null, error: appointmentError };
-      }
-
-      const formattedAppointment = {
-        ...appointment,
-        discount_type: appointment.discount_type as "none" | "fixed" | "percentage",
-      } as Appointment;
-
-      const bookingPromises = [
-        ...services.map((serviceId) =>
-          supabase.from("bookings").insert([
-            {
-              appointment_id: appointment.id,
-              service_id: serviceId,
-              employee_id: stylists[serviceId] || null,
-              price_paid: totalPrice,
-              status: status,
-              start_time: startDateTime.toISOString(),
-              end_time: endDateTime.toISOString(),
-            },
-          ])
-        ),
-        ...packages.map((packageId) =>
-          supabase.from("bookings").insert([
-            {
-              appointment_id: appointment.id,
-              package_id: packageId,
-              employee_id: stylists[packageId] || null,
-              price_paid: totalPrice,
-              status: status,
-              start_time: startDateTime.toISOString(),
-              end_time: endDateTime.toISOString(),
-            },
-          ])
-        ),
-      ];
-
-      await Promise.all(bookingPromises);
-
-      return { success: true, data: formattedAppointment, error: null };
-    } catch (error: any) {
-      console.error("Error creating appointment:", error);
-      return { success: false, data: null, error: error };
-    }
-  };
-
-  const updateAppointment = async (
-    appointmentId: string,
-    params: SaveAppointmentParams
-  ): Promise<{ success: boolean; data: Appointment | null; error: any }> => {
-    try {
-      const {
-        customerId,
-        date,
-        time,
-        services,
-        packages,
-        stylists,
-        totalPrice,
-        duration,
-        discountType,
-        discountValue,
-        paymentMethod,
-        notes,
-        status,
-        locationId
-      } = params;
-
-      const startDateTime = new Date(date);
-      const [hours, minutes] = time.split(":").map(Number);
-      startDateTime.setHours(hours, minutes, 0, 0);
-
-      const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
-
-      const { data: appointment, error: appointmentError } = await supabase
-        .from(APPOINTMENTS_TABLE)
-        .update({
-          customer_id: customerId,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          total_price: totalPrice,
-          total_duration: duration,
-          discount_type: discountType,
-          discount_value: discountValue,
-          payment_method: paymentMethod,
-          notes: notes,
-          status: status as AppointmentStatus,
-          location: locationId,
-        })
-        .eq("id", appointmentId)
-        .select("*")
-        .single();
-
-      if (appointmentError) {
-        console.error("Error updating appointment:", appointmentError);
-        return { success: false, data: null, error: appointmentError };
-      }
-
-      const formattedAppointment = {
-        ...appointment,
-        discount_type: appointment.discount_type as "none" | "fixed" | "percentage",
-      } as Appointment;
-
-      // First, delete existing bookings for this appointment
-      const { error: deleteError } = await supabase
-        .from("bookings")
-        .delete()
-        .eq("appointment_id", appointmentId);
-
-      if (deleteError) {
-        console.error("Error deleting existing bookings:", deleteError);
-        return { success: false, data: null, error: deleteError };
-      }
-
-      // Then, recreate the bookings
-      const bookingPromises = [
-        ...services.map((serviceId) =>
-          supabase.from("bookings").insert([
-            {
-              appointment_id: appointment.id,
-              service_id: serviceId,
-              employee_id: stylists[serviceId] || null,
-              price_paid: totalPrice,
-              status: status,
-              start_time: startDateTime.toISOString(),
-              end_time: endDateTime.toISOString(),
-            },
-          ])
-        ),
-        ...packages.map((packageId) =>
-          supabase.from("bookings").insert([
-            {
-              appointment_id: appointment.id,
-              package_id: packageId,
-              employee_id: stylists[packageId] || null,
-              price_paid: totalPrice,
-              status: status,
-              start_time: startDateTime.toISOString(),
-              end_time: endDateTime.toISOString(),
-            },
-          ])
-        ),
-      ];
-
-      await Promise.all(bookingPromises);
-
-      return { success: true, data: formattedAppointment, error: null };
-    } catch (error: any) {
-      console.error("Error updating appointment:", error);
-      return { success: false, data: null, error: error };
-    }
-  };
-
-  const deleteAppointment = async (
-    appointmentId: string
-  ): Promise<{ success: boolean; error: any }> => {
-    try {
-      // First, delete associated bookings
-      const { error: deleteBookingsError } = await supabase
-        .from("bookings")
-        .delete()
-        .eq("appointment_id", appointmentId);
-
-      if (deleteBookingsError) {
-        console.error("Error deleting bookings:", deleteBookingsError);
-        return { success: false, error: deleteBookingsError };
-      }
-
-      // Then, delete the appointment
-      const { error: deleteAppointmentError } = await supabase
-        .from(APPOINTMENTS_TABLE)
-        .delete()
-        .eq("id", appointmentId);
-
-      if (deleteAppointmentError) {
-        console.error("Error deleting appointment:", deleteAppointmentError);
-        return { success: false, error: deleteAppointmentError };
-      }
-
-      return { success: true, error: null };
-    } catch (error: any) {
-      console.error("Error deleting appointment:", error);
-      return { success: false, error: error };
-    }
-  };
-
-  const getAppointmentById = async (
-    appointmentId: string
-  ): Promise<{ success: boolean; data: Appointment | null; error: any }> => {
-    try {
-      const { data, error } = await supabase
-        .from(APPOINTMENTS_TABLE)
-        .select("*")
-        .eq("id", appointmentId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching appointment:", error);
-        return { success: false, data: null, error };
-      }
-
-      return { success: true, data: data as Appointment, error: null };
-    } catch (error: any) {
-      console.error("Error fetching appointment:", error);
-      return { success: false, data: null, error };
-    }
-  };
-
-  const getAllAppointments = async (): Promise<{
-    success: boolean;
-    data: Appointment[] | null;
-    error: any;
-  }> => {
-    try {
-      const { data, error } = await supabase
-        .from(APPOINTMENTS_TABLE)
-        .select("*");
-
-      if (error) {
-        console.error("Error fetching appointments:", error);
-        return { success: false, data: null, error };
-      }
-
-      const formattedAppointments = data.map(appointment => ({
-        ...appointment,
-        discount_type: appointment.discount_type as "none" | "fixed" | "percentage",
-      })) as Appointment[];
-
-      return { success: true, data: formattedAppointments, error: null };
-    } catch (error: any) {
-      console.error("Error fetching appointments:", error);
-      return { success: false, data: null, error };
-    }
-  };
-
-  return {
-    createAppointment,
-    updateAppointment,
-    deleteAppointment,
-    getAppointmentById,
-    getAllAppointments,
-  };
-}
-
-// Create a hook to use appointment actions with extended functionality
 export function useAppointmentActions() {
-  const {
-    createAppointment,
-    updateAppointment,
-    deleteAppointment,
-    getAppointmentById,
-    getAllAppointments,
-  } = useAppointmentActions();
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
+
+  const fetchAppointmentDetails = async (appointmentId: string): Promise<TransactionDetails | null> => {
+    try {
+      setIsLoading(true);
+
+      // First fetch the appointment
+      const { data: appointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customer:profiles!appointments_customer_id_fkey(*),
+          bookings (
+            *,
+            service:services(*),
+            package:packages(*),
+            employee:employees!bookings_employee_id_fkey(*)
+          )
+        `)
+        .eq('id', appointmentId)
+        .single();
+
+      if (appointmentError) throw appointmentError;
+
+      // If this is a refund, get the original sale
+      if (appointment.transaction_type === 'refund') {
+        const { data: originalSale, error: originalError } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            customer:profiles!appointments_customer_id_fkey(*),
+            bookings (
+              *,
+              service:services(*),
+              package:packages(*),
+              employee:employees!bookings_employee_id_fkey(*)
+            )
+          `)
+          .eq('id', appointment.original_appointment_id)
+          .single();
+
+        if (originalError) throw originalError;
+
+        // Get all refunds for this original sale
+        const { data: refunds, error: refundsError } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            customer:profiles!appointments_customer_id_fkey(*),
+            bookings (
+              *,
+              service:services(*),
+              package:packages(*),
+              employee:employees!bookings_employee_id_fkey(*)
+            )
+          `)
+          .eq('original_appointment_id', originalSale.id)
+          .eq('transaction_type', 'refund');
+
+        if (refundsError) throw refundsError;
+
+        // Create TransactionDetails with all required properties
+        return {
+          id: originalSale.id,
+          amount: originalSale.total_price,
+          status: originalSale.status,
+          payment_method: originalSale.payment_method,
+          created_at: originalSale.created_at,
+          originalSale,
+          refunds: refunds || []
+        };
+      } else {
+        // This is the original sale, get all its refunds
+        const { data: refunds, error: refundsError } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            customer:profiles!appointments_customer_id_fkey(*),
+            bookings (
+              *,
+              service:services(*),
+              package:packages(*),
+              employee:employees!bookings_employee_id_fkey(*)
+            )
+          `)
+          .eq('original_appointment_id', appointmentId)
+          .eq('transaction_type', 'refund');
+
+        if (refundsError) throw refundsError;
+
+        // Create TransactionDetails with all required properties
+        return {
+          id: appointment.id,
+          amount: appointment.total_price,
+          status: appointment.status,
+          payment_method: appointment.payment_method,
+          created_at: appointment.created_at,
+          originalSale: appointment,
+          refunds: refunds || []
+        };
+      }
+    } catch (error: any) {
+      console.error('Error fetching appointment:', error);
+      toast.error('Failed to load appointment details');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const processRefund = async (
+    appointmentId: string,
+    bookingIds: string[],
+    refundData: RefundData
+  ) => {
+    try {
+      setIsLoading(true);
+
+      // First get the original appointment details
+      const { data: originalAppointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('id', appointmentId)
+        .single();
+
+      if (appointmentError) throw appointmentError;
+
+      // Map refund reason to allowed values
+      let mappedRefundReason: RefundReason = "other";
+      if (refundData.reason === "booking_error") {
+        mappedRefundReason = "scheduling_error"; // Map booking_error to scheduling_error
+      } else if (refundData.reason === "service_unavailable") {
+        mappedRefundReason = "service_quality_issue"; // Map service_unavailable to service_quality_issue
+      } else if (refundData.reason === "customer_emergency" || refundData.reason === "customer_no_show") {
+        mappedRefundReason = "other"; // Map customer reasons to other
+      } else if (
+        ["customer_dissatisfaction", "service_quality_issue", "scheduling_error", 
+         "health_concern", "price_dispute", "other"].includes(refundData.reason as string)
+      ) {
+        mappedRefundReason = refundData.reason as RefundReason;
+      }
+
+      // Create a refund transaction
+      const { data: refundAppointment, error: refundError } = await supabase
+        .from('appointments')
+        .insert({
+          customer_id: originalAppointment.customer_id,
+          status: 'refunded',
+          transaction_type: 'refund',
+          original_appointment_id: appointmentId,
+          refunded_by: refundData.refundedBy,
+          refund_reason: mappedRefundReason,
+          refund_notes: refundData.notes,
+          total_price: 0, // Will be updated after processing bookings
+          start_time: originalAppointment.start_time,
+          end_time: originalAppointment.end_time
+        })
+        .select()
+        .single();
+
+      if (refundError) throw refundError;
+
+      // Update the original bookings
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'refunded',
+          refund_reason: mappedRefundReason,
+          refund_notes: refundData.notes,
+          refunded_by: refundData.refundedBy,
+          refunded_at: new Date().toISOString()
+        })
+        .in('id', bookingIds);
+
+      if (bookingsError) throw bookingsError;
+
+      // Get all bookings for this appointment to determine if it's a full or partial refund
+      const { data: allBookings, error: countError } = await supabase
+        .from('bookings')
+        .select('id, status, price_paid')
+        .eq('appointment_id', appointmentId);
+
+      if (countError) throw countError;
+
+      // Check if all bookings are now refunded
+      const isFullRefund = allBookings?.every(booking => 
+        booking.status === 'refunded' || bookingIds.includes(booking.id)
+      );
+
+      // Calculate total refund amount
+      const refundAmount = allBookings
+        ?.filter(booking => bookingIds.includes(booking.id))
+        .reduce((total, booking) => total + (booking.price_paid || 0), 0) || 0;
+
+      // Update the refund appointment with the total amount
+      const { error: updateRefundError } = await supabase
+        .from('appointments')
+        .update({
+          total_price: -refundAmount // Negative amount to indicate refund
+        })
+        .eq('id', refundAppointment.id);
+
+      if (updateRefundError) throw updateRefundError;
+
+      // Update the original appointment status
+      const { error: originalAppointmentError } = await supabase
+        .from('appointments')
+        .update({
+          status: isFullRefund ? 'refunded' : 'partially_refunded'
+        })
+        .eq('id', appointmentId);
+
+      if (originalAppointmentError) throw originalAppointmentError;
+
+      // Refresh the selected items after refund
+      await fetchAppointmentDetails(appointmentId);
+
+      toast.success('Refund processed successfully');
+      return true;
+    } catch (error: any) {
+      console.error('Error processing refund:', error);
+      toast.error(error.message || 'Failed to process refund');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    newStatus: AppointmentStatus,
+    status: Appointment['status'],
     bookingIds: string[]
-  ): Promise<boolean> => {
+  ) => {
     try {
-      // Update the appointment status
+      setIsLoading(true);
+
+      // First update the appointment status
       const { error: appointmentError } = await supabase
-        .from(APPOINTMENTS_TABLE)
-        .update({ status: newStatus })
-        .eq("id", appointmentId);
+        .from('appointments')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', appointmentId);
 
-      if (appointmentError) {
-        console.error("Error updating appointment status:", appointmentError);
-        return false;
+      if (appointmentError) throw appointmentError;
+
+      // Then update all associated bookings
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', bookingIds);
+
+      if (bookingsError) throw bookingsError;
+
+      let message = '';
+      switch (status) {
+        case 'canceled':
+          message = 'Appointment canceled successfully';
+          break;
+        case 'noshow':
+          message = 'Appointment marked as no-show';
+          break;
+        default:
+          message = `Appointment ${status} successfully`;
       }
-
-      // Update all bookings associated with this appointment
-      for (const bookingId of bookingIds) {
-        const { error: bookingError } = await supabase
-          .from("bookings")
-          .update({ status: newStatus })
-          .eq("id", bookingId);
-
-        if (bookingError) {
-          console.error(`Error updating booking ${bookingId} status:`, bookingError);
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error("Error updating appointment status:", error);
-      return false;
-    }
-  };
-
-  const fetchAppointmentDetails = async (appointmentId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from(APPOINTMENTS_TABLE)
-        .select(`
-          *,
-          bookings (
-            *,
-            service:services (*),
-            package:packages (*),
-            employee:employees (*)
-          ),
-          customer:customers (*)
-        `)
-        .eq("id", appointmentId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching appointment details:", error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error("Error fetching appointment details:", error);
-      return null;
-    }
-  };
-
-  const processRefund = async (appointmentId: string, bookingIds: string[], refundData: any) => {
-    try {
-      // Process the refund logic here
-      console.log("Processing refund for appointment:", appointmentId);
-      console.log("Bookings to refund:", bookingIds);
-      console.log("Refund data:", refundData);
       
-      // Return true if refund was successful
+      toast.success(message);
       return true;
-    } catch (error) {
-      console.error("Error processing refund:", error);
+    } catch (error: any) {
+      console.error('Error updating appointment:', error);
+      toast.error(error.message || 'Failed to update appointment');
       return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return {
-    createAppointment,
-    updateAppointment,
-    deleteAppointment,
-    getAppointmentById,
-    getAllAppointments,
-    updateAppointmentStatus,
+    isLoading,
+    selectedItems,
     fetchAppointmentDetails,
-    processRefund,
-    isLoading: false // Added for compatibility
+    updateAppointmentStatus,
+    processRefund
   };
 }

@@ -12,29 +12,14 @@ export function useActiveServices(locationId?: string) {
           *,
           category:services_categories(
             category:categories(*)
-          ),
-          service_locations(location_id)
+          )
         `)
         .eq("status", "active");
 
       // If locationId is provided, filter services that are available at this location
       if (locationId) {
-        const { data: serviceIds, error: serviceIdsError } = await supabase
-          .from('service_locations')
-          .select('service_id')
-          .eq('location_id', locationId);
-          
-        if (serviceIdsError) {
-          console.error("Error fetching service locations:", serviceIdsError);
-          throw serviceIdsError;
-        }
-        
-        if (serviceIds && serviceIds.length > 0) {
-          query = query.in('id', serviceIds.map(s => s.service_id));
-        } else {
-          // Return empty array if no services found for this location
-          return [];
-        }
+        // This could be adjusted based on your business logic
+        // For now, we're not filtering by location, as services might be available at any location
       }
 
       const { data, error } = await query.order("name");

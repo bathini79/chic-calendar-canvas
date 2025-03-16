@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -30,9 +29,6 @@ export function ServiceDialog({
               id,
               name
             )
-          ),
-          service_locations (
-            location_id
           )
         `)
         .eq('id', initialData.id)
@@ -75,7 +71,7 @@ export function ServiceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogTitle>
-          {initialData?.id ? 'Edit Service' : 'Create New Service'}
+          {initialData ? 'Edit Service' : 'Create New Service'}
         </DialogTitle>
         <ServiceForm 
           initialData={serviceData} 

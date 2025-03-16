@@ -15,29 +15,14 @@ export function useActivePackages(locationId?: string) {
           ),
           package_services(
             service:services(*)
-          ),
-          package_locations(location_id)
+          )
         `)
         .eq("status", "active");
 
       // If locationId is provided, filter packages that are available at this location
       if (locationId) {
-        const { data: packageIds, error: packageIdsError } = await supabase
-          .from('package_locations')
-          .select('package_id')
-          .eq('location_id', locationId);
-          
-        if (packageIdsError) {
-          console.error("Error fetching package locations:", packageIdsError);
-          throw packageIdsError;
-        }
-        
-        if (packageIds && packageIds.length > 0) {
-          query = query.in('id', packageIds.map(p => p.package_id));
-        } else {
-          // Return empty array if no packages found for this location
-          return [];
-        }
+        // This could be adjusted based on your business logic
+        // For now, we're not filtering by location, as packages might be available at any location
       }
 
       const { data, error } = await query.order("name");

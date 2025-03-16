@@ -25,14 +25,11 @@ export interface Service {
   selling_price: number;
   original_price: number;
   category_id?: string;
-  status: "active" | "inactive" | "archived";
+  status: "active" | "inactive";
   created_at: string;
   updated_at: string;
   gender?: string;
   image_urls?: string[];
-  service_locations?: {location_id: string}[];
-  location_ids?: string[];
-  category?: any[];
 }
 
 export interface Package {
@@ -41,9 +38,9 @@ export interface Package {
   description?: string;
   price: number;
   duration?: number;
-  discount_type?: "none" | "fixed" | "percentage" | string;
+  discount_type?: "none" | "fixed" | "percentage";
   discount_value?: number;
-  status: "active" | "inactive" | "archived";
+  status: "active" | "inactive";
   created_at: string;
   updated_at: string;
   image_urls?: string[];
@@ -51,8 +48,6 @@ export interface Package {
   customizable_services?: string[];
   categories?: any[];
   package_services?: any[];
-  package_locations?: {location_id: string}[];
-  location_ids?: string[];
 }
 
 export interface Customer {
@@ -105,7 +100,7 @@ export interface Appointment {
   end_time: string;
   status: AppointmentStatus;
   total_price: number;
-  discount_type: "none" | "fixed" | "percentage" | string;
+  discount_type: "none" | "fixed" | "percentage";
   discount_value: number;
   payment_method?: string;
   notes?: string;
@@ -122,21 +117,4 @@ export interface Appointment {
   total_duration?: number;
   customer?: Customer;
   bookings: Booking[];
-}
-
-export interface RefundData {
-  appointment_id: string;
-  reason: string;
-  notes?: string;
-  refundedBy?: string;
-}
-
-export interface TransactionDetails {
-  id: string;
-  status: AppointmentStatus;
-  created_at: string;
-  total_price: number;
-  payment_method: string;
-  originalSale?: Appointment;
-  refunds?: Appointment[];
 }

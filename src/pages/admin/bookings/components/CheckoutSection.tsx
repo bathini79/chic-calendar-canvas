@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,8 +33,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 import { 
-  calculateTotal as getTotalPrice, 
-  calculateDuration as getTotalDuration, 
+  getTotalPrice, 
+  getTotalDuration, 
   getFinalPrice, 
   getServicePriceInPackage,
   calculatePackagePrice 

@@ -1,348 +1,603 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { 
+  CheckCircle2, 
+  CreditCard, 
+  Banknote,
+  MoreVertical,
+  PencilLine,
+  FileText,
+  Mail,
+  Printer,
+  Download,
+  Ban,
+  Clock,
+  Package
+} from "lucide-react";
+import { format } from 'date-fns';
 import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { toast } from 'sonner';
-import { Appointment, Service, Package, RefundData } from '../types';
-import useAppointmentActions, { useAppointmentActions } from '../hooks/useAppointmentActions';
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAppointmentActions } from '../hooks/useAppointmentActions';
+import type { RefundData, TransactionDetails } from '../types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { formatRefundReason } from '../utils/formatters';
 
-interface SummaryViewProps {
-  appointmentId?: string;
-  customer: any;
-  services: Service[];
-  packages: Package[];
-  stylists: Record<string, string>;
-  employees: any[];
-  date: Date;
-  time: string;
-  discountType: 'none' | 'fixed' | 'percentage';
-  discountValue: number;
-  paymentMethod: string;
-  notes: string;
-  calculateTotal: (services: string[], packages: string[], servicesData: Service[], packagesData: Package[], customizedServices?: any) => number;
-  customizedServices?: any;
-  isLoading: boolean;
-  onSave: () => void;
-  onEdit: () => void;
+export interface SummaryViewProps {
+  appointmentId: string
 }
 
-export function SummaryView({
-  appointmentId,
-  customer,
-  services,
-  packages,
-  stylists,
-  employees,
-  date,
-  time,
-  discountType,
-  discountValue,
-  paymentMethod,
-  notes,
-  calculateTotal,
-  customizedServices,
-  isLoading,
-  onSave,
-  onEdit
-}: SummaryViewProps) {
-  const { fetchAppointmentDetails, processRefund } = useAppointmentActions();
-  const [transactionDetails, setTransactionDetails] = useState<any>(null);
-  const [showRefundModal, setShowRefundModal] = useState(false);
-  const [refundReason, setRefundReason] = useState('');
+export const SummaryView: React.FC<SummaryViewProps> = ({
+  appointmentId
+}) => {
+  const [showVoidDialog, setShowVoidDialog] = useState(false);
+  const [showRefundDialog, setShowRefundDialog] = useState(false);
+  const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
+  const [note, setNote] = useState('');
+  const [refundItems, setRefundItems] = useState<{[key: string]: boolean}>({});
+  const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
+  const [refundReason, setRefundReason] = useState<RefundData['reason']>('customer_dissatisfaction');
   const [refundNotes, setRefundNotes] = useState('');
-  const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
+  const [refundedBy, setRefundedBy] = useState('');
+  const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const { fetchAppointmentDetails, updateAppointmentStatus, processRefund } = useAppointmentActions();
 
   useEffect(() => {
-    if (appointmentId) {
-      fetchAppointmentDetails(appointmentId)
-        .then(details => {
-          setTransactionDetails(details);
-        });
+    loadAppointmentDetails();
+    fetchEmployees();
+  }, [appointmentId]);
+
+  const loadAppointmentDetails = async () => {
+    const details = await fetchAppointmentDetails(appointmentId);
+    if (details) {
+      setTransactionDetails(details);
     }
-  }, [appointmentId, fetchAppointmentDetails]);
+  };
 
-  const totalPrice = calculateTotal(
-    services.map(s => s.id),
-    packages.map(p => p.id),
-    services,
-    packages,
-    customizedServices
-  );
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id, name')
+        .eq('status', 'active');
 
-  const calculateDiscountedPrice = () => {
-    let discountedPrice = totalPrice;
-    if (discountType === 'fixed') {
-      discountedPrice = Math.max(0, totalPrice - discountValue);
-    } else if (discountType === 'percentage') {
-      discountedPrice = totalPrice * (1 - discountValue / 100);
+      if (error) throw error;
+      setEmployees(data || []);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
     }
-    return discountedPrice;
   };
 
-  const discountedPrice = calculateDiscountedPrice();
+  const getGroupedBookings = (transaction: any) => {
+    if (!transaction) return [];
 
-  const getEmployeeName = (itemId: string) => {
-    const employeeId = stylists[itemId];
-    const employee = employees.find(e => e.id === employeeId);
-    return employee ? employee.name : 'Any Stylist';
-  };
-
-  const handleRefundSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    const packageBookings = transaction.bookings.filter(b => b.package_id);
+    const serviceBookings = transaction.bookings.filter(b => b.service_id && !b.package_id);
     
-    const refundData: RefundData = {
-      appointment_id: transactionDetails.id,
-      reason: refundReason,
-      notes: refundNotes,
-      refundedBy: "system" // Or replace with the actual user ID if available
-    };
-    
-    processRefund(transactionDetails.id, selectedBookings, refundData);
-    setShowRefundModal(false);
-  };
-
-  const handleBookingSelection = (bookingId: string) => {
-    setSelectedBookings(prev => {
-      if (prev.includes(bookingId)) {
-        return prev.filter(id => id !== bookingId);
-      } else {
-        return [...prev, bookingId];
+    const packageGroups = packageBookings.reduce((groups, booking) => {
+      const packageId = booking.package_id;
+      if (!groups[packageId]) {
+        groups[packageId] = {
+          package: booking.package,
+          bookings: [],
+          totalPricePaid: 0
+        };
       }
-    });
+      groups[packageId].bookings.push(booking);
+      groups[packageId].totalPricePaid += booking.price_paid || 0;
+      return groups;
+    }, {});
+
+    const result = [
+      ...Object.values(packageGroups).map((group: any) => ({
+        type: 'package',
+        ...group
+      })),
+      ...serviceBookings.map(booking => ({
+        type: 'service',
+        booking
+      }))
+    ];
+
+    return result;
   };
+
+  const handleRefundSale = async () => {
+    if (!transactionDetails?.originalSale || !refundedBy) {
+      toast.error("Please select who processed the refund");
+      return;
+    }
+
+    try {
+      const selectedBookingIds = Object.entries(refundItems)
+        .filter(([_, isSelected]) => isSelected)
+        .map(([id]) => id);
+
+      if (selectedBookingIds.length === 0) {
+        toast.error("Please select at least one item to refund");
+        return;
+      }
+
+      const refundData: RefundData = {
+        reason: refundReason,
+        notes: refundNotes,
+        refundedBy: refundedBy
+      };
+
+      const success = await processRefund(appointmentId, selectedBookingIds, refundData);
+
+      if (success) {
+        await loadAppointmentDetails();
+        setShowRefundDialog(false);
+        toast.success('Refund processed successfully');
+      }
+    } catch (error: any) {
+      console.error("Error refunding sale:", error);
+      toast.error("Failed to process refund");
+    }
+  };
+
+  const handleVoidSale = async () => {
+    if (!transactionDetails?.originalSale) return;
+
+    try {
+      const bookingIds = transactionDetails.originalSale.bookings.map(booking => booking.id);
+      
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({ status: 'voided' })
+        .in('id', bookingIds);
+
+      if (bookingsError) throw bookingsError;
+
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .update({ status: 'voided' })
+        .eq('id', appointmentId);
+
+      if (appointmentError) throw appointmentError;
+
+      await loadAppointmentDetails();
+      setShowVoidDialog(false);
+      toast.success('Sale voided successfully');
+    } catch (error: any) {
+      console.error("Error voiding sale:", error);
+      toast.error("Failed to void sale");
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!note.trim()) {
+      toast.error("Please enter a note");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ notes: note })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      await loadAppointmentDetails();
+      setShowAddNoteDialog(false);
+      setNote('');
+      toast.success('Note added successfully');
+    } catch (error: any) {
+      console.error("Error adding note:", error);
+      toast.error("Failed to add note");
+    }
+  };
+
+  if (!transactionDetails) {
+    return <div>Loading...</div>;
+  }
+
+  const { originalSale, refunds } = transactionDetails;
+
+  const allTransactions = [
+    ...refunds,
+    originalSale
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Appointment Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center space-x-4">
-            <Avatar>
-              <AvatarImage src={`https://avatar.vercel.sh/${customer.email}.png`} />
-              <AvatarFallback>{customer.full_name?.substring(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="text-lg font-semibold">{customer.full_name}</h2>
-              <p className="text-gray-500">{customer.email}</p>
-            </div>
-          </div>
-          <Separator />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h3 className="text-md font-semibold">Date & Time</h3>
-              <p className="text-gray-500">{date.toLocaleDateString()} at {time}</p>
-            </div>
-            <div>
-              <h3 className="text-md font-semibold">Payment Method</h3>
-              <p className="text-gray-500">{paymentMethod}</p>
-            </div>
-          </div>
-          <Separator />
-          <div>
-            <h3 className="text-md font-semibold">Services</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Stylist</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {services.map(service => (
-                  <TableRow key={service.id}>
-                    <TableCell>{service.name}</TableCell>
-                    <TableCell>{getEmployeeName(service.id)}</TableCell>
-                    <TableCell className="text-right">₹{service.selling_price}</TableCell>
-                  </TableRow>
-                ))}
-                {packages.map(pkg => (
-                  <TableRow key={pkg.id}>
-                    <TableCell>{pkg.name}</TableCell>
-                    <TableCell>{getEmployeeName(pkg.id)}</TableCell>
-                    <TableCell className="text-right">₹{pkg.price}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={2}>Total</TableCell>
-                  <TableCell className="text-right">₹{totalPrice}</TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          </div>
-          <Separator />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h3 className="text-md font-semibold">Discount</h3>
-              <p className="text-gray-500">
-                {discountType === 'none' ? 'No Discount' : `${discountValue} ${discountType === 'fixed' ? '₹' : '%'}`}
-              </p>
-            </div>
-            <div>
-              <h3 className="text-md font-semibold">Total (After Discount)</h3>
-              <p className="text-gray-500">₹{discountedPrice}</p>
-            </div>
-          </div>
-          <Separator />
-          <div>
-            <h3 className="text-md font-semibold">Notes</h3>
-            <p className="text-gray-500">{notes || 'No notes provided'}</p>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {transactionDetails?.originalSale && transactionDetails?.refunds && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Refund Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold">Original Transaction</h3>
-              <p>
-                <strong>ID:</strong> {transactionDetails.originalSale.id}
-              </p>
-              <p>
-                <strong>Status:</strong> {transactionDetails.originalSale.status}
-              </p>
-              <p>
-                <strong>Total Price:</strong> ₹{transactionDetails.originalSale.total_price}
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold">Refunds</h3>
-              {transactionDetails.refunds.length === 0 ? (
-                <p>No refunds processed for this transaction.</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Reason</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-center">Select</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactionDetails.refunds.map(refund => (
-                      <TableRow key={refund.id}>
-                        <TableCell>{refund.id}</TableCell>
-                        <TableCell>{refund.refund_reason}</TableCell>
-                        <TableCell>{refund.refund_notes}</TableCell>
-                        <TableCell className="text-right">₹{refund.total_price}</TableCell>
-                        <TableCell className="text-center">
-                          <Input
-                            type="checkbox"
-                            checked={selectedBookings.includes(refund.id)}
-                            onChange={() => handleBookingSelection(refund.id)}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
-            
-            <Button onClick={() => setShowRefundModal(true)}>Process Refund</Button>
-          </CardContent>
-        </Card>
-      )}
+    <>
+      <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto px-1">
+        {allTransactions.map((transaction) => {
+          const isRefund = transaction.transaction_type === 'refund';
+          const groupedBookings = getGroupedBookings(transaction);
+          
+          return (
+            <Card key={transaction.id} className={`bg-white h-full ${isRefund ? 'border-red-200' : ''}`}>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex-1">
+                    <div className={`inline-flex items-center px-2.5 py-1 rounded ${
+                      isRefund ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                    } text-sm font-medium mb-2`}>
+                      {isRefund ? (
+                        <>
+                          <Ban className="h-4 w-4 mr-1" />
+                          Refund #{transaction.id.slice(0, 6)}
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Sale #{transaction.id.slice(0, 6)}
+                       </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Clock className="h-4 w-4" />
+                      {format(new Date(transaction.created_at), 'EEE dd MMM yyyy, h:mm a')}
+                    </div>
+                  </div>
+                  {!isRefund && (
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" className="bg-black text-white">
+                        Rebook
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem onSelect={() => setShowRefundDialog(true)}>
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            Refund sale
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <PencilLine className="mr-2 h-4 w-4" />
+                            Edit sale details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setShowAddNoteDialog(true)}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Add a note
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Email
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Print
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Download className="mr-2 h-4 w-4" />
+                            Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onSelect={() => setShowVoidDialog(true)}
+                          >
+                            <Ban className="mr-2 h-4 w-4" />
+                            Void sale
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+                </div>
 
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onEdit}>
-          Edit Appointment
-        </Button>
-        <Button onClick={onSave} disabled={isLoading}>
-          {isLoading ? 'Saving...' : 'Confirm Appointment'}
-        </Button>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-base font-semibold">
+                    {transaction.customer?.full_name || 'No name provided'}
+                  </h4>
+                  <p className="text-gray-600">{transaction.customer?.email || 'No email provided'}</p>
+                </div>
+
+                <div className="overflow-y-auto">
+                  <h4 className="font-medium mb-4">{isRefund ? 'Refunded Items' : 'Items'}</h4>
+                  
+                  {groupedBookings.map((item: any, idx: number) => {
+                    if (item.type === 'package') {
+                      return (
+                        <div key={idx} className="mb-4">
+                          <div className="py-2 flex justify-between items-start border-b bg-slate-50 px-2 rounded-t-md">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4" />
+                                <p className="font-medium line-clamp-1">{item.package.name}</p>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {item.bookings.length} services
+                              </p>
+                            </div>
+                            <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
+                              {isRefund ? '-' : ''}₹{item.totalPricePaid.toFixed(2)}
+                            </p>
+                          </div>
+                          
+                          <div className="pl-6 border-l-2 border-gray-300 ml-4 mt-2 space-y-1">
+                            {item.bookings.map((booking: any) => {
+                              const servicePrice = booking.price_paid || 0;
+                                
+                              return (
+                                <div key={booking.id} className="py-1 flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="text-sm line-clamp-1">{booking.service?.name}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {booking.start_time && format(new Date(booking.start_time), 'h:mma')}{' '}
+                                      {booking.employee && ` • ${booking.employee.name}`}
+                                    </p>
+                                  </div>
+                                  <p className="text-xs text-gray-600">
+                                    ₹{servicePrice.toFixed(2)}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      const booking = item.booking;
+                      return (
+                        <div key={booking.id} className="py-2 flex justify-between items-start border-b">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm line-clamp-1">{booking.service?.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {booking.start_time && format(new Date(booking.start_time), 'h:mma')}{' '}
+                              {booking.employee && ` • ${booking.employee.name}`}
+                            </p>
+                          </div>
+                          <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
+                            {isRefund ? '-' : ''}₹{booking.price_paid.toFixed(2)}
+                          </p>
+                        </div>
+                      );
+                    }
+                  })}
+                </div>
+
+                <div className="space-y-1 pt-2 border-t">
+                  {transaction.discount_type !== 'none' && transaction.discount_value > 0 && (
+                    <div className="flex justify-between text-xs text-green-600">
+                      <span>
+                        Discount ({transaction.discount_type === 'percentage' ? 
+                          `${transaction.discount_value}%` : 
+                          '₹' + transaction.discount_value
+                        })
+                      </span>
+                      <span>-₹{transaction.discount_value.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-bold pt-2">
+                    <span>Total</span>
+                    <span className={isRefund ? 'text-red-600' : ''}>
+                      {isRefund ? '-' : ''}₹{Math.abs(transaction.total_price).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <div className="flex justify-between text-xs">
+                    <span className="capitalize">
+                      Paid with {transaction.payment_method === 'cash' ? 'Cash' : 'Online'}
+                    </span>
+                    <div className="flex items-center">
+                      {transaction.payment_method === 'cash' ? (
+                        <Banknote className="h-4 w-4 mr-1" />
+                      ) : (
+                        <CreditCard className="h-4 w-4 mr-1" />
+                      )}
+                      ₹{Math.abs(transaction.total_price).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                {isRefund && transaction.refund_reason && (
+                  <div className="space-y-2 pt-4 border-t">
+                    {transaction.refund_reason && (
+                      <div>
+                        <p className="font-medium text-xs">Reason:</p>
+                        <p className="text-gray-600">{formatRefundReason(transaction.refund_reason)}</p>
+                      </div>
+                    )}
+                    {transaction.refund_notes && (
+                      <div>
+                        <p className="font-medium text-sm">Notes:</p>
+                        <p className="text-gray-600">{transaction.refund_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      <Dialog open={showRefundModal} onOpenChange={setShowRefundModal}>
+      <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Process Refund</DialogTitle>
+            <DialogTitle>Void Sale</DialogTitle>
             <DialogDescription>
-              Select the reason for the refund and add any relevant notes.
+              Are you sure you want to void this sale? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleRefundSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="refundReason" className="block text-sm font-medium text-gray-700">
-                Refund Reason
-              </label>
-              <select
-                value={refundReason}
-                onChange={(e) => setRefundReason(e.target.value)}
-                className="w-full p-2 border rounded"
-                required
-              >
-                <option value="">Select reason</option>
-                <option value="customer_dissatisfaction">Customer Dissatisfaction</option>
-                <option value="service_quality_issue">Service Quality Issue</option>
-                <option value="scheduling_error">Scheduling Error</option>
-                <option value="health_concern">Health Concern</option>
-                <option value="price_dispute">Price Dispute</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="refundNotes" className="block text-sm font-medium text-gray-700">
-                Refund Notes
-              </label>
-              <Textarea
-                id="refundNotes"
-                value={refundNotes}
-                onChange={(e) => setRefundNotes(e.target.value)}
-                rows={3}
-                className="w-full p-2 border rounded"
-              />
-            </div>
-            <div className="flex justify-end">
-              <Button type="submit">Process Refund</Button>
-            </div>
-          </form>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleVoidSale}>
+              Void Sale
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Refund Sale</DialogTitle>
+            <DialogDescription>
+              Select the items you want to refund
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <Label>Select Items</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectAll}
+                  onChange={(e) => {
+                    setSelectAll(e.target.checked);
+                    const allBookingIds = transactionDetails.originalSale.bookings
+                      .filter(booking => booking.status !== 'refunded')
+                      .reduce((acc, booking) => {
+                        acc[booking.id] = e.target.checked;
+                        return acc;
+                      }, {});
+                    setRefundItems(allBookingIds);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <span className="text-sm">Select All</span>
+              </div>
+            </div>
+
+            <div className="max-h-36 overflow-y-auto space-y-1">
+              {transactionDetails.originalSale.bookings.filter(
+                booking => booking.status !== 'refunded'
+              ).map((booking) => {
+                const itemName = booking.service?.name || booking.package?.name;
+                const itemPrice = booking.price_paid;
+                
+                return (
+                  <div key={booking.id} className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <p className="font-medium">{itemName}</p>
+                      <p className="text-sm text-gray-500">₹{itemPrice.toFixed(2)}</p>
+                      {booking.employee && (
+                        <p className="text-sm text-gray-500">Stylist: {booking.employee.name}</p>
+                      )}
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={refundItems[booking.id] || false}
+                      onChange={(e) => 
+                        setRefundItems({
+                          ...refundItems,
+                          [booking.id]: e.target.checked
+                        })
+                      }
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Processed By</Label>
+                <Select
+                  value={refundedBy}
+                  onValueChange={setRefundedBy}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select employee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Refund Reason</Label>
+                <Select
+                  value={refundReason}
+                  onValueChange={(value) => setRefundReason(value as RefundData['reason'])}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer_dissatisfaction">Customer Dissatisfaction</SelectItem>
+                    <SelectItem value="service_quality_issue">Service Quality Issue</SelectItem>
+                    <SelectItem value="scheduling_error">Scheduling Error</SelectItem>
+                    <SelectItem value="health_concern">Health Concern</SelectItem>
+                    <SelectItem value="price_dispute">Price Dispute</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {refundReason === 'other' && (
+                <div className="space-y-2">
+                  <Label>Additional Notes</Label>
+                  <Textarea
+                    value={refundNotes}
+                    onChange={(e) => setRefundNotes(e.target.value)}
+                    placeholder="Please provide details for the refund..."
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRefundDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRefundSale}>
+              Process Refund
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a Note</DialogTitle>
+          </DialogHeader>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="w-full h-32 p-2 border rounded"
+            placeholder="Enter your note here..."
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddNoteDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddNote}>
+              Save Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
-}
+};
