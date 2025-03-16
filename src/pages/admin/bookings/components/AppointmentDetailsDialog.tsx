@@ -62,7 +62,11 @@ export function AppointmentDetailsDialog({
   open,
   onOpenChange,
   onUpdated,
-}: AppointmentDetailsDialogProps) {
+}: AppointmentDetailsDialogProps) {  
+  if(!open){
+  return null
+}
+
   const [selectedStatus, setSelectedStatus] = useState<AppointmentStatus | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
