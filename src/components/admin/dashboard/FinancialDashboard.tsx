@@ -17,6 +17,7 @@ import RevenueChart from './RevenueChart';
 import TopServicesChart from './TopServicesChart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DailyRevenue } from '@/components/admin/reports/DailyRevenue';
+import { useAuth } from '@supabase/auth-helpers-react';
 
 type DashboardConfig = {
   id: string;
@@ -26,6 +27,7 @@ type DashboardConfig = {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+  user_id: string;
 };
 
 type DashboardWidget = {
@@ -50,6 +52,8 @@ export function FinancialDashboard() {
   const [newWidgetType, setNewWidgetType] = useState('revenue-chart');
   const [newWidgetTitle, setNewWidgetTitle] = useState('');
   const [newWidgetSize, setNewWidgetSize] = useState('medium');
+  const auth = useAuth();
+  const userId = auth?.user()?.id;
 
   // Fetch dashboard configurations
   const { data: dashboards, isLoading: isDashboardsLoading, refetch: refetchDashboards } = useQuery({
@@ -103,13 +107,19 @@ export function FinancialDashboard() {
       return;
     }
 
+    if (!userId) {
+      toast.error('User authentication required');
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('dashboard_configs')
         .insert({
           name: newDashboardName,
           description: newDashboardDescription || null,
-          is_default: !dashboards || dashboards.length === 0
+          is_default: !dashboards || dashboards.length === 0,
+          user_id: userId
         })
         .select();
 
@@ -546,7 +556,7 @@ export function FinancialDashboard() {
         </TabsContent>
       </Tabs>
 
-      <style jsx>{`
+      <style jsx global>{`
         .widget-small {
           grid-column: span 1;
         }

@@ -24,6 +24,7 @@ import { DailyRevenue } from "@/components/admin/reports/DailyRevenue";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { FinancialDashboard } from "@/components/admin/dashboard/FinancialDashboard";
 
 const reportCategories = [
   {
@@ -145,6 +146,25 @@ export default function Reports() {
             <h2 className="text-2xl font-bold">Daily Revenue Report</h2>
           </div>
           <DailyRevenue expanded={true} locations={locations} />
+        </div>
+      );
+    }
+    
+    if (expandedReport === "summary") {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setExpandedReport(null)}
+              className="mr-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+            <h2 className="text-2xl font-bold">Financial Dashboard</h2>
+          </div>
+          <FinancialDashboard />
         </div>
       );
     }
