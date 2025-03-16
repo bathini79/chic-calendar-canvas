@@ -149,6 +149,11 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(true);
   };
 
+  const handleAppointmentUpdated = () => {
+    // Refresh appointments after update
+    setSelectedAppointment(null);
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -202,6 +207,7 @@ export default function AdminBookings() {
           open={!!selectedAppointment && !isAddAppointmentOpen}
           onOpenChange={() => setSelectedAppointment(null)}
           onCheckout={handleCheckoutFromAppointment}
+          onUpdated={handleAppointmentUpdated}
         />
 
         {clickedCell && (

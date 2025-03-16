@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, Booking, AppointmentStatus, RefundData, TransactionDetails } from '../types';
+import { Appointment, AppointmentStatus, RefundData, TransactionDetails } from '../types';
 
 // Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
@@ -45,6 +45,12 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
       if (appointmentError) throw appointmentError;
 
+      // Type-safe casting to ensure appointment matches the Appointment interface
+      const safeAppointment = {
+        ...appointment,
+        discount_type: appointment.discount_type as "none" | "fixed" | "percentage",
+      } as Appointment;
+
       // If this is a refund, get the original sale
       if (appointment.transaction_type === 'refund') {
         const { data: originalSale, error: originalError } = await supabase
@@ -64,6 +70,12 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
         if (originalError) throw originalError;
 
+        // Type-safe casting for original sale
+        const safeOriginalSale = {
+          ...originalSale,
+          discount_type: originalSale.discount_type as "none" | "fixed" | "percentage",
+        } as Appointment;
+
         // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
           .from('appointments')
@@ -82,15 +94,21 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
         if (refundsError) throw refundsError;
 
+        // Type-safe casting for refunds
+        const safeRefunds = refunds?.map(refund => ({
+          ...refund,
+          discount_type: refund.discount_type as "none" | "fixed" | "percentage",
+        })) as Appointment[];
+
         // Create TransactionDetails with all required properties
         return {
-          id: originalSale.id,
-          amount: originalSale.total_price,
-          status: originalSale.status,
-          payment_method: originalSale.payment_method,
-          created_at: originalSale.created_at,
-          originalSale,
-          refunds: refunds || []
+          id: safeOriginalSale.id,
+          amount: safeOriginalSale.total_price,
+          status: safeOriginalSale.status,
+          payment_method: safeOriginalSale.payment_method,
+          created_at: safeOriginalSale.created_at,
+          originalSale: safeOriginalSale,
+          refunds: safeRefunds || []
         };
       } else {
         // This is the original sale, get all its refunds
@@ -111,15 +129,21 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
         if (refundsError) throw refundsError;
 
+        // Type-safe casting for refunds
+        const safeRefunds = refunds?.map(refund => ({
+          ...refund,
+          discount_type: refund.discount_type as "none" | "fixed" | "percentage",
+        })) as Appointment[];
+
         // Create TransactionDetails with all required properties
         return {
-          id: appointment.id,
-          amount: appointment.total_price,
-          status: appointment.status,
-          payment_method: appointment.payment_method,
-          created_at: appointment.created_at,
-          originalSale: appointment,
-          refunds: refunds || []
+          id: safeAppointment.id,
+          amount: safeAppointment.total_price,
+          status: safeAppointment.status,
+          payment_method: safeAppointment.payment_method,
+          created_at: safeAppointment.created_at,
+          originalSale: safeAppointment,
+          refunds: safeRefunds || []
         };
       }
     } catch (error: any) {

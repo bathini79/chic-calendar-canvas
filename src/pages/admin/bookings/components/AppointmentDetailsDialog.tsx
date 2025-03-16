@@ -54,7 +54,8 @@ interface AppointmentDetailsDialogProps {
   appointment: Appointment;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdated: () => void;
+  onUpdated?: () => void;
+  onCheckout?: (appointment: Appointment) => void;
 }
 
 export function AppointmentDetailsDialog({
@@ -62,6 +63,7 @@ export function AppointmentDetailsDialog({
   open,
   onOpenChange,
   onUpdated,
+  onCheckout,
 }: AppointmentDetailsDialogProps) {
   const [selectedStatus, setSelectedStatus] = useState<AppointmentStatus | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
@@ -130,6 +132,12 @@ export function AppointmentDetailsDialog({
 
   const selectedMessage = selectedStatus ? statusMessages[selectedStatus as keyof typeof statusMessages] : null;
 
+  const handleCheckoutClick = () => {
+    if (onCheckout) {
+      onCheckout(appointment);
+    }
+  };
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -141,7 +149,7 @@ export function AppointmentDetailsDialog({
           <div className="space-y-6 mt-4">
             {/* Status Badge and Change Status Button */}
             <div className="flex items-center justify-between">
-              <StatusBadge status={appointment.status} large />
+              <StatusBadge status={appointment.status} size="large" />
               
               <Select onValueChange={handleStatusChange} value={appointment.status}>
                 <SelectTrigger className="w-[160px]">
@@ -266,7 +274,10 @@ export function AppointmentDetailsDialog({
             {/* Button Group */}
             <div className="flex flex-col gap-2">
               {showCheckoutButton && (
-                <Button className="w-full">
+                <Button 
+                  className="w-full"
+                  onClick={handleCheckoutClick}
+                >
                   Checkout
                 </Button>
               )}

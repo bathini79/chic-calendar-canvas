@@ -4,14 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { 
   Tabs, 
@@ -44,9 +42,10 @@ interface SummaryViewProps {
   transactions: any[];
   onDateChange: (date: Date) => void;
   selectedDate: Date;
+  appointmentId?: string;
 }
 
-export function SummaryView({ transactions, onDateChange, selectedDate }: SummaryViewProps) {
+export function SummaryView({ transactions, onDateChange, selectedDate, appointmentId }: SummaryViewProps) {
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [refundReason, setRefundReason] = useState("");
@@ -327,14 +326,14 @@ function RefundDialog({
   if (!transaction) return null;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-md">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Issue Refund</AlertDialogTitle>
-          <AlertDialogDescription>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Issue Refund</DialogTitle>
+          <DialogDescription>
             This will refund the full amount of ${Number(transaction.total_price).toFixed(2)} to the customer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
         <div className="space-y-4 mb-4">
           <div>
             <label htmlFor="refund-reason" className="text-sm font-medium">Reason for Refund</label>
@@ -360,17 +359,17 @@ function RefundDialog({
             />
           </div>
         </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction 
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button 
             onClick={onSubmit}
             disabled={!refundReason}
             className="bg-destructive hover:bg-destructive/90"
           >
             Issue Refund
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,84 +1,44 @@
 
-import React from 'react';
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Ban, RotateCcw } from "lucide-react";
-import type { AppointmentStatus } from '../types';
+import { AppointmentStatus } from "../types";
 
 interface StatusBadgeProps {
   status: AppointmentStatus;
-  className?: string;
-  large?: boolean;
+  size?: "default" | "large";
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className, large }) => {
-  const getStatusConfig = () => {
-    switch (status) {
-      case 'completed':
-        return {
-          label: 'Completed',
-          icon: <CheckCircle className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
-          variant: 'success' as const
-        };
-      case 'confirmed':
-        return {
-          label: 'Confirmed',
-          icon: <CheckCircle className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
-          variant: 'default' as const
-        };
-      case 'inprogress':
-        return {
-          label: 'In Progress',
-          icon: <Clock className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
-          variant: 'warning' as const
-        };
-      case 'canceled':
-        return {
-          label: 'Canceled',
-          icon: <XCircle className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
-          variant: 'destructive' as const
-        };
-      case 'voided':
-        return {
-          label: 'Voided',
-          icon: <Ban className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
-          variant: 'destructive' as const
-        };
-      case 'refunded':
-        return {
-          label: 'Refunded',
-          icon: <RotateCcw className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
-          variant: 'destructive' as const
-        };
-      case 'partially_refunded':
-        return {
-          label: 'Partially Refunded',
-          icon: <RotateCcw className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
-          variant: 'destructive' as const
-        };
-      case 'noshow':
-        return {
-          label: 'No Show',
-          icon: <Ban className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
-          variant: 'destructive' as const
-        };
-      default:
-        return {
-          label: 'Pending',
-          icon: <Clock className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
-          variant: 'outline' as const
-        };
-    }
-  };
-
-  const { label, icon, variant } = getStatusConfig();
-
+export function StatusBadge({ status, size = "default" }: StatusBadgeProps) {
+  let variant: "default" | "secondary" | "destructive" | "outline" = "default";
+  
+  switch (status) {
+    case "pending":
+      variant = "secondary";
+      break;
+    case "confirmed":
+      variant = "default";
+      break;
+    case "completed":
+      variant = "default";
+      break;
+    case "inprogress":
+      variant = "outline";
+      break;
+    case "canceled":
+    case "refunded":
+    case "partially_refunded":
+    case "voided":
+    case "noshow":
+      variant = "destructive";
+      break;
+    default:
+      variant = "secondary";
+  }
+  
+  const className = size === "large" ? "px-3 py-1 text-sm" : "";
+  
   return (
-    <Badge
-      variant={variant}
-      className={`flex items-center ${large ? 'text-sm py-1 px-2' : ''} ${className || ''}`}
-    >
-      {icon}
-      {label}
+    <Badge variant={variant} className={className}>
+      {status.replace(/_/g, ' ')}
     </Badge>
   );
-};
+}
