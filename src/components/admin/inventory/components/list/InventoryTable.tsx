@@ -12,7 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Trash2, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Database } from "@/integrations/supabase/types";
-import { Category, Supplier, InventoryItem } from "../../types";
+import { Category, Supplier } from "../../types";
+
+type InventoryItem = Database['public']['Tables']['inventory_items']['Row'] & {
+  inventory_items_categories: Array<{ category_id: string }>;
+  categories: string[];
+};
 
 interface InventoryTableProps {
   items: InventoryItem[];
@@ -40,7 +45,6 @@ export function InventoryTable({
   onDeleteItem,
 }: InventoryTableProps) {
   const getLocationName = (locationId: string) => {
-    if (!locationId) return 'No Location';
     const location = locations.find(loc => loc.id === locationId);
     return location ? location.name : 'No Location';
   };
