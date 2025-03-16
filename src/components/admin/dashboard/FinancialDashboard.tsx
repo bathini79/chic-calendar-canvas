@@ -17,7 +17,6 @@ import RevenueChart from './RevenueChart';
 import TopServicesChart from './TopServicesChart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DailyRevenue } from '@/components/admin/reports/DailyRevenue';
-import { useAuth } from '@supabase/auth-helpers-react';
 
 type DashboardConfig = {
   id: string;
@@ -52,8 +51,20 @@ export function FinancialDashboard() {
   const [newWidgetType, setNewWidgetType] = useState('revenue-chart');
   const [newWidgetTitle, setNewWidgetTitle] = useState('');
   const [newWidgetSize, setNewWidgetSize] = useState('medium');
-  const auth = useAuth();
-  const userId = auth?.user()?.id;
+  
+  // Get the current user ID from Supabase session
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  // Initialize user ID on component mount
+  React.useEffect(() => {
+    const getUserId = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.user) {
+        setUserId(data.session.user.id);
+      }
+    };
+    getUserId();
+  }, []);
 
   // Fetch dashboard configurations
   const { data: dashboards, isLoading: isDashboardsLoading, refetch: refetchDashboards } = useQuery({
@@ -556,22 +567,24 @@ export function FinancialDashboard() {
         </TabsContent>
       </Tabs>
 
-      <style jsx global>{`
-        .widget-small {
-          grid-column: span 1;
-        }
-        .widget-medium {
-          grid-column: span 1;
-        }
-        .widget-large {
-          grid-column: span 2;
-        }
-        @media (max-width: 768px) {
-          .widget-large {
+      <style>
+        {`
+          .widget-small {
             grid-column: span 1;
           }
-        }
-      `}</style>
+          .widget-medium {
+            grid-column: span 1;
+          }
+          .widget-large {
+            grid-column: span 2;
+          }
+          @media (max-width: 768px) {
+            .widget-large {
+              grid-column: span 1;
+            }
+          }
+        `}
+      </style>
     </div>
   );
 }
