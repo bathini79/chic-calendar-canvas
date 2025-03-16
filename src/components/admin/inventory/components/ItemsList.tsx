@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { ItemDialog } from "../ItemDialog";
@@ -99,10 +98,10 @@ export function ItemsList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('suppliers')
-        .select('id, name');
+        .select('id, name, status, created_at, updated_at');
       
       if (error) throw error;
-      return data;
+      return data as Supplier[];
     },
   });
 

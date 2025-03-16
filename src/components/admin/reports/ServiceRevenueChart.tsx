@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,7 +18,6 @@ export function ServiceRevenueChart({ selectedDate, locationId }: ServiceRevenue
       const start = startOfDay(selectedDate).toISOString();
       const end = endOfDay(selectedDate).toISOString();
 
-      // Get all appointments for the selected date
       let query = supabase
         .from('appointments')
         .select(`
@@ -49,8 +47,7 @@ export function ServiceRevenueChart({ selectedDate, locationId }: ServiceRevenue
         throw error;
       }
 
-      // Aggregate revenue by service
-      const serviceRevenue = {};
+      const serviceRevenue: Record<string, number> = {};
       
       appointments.forEach(appointment => {
         appointment.bookings?.forEach(booking => {
@@ -59,16 +56,15 @@ export function ServiceRevenueChart({ selectedDate, locationId }: ServiceRevenue
             if (!serviceRevenue[serviceName]) {
               serviceRevenue[serviceName] = 0;
             }
-            serviceRevenue[serviceName] += booking.price_paid || 0;
+            serviceRevenue[serviceName] += Number(booking.price_paid || 0);
           }
         });
       });
 
-      // Convert to array for chart
       const chartData = Object.entries(serviceRevenue)
         .map(([name, revenue]) => ({ name, revenue }))
         .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 10); // Get top 10 services
+        .slice(0, 10);
 
       return chartData;
     }

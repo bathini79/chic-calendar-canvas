@@ -1,4 +1,3 @@
-
 export enum SCREEN {
   SERVICE_SELECTION = "service_selection",
   CHECKOUT = "checkout",
@@ -15,7 +14,8 @@ export type AppointmentStatus =
   | "refunded"
   | "partially_refunded"
   | "noshow"
-  | "booked";
+  | "booked"
+  | "paid";
 
 export interface Service {
   id: string;
@@ -69,7 +69,7 @@ export interface Employee {
   employment_type: "stylist" | "operations";
   created_at: string;
   updated_at: string;
-  avatar?: string; // Add avatar property
+  avatar?: string;
 }
 
 export interface Booking {
@@ -120,14 +120,12 @@ export interface Appointment {
   bookings: Booking[];
 }
 
-// Add RefundData interface
 export interface RefundData {
   reason: string;
   notes: string;
   refundedBy: string;
 }
 
-// Add TransactionDetails interface
 export interface TransactionDetails {
   id: string;
   amount: number;

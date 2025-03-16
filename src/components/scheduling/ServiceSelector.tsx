@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -72,7 +71,6 @@ export function ServiceSelector({
         .eq("employment_type", "stylist");
       
       if (locationId) {
-        // Proper query using the employee_locations junction table
         query = query.contains('employee_locations', [{ location_id: locationId }]);
       }
       
@@ -141,14 +139,15 @@ export function ServiceSelector({
 
   const groupedItems = itemsWithServices.reduce((acc: GroupedItems, item) => {
     if (item.package_id && item.package) {
+      const packageItem = item as { package: any, id: string, customized_services?: string[] };
       const packageServices: PackageService[] = [];
       
-      if (item.package.package_services) {
-        packageServices.push(...item.package.package_services);
+      if (packageItem.package.package_services) {
+        packageServices.push(...packageItem.package.package_services);
       }
       
-      if (item.customized_services?.length && services) {
-        const customizedServiceObjects = item.customized_services
+      if (packageItem.customized_services?.length && services) {
+        const customizedServiceObjects = packageItem.customized_services
           .map(serviceId => {
             const service = services.find(s => s.id === serviceId);
             return service ? { service } : null;
@@ -158,9 +157,9 @@ export function ServiceSelector({
         packageServices.push(...customizedServiceObjects);
       }
 
-      acc.packages[item.package_id] = {
-        package: item.package,
-        cartItemId: item.id,
+      acc.packages[packageItem.package.id] = {
+        package: packageItem.package,
+        cartItemId: packageItem.id,
         services: packageServices
       };
     } else if (item.service) {

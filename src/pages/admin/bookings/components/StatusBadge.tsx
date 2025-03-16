@@ -15,6 +15,7 @@ export function StatusBadge({ status, size = "default" }: StatusBadgeProps) {
       variant = "secondary";
       break;
     case "confirmed":
+    case "paid":
       variant = "default";
       break;
     case "completed":

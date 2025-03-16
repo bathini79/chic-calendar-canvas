@@ -1,10 +1,8 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Appointment, AppointmentStatus, RefundData, TransactionDetails } from '../types';
 
-// Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
 
 interface SelectedItem {
@@ -27,7 +25,6 @@ export function useAppointmentActions(onUpdated?: () => void) {
     try {
       setIsLoading(true);
 
-      // First fetch the appointment
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
         .select(`
@@ -45,13 +42,11 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
       if (appointmentError) throw appointmentError;
 
-      // Type-safe casting to ensure appointment matches the Appointment interface
       const safeAppointment = {
         ...appointment,
         discount_type: appointment.discount_type as "none" | "fixed" | "percentage",
-      } as Appointment;
+      } as unknown as Appointment;
 
-      // If this is a refund, get the original sale
       if (appointment.transaction_type === 'refund') {
         const { data: originalSale, error: originalError } = await supabase
           .from('appointments')
@@ -70,13 +65,11 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
         if (originalError) throw originalError;
 
-        // Type-safe casting for original sale
         const safeOriginalSale = {
           ...originalSale,
           discount_type: originalSale.discount_type as "none" | "fixed" | "percentage",
-        } as Appointment;
+        } as unknown as Appointment;
 
-        // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
           .from('appointments')
           .select(`
@@ -94,13 +87,11 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
         if (refundsError) throw refundsError;
 
-        // Type-safe casting for refunds
         const safeRefunds = refunds?.map(refund => ({
           ...refund,
           discount_type: refund.discount_type as "none" | "fixed" | "percentage",
-        })) as Appointment[];
+        })) as unknown as Appointment[];
 
-        // Create TransactionDetails with all required properties
         return {
           id: safeOriginalSale.id,
           amount: safeOriginalSale.total_price,
@@ -111,7 +102,6 @@ export function useAppointmentActions(onUpdated?: () => void) {
           refunds: safeRefunds || []
         };
       } else {
-        // This is the original sale, get all its refunds
         const { data: refunds, error: refundsError } = await supabase
           .from('appointments')
           .select(`
@@ -129,13 +119,11 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
         if (refundsError) throw refundsError;
 
-        // Type-safe casting for refunds
         const safeRefunds = refunds?.map(refund => ({
           ...refund,
           discount_type: refund.discount_type as "none" | "fixed" | "percentage",
-        })) as Appointment[];
+        })) as unknown as Appointment[];
 
-        // Create TransactionDetails with all required properties
         return {
           id: safeAppointment.id,
           amount: safeAppointment.total_price,
@@ -221,7 +209,6 @@ export function useAppointmentActions(onUpdated?: () => void) {
     try {
       setIsLoading(true);
 
-      // First get the original appointment details
       const { data: originalAppointment, error: appointmentError } = await supabase
         .from('appointments')
         .select('*')
@@ -230,14 +217,13 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
       if (appointmentError) throw appointmentError;
 
-      // Map refund reason to allowed values
       let mappedRefundReason: RefundReason = "other";
       if (refundData.reason === "booking_error") {
-        mappedRefundReason = "scheduling_error"; // Map booking_error to scheduling_error
+        mappedRefundReason = "scheduling_error";
       } else if (refundData.reason === "service_unavailable") {
-        mappedRefundReason = "service_quality_issue"; // Map service_unavailable to service_quality_issue
+        mappedRefundReason = "service_quality_issue";
       } else if (refundData.reason === "customer_emergency" || refundData.reason === "customer_no_show") {
-        mappedRefundReason = "other"; // Map customer reasons to other
+        mappedRefundReason = "other";
       } else if (
         ["customer_dissatisfaction", "service_quality_issue", "scheduling_error", 
          "health_concern", "price_dispute", "other"].includes(refundData.reason as string)
@@ -245,7 +231,6 @@ export function useAppointmentActions(onUpdated?: () => void) {
         mappedRefundReason = refundData.reason as RefundReason;
       }
 
-      // Create a refund transaction
       const { data: refundAppointment, error: refundError } = await supabase
         .from('appointments')
         .insert({
@@ -256,7 +241,7 @@ export function useAppointmentActions(onUpdated?: () => void) {
           refunded_by: refundData.refundedBy,
           refund_reason: mappedRefundReason,
           refund_notes: refundData.notes,
-          total_price: 0, // Will be updated after processing bookings
+          total_price: 0,
           start_time: originalAppointment.start_time,
           end_time: originalAppointment.end_time
         })
@@ -265,7 +250,6 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
       if (refundError) throw refundError;
 
-      // Update the original bookings
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({
@@ -279,7 +263,6 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
       if (bookingsError) throw bookingsError;
 
-      // Get all bookings for this appointment to determine if it's a full or partial refund
       const { data: allBookings, error: countError } = await supabase
         .from('bookings')
         .select('id, status, price_paid')
@@ -287,27 +270,23 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
       if (countError) throw countError;
 
-      // Check if all bookings are now refunded
       const isFullRefund = allBookings?.every(booking => 
         booking.status === 'refunded' || bookingIds.includes(booking.id)
       );
 
-      // Calculate total refund amount
       const refundAmount = allBookings
         ?.filter(booking => bookingIds.includes(booking.id))
         .reduce((total, booking) => total + (booking.price_paid || 0), 0) || 0;
 
-      // Update the refund appointment with the total amount
       const { error: updateRefundError } = await supabase
         .from('appointments')
         .update({
-          total_price: -refundAmount // Negative amount to indicate refund
+          total_price: -refundAmount
         })
         .eq('id', refundAppointment.id);
 
       if (updateRefundError) throw updateRefundError;
 
-      // Update the original appointment status
       const { error: originalAppointmentError } = await supabase
         .from('appointments')
         .update({
@@ -317,7 +296,6 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
       if (originalAppointmentError) throw originalAppointmentError;
 
-      // Refresh the selected items after refund
       await fetchAppointmentDetails(appointmentId);
 
       toast.success('Refund processed successfully');
@@ -339,7 +317,6 @@ export function useAppointmentActions(onUpdated?: () => void) {
     try {
       setIsLoading(true);
 
-      // First update the appointment status
       const { error: appointmentError } = await supabase
         .from('appointments')
         .update({ 
@@ -350,7 +327,6 @@ export function useAppointmentActions(onUpdated?: () => void) {
 
       if (appointmentError) throw appointmentError;
 
-      // Then update all associated bookings
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({ 

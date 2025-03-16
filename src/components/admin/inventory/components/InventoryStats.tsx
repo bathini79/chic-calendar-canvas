@@ -6,11 +6,19 @@ interface InventoryStatsProps {
   selectedLocation?: string;
 }
 
+interface InventoryItemBase {
+  id: string;
+  quantity: number;
+  minimum_quantity: number;
+  unit_price: number;
+  location_id?: string;
+}
+
 export function InventoryStats({ selectedLocation = 'all' }: InventoryStatsProps) {
   const { data: items = [] } = useQuery({
     queryKey: ['inventory_items', selectedLocation],
     queryFn: async () => {
-      let query = supabase.from('inventory_items').select('*');
+      let query = supabase.from('inventory_items').select('id, quantity, minimum_quantity, unit_price, location_id');
       
       if (selectedLocation !== 'all') {
         query = query.eq('location_id', selectedLocation);
@@ -18,7 +26,7 @@ export function InventoryStats({ selectedLocation = 'all' }: InventoryStatsProps
       
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      return data as InventoryItemBase[];
     }
   });
 

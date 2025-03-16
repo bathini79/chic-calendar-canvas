@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -50,7 +49,6 @@ export default function AdminBookings() {
     useCalendarState();
   const { data: appointments = [] } = useAppointmentsByDate(currentDate, selectedLocationId);
   
-  // Fetch locations
   const { data: locations = [] } = useQuery({
     queryKey: ['locations'],
     queryFn: async () => {
@@ -66,7 +64,6 @@ export default function AdminBookings() {
   });
 
   useEffect(() => {
-    // If no location is selected yet but we have locations, select the first one by default
     if (!selectedLocationId && locations.length > 0) {
       setSelectedLocationId(locations[0].id);
     }
@@ -80,7 +77,6 @@ export default function AdminBookings() {
           return;
         }
         
-        // Fetch employees with their assigned locations
         const { data, error } = await supabase
           .from("employees")
           .select(`
@@ -113,11 +109,9 @@ export default function AdminBookings() {
 
   const openAddAppointment = () => {
     if (clickedCell) {
-      // Extract hours and minutes from the time value
       const hours = Math.floor(clickedCell.time);
       const minutes = Math.round((clickedCell.time - hours) * 60);
       
-      // Format time as HH:MM
       const timeString = `${hours.toString().padStart(2, "0")}:${minutes
         .toString()
         .padStart(2, "0")}`;
@@ -141,7 +135,6 @@ export default function AdminBookings() {
   const handleCheckoutFromAppointment = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
     
-    // Set the appointment date and time from the existing appointment
     const startDate = new Date(appointment.start_time);
     setAppointmentDate(startDate);
     setAppointmentTime(format(startDate, 'HH:mm'));
@@ -150,7 +143,6 @@ export default function AdminBookings() {
   };
 
   const handleAppointmentUpdated = () => {
-    // Refresh appointments after update
     setSelectedAppointment(null);
   };
 
@@ -193,7 +185,7 @@ export default function AdminBookings() {
           currentDate={currentDate}
           nowPosition={nowPosition}
           isSameDay={isSameDay}
-          appointments={appointments}
+          appointments={appointments as Appointment[]}
           setSelectedAppointment={setSelectedAppointment}
           setClickedCell={handleCellClick}
           hourLabels={[]}
