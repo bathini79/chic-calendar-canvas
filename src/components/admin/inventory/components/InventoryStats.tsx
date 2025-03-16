@@ -1,8 +1,26 @@
 
-import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-export function InventoryStats() {
-  const { data: items } = useSupabaseCrud('inventory_items');
+interface InventoryStatsProps {
+  selectedLocation?: string;
+}
+
+export function InventoryStats({ selectedLocation = 'all' }: InventoryStatsProps) {
+  const { data: items = [] } = useQuery({
+    queryKey: ['inventory_items', selectedLocation],
+    queryFn: async () => {
+      let query = supabase.from('inventory_items').select('*');
+      
+      if (selectedLocation !== 'all') {
+        query = query.eq('location_id', selectedLocation);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    }
+  });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -1,18 +1,25 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
   Sheet,
   SheetContent,
   SheetHeader,
+  SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { 
-  CheckCircle, 
-  MoreVertical,
-  Clock,
-  Calendar,
-  Ban,
+import {
+  CalendarDays,
   XCircle,
   ShoppingCart,
   Package,
@@ -21,180 +28,104 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import type { Appointment, AppointmentStatus } from '../types';
-import { useAppointmentActions } from '../hooks/useAppointmentActions';
-import { StatusBadge } from './StatusBadge';
+import { Textarea } from "@/components/ui/textarea";
+import { Appointment, AppointmentStatus } from "../types";
+import { StatusBadge } from "./StatusBadge";
+import { Separator } from "@/components/ui/separator";
+import { useAppointmentActions } from "../hooks/useAppointmentActions";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 interface AppointmentDetailsDialogProps {
-  appointment: Appointment | null;
+  appointment: Appointment;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onEdit?: () => void;
-  onUpdated?: () => void;
-  onCheckout?: (appointment: Appointment) => void;
+  onUpdated: () => void;
 }
-
-const TERMINAL_STATUSES: AppointmentStatus[] = ['completed', 'refunded', 'partially_refunded', 'voided'];
-const ACTIVE_STATUSES: AppointmentStatus[] = ['pending', 'confirmed', 'inprogress','booked'];
-
-const statusMessages = {
-  canceled: {
-    title: "Cancel Appointment",
-    description: "Are you sure you want to cancel this appointment? This will notify the customer and free up the time slot.",
-    action: "Yes, Cancel",
-    icon: <XCircle className="h-5 w-5 text-red-500" />
-  },
-  noshow: {
-    title: "Mark as No Show",
-    description: "Are you sure you want to mark this appointment as a no-show? This will be recorded in the customer's history.",
-    action: "Yes, Mark as No Show",
-    icon: <Ban className="h-5 w-5 text-orange-500" />
-  },
-  completed: {
-    title: "Mark as Completed",
-    description: "Are you sure you want to mark this appointment as completed? This will update the customer's history.",
-    action: "Yes, Mark as Completed",
-    icon: <CheckCircle className="h-5 w-5 text-green-500" />
-  },
-  voided: {
-    title: "Void Appointment",
-    description: "Are you sure you want to void this appointment? This cannot be undone.",
-    action: "Yes, Void",
-    icon: <Ban className="h-5 w-5 text-red-500" />
-  }
-};
 
 export function AppointmentDetailsDialog({
   appointment,
   open,
   onOpenChange,
-  onEdit,
   onUpdated,
-  onCheckout
 }: AppointmentDetailsDialogProps) {
-  const { isLoading, updateAppointmentStatus } = useAppointmentActions();
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<AppointmentStatus | null>(null);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundNotes, setRefundNotes] = useState("");
 
-  if (!appointment) return null;
+  const { changeStatus, refundAppointment } = useAppointmentActions(onUpdated);
 
-  const isTerminalStatus = TERMINAL_STATUSES.includes(appointment.status as AppointmentStatus);
-  const isActiveStatus = ACTIVE_STATUSES.includes(appointment.status as AppointmentStatus);
-
-  const handleStatusChange = async (newStatus: string) => {
-    setSelectedStatus(newStatus as AppointmentStatus);
-    if(statusMessages[newStatus as keyof typeof statusMessages]){
-      setShowConfirmDialog(true);
-    } else {
-      handleStatusConfirm();
-    }
-  };
-
-  const handleStatusConfirm = async () => {
-    if (!appointment || !selectedStatus) return;
-    
-    const bookingIds = appointment.bookings.map(b => b.id);
-    const success = await updateAppointmentStatus(
-      appointment.id,
-      selectedStatus as AppointmentStatus,
-      bookingIds
-    );
-
-    if (success) {
-      onUpdated?.();
-      setShowConfirmDialog(false);
-    }
-  };
-
-  const handleCheckout = () => {
-    if (appointment && onCheckout) {
-      onCheckout(appointment);
-    }
-  };
-
-  const appointmentDate = new Date(appointment.start_time);
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase();
-  };
-
-  const customerInitials = appointment.customer?.full_name 
-    ? getInitials(appointment.customer.full_name)
-    : '?';
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-500';
-      case 'canceled':
-      case 'noshow':
-      case 'voided':
-      case 'refunded':
-      case 'partially_refunded':
-        return 'bg-red-500';
-      case 'confirmed':
-        return 'bg-blue-500';
-      case 'inprogress':
-        return 'bg-yellow-500';
-        case 'booked':
-        return 'bg-yellow-500';
-      default:
-        return 'bg-gray-500';
-    }
-  };
-
-  const groupedBookings = appointment.bookings.reduce((groups, booking) => {
-    if (booking.package_id) {
-      if (!groups.packages[booking.package_id]) {
-        groups.packages[booking.package_id] = {
-          packageDetails: booking.package,
-          bookings: [],
-          stylist: booking.employee,
-          startTime: booking.start_time,
-          totalPrice: 0
-        };
-      }
-      groups.packages[booking.package_id].totalPrice =(groups.packages[booking.package_id].totalPrice || 0) + booking.price_paid
-      groups.packages[booking.package_id].bookings.push(booking);
+  // Query to get location name
+  const { data: locationData } = useQuery({
+    queryKey: ['location', appointment.location],
+    queryFn: async () => {
+      if (!appointment.location) return null;
       
-      if (!booking.service_id) {
-        groups.packages[booking.package_id].totalPrice = booking.price_paid;
-      }
-    } else if (booking.service_id) {
-      groups.services.push(booking);
-    }
-    return groups;
-  }, { 
-    packages: {} as Record<string, { 
-      packageDetails: any, 
-      bookings: typeof appointment.bookings, 
-      stylist: any, 
-      startTime: string,
-      totalPrice: number
-    }>, 
-    services: [] as typeof appointment.bookings 
+      const { data, error } = await supabase
+        .from('locations')
+        .select('name')
+        .eq('id', appointment.location)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!appointment.location
   });
 
+  // Group bookings by service and employee
+  const groupedBookings = appointment.bookings.reduce((acc, booking) => {
+    const key = `${booking.service?.name || 'Package'}-${booking.employee?.name || 'Unassigned'}`;
+    if (!acc[key]) {
+      acc[key] = {
+        service: booking.service,
+        package: booking.package,
+        employee: booking.employee,
+        count: 1,
+        total: Number(booking.price_paid)
+      };
+    } else {
+      acc[key].count += 1;
+      acc[key].total += Number(booking.price_paid);
+    }
+    return acc;
+  }, {} as Record<string, any>);
+
+  const handleStatusChange = (status: AppointmentStatus) => {
+    setSelectedStatus(status);
+    setStatusDialogOpen(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (selectedStatus) {
+      await changeStatus(appointment.id, selectedStatus);
+      setStatusDialogOpen(false);
+    }
+  };
+
+  const handleRefund = async () => {
+    await refundAppointment(appointment.id, refundReason, refundNotes);
+    setRefundDialogOpen(false);
+    onOpenChange(false);
+  };
+
+  const canRefund = appointment.status !== 'refunded' && appointment.transaction_type !== 'refund';
   const showCheckoutButton = ['inprogress', 'confirmed', 'pending'].includes(appointment.status);
 
   const selectedMessage = selectedStatus ? statusMessages[selectedStatus as keyof typeof statusMessages] : null;
@@ -202,265 +133,218 @@ export function AppointmentDetailsDialog({
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-          <SheetHeader className="border-b pb-4 mb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-gray-500" />
-                <div>
-                  <h3 className="font-semibold text-lg">
-                    {format(appointmentDate, "EEE dd MMM")}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {format(appointmentDate, "h:mm a")} · Doesn't repeat
-                  </p>
-                </div>
-              </div>
-
-              {isTerminalStatus ? (
-                <StatusBadge status={appointment.status as AppointmentStatus} />
-              ) : (
-                <Select 
-                  value={appointment.status} 
-                  onValueChange={handleStatusChange}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                  <SelectItem value="booked">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-gray-500" />
-                        Booked
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pending">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-gray-500" />
-                        Pending
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="confirmed">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-blue-500" />
-                        Confirmed
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="inprogress">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-yellow-500" />
-                        In Progress
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="completed">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-green-500" />
-                        Completed
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="canceled">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-red-500" />
-                        Canceled
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="noshow">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-orange-500" />
-                        No Show
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="voided">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-red-500" />
-                        Voided
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="refunded">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-red-500" />
-                        Refunded
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="partially_refunded">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-red-500" />
-                        Partially Refunded
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+        <SheetContent className="sm:max-w-md md:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Appointment Details</SheetTitle>
           </SheetHeader>
-
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <Avatar className={`h-16 w-16 ${getStatusColor(appointment.status)} text-white text-xl`}>
-                <AvatarFallback>{customerInitials}</AvatarFallback>
-              </Avatar>
-              <div>
-                <h2 className="font-semibold text-lg">
-                  {appointment.customer?.full_name}
-                </h2>
-                <p className="text-sm text-gray-500">
-                  {appointment.customer?.email}
-                </p>
-                {appointment.customer?.phone_number && (
-                  <p className="text-sm text-gray-500">
-                    {appointment.customer.phone_number}
-                  </p>
-                )}
-                {appointment.location && (
-                  <p className="text-sm text-gray-500 flex items-center mt-1">
-                    <MapPin className="h-3.5 w-3.5 mr-1 text-gray-400" />
-                    {appointment.location}
-                  </p>
-                )}
-              </div>
+          
+          <div className="space-y-6 mt-4">
+            {/* Status Badge and Change Status Button */}
+            <div className="flex items-center justify-between">
+              <StatusBadge status={appointment.status} large />
+              
+              <Select onValueChange={handleStatusChange} value={appointment.status}>
+                <SelectTrigger className="w-[160px]">
+                  <span>Change Status</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="inprogress">In Progress</SelectItem>
+                  <SelectItem value="noshow">No Show</SelectItem>
+                  <SelectItem value="canceled">Canceled</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Services</h3>
-              <div className="space-y-4">
-                {Object.values(groupedBookings.packages).map((packageGroup) => (
-                  <div 
-                    key={packageGroup.packageDetails?.id || 'package-group'} 
-                    className="border rounded-md p-4"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4 text-blue-500" />
-                          <h4 className="font-medium text-blue-600">
-                            {packageGroup.packageDetails?.name || 'Package'}
-                          </h4>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                          <Clock className="h-4 w-4" />
-                          <span>
-                            {format(new Date(packageGroup.startTime), "h:mm a")} · 
-                            {packageGroup.packageDetails?.duration || '0'}min
-                          </span>
-                        </div>
-                      </div>
-                      <span className="font-medium">
-                        ₹{packageGroup.totalPrice}
-                      </span>
+            
+            {/* Date and Time */}
+            <Card>
+              <CardHeader className="py-2">
+                <CardTitle className="text-lg flex items-center">
+                  <CalendarDays className="h-5 w-5 mr-2" />
+                  Date & Time
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Date</p>
+                    <p className="text-sm">
+                      {format(new Date(appointment.start_time), 'EEE, MMM d, yyyy')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Time</p>
+                    <p className="text-sm">
+                      {format(new Date(appointment.start_time), 'h:mm a')} - {format(new Date(appointment.end_time), 'h:mm a')}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Services */}
+            <Card>
+              <CardHeader className="py-2">
+                <CardTitle className="text-lg flex items-center">
+                  {appointment.bookings.some(b => b.package) 
+                    ? <Package className="h-5 w-5 mr-2" /> 
+                    : <ShoppingCart className="h-5 w-5 mr-2" />}
+                  Services
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-2 space-y-3">
+                {Object.values(groupedBookings).map((group: any, index) => (
+                  <div key={index} className="flex justify-between items-start py-1">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {group.service?.name || (group.package?.name + ' (Package)')}
+                        {group.count > 1 && ` (${group.count})`}
+                      </p>
+                      <p className="text-xs text-gray-500">With {group.employee?.name || 'Unassigned'}</p>
                     </div>
-
-                    {packageGroup.bookings.length > 0 && (
-                      <div className="pl-6 mt-3 space-y-2 border-l-2 border-blue-200">
-                        {packageGroup.bookings
-                          .filter(booking => booking.service)
-                          .map((booking) => (
-                            <div key={booking.id} className="flex justify-between items-start">
-                              <div>
-                                <p className="text-sm font-medium">{booking.service?.name}</p>
-                                <p className="text-xs text-gray-500">{booking.service?.duration}min with {booking.employee?.name}</p>
-                              </div>
-                            </div>
-                          ))
-                        }
-                      </div>
-                    )}
+                    <p className="text-sm font-medium">${group.total.toFixed(2)}</p>
                   </div>
                 ))}
-                
-                {groupedBookings.services.map((booking) => (
-                  booking.service && (
-                    <div 
-                      key={booking.id} 
-                      className="border-l-4 border-blue-400 pl-4 py-2"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-medium">
-                            {booking.service.name}
-                          </h4>
-                          <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                            <Clock className="h-4 w-4" />
-                            <span>
-                              {format(new Date(booking.start_time), "h:mm a")} · 
-                              {booking.service.duration}min
-                            </span>
-                          </div>
-                          {/* {booking.employee && (
-                            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                              <User className="h-4 w-4" />
-                              <span>{booking.employee.name}</span>
-                            </div>
-                          )} */}
-                        </div>
-                        <span className="font-medium">
-                          ₹{booking.price_paid}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                ))}
-              </div>
-            </div>
-
-            {appointment.notes && (
-              <div>
-                <h3 className="font-semibold mb-2">Notes</h3>
-                <p className="text-gray-600">{appointment.notes}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="absolute bottom-0 left-0 right-0 p-6 bg-white border-t">
-            <div className="flex w-full justify-between items-center">
-              <div>
-                <div className="text-sm text-gray-500">Total</div>
-                <div className="text-xl font-semibold">
-                  ₹{appointment.total_price.toFixed(2)}
+                <Separator />
+                <div className="flex justify-between font-medium pt-1">
+                  <span>Total</span>
+                  <span>${Number(appointment.total_price).toFixed(2)}</span>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                {showCheckoutButton && (
-                  <Button
-                    variant="default"
-                    onClick={handleCheckout}
-                    className="flex items-center gap-2"
-                  >
-                    <ShoppingCart className="h-4 w-4" />
-                    Checkout
-                  </Button>
-                )}
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={onEdit}
-                >
-                  <MoreVertical className="h-4 w-4" />
+              </CardContent>
+            </Card>
+            
+            {/* Customer Details */}
+            <Card>
+              <CardHeader className="py-2">
+                <CardTitle className="text-lg flex items-center">
+                  <User className="h-5 w-5 mr-2" />
+                  Customer Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-2">
+                <div className="flex items-center gap-3">
+                  <Avatar>
+                    <AvatarFallback>
+                      {appointment.customer?.full_name?.substring(0, 2).toUpperCase() || 'CU'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium">{appointment.customer?.full_name || 'Anonymous'}</p>
+                    {appointment.customer?.email && (
+                      <p className="text-xs text-gray-500">{appointment.customer.email}</p>
+                    )}
+                    {appointment.customer?.phone_number && (
+                      <p className="text-sm text-gray-500">
+                        {appointment.customer.phone_number}
+                      </p>
+                    )}
+                    {appointment.location && (
+                      <p className="text-sm text-gray-500 flex items-center mt-1">
+                        <MapPin className="h-3.5 w-3.5 mr-1 text-gray-400" />
+                        {locationData?.name || 'Unknown Location'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Notes */}
+            {appointment.notes && (
+              <Card>
+                <CardHeader className="py-2">
+                  <CardTitle className="text-lg">Notes</CardTitle>
+                </CardHeader>
+                <CardContent className="py-2">
+                  <p className="text-sm">{appointment.notes}</p>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Button Group */}
+            <div className="flex flex-col gap-2">
+              {showCheckoutButton && (
+                <Button className="w-full">
+                  Checkout
                 </Button>
-              </div>
+              )}
+              
+              {canRefund && (
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setRefundDialogOpen(true)}
+                >
+                  Issue Refund
+                </Button>
+              )}
             </div>
           </div>
+          
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+      {/* Status Change Dialog */}
+      <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              {selectedMessage?.icon}
-              {selectedMessage?.title}
-            </AlertDialogTitle>
+            <AlertDialogTitle>Change Appointment Status</AlertDialogTitle>
             <AlertDialogDescription>
-              {selectedMessage?.description}
+              {selectedMessage?.description || 'Are you sure you want to change the status of this appointment?'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmStatusChange}>
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Refund Dialog */}
+      <AlertDialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Issue Refund</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will refund the full amount of ${Number(appointment.total_price).toFixed(2)} to the customer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 mb-4">
+            <div>
+              <label htmlFor="refund-reason" className="text-sm font-medium">Reason for Refund</label>
+              <Select value={refundReason} onValueChange={setRefundReason}>
+                <SelectTrigger id="refund-reason">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer_request">Customer Request</SelectItem>
+                  <SelectItem value="service_issue">Service Issue</SelectItem>
+                  <SelectItem value="scheduling_conflict">Scheduling Conflict</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="refund-notes" className="text-sm font-medium">Additional Notes</label>
+              <Textarea 
+                id="refund-notes" 
+                value={refundNotes} 
+                onChange={(e) => setRefundNotes(e.target.value)}
+                placeholder="Add any additional notes about this refund"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleStatusConfirm}
-              disabled={isLoading}
-            >
-              {selectedMessage?.action}
+              onClick={handleRefund}
+              disabled={!refundReason}
+              className="bg-destructive hover:bg-destructive/90">
+              Issue Refund
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -468,3 +352,24 @@ export function AppointmentDetailsDialog({
     </>
   );
 }
+
+const statusMessages = {
+  pending: {
+    description: "This will mark the appointment as pending confirmation."
+  },
+  confirmed: {
+    description: "This will confirm the appointment."
+  },
+  inprogress: {
+    description: "This will mark the appointment as in progress."
+  },
+  completed: {
+    description: "This will mark the appointment as completed."
+  },
+  canceled: {
+    description: "This will cancel the appointment. The time slot will become available again."
+  },
+  noshow: {
+    description: "This will mark the appointment as a no-show."
+  }
+};

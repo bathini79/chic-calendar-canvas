@@ -20,6 +20,7 @@ export function useItemForm(item?: any, onClose?: () => void) {
     status: item?.status || "active",
     supplier_id: item?.supplier_id || "_none",
     unit_of_quantity: item?.unit_of_quantity || "",
+    location_id: item?.location_id || "",
   };
 
   const handleSubmit = async (values: ItemFormValues) => {
@@ -34,7 +35,8 @@ export function useItemForm(item?: any, onClose?: () => void) {
         status: values.status,
         supplier_id: values.supplier_id === "_none" ? null : values.supplier_id,
         unit_of_quantity: values.unit_of_quantity,
-        categories: values.categories
+        categories: values.categories,
+        location_id: values.location_id || null
       };
 
       if (item) {
