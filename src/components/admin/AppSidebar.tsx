@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,7 @@ import {
   Scissors,
   Users,
   FileBarChart,
+  Map,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -35,6 +37,11 @@ const sidebarNavItems = [
     title: "Staff",
     href: "/admin/staff",
     icon: <Users className="mr-2 h-4 w-4" />,
+  },
+  {
+    title: "Locations",
+    href: "/admin/locations",
+    icon: <Map className="mr-2 h-4 w-4" />,
   },
   {
     title: "Inventory",

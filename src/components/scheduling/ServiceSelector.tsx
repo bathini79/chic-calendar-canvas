@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +72,7 @@ export function ServiceSelector({
         .eq("employment_type", "stylist");
       
       if (locationId) {
+        // Proper query using the employee_locations junction table
         query = query.contains('employee_locations', [{ location_id: locationId }]);
       }
       

@@ -6,13 +6,12 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
-import { CalendarIcon, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { formatTime, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
-import { Appointment } from "./bookings/types";
 import { AppointmentManager } from "./bookings/components/AppointmentManager";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
 import { 
@@ -87,6 +86,7 @@ export default function AdminBookings() {
         
         // Filter by location if one is selected
         if (selectedLocationId) {
+          // Proper query with the employee_locations junction table
           query = query.contains('employee_locations', [{ location_id: selectedLocationId }]);
         }
         

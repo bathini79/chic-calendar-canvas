@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useState } from "react";
 import { Package as PackageIcon, Plus, Minus } from "lucide-react";
@@ -136,36 +135,29 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   };
 
   const handlePackageSelect = (pkg: any) => {
-    // Extract base service IDs from the package
     const baseServices = pkg?.package_services.map((ps: any) => ps.service.id);
     const currentCustomServices = customizedServices[pkg.id] || [];
 
     if (selectedPackages.includes(pkg.id)) {
-      // If already selected, deselect the package
       onPackageSelect(pkg.id);
       setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
     } else {
-      // Expand the package view even if not selecting yet
       setExpandedPackages(prev => [...prev, pkg.id]);
-      // Select the package and provide all service IDs (base + custom)
       onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
     }
   };
 
-  // Get the price of a service within a package
   const getServicePriceInPackage = (packageId: string, serviceId: string) => {
     const pkg = packages?.find(p => p.id === packageId);
     if (!pkg) return 0;
 
     const packageService = pkg.package_services?.find(ps => ps.service.id === serviceId);
     if (packageService) {
-      // Use package_selling_price if available, otherwise fall back to the service's selling_price
       return packageService.package_selling_price !== null && packageService.package_selling_price !== undefined
         ? packageService.package_selling_price
         : packageService.service.selling_price;
     }
 
-    // For customized services not in the base package
     const service = services?.find(s => s.id === serviceId);
     return service?.selling_price || 0;
   };
@@ -363,4 +355,3 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     </div>
   );
 };
-
