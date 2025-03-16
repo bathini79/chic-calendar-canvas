@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ServiceForm } from "./ServiceForm";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ServiceDialogProps {
   open: boolean;
@@ -73,15 +74,19 @@ export function ServiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] flex flex-col">
         <DialogTitle>
           {initialData ? 'Edit Service' : 'Create New Service'}
         </DialogTitle>
-        <ServiceForm 
-          initialData={serviceData} 
-          onSuccess={() => onOpenChange(false)} 
-          onCancel={() => onOpenChange(false)}
-        />
+        <ScrollArea className="flex-1 overflow-auto">
+          <div className="p-1">
+            <ServiceForm 
+              initialData={serviceData} 
+              onSuccess={() => onOpenChange(false)} 
+              onCancel={() => onOpenChange(false)}
+            />
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
