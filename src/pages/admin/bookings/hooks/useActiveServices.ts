@@ -1,55 +1,45 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Service } from "../types";
 
 export function useActiveServices(locationId?: string) {
-  return useQuery({
-    queryKey: ["active-services", locationId],
+  return useQuery<Service[]>({
+    queryKey: ['activeServices', locationId],
     queryFn: async () => {
-      // First, get all active services
       let query = supabase
-        .from("services")
+        .from('services')
         .select(`
           *,
-          category:services_categories(
-            category:categories(*)
+          services_categories(
+            categories(
+              id,
+              name
+            )
           )
         `)
-        .eq("status", "active");
-
-      const { data: services, error } = await query.order("name");
-
-      if (error) {
-        console.error("Error fetching services:", error);
-        throw error;
-      }
-
-      // If no locationId is provided, return all services
-      if (!locationId) {
-        return services || [];
-      }
-
-      // If locationId is provided, filter services by checking service_locations table
-      const { data: serviceLocations, error: locationsError } = await supabase
-        .from("service_locations")
-        .select("service_id")
-        .eq("location_id", locationId);
-
-      if (locationsError) {
-        console.error("Error fetching service locations:", locationsError);
-        throw locationsError;
-      }
-
-      // Get service IDs available at this location
-      const serviceIdsAtLocation = serviceLocations.map(item => item.service_id);
+        .eq('status', 'active');
       
-      // Filter services that are available at the specified location
-      const filteredServices = services.filter(service => 
-        serviceIdsAtLocation.includes(service.id)
-      );
-
-      return filteredServices || [];
+      if (locationId) {
+        // Get services associated with this location
+        const { data: serviceLocations, error: serviceLocationsError } = await supabase
+          .from('service_locations')
+          .select('service_id')
+          .eq('location_id', locationId);
+        
+        if (serviceLocationsError) throw serviceLocationsError;
+        
+        // If we have service locations, filter by them
+        if (serviceLocations && serviceLocations.length > 0) {
+          const serviceIds = serviceLocations.map(sl => sl.service_id);
+          query = query.in('id', serviceIds);
+        }
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      return data as Service[];
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

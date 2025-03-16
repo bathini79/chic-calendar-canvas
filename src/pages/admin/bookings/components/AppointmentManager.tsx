@@ -1,3 +1,4 @@
+
 // First line replaces the existing first lines
 // This component now takes locationId as a prop
 import React, { useState, useEffect } from "react";
@@ -81,8 +82,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   );
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
 
-  const { data: services } = useActiveServices();
-  const { data: packages } = useActivePackages();
+  const { data: services } = useActiveServices(locationId);
+  const { data: packages } = useActivePackages(locationId);
 
   const {
     selectedCustomer,
@@ -199,8 +200,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setSelectedPackages(packages);
     setSelectedStylists(stylists);
     setCustomizedServices(customizedServicesMap);
-    setPaymentMethod(appointment.payment_method || 'cash');
-    setDiscountType(appointment.discount_type || 'none');
+    setPaymentMethod(appointment.payment_method as 'cash' | 'online' || 'cash');
+    setDiscountType(appointment.discount_type as 'none' | 'percentage' | 'fixed' || 'none');
     setDiscountValue(appointment.discount_value || 0);
     setAppointmentNotes(appointment.notes || '');
     setSelectedCustomer(appointment.customer || null);
@@ -393,7 +394,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                     stylists={employees}
                     onCustomPackage={handleCustomServiceToggle}
                     customizedServices={customizedServices}
-                    locationId={locationId} // Pass the locationId to ServiceSelector
+                    locationId={locationId}
                   />
                 </div>
 

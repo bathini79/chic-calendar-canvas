@@ -37,6 +37,7 @@ export interface ServiceSelectorProps {
   stylists: Stylist[];
   onCustomPackage?: (packageId: string, serviceId: string) => void;
   customizedServices?: Record<string, string[]>;
+  locationId?: string;
 }
 
 export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
@@ -49,6 +50,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   stylists,
   onCustomPackage,
   customizedServices = {},
+  locationId
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
@@ -67,12 +69,35 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   });
 
   const { data: services } = useQuery({
-    queryKey: ['services'],
+    queryKey: ['services', locationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('services')
-        .select('*, services_categories!inner(categories(id, name))')
+        .select(`
+          *,
+          services_categories!inner(
+            categories(id, name)
+          )
+        `)
         .eq('status', 'active');
+      
+      if (locationId) {
+        // Get services associated with this location
+        const { data: serviceLocations, error: serviceLocationsError } = await supabase
+          .from('service_locations')
+          .select('service_id')
+          .eq('location_id', locationId);
+        
+        if (serviceLocationsError) throw serviceLocationsError;
+        
+        // If we have service locations, filter by them
+        if (serviceLocations && serviceLocations.length > 0) {
+          const serviceIds = serviceLocations.map(sl => sl.service_id);
+          query = query.in('id', serviceIds);
+        }
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
@@ -80,9 +105,9 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   });
 
   const { data: packages } = useQuery({
-    queryKey: ['packages'],
+    queryKey: ['packages', locationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('packages')
         .select(`
           *,
@@ -92,6 +117,24 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           )
         `)
         .eq('status', 'active');
+      
+      if (locationId) {
+        // Get packages associated with this location
+        const { data: packageLocations, error: packageLocationsError } = await supabase
+          .from('package_locations')
+          .select('package_id')
+          .eq('location_id', locationId);
+        
+        if (packageLocationsError) throw packageLocationsError;
+        
+        // If we have package locations, filter by them
+        if (packageLocations && packageLocations.length > 0) {
+          const packageIds = packageLocations.map(pl => pl.package_id);
+          query = query.in('id', packageIds);
+        }
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
@@ -363,4 +406,3 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     </div>
   );
 };
-

@@ -1,58 +1,43 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Package } from "../types";
 
 export function useActivePackages(locationId?: string) {
-  return useQuery({
-    queryKey: ["active-packages", locationId],
+  return useQuery<Package[]>({
+    queryKey: ['activePackages', locationId],
     queryFn: async () => {
-      // First, get all active packages
       let query = supabase
-        .from("packages")
+        .from('packages')
         .select(`
           *,
-          categories:package_categories(
-            category:categories(*)
-          ),
           package_services(
-            service:services(*)
+            service:services(*),
+            package_selling_price
           )
         `)
-        .eq("status", "active");
-
-      const { data: packages, error } = await query.order("name");
-
-      if (error) {
-        console.error("Error fetching packages:", error);
-        throw error;
-      }
-
-      // If no locationId is provided, return all packages
-      if (!locationId) {
-        return packages || [];
-      }
-
-      // If locationId is provided, filter packages by checking package_locations table
-      const { data: packageLocations, error: locationsError } = await supabase
-        .from("package_locations")
-        .select("package_id")
-        .eq("location_id", locationId);
-
-      if (locationsError) {
-        console.error("Error fetching package locations:", locationsError);
-        throw locationsError;
-      }
-
-      // Get package IDs available at this location
-      const packageIdsAtLocation = packageLocations.map(item => item.package_id);
+        .eq('status', 'active');
       
-      // Filter packages that are available at the specified location
-      const filteredPackages = packages.filter(pkg => 
-        packageIdsAtLocation.includes(pkg.id)
-      );
-
-      return filteredPackages || [];
+      if (locationId) {
+        // Get packages associated with this location
+        const { data: packageLocations, error: packageLocationsError } = await supabase
+          .from('package_locations')
+          .select('package_id')
+          .eq('location_id', locationId);
+        
+        if (packageLocationsError) throw packageLocationsError;
+        
+        // If we have package locations, filter by them
+        if (packageLocations && packageLocations.length > 0) {
+          const packageIds = packageLocations.map(pl => pl.package_id);
+          query = query.in('id', packageIds);
+        }
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      return data as Package[];
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
