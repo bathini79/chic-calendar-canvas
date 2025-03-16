@@ -1,35 +1,42 @@
 
-import React, { useState } from "react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import React from 'react';
+import { useState } from "react";
+import { Package as PackageIcon, Plus, Minus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useActiveServices } from "../hooks/useActiveServices";
-import { useActivePackages } from "../hooks/useActivePackages";
-import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
+import { cn } from "@/lib/utils";
 
-interface ServiceSelectorProps {
-  onServiceSelect: (serviceId: string) => void;
-  onPackageSelect: (packageId: string) => void;
+type Stylist = {
+  id: string;
+  name: string;
+  employment_type: 'stylist';
+  status: 'active' | 'inactive';
+};
+
+export interface ServiceSelectorProps {
+  onServiceSelect?: (serviceId: string) => void;
+  onPackageSelect?: (packageId: string, serviceIds?: string[]) => void;
   onStylistSelect: (itemId: string, stylistId: string) => void;
   selectedServices: string[];
   selectedPackages: string[];
   selectedStylists: Record<string, string>;
-  stylists: any[];
-  onCustomPackage: (packageId: string, serviceId: string) => void; 
-  customizedServices: Record<string, string[]>;
-  locationId?: string;
+  stylists: Stylist[];
+  onCustomPackage?: (packageId: string, serviceId: string) => void;
+  customizedServices?: Record<string, string[]>;
 }
 
 export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
@@ -41,271 +48,319 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   selectedStylists,
   stylists,
   onCustomPackage,
-  customizedServices,
-  locationId
+  customizedServices = {},
 }) => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const { data: services = [], isLoading: isServicesLoading } = useActiveServices(locationId);
-  const { data: packages = [], isLoading: isPackagesLoading } = useActivePackages(locationId);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*, services_categories!inner(categories(id, name))')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: packages } = useQuery({
+    queryKey: ['packages'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('packages')
+        .select(`
+          *,
+          package_services(
+            service:services(*),
+            package_selling_price
+          )
+        `)
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const filteredServices = selectedCategory
+    ? services?.filter(service => 
+        service.services_categories.some(sc => sc.categories.id === selectedCategory)
+      )
+    : services;
+
+  const filteredPackages = selectedCategory
+    ? packages?.filter(pkg => 
+        pkg.package_services.some(ps => 
+          services?.find(s => s.id === ps.service.id)?.services_categories.some(
+            sc => sc.categories.id === selectedCategory
+          )
+        )
+      )
+    : packages;
+
+  const allItems = [
+    ...(filteredPackages || []).map(pkg => ({
+      type: 'package' as const,
+      ...pkg
+    })),
+    ...(filteredServices || []).map(service => ({
+      type: 'service' as const,
+      ...service
+    }))
+  ];
+
+  const calculatePackagePrice = (pkg: any) => {
+    const basePrice = pkg.price || 0;
+    const customServices = customizedServices[pkg.id] || [];
+    const additionalPrice = customServices.reduce((sum, serviceId) => {
+      const service = services?.find(s => s.id === serviceId);
+      return sum + (service?.selling_price || 0);
+    }, 0);
+    return basePrice + additionalPrice;
   };
 
-  const filteredServices = services.filter((service) => 
-    service.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handlePackageSelect = (pkg: any) => {
+    // Extract base service IDs from the package
+    const baseServices = pkg?.package_services.map((ps: any) => ps.service.id);
+    const currentCustomServices = customizedServices[pkg.id] || [];
 
-  const filteredPackages = packages.filter((pkg) =>
-    pkg.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Group services by category
-  const servicesByCategory: Record<string, typeof services> = {};
-  filteredServices.forEach((service) => {
-    const categoryName = service.category?.name || "Uncategorized";
-    if (!servicesByCategory[categoryName]) {
-      servicesByCategory[categoryName] = [];
+    if (selectedPackages.includes(pkg.id)) {
+      // If already selected, deselect the package
+      onPackageSelect(pkg.id);
+      setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
+    } else {
+      // Expand the package view even if not selecting yet
+      setExpandedPackages(prev => [...prev, pkg.id]);
+      // Select the package and provide all service IDs (base + custom)
+      onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
     }
-    servicesByCategory[categoryName].push(service);
-  });
+  };
 
-  // Group packages by category
-  const packagesByCategory: Record<string, typeof packages> = {};
-  filteredPackages.forEach((pkg) => {
-    // Use the first category or "Uncategorized"
-    const categoryName = pkg.categories?.length ? pkg.categories[0]?.name : "Uncategorized";
-    if (!packagesByCategory[categoryName]) {
-      packagesByCategory[categoryName] = [];
+  // Get the price of a service within a package
+  const getServicePriceInPackage = (packageId: string, serviceId: string) => {
+    const pkg = packages?.find(p => p.id === packageId);
+    if (!pkg) return 0;
+
+    const packageService = pkg.package_services?.find(ps => ps.service.id === serviceId);
+    if (packageService) {
+      // Use package_selling_price if available, otherwise fall back to the service's selling_price
+      return packageService.package_selling_price !== null && packageService.package_selling_price !== undefined
+        ? packageService.package_selling_price
+        : packageService.service.selling_price;
     }
-    packagesByCategory[categoryName].push(pkg);
-  });
 
-  if (isServicesLoading || isPackagesLoading) {
-    return <div>Loading...</div>;
-  }
+    // For customized services not in the base package
+    const service = services?.find(s => s.id === serviceId);
+    return service?.selling_price || 0;
+  };
 
   return (
     <div className="space-y-6">
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-          <Search className="h-4 w-4 text-gray-400" />
-        </div>
-        <Input
-          type="search"
-          placeholder="Search services and packages..."
-          className="pl-10"
-          value={searchQuery}
-          onChange={handleSearchChange}
-        />
-      </div>
+      <CategoryFilter
+        categories={categories || []}
+        selectedCategory={selectedCategory}
+        onCategorySelect={setSelectedCategory}
+      />
 
-      <div className="space-y-8">
-        <div>
-          <h3 className="text-lg font-semibold mb-3">Services</h3>
-          <Accordion type="multiple" className="w-full">
-            {Object.keys(servicesByCategory).map((category) => (
-              <AccordionItem value={category} key={category}>
-                <AccordionTrigger>{category}</AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-4">
-                    {servicesByCategory[category].map((service) => (
-                      <div
-                        key={service.id}
-                        className={`p-3 rounded-md border ${
-                          selectedServices.includes(service.id)
-                            ? "border-primary bg-primary/5"
-                            : "border-border"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-medium">{service.name}</h4>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {service.duration} min · ${service.selling_price}
-                            </p>
-                          </div>
-                          <Button
-                            variant={
-                              selectedServices.includes(service.id)
-                                ? "default"
-                                : "outline"
-                            }
-                            size="sm"
-                            onClick={() => onServiceSelect(service.id)}
-                          >
-                            {selectedServices.includes(service.id)
-                              ? "Selected"
-                              : "Select"}
-                          </Button>
-                        </div>
+      <ScrollArea className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead className="w-[200px]">Stylist</TableHead>
+              <TableHead className="w-[100px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {allItems.map((item) => {
+              const isService = item.type === 'service';
+              const isPackage = item.type === 'package';
+              const isExpanded = isPackage && (selectedPackages.includes(item.id) || expandedPackages.includes(item.id));
+              const isSelected = isService 
+                ? selectedServices.includes(item.id)
+                : isExpanded;
 
-                        {selectedServices.includes(service.id) && (
-                          <div className="mt-3 pt-3 border-t">
-                            <div className="flex items-center">
-                              <span className="text-sm font-medium mr-2">
-                                Stylist:
-                              </span>
-                              <Select
-                                value={
-                                  selectedStylists[service.id] || "any"
-                                }
-                                onValueChange={(value) =>
-                                  onStylistSelect(service.id, value)
-                                }
-                              >
-                                <SelectTrigger className="w-[180px] h-8 text-xs">
-                                  <SelectValue placeholder="Any stylist" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="any">
-                                    Any available stylist
-                                  </SelectItem>
-                                  {stylists.map((stylist) => (
-                                    <SelectItem
-                                      key={stylist.id}
-                                      value={stylist.id}
-                                    >
-                                      {stylist.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+              return (
+                <React.Fragment key={`${item.type}-${item.id}`}>
+                  <TableRow 
+                    className={cn(
+                      "transition-colors",
+                      isSelected && "bg-red-50 hover:bg-red-100"
+                    )}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {isPackage && (
+                          <div className="flex items-center gap-1">
+                            <PackageIcon className="h-4 w-4" />
+                            <Badge variant="default">Package</Badge>
                           </div>
                         )}
+                        <span className="font-medium">{item.name}</span>
                       </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold mb-3">Packages</h3>
-          <Accordion type="multiple" className="w-full">
-            {Object.keys(packagesByCategory).map((category) => (
-              <AccordionItem value={category} key={category}>
-                <AccordionTrigger>{category}</AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-4">
-                    {packagesByCategory[category].map((pkg) => (
-                      <div
-                        key={pkg.id}
-                        className={`p-3 rounded-md border ${
-                          selectedPackages.includes(pkg.id)
-                            ? "border-primary bg-primary/5"
-                            : "border-border"
-                        }`}
+                    </TableCell>
+                    <TableCell>
+                      {isService ? item.duration : 
+                        item.package_services?.reduce((sum: number, ps: any) => 
+                          sum + (ps.service?.duration || 0), 0)
+                      } min
+                    </TableCell>
+                    <TableCell>
+                      ₹{isService ? item.selling_price : calculatePackagePrice(item)}
+                    </TableCell>
+                    <TableCell>
+                      {isService && isSelected && (
+                        <Select 
+                          value={selectedStylists[item.id] || ''} 
+                          onValueChange={(value) => onStylistSelect(item.id, value)}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Select stylist" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {stylists.map((stylist) => (
+                              <SelectItem key={stylist.id} value={stylist.id}>
+                                {stylist.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (isPackage) {
+                            handlePackageSelect(item);
+                          } else {
+                            onServiceSelect(item.id);
+                          }
+                        }}
                       >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-medium">{pkg.name}</h4>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              ${pkg.price}
-                            </p>
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {pkg.package_services?.map((ps: any) => (
-                                <Badge
-                                  key={ps.service.id}
-                                  variant="outline"
-                                  className="text-xs"
+                        {isSelected ? (
+                          <Minus className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Plus className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {isPackage && isExpanded && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="bg-slate-50">
+                        <div className="pl-8 pr-4 py-2 space-y-2">
+                          {item.package_services?.map((ps: any) => (
+                            <div
+                              key={ps.service.id}
+                              className="flex items-center justify-between py-2 border-b last:border-0"
+                            >
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm font-medium">{ps.service.name}</span>
+                                <span className="text-sm text-muted-foreground">
+                                  ({ps.service.duration} min)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm font-medium">
+                                  ₹{ps.package_selling_price !== null && ps.package_selling_price !== undefined
+                                    ? ps.package_selling_price
+                                    : ps.service.selling_price}
+                                </span>
+                                <Select 
+                                  value={selectedStylists[ps.service.id] || ''} 
+                                  onValueChange={(value) => onStylistSelect(ps.service.id, value)}
                                 >
-                                  {ps.service.name}
-                                </Badge>
+                                  <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Select stylist" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {stylists.map((stylist) => (
+                                      <SelectItem key={stylist.id} value={stylist.id}>
+                                        {stylist.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          ))}
+                          {item.is_customizable && (
+                            <div className="pt-4 space-y-4">
+                              <h4 className="font-medium text-sm">Additional Services</h4>
+                              {services?.filter(service => 
+                                item.customizable_services.includes(service.id)
+                              ).map(service => (
+                                <div
+                                  key={service.id}
+                                  className="flex items-center justify-between py-2"
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <Checkbox
+                                      checked={customizedServices[item.id]?.includes(service.id)}
+                                      onCheckedChange={() => onCustomPackage(item.id, service.id)}
+                                    />
+                                    <span className="text-sm font-medium">{service.name}</span>
+                                    <span className="text-sm text-muted-foreground">
+                                      ({service.duration} min)
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                    <span className="text-sm font-medium">
+                                      +₹{service.selling_price}
+                                    </span>
+                                    {customizedServices[item.id]?.includes(service.id) && (
+                                      <Select 
+                                        value={selectedStylists[service.id] || ''} 
+                                        onValueChange={(value) => onStylistSelect(service.id, value)}
+                                      >
+                                        <SelectTrigger className="w-[180px]">
+                                          <SelectValue placeholder="Select stylist" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {stylists.map((stylist) => (
+                                            <SelectItem key={stylist.id} value={stylist.id}>
+                                              {stylist.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                  </div>
+                                </div>
                               ))}
                             </div>
-                          </div>
-                          <Button
-                            variant={
-                              selectedPackages.includes(pkg.id)
-                                ? "default"
-                                : "outline"
-                            }
-                            size="sm"
-                            onClick={() => onPackageSelect(pkg.id)}
-                          >
-                            {selectedPackages.includes(pkg.id)
-                              ? "Selected"
-                              : "Select"}
-                          </Button>
+                          )}
                         </div>
-
-                        {selectedPackages.includes(pkg.id) && (
-                          <div className="mt-3 pt-3 border-t">
-                            <div className="flex items-center mb-3">
-                              <span className="text-sm font-medium mr-2">
-                                Stylist:
-                              </span>
-                              <Select
-                                value={
-                                  selectedStylists[pkg.id] || "any"
-                                }
-                                onValueChange={(value) =>
-                                  onStylistSelect(pkg.id, value)
-                                }
-                              >
-                                <SelectTrigger className="w-[180px] h-8 text-xs">
-                                  <SelectValue placeholder="Any stylist" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="any">
-                                    Any available stylist
-                                  </SelectItem>
-                                  {stylists.map((stylist) => (
-                                    <SelectItem
-                                      key={stylist.id}
-                                      value={stylist.id}
-                                    >
-                                      {stylist.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            {pkg.is_customizable && (
-                              <div className="mt-3">
-                                <h5 className="text-sm font-medium mb-2">
-                                  Customize Package:
-                                </h5>
-                                <div className="space-y-2">
-                                  {pkg.customizable_services?.map((serviceId: string) => {
-                                    const service = services.find(s => s.id === serviceId);
-                                    if (!service) return null;
-                                    
-                                    return (
-                                      <div className="flex items-center space-x-2" key={serviceId}>
-                                        <Checkbox 
-                                          id={`${pkg.id}-${serviceId}`}
-                                          checked={(customizedServices[pkg.id] || []).includes(serviceId)}
-                                          onCheckedChange={() => onCustomPackage(pkg.id, serviceId)}
-                                        />
-                                        <Label 
-                                          htmlFor={`${pkg.id}-${serviceId}`}
-                                          className="text-sm font-normal"
-                                        >
-                                          {service.name} (+${service.selling_price})
-                                        </Label>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </ScrollArea>
     </div>
   );
 };
+

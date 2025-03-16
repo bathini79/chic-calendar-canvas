@@ -39,11 +39,6 @@ const sidebarNavItems = [
     icon: <Users className="mr-2 h-4 w-4" />,
   },
   {
-    title: "Locations",
-    href: "/admin/locations",
-    icon: <Map className="mr-2 h-4 w-4" />,
-  },
-  {
     title: "Inventory",
     href: "/admin/inventory",
     icon: <Package className="mr-2 h-4 w-4" />,
