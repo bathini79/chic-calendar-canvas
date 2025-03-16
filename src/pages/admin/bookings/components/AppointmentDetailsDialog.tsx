@@ -55,7 +55,6 @@ interface AppointmentDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
-  onCheckout?: (appointment: Appointment) => void;
 }
 
 export function AppointmentDetailsDialog({
@@ -63,7 +62,6 @@ export function AppointmentDetailsDialog({
   open,
   onOpenChange,
   onUpdated,
-  onCheckout,
 }: AppointmentDetailsDialogProps) {
   const [selectedStatus, setSelectedStatus] = useState<AppointmentStatus | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
@@ -127,13 +125,6 @@ export function AppointmentDetailsDialog({
     onOpenChange(false);
   };
 
-  const handleCheckout = () => {
-    if (onCheckout) {
-      onCheckout(appointment);
-      onOpenChange(false);
-    }
-  };
-
   const canRefund = appointment.status !== 'refunded' && appointment.transaction_type !== 'refund';
   const showCheckoutButton = ['inprogress', 'confirmed', 'pending'].includes(appointment.status);
 
@@ -150,7 +141,7 @@ export function AppointmentDetailsDialog({
           <div className="space-y-6 mt-4">
             {/* Status Badge and Change Status Button */}
             <div className="flex items-center justify-between">
-              <StatusBadge status={appointment.status} />
+              <StatusBadge status={appointment.status} large />
               
               <Select onValueChange={handleStatusChange} value={appointment.status}>
                 <SelectTrigger className="w-[160px]">
@@ -275,7 +266,7 @@ export function AppointmentDetailsDialog({
             {/* Button Group */}
             <div className="flex flex-col gap-2">
               {showCheckoutButton && (
-                <Button className="w-full" onClick={handleCheckout}>
+                <Button className="w-full">
                   Checkout
                 </Button>
               )}
