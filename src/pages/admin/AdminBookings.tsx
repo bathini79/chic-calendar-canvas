@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FullCalendar } from '@fullcalendar/react';
+import FullCalendar from '@fullcalendar/react';
 import { Button } from '@/components/ui/button';
 import { CalendarHeader } from './bookings/components/CalendarHeader';
 import { AppointmentManager } from './bookings/components/AppointmentManager';
 import { Appointment } from './bookings/types';
 import { AppointmentDetailsDialog } from './bookings/components/AppointmentDetailsDialog';
 import { Calendar as CalendarIcon } from 'lucide-react';
-import { TimeSlots } from './bookings/components/TimeSlots';
+import TimeSlots from './bookings/components/TimeSlots';
 
 export default function AdminBookings() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -25,12 +25,10 @@ export default function AdminBookings() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
-  // Fetch locations on component mount
   useEffect(() => {
     fetchLocations();
   }, []);
 
-  // Fetch employees and appointments when location changes
   useEffect(() => {
     if (selectedLocation) {
       fetchEmployees();
@@ -50,7 +48,6 @@ export default function AdminBookings() {
       
       setLocations(data || []);
       
-      // Select the first location by default if available
       if (data && data.length > 0) {
         setSelectedLocation(data[0].id);
       }
@@ -146,7 +143,6 @@ export default function AdminBookings() {
         title += ` - ${appointment.bookings.length} service(s)`;
       }
       
-      // Determine color based on status
       let backgroundColor;
       switch (appointment.status) {
         case 'completed':
@@ -265,7 +261,9 @@ export default function AdminBookings() {
       {showDetailsDialog && selectedAppointment && (
         <AppointmentDetailsDialog
           appointment={selectedAppointment}
-          onClose={handleDetailsClose}
+          onOpenChange={(open) => {
+            if (!open) handleDetailsClose();
+          }}
         />
       )}
     </div>

@@ -19,6 +19,9 @@ interface ServiceSelectorProps {
   stylists?: any[];
   selectedStylists?: Record<string, string>;
   locationId?: string;
+  onCustomPackage?: (packageId: string, serviceId: string) => void;
+  customizedServices?: Record<string, string[]>;
+  items?: any[]; // For customer-facing cart components
 }
 
 export function ServiceSelector({
@@ -29,34 +32,38 @@ export function ServiceSelector({
   selectedPackages = [],
   stylists = [],
   selectedStylists = {},
-  locationId
+  locationId,
+  onCustomPackage = () => {},
+  customizedServices = {},
+  items = []
 }: ServiceSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('services');
-  const { data: services = [], isLoading: isLoadingServices } = useActiveServices(locationId);
-  const { data: packages = [], isLoading: isLoadingPackages } = useActivePackages(locationId);
+  const { data: servicesData = [], isLoading: isLoadingServices } = useActiveServices(locationId);
+  const { data: packagesData = [], isLoading: isLoadingPackages } = useActivePackages(locationId);
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [filteredPackages, setFilteredPackages] = useState<Package[]>([]);
-  const { cartItems } = useCart ? useCart() : { cartItems: [] };
+  const cart = useCart();
+  const cartItems = cart?.cartItems || [];
   
   // Filter services and packages based on search query
   useEffect(() => {
-    if (services) {
-      const filtered = services.filter((service: Service) =>
+    if (servicesData) {
+      const filtered = servicesData.filter((service: any) =>
         service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         service.description?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredServices(filtered);
+      setFilteredServices(filtered as Service[]);
     }
     
-    if (packages) {
-      const filtered = packages.filter((pkg: Package) =>
+    if (packagesData) {
+      const filtered = packagesData.filter((pkg: any) =>
         pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         pkg.description?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredPackages(filtered);
+      setFilteredPackages(filtered as Package[]);
     }
-  }, [searchQuery, services, packages]);
+  }, [searchQuery, servicesData, packagesData]);
 
   const handleServiceSelect = (serviceId: string) => {
     if (onServiceSelect) {
@@ -73,6 +80,12 @@ export function ServiceSelector({
   const handleStylistChange = (itemId: string, stylistId: string) => {
     if (onStylistSelect) {
       onStylistSelect(itemId, stylistId);
+    }
+  };
+
+  const handleCustomizableServiceToggle = (packageId: string, serviceId: string) => {
+    if (onCustomPackage) {
+      onCustomPackage(packageId, serviceId);
     }
   };
 
@@ -272,6 +285,33 @@ export function ServiceSelector({
                       )}
                     </Button>
                   </div>
+
+                  {pkg.is_customizable && selectedPackages.includes(pkg.id) && (
+                    <div className="mt-3 pt-3 border-t">
+                      <h4 className="text-sm font-medium mb-2">Customize package:</h4>
+                      <div className="space-y-2">
+                        {pkg.customizable_services?.map(serviceId => {
+                          const service = servicesData.find(s => s.id === serviceId);
+                          if (!service) return null;
+                          
+                          const isSelected = customizedServices[pkg.id]?.includes(serviceId);
+                          
+                          return (
+                            <div key={serviceId} className="flex items-center justify-between">
+                              <span className="text-sm">{service.name} (+₹{service.selling_price})</span>
+                              <Button 
+                                size="sm" 
+                                variant={isSelected ? "default" : "outline"}
+                                onClick={() => handleCustomizableServiceToggle(pkg.id, serviceId)}
+                              >
+                                {isSelected ? "Added" : "Add"}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

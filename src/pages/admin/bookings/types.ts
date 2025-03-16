@@ -25,13 +25,14 @@ export interface Service {
   selling_price: number;
   original_price: number;
   category_id?: string;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "archived";
   created_at: string;
   updated_at: string;
   gender?: string;
   image_urls?: string[];
   service_locations?: {location_id: string}[];
   location_ids?: string[];
+  category?: any[];
 }
 
 export interface Package {
@@ -40,9 +41,9 @@ export interface Package {
   description?: string;
   price: number;
   duration?: number;
-  discount_type?: "none" | "fixed" | "percentage";
+  discount_type?: "none" | "fixed" | "percentage" | string;
   discount_value?: number;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "archived";
   created_at: string;
   updated_at: string;
   image_urls?: string[];
@@ -104,7 +105,7 @@ export interface Appointment {
   end_time: string;
   status: AppointmentStatus;
   total_price: number;
-  discount_type: "none" | "fixed" | "percentage";
+  discount_type: "none" | "fixed" | "percentage" | string;
   discount_value: number;
   payment_method?: string;
   notes?: string;

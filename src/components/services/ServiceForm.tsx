@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -280,8 +279,9 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
         <div>
           <Label>Categories</Label>
           <CategoryMultiSelect 
-            selectedValues={selectedCategories} 
-            onChange={setSelectedCategories} 
+            selectedCategories={selectedCategories}
+            onCategorySelect={handleCategorySelect}
+            onCategoryRemove={handleCategoryRemove}
           />
         </div>
         

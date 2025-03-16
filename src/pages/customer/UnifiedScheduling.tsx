@@ -100,6 +100,8 @@ export default function UnifiedScheduling() {
             selectedStylists={selectedStylists}
             onStylistSelect={handleStylistSelect}
             locationId={selectedLocation}
+            onCustomPackage={() => {}}
+            customizedServices={{}}
           />
           <UnifiedCalendar
             selectedDate={selectedDate}

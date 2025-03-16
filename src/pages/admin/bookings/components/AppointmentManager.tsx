@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useQuery } from '@tanstack/react-query';
 import { ServiceSelector } from './ServiceSelector';
 import { CheckoutSection } from './CheckoutSection';
 import { SelectCustomer } from '@/components/admin/bookings/components/SelectCustomer';
@@ -45,14 +44,14 @@ export function AppointmentManager({
     setSelectedCustomer,
     showCreateForm,
     setShowCreateForm,
-    activeScreen,
-    setActiveScreen,
     selectedServices,
     setSelectedServices,
     selectedPackages,
     setSelectedPackages,
     selectedStylists,
     setSelectedStylists,
+    activeScreen,
+    setActiveScreen,
     appointmentId,
     setAppointmentId,
     appointmentDate,
@@ -107,6 +106,23 @@ export function AppointmentManager({
     setSelectedStylists({
       ...selectedStylists,
       [itemId]: stylistId
+    });
+  };
+
+  const handleCustomPackage = (packageId: string, serviceId: string) => {
+    setCustomizedServices(prev => {
+      const currentServices = prev[packageId] || [];
+      if (currentServices.includes(serviceId)) {
+        return {
+          ...prev,
+          [packageId]: currentServices.filter(id => id !== serviceId)
+        };
+      } else {
+        return {
+          ...prev,
+          [packageId]: [...currentServices, serviceId]
+        };
+      }
     });
   };
 
@@ -208,7 +224,7 @@ export function AppointmentManager({
                 <h3 className="text-lg font-medium mb-4">Select Customer</h3>
                 <SelectCustomer
                   selectedCustomer={selectedCustomer}
-                  onSelect={setSelectedCustomer}
+                  onSelectCustomer={setSelectedCustomer}
                   onCreateNew={() => setShowCreateForm(true)}
                 />
               </div>
@@ -224,6 +240,8 @@ export function AppointmentManager({
                   stylists={employees}
                   selectedStylists={selectedStylists}
                   locationId={locationId}
+                  onCustomPackage={handleCustomPackage}
+                  customizedServices={customizedServices}
                 />
                 
                 <div className="mt-6 flex justify-end">
@@ -248,10 +266,10 @@ export function AppointmentManager({
               services={services as Service[]}
               packages={packages as Package[]}
               selectedStylists={selectedStylists}
-              appointmentDate={appointmentDate}
-              setAppointmentDate={setAppointmentDate}
-              appointmentTime={appointmentTime}
-              setAppointmentTime={setAppointmentTime}
+              date={appointmentDate}
+              setDate={setAppointmentDate}
+              time={appointmentTime}
+              setTime={setAppointmentTime}
               discountType={discountType}
               setDiscountType={setDiscountType}
               discountValue={discountValue}
@@ -262,8 +280,20 @@ export function AppointmentManager({
               setNotes={setNotes}
               customizedServices={customizedServices}
               setCustomizedServices={setCustomizedServices}
-              calculateTotal={calculateTotal}
-              calculateDiscountedTotal={calculateTotal}
+              calculateTotal={() => calculateTotal(
+                selectedServices,
+                selectedPackages,
+                services as Service[],
+                packages as Package[],
+                customizedServices
+              )}
+              calculateDiscountedTotal={() => calculateTotal(
+                selectedServices,
+                selectedPackages,
+                services as Service[],
+                packages as Package[],
+                customizedServices
+              )}
               onContinue={handleProceedToSummary}
               locationId={locationId}
             />
@@ -287,7 +317,13 @@ export function AppointmentManager({
               discountValue={discountValue}
               paymentMethod={paymentMethod}
               notes={notes}
-              calculateTotal={calculateTotal}
+              calculateTotal={() => calculateTotal(
+                selectedServices,
+                selectedPackages,
+                services as Service[],
+                packages as Package[],
+                customizedServices
+              )}
               customizedServices={customizedServices}
               isLoading={isSaving}
               onSave={handleSaveAppointment}
@@ -299,11 +335,11 @@ export function AppointmentManager({
         {showCreateForm && (
           <CreateClientDialog
             open={showCreateForm}
-            onOpenChange={setShowCreateForm}
             onSuccess={(newCustomer: Customer) => {
               setSelectedCustomer(newCustomer);
               setShowCreateForm(false);
             }}
+            onCancel={() => setShowCreateForm(false)}
           />
         )}
       </DialogContent>
