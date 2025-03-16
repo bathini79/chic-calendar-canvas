@@ -1,3 +1,4 @@
+
 export enum SCREEN {
   SERVICE_SELECTION = "service_selection",
   CHECKOUT = "checkout",
@@ -14,8 +15,7 @@ export type AppointmentStatus =
   | "refunded"
   | "partially_refunded"
   | "noshow"
-  | "booked"
-  | "paid";
+  | "booked";
 
 export interface Service {
   id: string;
@@ -69,7 +69,6 @@ export interface Employee {
   employment_type: "stylist" | "operations";
   created_at: string;
   updated_at: string;
-  avatar?: string;
 }
 
 export interface Booking {
@@ -118,20 +117,4 @@ export interface Appointment {
   total_duration?: number;
   customer?: Customer;
   bookings: Booking[];
-}
-
-export interface RefundData {
-  reason: string;
-  notes: string;
-  refundedBy: string;
-}
-
-export interface TransactionDetails {
-  id: string;
-  amount: number;
-  status: string;
-  payment_method?: string;
-  created_at: string;
-  originalSale: Appointment;
-  refunds: Appointment[];
 }

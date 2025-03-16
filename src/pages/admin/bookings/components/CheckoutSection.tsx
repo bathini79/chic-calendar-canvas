@@ -66,7 +66,6 @@ interface CheckoutSectionProps {
   onBackToServices: () => void;
   isExistingAppointment?: boolean;
   customizedServices?: Record<string, string[]>;
-  locationId?: string;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -92,8 +91,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onRemovePackage,
   onBackToServices,
   isExistingAppointment,
-  customizedServices = {},
-  locationId
+  customizedServices = {}
 }) => {
   const { data: employees } = useQuery({
     queryKey: ['employees'],

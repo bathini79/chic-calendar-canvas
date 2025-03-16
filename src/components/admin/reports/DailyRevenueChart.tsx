@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +16,7 @@ export function DailyRevenueChart({ selectedDate, locationId }: DailyRevenueChar
   const { data, isLoading } = useQuery({
     queryKey: ['daily-revenue-chart', format(selectedDate, 'yyyy-MM-dd'), locationId],
     queryFn: async () => {
+      // Get data for the past 7 days
       const chartData = [];
       
       for (let i = 6; i >= 0; i--) {
@@ -45,9 +47,7 @@ export function DailyRevenueChart({ selectedDate, locationId }: DailyRevenueChar
           throw error;
         }
         
-        const completedAppointments = dailyData.filter(a => 
-          a.status === 'completed' || a.status === 'paid' || a.status === 'confirmed'
-        );
+        const completedAppointments = dailyData.filter(a => a.status === 'completed' || a.status === 'paid');
         const totalRevenue = completedAppointments.reduce((sum, a) => sum + (a.total_price || 0), 0);
         const bookingCount = dailyData.reduce((sum, a) => sum + (a.bookings?.length || 0), 0);
         

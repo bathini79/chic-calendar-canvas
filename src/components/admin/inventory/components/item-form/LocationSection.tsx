@@ -27,7 +27,7 @@ export function LocationSection({ control }: LocationSectionProps) {
         .order('name');
       
       if (error) throw error;
-      return data || [];
+      return data;
     }
   });
 

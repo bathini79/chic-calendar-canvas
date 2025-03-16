@@ -1,3 +1,4 @@
+
 // First line replaces the existing first lines
 // This component now takes locationId as a prop
 import React, { useState, useEffect } from "react";
@@ -447,9 +448,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                 </h3>
                 <SummaryView
                   appointmentId={newAppointmentId}
-                  transactions={[]} // Provide an empty array for transactions
-                  onDateChange={() => {}} // Provide a no-op function
-                  selectedDate={new Date()} // Provide the current date
                 />
                 <div className="mt-6 flex justify-end">
                   <Button
