@@ -15,14 +15,14 @@ export function useActivePackages(locationId?: string) {
           ),
           package_services(
             service:services(*)
-          )
+          ),
+          package_locations(location_id)
         `)
         .eq("status", "active");
 
       // If locationId is provided, filter packages that are available at this location
       if (locationId) {
-        // This could be adjusted based on your business logic
-        // For now, we're not filtering by location, as packages might be available at any location
+        query = query.contains('package_locations', [{location_id: locationId}]);
       }
 
       const { data, error } = await query.order("name");

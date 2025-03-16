@@ -12,14 +12,14 @@ export function useActiveServices(locationId?: string) {
           *,
           category:services_categories(
             category:categories(*)
-          )
+          ),
+          service_locations(location_id)
         `)
         .eq("status", "active");
 
       // If locationId is provided, filter services that are available at this location
       if (locationId) {
-        // This could be adjusted based on your business logic
-        // For now, we're not filtering by location, as services might be available at any location
+        query = query.contains('service_locations', [{location_id: locationId}]);
       }
 
       const { data, error } = await query.order("name");

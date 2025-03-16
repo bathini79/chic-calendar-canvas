@@ -30,6 +30,7 @@ export interface Service {
   updated_at: string;
   gender?: string;
   image_urls?: string[];
+  location_ids?: string[];
 }
 
 export interface Package {
@@ -48,6 +49,7 @@ export interface Package {
   customizable_services?: string[];
   categories?: any[];
   package_services?: any[];
+  location_ids?: string[];
 }
 
 export interface Customer {
@@ -117,4 +119,20 @@ export interface Appointment {
   total_duration?: number;
   customer?: Customer;
   bookings: Booking[];
+}
+
+export interface RefundData {
+  appointment_id: string;
+  refund_reason: string;
+  refund_notes?: string;
+}
+
+export interface TransactionDetails {
+  id: string;
+  status: AppointmentStatus;
+  transaction_type: string;
+  created_at: string;
+  total_price: number;
+  payment_method: string;
+  customer_name: string;
 }

@@ -1,3 +1,4 @@
+
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,14 +11,15 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { CategoryMultiSelect } from "@/components/categories/CategoryMultiSelect";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Image, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const formSchema = z.object({
   name: z.string().min(1, "Service name is required"),
@@ -28,6 +30,7 @@ const formSchema = z.object({
   description: z.string().optional(),
   image_urls: z.array(z.string()).optional(),
   gender: z.enum(['all', 'male', 'female']).default('all'),
+  locations: z.array(z.string()),
 });
 
 type ServiceFormData = z.infer<typeof formSchema>;
@@ -43,8 +46,26 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     initialData?.categories?.map((cat: any) => cat.id) || []
   );
+  const [selectedLocations, setSelectedLocations] = useState<string[]>(
+    initialData?.service_locations?.map((loc: any) => loc.location_id) || []
+  );
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
+
+  // Fetch all locations
+  const { data: locations } = useQuery({
+    queryKey: ['locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('status', 'active')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const form = useForm<ServiceFormData>({
     resolver: zodResolver(formSchema),
@@ -57,8 +78,18 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
       description: initialData?.description || '',
       image_urls: images,
       gender: initialData?.gender || 'all',
+      locations: selectedLocations,
     },
   });
+
+  // Effect to update form when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      const serviceLocations = initialData?.service_locations?.map((sl: any) => sl.location_id) || [];
+      setSelectedLocations(serviceLocations);
+      form.setValue('locations', serviceLocations);
+    }
+  }, [initialData, form]);
 
   const handleCategorySelect = (categoryId: string) => {
     const newCategories = [...selectedCategories, categoryId];
@@ -70,6 +101,17 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
     const newCategories = selectedCategories.filter(id => id !== categoryId);
     setSelectedCategories(newCategories);
     form.setValue('categories', newCategories);
+  };
+
+  const handleLocationToggle = (locationId: string) => {
+    let newLocations: string[];
+    if (selectedLocations.includes(locationId)) {
+      newLocations = selectedLocations.filter(id => id !== locationId);
+    } else {
+      newLocations = [...selectedLocations, locationId];
+    }
+    setSelectedLocations(newLocations);
+    form.setValue('locations', newLocations);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,6 +194,28 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
 
         if (categoriesError) throw categoriesError;
 
+        // Delete existing location relationships
+        const { error: deleteLocationError } = await supabase
+          .from('service_locations')
+          .delete()
+          .eq('service_id', initialData.id);
+
+        if (deleteLocationError) throw deleteLocationError;
+
+        // Insert new location relationships
+        if (data.locations.length > 0) {
+          const { error: locationsError } = await supabase
+            .from('service_locations')
+            .insert(
+              data.locations.map(locationId => ({
+                service_id: initialData.id,
+                location_id: locationId,
+              }))
+            );
+
+          if (locationsError) throw locationsError;
+        }
+
       } else {
         // Create new service
         const { data: newService, error: serviceError } = await supabase
@@ -181,6 +245,20 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
           );
 
         if (categoriesError) throw categoriesError;
+
+        // Insert location relationships
+        if (data.locations.length > 0) {
+          const { error: locationsError } = await supabase
+            .from('service_locations')
+            .insert(
+              data.locations.map(locationId => ({
+                service_id: newService.id,
+                location_id: locationId,
+              }))
+            );
+
+          if (locationsError) throw locationsError;
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -220,6 +298,36 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
                   onCategorySelect={handleCategorySelect}
                   onCategoryRemove={handleCategoryRemove}
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="locations"
+          render={() => (
+            <FormItem>
+              <FormLabel>Locations *</FormLabel>
+              <FormControl>
+                <div className="space-y-2">
+                  {locations?.map((location) => (
+                    <div key={location.id} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`location-${location.id}`}
+                        checked={selectedLocations.includes(location.id)}
+                        onCheckedChange={() => handleLocationToggle(location.id)}
+                      />
+                      <label 
+                        htmlFor={`location-${location.id}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {location.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
