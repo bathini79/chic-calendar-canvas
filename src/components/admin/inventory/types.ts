@@ -13,6 +13,7 @@ export interface InventoryItem {
   unit_of_quantity: string;
   categories: string[];
   status: ItemStatus;
+  location_id?: string;
   created_at: string;
   updated_at: string;
   inventory_items_categories: Array<{ category_id: string }>;

@@ -373,3 +373,5 @@ const statusMessages = {
     description: "This will mark the appointment as a no-show."
   }
 };
+
+export default AppointmentDetailsDialog;

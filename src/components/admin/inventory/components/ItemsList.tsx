@@ -10,11 +10,7 @@ import { Database } from "@/integrations/supabase/types";
 import { InventoryFilters } from "./list/InventoryFilters";
 import { InventoryTable } from "./list/InventoryTable";
 import { InventoryStats } from "./InventoryStats";
-
-type InventoryItem = Database['public']['Tables']['inventory_items']['Row'] & {
-  inventory_items_categories: Array<{ category_id: string }>;
-  categories: string[];
-};
+import { InventoryItem, Supplier } from "../types";
 
 export function ItemsList() {
   const { remove } = useSupabaseCrud('inventory_items');
@@ -87,9 +83,9 @@ export function ItemsList() {
       const { data, error } = await query;
       
       if (error) throw error;
-      return (data || []).map((item: InventoryItem) => ({
+      return (data || []).map((item: any) => ({
         ...item,
-        categories: item.inventory_items_categories.map(ic => ic.category_id)
+        categories: item.inventory_items_categories.map((ic: any) => ic.category_id)
       }));
     },
   });
@@ -99,10 +95,10 @@ export function ItemsList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('suppliers')
-        .select('id, name');
+        .select('*');
       
       if (error) throw error;
-      return data;
+      return data as Supplier[];
     },
   });
 
