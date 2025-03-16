@@ -1,61 +1,38 @@
 
 import { useState, useEffect } from "react";
-import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
-import { ItemDialog } from "../ItemDialog";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import debounce from "lodash/debounce";
-import { InventoryFilters } from "./list/InventoryFilters";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { InventoryTable } from "./list/InventoryTable";
-import { InventoryLocationItem } from "../types";
+import { InventoryFilters } from "./list/InventoryFilters";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ItemDialog } from "../ItemDialog";
+import { Category, Supplier } from "./types";
 
 export function ItemsList() {
-  const { remove } = useSupabaseCrud('inventory_items');
-  const [editingItem, setEditingItem] = useState<any | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedLocation, setSelectedLocation] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [displayItems, setDisplayItems] = useState<any[]>([]);
+  const [editingItem, setEditingItem] = useState<any>(null);
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
-  const [showLowStock, setShowLowStock] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const queryClient = useQueryClient();
 
-  const { data: categories } = useQuery({
-    queryKey: ['inventory_categories'],
+  // Fetch inventory items with location-specific data
+  const { data: items, isLoading: itemsLoading } = useQuery({
+    queryKey: ["inventory_items"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('inventory_categories')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: locations = [] } = useQuery({
-    queryKey: ['locations'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('id, name')
-        .eq('status', 'active');
-      
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const { data: items = [], refetch } = useQuery({
-    queryKey: ['inventory_items_with_locations', selectedCategory, selectedStatus, selectedLocation, searchQuery, showLowStock],
-    queryFn: async () => {
-      let query = supabase
-        .from('inventory_items')
+        .from("inventory_items")
         .select(`
-          *,
-          inventory_location_items!inner(
+          id,
+          name,
+          description,
+          unit_of_quantity,
+          has_location_specific_data,
+          created_at,
+          updated_at,
+          location_items:inventory_location_items(
             id,
             location_id,
             quantity,
@@ -68,155 +45,194 @@ export function ItemsList() {
           )
         `);
 
-      if (searchQuery) {
-        query = query.ilike('name', `%${searchQuery}%`);
+      if (error) {
+        console.error("Error fetching inventory items:", error);
+        throw error;
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Transform the data to group location items by item
-      const itemsMap = {};
-      data.forEach(item => {
-        if (!itemsMap[item.id]) {
-          itemsMap[item.id] = {
-            ...item,
-            location_items: []
-          };
-        }
-        
-        const locationItem = item.inventory_location_items;
-        itemsMap[item.id].location_items.push(locationItem);
-      });
-
-      return Object.values(itemsMap);
-    }
-  });
-
-  // Filter items based on selected location and status
-  useEffect(() => {
-    if (items) {
-      let filtered = [...items];
-      
-      // Filter by location
-      if (selectedLocation !== "all") {
-        filtered = filtered.filter(item => 
-          item.location_items.some(li => li.location_id === selectedLocation)
-        );
-      }
-      
-      // Filter by category
-      if (selectedCategory !== "all") {
-        filtered = filtered.filter(item => 
-          item.location_items.some(li => 
-            li.categories && li.categories.includes(selectedCategory)
-          )
-        );
-      }
-      
-      // Filter by status
-      if (selectedStatus !== "all") {
-        filtered = filtered.filter(item => 
-          item.location_items.some(li => li.status === selectedStatus)
-        );
-      }
-      
-      // Filter by low stock
-      if (showLowStock) {
-        filtered = filtered.filter(item => 
-          item.location_items.some(li => li.quantity <= li.minimum_quantity)
-        );
-      }
-      
-      setDisplayItems(filtered);
-    }
-  }, [items, selectedLocation, selectedCategory, selectedStatus, showLowStock]);
-
-  const { data: suppliers } = useQuery({
-    queryKey: ['suppliers'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('id, name');
-      
-      if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 
-  const handleDeleteItem = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this item?')) {
-      await remove(id);
-      refetch();
-    }
-  };
-
-  const handleStatusChange = async (itemId: string, locationId: string, newStatus: "active" | "inactive") => {
-    try {
-      const { error } = await supabase
-        .from('inventory_location_items')
-        .update({ status: newStatus })
-        .eq('item_id', itemId)
-        .eq('location_id', locationId);
+  // Fetch categories for filtering
+  const { data: categories, isLoading: categoriesLoading } = useQuery({
+    queryKey: ["inventory_categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("inventory_categories")
+        .select("id, name");
 
       if (error) throw error;
+      return data as Category[];
+    },
+  });
 
-      await queryClient.invalidateQueries({ queryKey: ['inventory_items_with_locations'] });
-      toast.success(`Status updated to ${newStatus}`);
+  // Fetch suppliers for filtering
+  const { data: suppliers, isLoading: suppliersLoading } = useQuery({
+    queryKey: ["suppliers"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("suppliers").select("id, name");
+
+      if (error) throw error;
+      return data as Supplier[];
+    },
+  });
+
+  // Fetch locations for filtering
+  const { data: locations, isLoading: locationsLoading } = useQuery({
+    queryKey: ["locations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, name")
+        .eq("status", "active");
+
+      if (error) throw error;
+      return data as Array<{ id: string; name: string }>;
+    },
+  });
+
+  // Filter items based on search, category, supplier, location, and status
+  const filteredItems = items?.filter((item) => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory =
+      selectedCategory === "all" ||
+      item.location_items.some(
+        (li) => li.categories && li.categories.includes(selectedCategory)
+      );
+    const matchesSupplier =
+      selectedSupplier === "all" ||
+      item.location_items.some(
+        (li) => li.supplier_id === selectedSupplier
+      );
+    const matchesLocation =
+      selectedLocation === "all" ||
+      item.location_items.some(
+        (li) => li.location_id === selectedLocation
+      );
+    const matchesStatus =
+      selectedStatus === "all" ||
+      item.location_items.some(
+        (li) => li.status === selectedStatus
+      );
+
+    return matchesSearch && matchesCategory && matchesSupplier && matchesLocation && matchesStatus;
+  });
+
+  // Mutation for updating item status
+  const statusMutation = useMutation({
+    mutationFn: async ({
+      itemId,
+      locationId,
+      newStatus,
+    }: {
+      itemId: string;
+      locationId: string;
+      newStatus: "active" | "inactive";
+    }) => {
+      const { error } = await supabase
+        .from("inventory_location_items")
+        .update({ status: newStatus })
+        .eq("item_id", itemId)
+        .eq("location_id", locationId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory_items"] });
+      toast.success("Status updated successfully");
       setEditingStatus(null);
-    } catch (error: any) {
-      toast.error(error.message);
+    },
+    onError: (error) => {
+      console.error("Error updating status:", error);
+      toast.error("Failed to update status");
+    },
+  });
+
+  // Delete item mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("inventory_items")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory_items"] });
+      toast.success("Item deleted successfully");
+    },
+    onError: (error) => {
+      console.error("Error deleting item:", error);
+      toast.error("Failed to delete item");
+    },
+  });
+
+  // Handle status edit
+  const handleStatusEdit = (id: string) => {
+    setEditingStatus(id);
+  };
+
+  // Handle status change
+  const handleStatusChange = (itemId: string, locationId: string, newStatus: "active" | "inactive") => {
+    statusMutation.mutate({ itemId, locationId, newStatus });
+  };
+
+  // Handle delete item
+  const handleDeleteItem = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this item?")) {
+      deleteMutation.mutate(id);
     }
   };
 
-  const debouncedSearch = debounce((value: string) => {
-    setSearchQuery(value);
-  }, 300);
-
+  // Handle edit item
   const handleEditItem = (item: any) => {
     setEditingItem(item);
   };
 
+  const handleCloseDialog = () => {
+    setEditingItem(null);
+  };
+
+  if (itemsLoading || categoriesLoading || suppliersLoading || locationsLoading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="space-y-4">
       <InventoryFilters
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        categories={categories || []}
         selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-        selectedStatus={selectedStatus}
-        setSelectedStatus={setSelectedStatus}
+        onCategoryChange={setSelectedCategory}
+        suppliers={suppliers || []}
+        selectedSupplier={selectedSupplier}
+        onSupplierChange={setSelectedSupplier}
+        locations={locations || []}
         selectedLocation={selectedLocation}
-        setSelectedLocation={setSelectedLocation}
-        onSearchChange={(e) => debouncedSearch(e.target.value)}
-        showLowStock={showLowStock}
-        setShowLowStock={setShowLowStock}
+        onLocationChange={setSelectedLocation}
+        selectedStatus={selectedStatus}
+        onStatusChange={setSelectedStatus}
+      />
+
+      <InventoryTable
+        items={filteredItems || []}
         categories={categories}
+        suppliers={suppliers}
         locations={locations}
+        selectedLocation={selectedLocation}
+        editingStatus={editingStatus}
+        onStatusEdit={handleStatusEdit}
+        onStatusChange={handleStatusChange}
+        onCancelEdit={() => setEditingStatus(null)}
+        onEditItem={handleEditItem}
+        onDeleteItem={handleDeleteItem}
       />
 
-      <div className="bg-card rounded-lg">
-        <InventoryTable
-          items={displayItems}
-          categories={categories}
-          suppliers={suppliers}
-          locations={locations}
-          selectedLocation={selectedLocation}
-          editingStatus={editingStatus}
-          onStatusEdit={setEditingStatus}
-          onStatusChange={handleStatusChange}
-          onCancelEdit={() => setEditingStatus(null)}
-          onEditItem={handleEditItem}
-          onDeleteItem={handleDeleteItem}
-        />
-      </div>
-
-      <ItemDialog 
-        open={editingItem !== null}
-        item={editingItem} 
-        onClose={() => {
-          setEditingItem(null);
-          refetch();
-        }} 
-      />
+      {editingItem && (
+        <ItemDialog item={editingItem} onClose={handleCloseDialog} open={true} />
+      )}
     </div>
   );
 }
