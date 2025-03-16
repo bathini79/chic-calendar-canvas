@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,8 @@ import {
   Download,
   Ban,
   Clock,
-  Package
+  Package,
+  MapPin
 } from "lucide-react";
 import { format } from 'date-fns';
 import {
@@ -250,6 +252,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                       <Clock className="h-4 w-4" />
                       {format(new Date(transaction.created_at), 'EEE dd MMM yyyy, h:mm a')}
                     </div>
+                    {transaction.location && (
+                      <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                        <MapPin className="h-4 w-4" />
+                        {transaction.location}
+                      </div>
+                    )}
                   </div>
                   {!isRefund && (
                     <div className="flex items-center gap-2">

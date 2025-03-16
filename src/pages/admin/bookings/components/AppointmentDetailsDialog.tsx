@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import {
@@ -15,7 +16,8 @@ import {
   XCircle,
   ShoppingCart,
   Package,
-  User
+  User,
+  MapPin
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -196,7 +198,7 @@ export function AppointmentDetailsDialog({
   const showCheckoutButton = ['inprogress', 'confirmed', 'pending'].includes(appointment.status);
 
   const selectedMessage = selectedStatus ? statusMessages[selectedStatus as keyof typeof statusMessages] : null;
-console.log("groupedBookings",groupedBookings)
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -308,6 +310,12 @@ console.log("groupedBookings",groupedBookings)
                 {appointment.customer?.phone_number && (
                   <p className="text-sm text-gray-500">
                     {appointment.customer.phone_number}
+                  </p>
+                )}
+                {appointment.location && (
+                  <p className="text-sm text-gray-500 flex items-center mt-1">
+                    <MapPin className="h-3.5 w-3.5 mr-1 text-gray-400" />
+                    {appointment.location}
                   </p>
                 )}
               </div>
