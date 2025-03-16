@@ -13,7 +13,6 @@ import { QuantitySection } from "./item-form/QuantitySection";
 import { SupplierSection } from "./item-form/SupplierSection";
 import { StatusSection } from "./item-form/StatusSection";
 import { CategorySection } from "./item-form/CategorySection";
-import { LocationSection } from "./item-form/LocationSection";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 
 interface ItemFormProps {
@@ -98,9 +97,7 @@ export function ItemForm({ defaultValues, onSubmit }: ItemFormProps) {
           )}
         />
 
-        <LocationSection control={form.control} />
-
-        <QuantitySection control={form.control} register={form.register} />
+        <QuantitySection register={form.register} />
 
         <FormField
           control={form.control}

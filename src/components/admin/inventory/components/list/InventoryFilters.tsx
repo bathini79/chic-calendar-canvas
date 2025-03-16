@@ -1,5 +1,5 @@
 
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,18 +9,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Category } from "../../types";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { Category } from "../types";
 
 interface InventoryFiltersProps {
   selectedCategory: string;
   setSelectedCategory: (value: string) => void;
   selectedStatus: string;
   setSelectedStatus: (value: string) => void;
-  selectedLocation: string;
-  setSelectedLocation: (value: string) => void;
-  onSearchChange: (value: string) => void;
+  onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   showLowStock: boolean;
   setShowLowStock: (value: boolean) => void;
   categories?: Category[];
@@ -31,27 +27,11 @@ export function InventoryFilters({
   setSelectedCategory,
   selectedStatus,
   setSelectedStatus,
-  selectedLocation,
-  setSelectedLocation,
   onSearchChange,
   showLowStock,
   setShowLowStock,
   categories,
 }: InventoryFiltersProps) {
-  const { data: locations = [] } = useQuery({
-    queryKey: ['locations'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('status', 'active')
-        .order('name');
-      
-      if (error) throw error;
-      return data;
-    }
-  });
-
   return (
     <div className="flex flex-wrap gap-4 items-center">
       <div className="w-[200px]">
@@ -89,32 +69,13 @@ export function InventoryFilters({
         </Select>
       </div>
 
-      <div className="w-[200px]">
-        <Select
-          value={selectedLocation}
-          onValueChange={setSelectedLocation}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Filter by location" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Locations</SelectItem>
-            {locations?.map((location) => (
-              <SelectItem key={location.id} value={location.id}>
-                {location.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       <div className="flex-1 max-w-sm">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
             className="pl-10"
             placeholder="Search items..."
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={onSearchChange}
           />
         </div>
       </div>

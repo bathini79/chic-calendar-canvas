@@ -9,7 +9,6 @@ import debounce from "lodash/debounce";
 import { Database } from "@/integrations/supabase/types";
 import { InventoryFilters } from "./list/InventoryFilters";
 import { InventoryTable } from "./list/InventoryTable";
-import { InventoryStats } from "./InventoryStats";
 
 type InventoryItem = Database['public']['Tables']['inventory_items']['Row'] & {
   inventory_items_categories: Array<{ category_id: string }>;
@@ -21,7 +20,6 @@ export function ItemsList() {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [displayItems, setDisplayItems] = useState<InventoryItem[]>([]);
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
@@ -41,22 +39,8 @@ export function ItemsList() {
     },
   });
 
-  const { data: locations } = useQuery({
-    queryKey: ['locations'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('status', 'active')
-        .order('name');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const { data: items, refetch } = useQuery({
-    queryKey: ['inventory_items', selectedCategory, selectedStatus, selectedLocation, searchQuery, showLowStock],
+    queryKey: ['inventory_items', selectedCategory, selectedStatus, searchQuery, showLowStock],
     queryFn: async () => {
       let query = supabase
         .from('inventory_items')
@@ -69,10 +53,6 @@ export function ItemsList() {
 
       if (selectedStatus !== "all") {
         query = query.eq('status', selectedStatus);
-      }
-
-      if (selectedLocation !== "all") {
-        query = query.eq('location_id', selectedLocation);
       }
 
       if (searchQuery) {
@@ -150,15 +130,11 @@ export function ItemsList() {
 
   return (
     <div className="space-y-4">
-      <InventoryStats selectedLocation={selectedLocation} />
-
       <InventoryFilters
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
         selectedStatus={selectedStatus}
         setSelectedStatus={setSelectedStatus}
-        selectedLocation={selectedLocation}
-        setSelectedLocation={setSelectedLocation}
         onSearchChange={debouncedSearch}
         showLowStock={showLowStock}
         setShowLowStock={setShowLowStock}
@@ -170,7 +146,6 @@ export function ItemsList() {
           items={displayItems}
           categories={categories}
           suppliers={suppliers}
-          locations={locations}
           editingStatus={editingStatus}
           onStatusEdit={setEditingStatus}
           onStatusChange={handleStatusChange}

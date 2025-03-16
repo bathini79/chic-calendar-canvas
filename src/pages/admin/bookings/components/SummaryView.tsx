@@ -2,24 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/dialog";
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from "@/components/ui/tabs";
-import {
+  CheckCircle2, 
+  CreditCard, 
+  Banknote,
+  MoreVertical,
+  PencilLine,
+  FileText,
+  Mail,
+  Printer,
   Download,
   Ban,
   Clock,
@@ -28,349 +19,593 @@ import {
 } from "lucide-react";
 import { format } from 'date-fns';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useAppointmentActions } from "../hooks/useAppointmentActions";
-import { StatusBadge } from "./StatusBadge";
-import { useQuery } from "@tanstack/react-query";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAppointmentActions } from '../hooks/useAppointmentActions';
+import type { RefundData, TransactionDetails } from '../types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { formatRefundReason } from '../utils/formatters';
 
-interface SummaryViewProps {
-  transactions: any[];
-  onDateChange: (date: Date) => void;
-  selectedDate: Date;
+export interface SummaryViewProps {
+  appointmentId: string
 }
 
-export function SummaryView({ transactions, onDateChange, selectedDate }: SummaryViewProps) {
-  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
-  const [refundReason, setRefundReason] = useState("");
-  const [refundNotes, setRefundNotes] = useState("");
-  const [appointmentTypeFilter, setAppointmentTypeFilter] = useState("all");
+export const SummaryView: React.FC<SummaryViewProps> = ({
+  appointmentId
+}) => {
+  const [showVoidDialog, setShowVoidDialog] = useState(false);
+  const [showRefundDialog, setShowRefundDialog] = useState(false);
+  const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
+  const [note, setNote] = useState('');
+  const [refundItems, setRefundItems] = useState<{[key: string]: boolean}>({});
+  const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
+  const [refundReason, setRefundReason] = useState<RefundData['reason']>('customer_dissatisfaction');
+  const [refundNotes, setRefundNotes] = useState('');
+  const [refundedBy, setRefundedBy] = useState('');
+  const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const { fetchAppointmentDetails, updateAppointmentStatus, processRefund } = useAppointmentActions();
 
-  const { refundAppointment } = useAppointmentActions(() => {
-    // This will trigger a refetch after the refund
-    onDateChange(selectedDate);
-  });
+  useEffect(() => {
+    loadAppointmentDetails();
+    fetchEmployees();
+  }, [appointmentId]);
 
-  // Get location names for all transactions with locationId
-  const locationIds = transactions
-    .filter(t => t.location)
-    .map(t => t.location);
+  const loadAppointmentDetails = async () => {
+    const details = await fetchAppointmentDetails(appointmentId);
+    if (details) {
+      setTransactionDetails(details);
+    }
+  };
 
-  const { data: locations = [] } = useQuery({
-    queryKey: ['locationNames', locationIds],
-    queryFn: async () => {
-      if (locationIds.length === 0) return [];
-      
+  const fetchEmployees = async () => {
+    try {
       const { data, error } = await supabase
-        .from('locations')
+        .from('employees')
         .select('id, name')
-        .in('id', locationIds);
-      
+        .eq('status', 'active');
+
       if (error) throw error;
-      return data;
-    },
-    enabled: locationIds.length > 0
-  });
-
-  const getLocationName = (locationId: string) => {
-    const location = locations.find(loc => loc.id === locationId);
-    return location ? location.name : 'Unknown Location';
-  };
-
-  const handleRefundClick = (transaction: any) => {
-    setSelectedTransaction(transaction);
-    setRefundDialogOpen(true);
-  };
-
-  const handleRefundSubmit = async () => {
-    if (selectedTransaction && refundReason) {
-      await refundAppointment(selectedTransaction.id, refundReason, refundNotes);
-      setRefundDialogOpen(false);
-      setSelectedTransaction(null);
-      setRefundReason("");
-      setRefundNotes("");
+      setEmployees(data || []);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
     }
   };
 
-  // Filter transactions based on appointment type
-  const filteredTransactions = transactions.filter(transaction => {
-    switch (appointmentTypeFilter) {
-      case "sales":
-        return transaction.transaction_type === 'sale' && !transaction.refund_reason;
-      case "refunds":
-        return transaction.transaction_type === 'refund' || transaction.refund_reason;
-      default:
-        return true;
+  const getGroupedBookings = (transaction: any) => {
+    if (!transaction) return [];
+
+    const packageBookings = transaction.bookings.filter(b => b.package_id);
+    const serviceBookings = transaction.bookings.filter(b => b.service_id && !b.package_id);
+    
+    const packageGroups = packageBookings.reduce((groups, booking) => {
+      const packageId = booking.package_id;
+      if (!groups[packageId]) {
+        groups[packageId] = {
+          package: booking.package,
+          bookings: [],
+          totalPricePaid: 0
+        };
+      }
+      groups[packageId].bookings.push(booking);
+      groups[packageId].totalPricePaid += booking.price_paid || 0;
+      return groups;
+    }, {});
+
+    const result = [
+      ...Object.values(packageGroups).map((group: any) => ({
+        type: 'package',
+        ...group
+      })),
+      ...serviceBookings.map(booking => ({
+        type: 'service',
+        booking
+      }))
+    ];
+
+    return result;
+  };
+
+  const handleRefundSale = async () => {
+    if (!transactionDetails?.originalSale || !refundedBy) {
+      toast.error("Please select who processed the refund");
+      return;
     }
-  });
 
-  // Calculate totals
-  const salesTotals = transactions
-    .filter(t => t.transaction_type === 'sale' && !t.refund_reason)
-    .reduce((acc, t) => acc + Number(t.total_price), 0);
+    try {
+      const selectedBookingIds = Object.entries(refundItems)
+        .filter(([_, isSelected]) => isSelected)
+        .map(([id]) => id);
 
-  const refundsTotals = transactions
-    .filter(t => t.transaction_type === 'refund' || t.refund_reason)
-    .reduce((acc, t) => acc + Number(t.total_price), 0);
+      if (selectedBookingIds.length === 0) {
+        toast.error("Please select at least one item to refund");
+        return;
+      }
 
-  const netTotal = salesTotals - refundsTotals;
+      const refundData: RefundData = {
+        reason: refundReason,
+        notes: refundNotes,
+        refundedBy: refundedBy
+      };
 
-  return (
-    <div className="space-y-4 p-4">
-      <div className="flex flex-col md:flex-row gap-4 mb-6 w-full">
-        <Card className="flex-1">
-          <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">Gross Sales</div>
-            <div className="text-2xl font-bold">${salesTotals.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-        <Card className="flex-1">
-          <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">Refunds</div>
-            <div className="text-2xl font-bold text-destructive">-${refundsTotals.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-        <Card className="flex-1">
-          <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">Net Total</div>
-            <div className="text-2xl font-bold">${netTotal.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-      </div>
+      const success = await processRefund(appointmentId, selectedBookingIds, refundData);
 
-      <Tabs defaultValue="all" value={appointmentTypeFilter} onValueChange={setAppointmentTypeFilter}>
-        <div className="flex justify-between items-center mb-4">
-          <TabsList>
-            <TabsTrigger value="all">All Transactions</TabsTrigger>
-            <TabsTrigger value="sales">Sales</TabsTrigger>
-            <TabsTrigger value="refunds">Refunds</TabsTrigger>
-          </TabsList>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-        </div>
+      if (success) {
+        await loadAppointmentDetails();
+        setShowRefundDialog(false);
+        toast.success('Refund processed successfully');
+      }
+    } catch (error: any) {
+      console.error("Error refunding sale:", error);
+      toast.error("Failed to process refund");
+    }
+  };
 
-        <TabsContent value="all" className="m-0">
-          <TransactionsList 
-            transactions={filteredTransactions} 
-            onRefund={handleRefundClick}
-            getLocationName={getLocationName}
-          />
-        </TabsContent>
-        <TabsContent value="sales" className="m-0">
-          <TransactionsList 
-            transactions={filteredTransactions} 
-            onRefund={handleRefundClick}
-            getLocationName={getLocationName}
-          />
-        </TabsContent>
-        <TabsContent value="refunds" className="m-0">
-          <TransactionsList 
-            transactions={filteredTransactions} 
-            onRefund={handleRefundClick}
-            getLocationName={getLocationName}
-          />
-        </TabsContent>
-      </Tabs>
+  const handleVoidSale = async () => {
+    if (!transactionDetails?.originalSale) return;
 
-      <RefundDialog
-        open={refundDialogOpen}
-        onOpenChange={setRefundDialogOpen}
-        transaction={selectedTransaction}
-        refundReason={refundReason}
-        setRefundReason={setRefundReason}
-        refundNotes={refundNotes}
-        setRefundNotes={setRefundNotes}
-        onSubmit={handleRefundSubmit}
-      />
-    </div>
-  );
-}
+    try {
+      const bookingIds = transactionDetails.originalSale.bookings.map(booking => booking.id);
+      
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({ status: 'voided' })
+        .in('id', bookingIds);
 
-interface TransactionsListProps {
-  transactions: any[];
-  onRefund: (transaction: any) => void;
-  getLocationName: (locationId: string) => string;
-}
+      if (bookingsError) throw bookingsError;
 
-function TransactionsList({ transactions, onRefund, getLocationName }: TransactionsListProps) {
-  if (transactions.length === 0) {
-    return <div className="text-center py-8 text-muted-foreground">No transactions for this period</div>;
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .update({ status: 'voided' })
+        .eq('id', appointmentId);
+
+      if (appointmentError) throw appointmentError;
+
+      await loadAppointmentDetails();
+      setShowVoidDialog(false);
+      toast.success('Sale voided successfully');
+    } catch (error: any) {
+      console.error("Error voiding sale:", error);
+      toast.error("Failed to void sale");
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!note.trim()) {
+      toast.error("Please enter a note");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ notes: note })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      await loadAppointmentDetails();
+      setShowAddNoteDialog(false);
+      setNote('');
+      toast.success('Note added successfully');
+    } catch (error: any) {
+      console.error("Error adding note:", error);
+      toast.error("Failed to add note");
+    }
+  };
+
+  if (!transactionDetails) {
+    return <div>Loading...</div>;
   }
 
+  const { originalSale, refunds } = transactionDetails;
+
+  const allTransactions = [
+    ...refunds,
+    originalSale
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
   return (
-    <div className="space-y-4">
-      {transactions.map(transaction => {
-        const isRefund = transaction.transaction_type === 'refund' || transaction.refund_reason;
-        const customerName = transaction.customer?.full_name || 'Anonymous';
-        
-        return (
-          <Card key={transaction.id} className={isRefund ? "border-destructive/20 bg-destructive/5" : ""}>
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row justify-between mb-2">
-                <div className="flex items-center gap-3 mb-2 sm:mb-0">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="text-xs">
-                      {customerName.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="text-sm font-medium">{customerName}</div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
+    <>
+      <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto px-1">
+        {allTransactions.map((transaction) => {
+          const isRefund = transaction.transaction_type === 'refund';
+          const groupedBookings = getGroupedBookings(transaction);
+          
+          return (
+            <Card key={transaction.id} className={`bg-white h-full ${isRefund ? 'border-red-200' : ''}`}>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex-1">
+                    <div className={`inline-flex items-center px-2.5 py-1 rounded ${
+                      isRefund ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                    } text-sm font-medium mb-2`}>
+                      {isRefund ? (
+                        <>
+                          <Ban className="h-4 w-4 mr-1" />
+                          Refund #{transaction.id.slice(0, 6)}
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Sale #{transaction.id.slice(0, 6)}
+                       </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
                       <Clock className="h-4 w-4" />
                       {format(new Date(transaction.created_at), 'EEE dd MMM yyyy, h:mm a')}
                     </div>
                     {transaction.location && (
                       <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                         <MapPin className="h-4 w-4" />
-                        {getLocationName(transaction.location)}
+                        {transaction.location}
                       </div>
                     )}
                   </div>
-                </div>
-                {!isRefund && (
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={transaction.status} />
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="h-8 px-2"
-                      onClick={() => onRefund(transaction)}
-                      disabled={['refunded', 'voided'].includes(transaction.status)}
-                    >
-                      <Ban className="h-4 w-4 mr-1" />
-                      Refund
-                    </Button>
-                  </div>
-                )}
-                {isRefund && (
-                  <div className="flex items-center">
-                    <div className="bg-destructive/20 text-destructive text-xs px-2 py-1 rounded">
-                      Refunded
+                  {!isRefund && (
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" className="bg-black text-white">
+                        Rebook
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem onSelect={() => setShowRefundDialog(true)}>
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            Refund sale
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <PencilLine className="mr-2 h-4 w-4" />
+                            Edit sale details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setShowAddNoteDialog(true)}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Add a note
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Email
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Print
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Download className="mr-2 h-4 w-4" />
+                            Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onSelect={() => setShowVoidDialog(true)}
+                          >
+                            <Ban className="mr-2 h-4 w-4" />
+                            Void sale
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  </div>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-                <div>
-                  <div className="text-sm text-muted-foreground">Services/Packages</div>
-                  <div className="text-sm">
-                    {transaction.bookings.map((booking: any, idx: number) => (
-                      <div key={idx} className="flex items-center gap-1 mt-1">
-                        {booking.package ? (
-                          <Package className="h-3 w-3 mr-1" />
-                        ) : null}
-                        {booking.service?.name || booking.package?.name || 'Service'}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-muted-foreground">Payment Method</div>
-                  <div className="text-sm capitalize">{transaction.payment_method || 'Cash'}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-muted-foreground">Amount</div>
-                  <div className={`text-lg font-bold ${isRefund ? 'text-destructive' : ''}`}>
-                    {isRefund ? '-' : ''}${Number(transaction.total_price).toFixed(2)}
-                  </div>
-                </div>
-              </div>
-              
-              {transaction.refund_reason && (
-                <div className="mt-3 pt-3 border-t">
-                  <div className="text-sm text-muted-foreground">Refund Reason</div>
-                  <div className="text-sm capitalize">{transaction.refund_reason.replace(/_/g, ' ')}</div>
-                  {transaction.refund_notes && (
-                    <div className="text-sm mt-1">{transaction.refund_notes}</div>
                   )}
                 </div>
+
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-base font-semibold">
+                    {transaction.customer?.full_name || 'No name provided'}
+                  </h4>
+                  <p className="text-gray-600">{transaction.customer?.email || 'No email provided'}</p>
+                </div>
+
+                <div className="overflow-y-auto">
+                  <h4 className="font-medium mb-4">{isRefund ? 'Refunded Items' : 'Items'}</h4>
+                  
+                  {groupedBookings.map((item: any, idx: number) => {
+                    if (item.type === 'package') {
+                      return (
+                        <div key={idx} className="mb-4">
+                          <div className="py-2 flex justify-between items-start border-b bg-slate-50 px-2 rounded-t-md">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4" />
+                                <p className="font-medium line-clamp-1">{item.package.name}</p>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {item.bookings.length} services
+                              </p>
+                            </div>
+                            <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
+                              {isRefund ? '-' : ''}₹{item.totalPricePaid.toFixed(2)}
+                            </p>
+                          </div>
+                          
+                          <div className="pl-6 border-l-2 border-gray-300 ml-4 mt-2 space-y-1">
+                            {item.bookings.map((booking: any) => {
+                              const servicePrice = booking.price_paid || 0;
+                                
+                              return (
+                                <div key={booking.id} className="py-1 flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="text-sm line-clamp-1">{booking.service?.name}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {booking.start_time && format(new Date(booking.start_time), 'h:mma')}{' '}
+                                      {booking.employee && ` • ${booking.employee.name}`}
+                                    </p>
+                                  </div>
+                                  <p className="text-xs text-gray-600">
+                                    ₹{servicePrice.toFixed(2)}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      const booking = item.booking;
+                      return (
+                        <div key={booking.id} className="py-2 flex justify-between items-start border-b">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm line-clamp-1">{booking.service?.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {booking.start_time && format(new Date(booking.start_time), 'h:mma')}{' '}
+                              {booking.employee && ` • ${booking.employee.name}`}
+                            </p>
+                          </div>
+                          <p className={`text-right ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
+                            {isRefund ? '-' : ''}₹{booking.price_paid.toFixed(2)}
+                          </p>
+                        </div>
+                      );
+                    }
+                  })}
+                </div>
+
+                <div className="space-y-1 pt-2 border-t">
+                  {transaction.discount_type !== 'none' && transaction.discount_value > 0 && (
+                    <div className="flex justify-between text-xs text-green-600">
+                      <span>
+                        Discount ({transaction.discount_type === 'percentage' ? 
+                          `${transaction.discount_value}%` : 
+                          '₹' + transaction.discount_value
+                        })
+                      </span>
+                      <span>-₹{transaction.discount_value.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-bold pt-2">
+                    <span>Total</span>
+                    <span className={isRefund ? 'text-red-600' : ''}>
+                      {isRefund ? '-' : ''}₹{Math.abs(transaction.total_price).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <div className="flex justify-between text-xs">
+                    <span className="capitalize">
+                      Paid with {transaction.payment_method === 'cash' ? 'Cash' : 'Online'}
+                    </span>
+                    <div className="flex items-center">
+                      {transaction.payment_method === 'cash' ? (
+                        <Banknote className="h-4 w-4 mr-1" />
+                      ) : (
+                        <CreditCard className="h-4 w-4 mr-1" />
+                      )}
+                      ₹{Math.abs(transaction.total_price).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                {isRefund && transaction.refund_reason && (
+                  <div className="space-y-2 pt-4 border-t">
+                    {transaction.refund_reason && (
+                      <div>
+                        <p className="font-medium text-xs">Reason:</p>
+                        <p className="text-gray-600">{formatRefundReason(transaction.refund_reason)}</p>
+                      </div>
+                    )}
+                    {transaction.refund_notes && (
+                      <div>
+                        <p className="font-medium text-sm">Notes:</p>
+                        <p className="text-gray-600">{transaction.refund_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void Sale</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to void this sale? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleVoidSale}>
+              Void Sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Refund Sale</DialogTitle>
+            <DialogDescription>
+              Select the items you want to refund
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <Label>Select Items</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectAll}
+                  onChange={(e) => {
+                    setSelectAll(e.target.checked);
+                    const allBookingIds = transactionDetails.originalSale.bookings
+                      .filter(booking => booking.status !== 'refunded')
+                      .reduce((acc, booking) => {
+                        acc[booking.id] = e.target.checked;
+                        return acc;
+                      }, {});
+                    setRefundItems(allBookingIds);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <span className="text-sm">Select All</span>
+              </div>
+            </div>
+
+            <div className="max-h-36 overflow-y-auto space-y-1">
+              {transactionDetails.originalSale.bookings.filter(
+                booking => booking.status !== 'refunded'
+              ).map((booking) => {
+                const itemName = booking.service?.name || booking.package?.name;
+                const itemPrice = booking.price_paid;
+                
+                return (
+                  <div key={booking.id} className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <p className="font-medium">{itemName}</p>
+                      <p className="text-sm text-gray-500">₹{itemPrice.toFixed(2)}</p>
+                      {booking.employee && (
+                        <p className="text-sm text-gray-500">Stylist: {booking.employee.name}</p>
+                      )}
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={refundItems[booking.id] || false}
+                      onChange={(e) => 
+                        setRefundItems({
+                          ...refundItems,
+                          [booking.id]: e.target.checked
+                        })
+                      }
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Processed By</Label>
+                <Select
+                  value={refundedBy}
+                  onValueChange={setRefundedBy}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select employee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Refund Reason</Label>
+                <Select
+                  value={refundReason}
+                  onValueChange={(value) => setRefundReason(value as RefundData['reason'])}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer_dissatisfaction">Customer Dissatisfaction</SelectItem>
+                    <SelectItem value="service_quality_issue">Service Quality Issue</SelectItem>
+                    <SelectItem value="scheduling_error">Scheduling Error</SelectItem>
+                    <SelectItem value="health_concern">Health Concern</SelectItem>
+                    <SelectItem value="price_dispute">Price Dispute</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {refundReason === 'other' && (
+                <div className="space-y-2">
+                  <Label>Additional Notes</Label>
+                  <Textarea
+                    value={refundNotes}
+                    onChange={(e) => setRefundNotes(e.target.value)}
+                    placeholder="Please provide details for the refund..."
+                    rows={3}
+                  />
+                </div>
               )}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
-
-interface RefundDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  transaction: any;
-  refundReason: string;
-  setRefundReason: (reason: string) => void;
-  refundNotes: string;
-  setRefundNotes: (notes: string) => void;
-  onSubmit: () => void;
-}
-
-function RefundDialog({
-  open,
-  onOpenChange,
-  transaction,
-  refundReason,
-  setRefundReason,
-  refundNotes,
-  setRefundNotes,
-  onSubmit,
-}: RefundDialogProps) {
-  if (!transaction) return null;
-
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-md">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Issue Refund</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will refund the full amount of ${Number(transaction.total_price).toFixed(2)} to the customer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <div className="space-y-4 mb-4">
-          <div>
-            <label htmlFor="refund-reason" className="text-sm font-medium">Reason for Refund</label>
-            <Select value={refundReason} onValueChange={setRefundReason}>
-              <SelectTrigger id="refund-reason">
-                <SelectValue placeholder="Select a reason" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="customer_request">Customer Request</SelectItem>
-                <SelectItem value="service_issue">Service Issue</SelectItem>
-                <SelectItem value="scheduling_conflict">Scheduling Conflict</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+            </div>
           </div>
-          <div>
-            <label htmlFor="refund-notes" className="text-sm font-medium">Additional Notes</label>
-            <Textarea 
-              id="refund-notes" 
-              value={refundNotes} 
-              onChange={(e) => setRefundNotes(e.target.value)}
-              placeholder="Add any additional notes about this refund"
-            />
-          </div>
-        </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction 
-            onClick={onSubmit}
-            disabled={!refundReason}
-            className="bg-destructive hover:bg-destructive/90"
-          >
-            Issue Refund
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRefundDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRefundSale}>
+              Process Refund
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a Note</DialogTitle>
+          </DialogHeader>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="w-full h-32 p-2 border rounded"
+            placeholder="Enter your note here..."
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddNoteDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddNote}>
+              Save Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
-}
+};

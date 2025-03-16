@@ -12,7 +12,6 @@ export const itemSchema = z.object({
   status: z.enum(["active", "inactive"]).default("active"),
   supplier_id: z.string(),
   unit_of_quantity: z.string().min(1, "Unit of quantity is required"),
-  location_id: z.string().optional(),
 });
 
 export type ItemFormValues = z.infer<typeof itemSchema>;

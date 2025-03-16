@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Trash2, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Database } from "@/integrations/supabase/types";
-import { Category, Supplier } from "../../types";
+import { Category, Supplier } from "../types";
 
 type InventoryItem = Database['public']['Tables']['inventory_items']['Row'] & {
   inventory_items_categories: Array<{ category_id: string }>;
@@ -23,7 +23,6 @@ interface InventoryTableProps {
   items: InventoryItem[];
   categories?: Category[];
   suppliers?: Supplier[];
-  locations?: any[];
   editingStatus: string | null;
   onStatusEdit: (id: string) => void;
   onStatusChange: (itemId: string, newStatus: "active" | "inactive") => void;
@@ -36,7 +35,6 @@ export function InventoryTable({
   items,
   categories,
   suppliers,
-  locations = [],
   editingStatus,
   onStatusEdit,
   onStatusChange,
@@ -44,17 +42,11 @@ export function InventoryTable({
   onEditItem,
   onDeleteItem,
 }: InventoryTableProps) {
-  const getLocationName = (locationId: string) => {
-    const location = locations.find(loc => loc.id === locationId);
-    return location ? location.name : 'No Location';
-  };
-
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Name</TableHead>
-          <TableHead>Location</TableHead>
           <TableHead>Quantity</TableHead>
           <TableHead>Min. Quantity</TableHead>
           <TableHead>Max. Quantity</TableHead>
@@ -70,7 +62,6 @@ export function InventoryTable({
         {items.map((item) => (
           <TableRow key={item.id}>
             <TableCell className="font-medium">{item.name}</TableCell>
-            <TableCell>{item.location_id ? getLocationName(item.location_id) : 'No Location'}</TableCell>
             <TableCell>
               <Badge variant={item.quantity <= item.minimum_quantity ? "destructive" : "default"}>
                 {item.quantity} {item.unit_of_quantity}
