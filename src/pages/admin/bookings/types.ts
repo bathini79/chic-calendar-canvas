@@ -69,6 +69,7 @@ export interface Employee {
   employment_type: "stylist" | "operations";
   created_at: string;
   updated_at: string;
+  avatar?: string; // Add avatar property
 }
 
 export interface Booking {
@@ -117,4 +118,22 @@ export interface Appointment {
   total_duration?: number;
   customer?: Customer;
   bookings: Booking[];
+}
+
+// Add RefundData interface
+export interface RefundData {
+  reason: string;
+  notes: string;
+  refundedBy: string;
+}
+
+// Add TransactionDetails interface
+export interface TransactionDetails {
+  id: string;
+  amount: number;
+  status: string;
+  payment_method?: string;
+  created_at: string;
+  originalSale: Appointment;
+  refunds: Appointment[];
 }

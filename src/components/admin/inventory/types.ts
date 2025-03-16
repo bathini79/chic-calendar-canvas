@@ -15,6 +15,7 @@ export interface InventoryItem {
   status: ItemStatus;
   created_at: string;
   updated_at: string;
+  location_id?: string;
   inventory_items_categories: Array<{ category_id: string }>;
 }
 

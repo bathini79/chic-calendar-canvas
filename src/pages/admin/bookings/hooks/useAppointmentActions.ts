@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
+import { Appointment, Booking, AppointmentStatus, RefundData, TransactionDetails } from '../types';
 
 // Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
@@ -19,7 +19,7 @@ interface SelectedItem {
   duration?: number;
 }
 
-export function useAppointmentActions() {
+export function useAppointmentActions(onUpdated?: () => void) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
 
@@ -128,6 +128,64 @@ export function useAppointmentActions() {
       return null;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const changeStatus = async (appointmentId: string, status: AppointmentStatus) => {
+    try {
+      const { data: appointment, error: fetchError } = await supabase
+        .from('appointments')
+        .select('id, bookings(id)')
+        .eq('id', appointmentId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const bookingIds = appointment.bookings.map((booking: any) => booking.id);
+      
+      await updateAppointmentStatus(appointmentId, status, bookingIds);
+      
+      if (onUpdated) {
+        onUpdated();
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('Error changing status:', error);
+      toast.error(error.message || 'Failed to change appointment status');
+      return false;
+    }
+  };
+
+  const refundAppointment = async (appointmentId: string, reason: string, notes: string) => {
+    try {
+      const { data: appointment, error: fetchError } = await supabase
+        .from('appointments')
+        .select('id, bookings(id)')
+        .eq('id', appointmentId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const bookingIds = appointment.bookings.map((booking: any) => booking.id);
+      
+      const refundData: RefundData = {
+        reason,
+        notes,
+        refundedBy: 'system' // This should be replaced with the actual user ID in a real app
+      };
+      
+      await processRefund(appointmentId, bookingIds, refundData);
+      
+      if (onUpdated) {
+        onUpdated();
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('Error processing refund:', error);
+      toast.error(error.message || 'Failed to process refund');
+      return false;
     }
   };
 
@@ -251,7 +309,7 @@ export function useAppointmentActions() {
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: Appointment['status'],
+    status: AppointmentStatus,
     bookingIds: string[]
   ) => {
     try {
@@ -307,6 +365,8 @@ export function useAppointmentActions() {
     selectedItems,
     fetchAppointmentDetails,
     updateAppointmentStatus,
-    processRefund
+    processRefund,
+    changeStatus,
+    refundAppointment
   };
 }

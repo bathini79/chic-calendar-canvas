@@ -7,63 +7,64 @@ import type { AppointmentStatus } from '../types';
 interface StatusBadgeProps {
   status: AppointmentStatus;
   className?: string;
+  large?: boolean;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className, large }) => {
   const getStatusConfig = () => {
     switch (status) {
       case 'completed':
         return {
           label: 'Completed',
-          icon: <CheckCircle className="h-3 w-3 mr-1" />,
+          icon: <CheckCircle className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
           variant: 'success' as const
         };
       case 'confirmed':
         return {
           label: 'Confirmed',
-          icon: <CheckCircle className="h-3 w-3 mr-1" />,
+          icon: <CheckCircle className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
           variant: 'default' as const
         };
       case 'inprogress':
         return {
           label: 'In Progress',
-          icon: <Clock className="h-3 w-3 mr-1" />,
+          icon: <Clock className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
           variant: 'warning' as const
         };
       case 'canceled':
         return {
           label: 'Canceled',
-          icon: <XCircle className="h-3 w-3 mr-1" />,
+          icon: <XCircle className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
           variant: 'destructive' as const
         };
       case 'voided':
         return {
           label: 'Voided',
-          icon: <Ban className="h-3 w-3 mr-1" />,
+          icon: <Ban className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
           variant: 'destructive' as const
         };
       case 'refunded':
         return {
           label: 'Refunded',
-          icon: <RotateCcw className="h-3 w-3 mr-1" />,
+          icon: <RotateCcw className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
           variant: 'destructive' as const
         };
       case 'partially_refunded':
         return {
           label: 'Partially Refunded',
-          icon: <RotateCcw className="h-3 w-3 mr-1" />,
+          icon: <RotateCcw className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
           variant: 'destructive' as const
         };
       case 'noshow':
         return {
           label: 'No Show',
-          icon: <Ban className="h-3 w-3 mr-1" />,
+          icon: <Ban className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
           variant: 'destructive' as const
         };
       default:
         return {
           label: 'Pending',
-          icon: <Clock className="h-3 w-3 mr-1" />,
+          icon: <Clock className={`${large ? 'h-4 w-4' : 'h-3 w-3'} mr-1`} />,
           variant: 'outline' as const
         };
     }
@@ -74,7 +75,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
   return (
     <Badge
       variant={variant}
-      className={`flex items-center ${className}`}
+      className={`flex items-center ${large ? 'text-sm py-1 px-2' : ''} ${className || ''}`}
     >
       {icon}
       {label}
