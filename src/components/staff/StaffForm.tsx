@@ -1,4 +1,3 @@
-
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +23,6 @@ import {
 } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
@@ -53,28 +51,6 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Fetch employee data if editing
-  const { data: employeeData } = useQuery({
-    queryKey: ['employee', employeeId],
-    queryFn: async () => {
-      if (!employeeId) return null;
-      
-      const { data, error } = await supabase
-        .from('employees')
-        .select(`
-          *,
-          employee_skills(service_id),
-          employee_locations(location_id)
-        `)
-        .eq('id', employeeId)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!employeeId
-  });
 
   const form = useForm<StaffFormData>({
     resolver: zodResolver(formSchema),
@@ -107,26 +83,26 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
 
   // Initialize form with employee data when it's loaded
   useEffect(() => {
-    if (employeeData) {
+    if (initialData) {
       form.reset({
-        name: employeeData.name || '',
-        email: employeeData.email || '',
-        phone: employeeData.phone || '',
-        photo_url: employeeData.photo_url || '',
-        status: employeeData.status || 'active',
-        employment_type: employeeData.employment_type || 'stylist',
-        skills: employeeData.employee_skills?.map((s: any) => s.service_id) || [],
-        locations: employeeData.employee_locations?.map((l: any) => l.location_id) || [],
+        name: initialData.name || '',
+        email: initialData.email || '',
+        phone: initialData.phone || '',
+        photo_url: initialData.photo_url || '',
+        status: initialData.status || 'active',
+        employment_type: initialData.employment_type || 'stylist',
+        skills: initialData.employee_skills?.map((s: any) => s.service_id) || [],
+        locations: initialData.employee_locations?.map((l: any) => l.location_id) || [],
       });
       
-      if (employeeData.photo_url) {
-        setImages([employeeData.photo_url]);
+      if (initialData.photo_url) {
+        setImages([initialData.photo_url]);
       }
       
-      setSelectedSkills(employeeData.employee_skills?.map((s: any) => s.service_id) || []);
-      setSelectedLocations(employeeData.employee_locations?.map((l: any) => l.location_id) || []);
+      setSelectedSkills(initialData.employee_skills?.map((s: any) => s.service_id) || []);
+      setSelectedLocations(initialData.employee_locations?.map((l: any) => l.location_id) || []);
     }
-  }, [employeeData, form]);
+  }, [initialData, form]);
 
   // Update form when selected locations change
   useEffect(() => {

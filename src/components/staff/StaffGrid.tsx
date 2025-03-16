@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { toast } from "sonner";
 
 interface StaffGridProps {
   searchQuery: string;
-  onEdit: (staff: any) => void;
+  onEdit: (staffId: string) => void;
 }
 
 export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
@@ -87,7 +88,7 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
               variant="outline"
               size="sm"
               className="flex items-center gap-2"
-              onClick={() => onEdit(member)}
+              onClick={() => onEdit(member.id)}
             >
               <Edit className="h-4 w-4" />
               Edit

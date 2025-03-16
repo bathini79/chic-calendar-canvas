@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { StaffDialog } from "@/components/staff/StaffDialog";
 import { StaffGrid } from "@/components/staff/StaffGrid";
@@ -13,7 +14,18 @@ export default function Staff() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | undefined>(undefined);
   const { data: employees, isLoading } = useSupabaseCrud<'employees'>('employees');
+
+  const handleOpenDialog = (employeeId?: string) => {
+    setSelectedEmployeeId(employeeId);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setSelectedEmployeeId(undefined);
+  };
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -22,7 +34,7 @@ export default function Staff() {
   return (
     <div className="container py-6 space-y-4">
       <HeaderActions 
-        onAdd={() => setIsDialogOpen(true)} 
+        onAdd={() => handleOpenDialog()} 
         view={view} 
         onViewChange={setView}
       />
@@ -30,18 +42,19 @@ export default function Staff() {
       {view === "grid" ? (
         <StaffGrid 
           searchQuery={searchQuery}
-          onEdit={() => setIsDialogOpen(true)}
+          onEdit={handleOpenDialog}
         />
       ) : (
         <StaffList 
           searchQuery={searchQuery}
-          onEdit={() => setIsDialogOpen(true)}
+          onEdit={handleOpenDialog}
         />
       )}
 
       <StaffDialog 
         open={isDialogOpen} 
-        onOpenChange={setIsDialogOpen}
+        onOpenChange={handleCloseDialog}
+        employeeId={selectedEmployeeId}
       />
     </div>
   );

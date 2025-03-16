@@ -1,5 +1,3 @@
-
-// Update StaffList to fetch employee locations correctly
 import React, { useState } from "react";
 import {
   Table,
@@ -41,19 +39,6 @@ export function StaffList({ searchQuery, onEdit }: StaffListProps) {
         throw error;
       }
       
-      return data || [];
-    },
-  });
-
-  const { data: locations = [] } = useQuery({
-    queryKey: ["locations"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("locations")
-        .select("*")
-        .eq("is_active", true);
-
-      if (error) throw error;
       return data || [];
     },
   });

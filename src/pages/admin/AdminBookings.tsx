@@ -1,5 +1,4 @@
 
-// Fixing the AdminBookings component to handle locations correctly
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -42,7 +41,7 @@ export default function AdminBookings() {
     date?: Date;
   } | null>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
@@ -76,24 +75,24 @@ export default function AdminBookings() {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        let query = supabase
+        if (!selectedLocationId) {
+          setEmployees([]);
+          return;
+        }
+        
+        // Fetch employees with their assigned locations
+        const { data, error } = await supabase
           .from("employees")
           .select(`
             *,
-            employee_locations(location_id)
+            employee_locations!inner(location_id)
           `)
           .eq("employment_type", "stylist")
-          .eq("status", "active");
-        
-        // Filter by location if one is selected
-        if (selectedLocationId) {
-          // Proper query with the employee_locations junction table
-          query = query.contains('employee_locations', [{ location_id: selectedLocationId }]);
-        }
-        
-        const { data, error } = await query;
+          .eq("status", "active")
+          .eq("employee_locations.location_id", selectedLocationId);
         
         if (error) throw error;
+        
         const employeeWithAvatar = data.map((employee) => ({
           ...employee,
           avatar: employee.name
@@ -101,6 +100,7 @@ export default function AdminBookings() {
             .map((n) => n[0])
             .join(""),
         }));
+        
         setEmployees(employeeWithAvatar);
       } catch (error) {
         console.error("Error fetching employees:", error);

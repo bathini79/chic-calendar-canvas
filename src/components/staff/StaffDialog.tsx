@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 interface StaffDialogProps {
   open: boolean;
@@ -11,6 +12,28 @@ interface StaffDialogProps {
 }
 
 export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps) {
+  // Fetch employee data if editing
+  const { data: employeeData } = useQuery({
+    queryKey: ['employee', employeeId],
+    queryFn: async () => {
+      if (!employeeId) return null;
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .select(`
+          *,
+          employee_skills(service_id),
+          employee_locations(location_id)
+        `)
+        .eq('id', employeeId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employeeId
+  });
+
   const handleFormSubmit = async (data: any) => {
     try {
       let id = employeeId;
@@ -112,6 +135,7 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
           onSubmit={handleFormSubmit} 
           onCancel={() => onOpenChange(false)} 
           employeeId={employeeId}
+          initialData={employeeData}
         />
       </DialogContent>
     </Dialog>
