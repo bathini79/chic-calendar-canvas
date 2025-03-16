@@ -6,7 +6,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
-import { MapPin } from "lucide-react";
+import { MapPin, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { formatTime, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
@@ -22,6 +22,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
+import { Appointment } from "./bookings/types";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { startOfDay, format, parse, addMinutes } from "date-fns";
-import { SCREEN } from "../types";
+import { SCREEN, AppointmentStatus } from "../types";
 
 interface SaveAppointmentProps {
   selectedDate: Date | null;
@@ -22,7 +22,7 @@ interface SaveAppointmentProps {
   notes: string;
   customizedServices: Record<string, string[]>;
   currentScreen: SCREEN;
-  locationId?: string; // Add locationId as an optional parameter
+  locationId?: string;
 }
 
 export default function useSaveAppointment({
@@ -94,18 +94,21 @@ export default function useSaveAppointment({
         discountValue
       );
 
-      // Create or update appointment
+      // Create or update appointment with properly typed status
+      const appointmentStatus: AppointmentStatus = 
+        currentScreen === SCREEN.CHECKOUT ? 'confirmed' : 'pending';
+
       const appointmentData = {
         customer_id: selectedCustomer.id,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
-        status: currentScreen === SCREEN.CHECKOUT ? 'confirmed' : 'pending',
+        status: appointmentStatus,
         total_price: totalPrice,
-        discount_type: discountType,
+        discount_type: discountType as 'none' | 'percentage' | 'fixed',
         discount_value: discountValue,
         payment_method: paymentMethod,
         notes: notes,
-        location: locationId, // Add locationId to the appointment data
+        location: locationId,
       };
 
       let createdAppointmentId;
@@ -139,19 +142,20 @@ export default function useSaveAppointment({
         createdAppointmentId = data.id;
       }
 
-      // Create bookings for each service
+      // Create bookings for each service with properly typed status
       for (const serviceId of selectedServices) {
         const service = services.find(s => s.id === serviceId);
         if (!service) continue;
 
         const serviceStartTime = new Date(startTime);
-        // TODO: Calculate proper start time based on previous services
+        const bookingStatus: AppointmentStatus = 
+          currentScreen === SCREEN.CHECKOUT ? 'confirmed' : 'pending';
 
         const bookingData = {
           appointment_id: createdAppointmentId,
           service_id: serviceId,
           employee_id: selectedStylists[serviceId] === 'any' ? null : selectedStylists[serviceId],
-          status: currentScreen === SCREEN.CHECKOUT ? 'confirmed' : 'pending',
+          status: bookingStatus,
           start_time: serviceStartTime.toISOString(),
           end_time: addMinutes(serviceStartTime, service.duration).toISOString(),
           price_paid: service.selling_price,

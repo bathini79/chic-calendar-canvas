@@ -1,4 +1,3 @@
-
 // First line replaces the existing first lines
 // This component now takes locationId as a prop
 import React, { useState, useEffect } from "react";
@@ -13,7 +12,7 @@ import { useActivePackages } from "../hooks/useActivePackages";
 import useSaveAppointment from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
-import { Appointment, SCREEN } from "../types";
+import { Appointment, SCREEN, Service, Package } from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 
 interface AppointmentManagerProps {
@@ -24,6 +23,48 @@ interface AppointmentManagerProps {
   employees: any[];
   existingAppointment?: Appointment | null;
   locationId?: string;
+}
+
+// Define the expected prop types for ServiceSelector to match usage
+interface ServiceSelectorProps {
+  onServiceSelect: (serviceId: string) => void;
+  onPackageSelect: (packageId: string) => void;
+  onStylistSelect: (itemId: string, stylistId: string) => void;
+  selectedServices: string[];
+  selectedPackages: string[];
+  selectedStylists: Record<string, string>;
+  stylists: any[];
+  onCustomPackage: (packageId: string, serviceId: string) => void;
+  customizedServices: Record<string, string[]>;
+  locationId?: string; // Make locationId optional
+}
+
+// Define the expected prop types for CheckoutSection to match usage
+interface CheckoutSectionProps {
+  appointmentId: string | null;
+  selectedCustomer: any;
+  selectedServices: string[];
+  selectedPackages: string[];
+  services: any[];
+  packages: any[];
+  discountType: string;
+  discountValue: number;
+  paymentMethod: string;
+  notes: string;
+  onDiscountTypeChange: (value: string) => void;
+  onDiscountValueChange: (value: number) => void;
+  onPaymentMethodChange: (value: string) => void;
+  onNotesChange: (value: string) => void;
+  onPaymentComplete: (appointmentId?: string) => void;
+  selectedStylists: Record<string, string>;
+  selectedTimeSlots: Record<string, string>;
+  onSaveAppointment: () => Promise<string | undefined>;
+  onRemoveService: (serviceId: string) => void;
+  onRemovePackage: (packageId: string) => void;
+  onBackToServices: () => void;
+  customizedServices: Record<string, string[]>;
+  isExistingAppointment: boolean;
+  locationId?: string; // Make locationId optional
 }
 
 export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
@@ -169,6 +210,34 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setSelectedTime(format(startDate, 'HH:mm'));
   };
 
+  const calculateTotalDuration = (
+    services: any[],
+    packages: any[]
+  ): number => {
+    return getTotalDuration(
+      selectedServices,
+      selectedPackages,
+      services,
+      packages,
+      customizedServices
+    );
+  };
+
+  const calculateTotalPrice = (
+    services: any[],
+    packages: any[],
+    discountType: string,
+    discountValue: number
+  ): number => {
+    return getTotalPrice(
+      selectedServices,
+      selectedPackages,
+      services,
+      packages,
+      customizedServices
+    );
+  };
+
   const { handleSaveAppointment } = useSaveAppointment({
     selectedDate: stateSelectedDate,
     selectedTime: stateSelectedTime,
@@ -178,8 +247,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     services,
     packages,
     selectedStylists,
-    getTotalDuration,
-    getTotalPrice,
+    getTotalDuration: calculateTotalDuration,
+    getTotalPrice: calculateTotalPrice,
     discountType,
     discountValue,
     paymentMethod,
