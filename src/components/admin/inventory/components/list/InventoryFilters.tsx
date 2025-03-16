@@ -1,6 +1,6 @@
 
 import { Input } from "@/components/ui/input";
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import { Search } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -44,7 +44,7 @@ export function InventoryFilters({
   return (
     <div className="space-y-2">
       <div className="relative w-full">
-        <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
         <Input
           placeholder="Search by name..."
           className="w-full pl-9"

@@ -118,7 +118,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
           >
             <div className="flex flex-col items-center space-y-1">
               <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
-                {emp.avatar}
+                {emp.avatar || emp.name?.charAt(0) || "?"}
               </div>
               <div className="text-xs font-medium text-gray-700">
                 {emp.name}

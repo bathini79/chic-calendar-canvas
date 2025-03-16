@@ -1,4 +1,3 @@
-
 // First line replaces the existing first lines
 // This component now takes locationId as a prop
 import React, { useState, useEffect } from "react";
@@ -65,7 +64,7 @@ interface CheckoutSectionProps {
   onBackToServices: () => void;
   customizedServices: Record<string, string[]>;
   isExistingAppointment: boolean;
-  locationId?: string; // Make locationId optional
+  locationId?: string; // Add locationId property
 }
 
 export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
@@ -112,7 +111,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setCustomizedServices,
   } = useAppointmentState();
 
-  // Initialize appointment state from props
   useEffect(() => {
     if (selectedDate) {
       setSelectedDate(selectedDate);
@@ -122,7 +120,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       setSelectedTime(selectedTime);
     }
 
-    // Process existing appointment if provided
     if (existingAppointment) {
       processExistingAppointment(existingAppointment);
       setCurrentScreen(SCREEN.CHECKOUT);
@@ -135,7 +132,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     const stylists: Record<string, string> = {};
     const customizedServicesMap: Record<string, string[]> = {};
 
-    // First collect all packages
     const packageIdsSet = new Set<string>();
     appointment.bookings.forEach(booking => {
       if (booking.package_id) {
@@ -146,18 +142,14 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       }
     });
 
-    // Add packages to the selectedPackages array
     const packageIds = Array.from(packageIdsSet);
     packageIds.forEach(pkgId => {
       packages.push(pkgId);
     });
 
-    // Now process all services
     appointment.bookings.forEach(booking => {
       if (booking.service_id) {
-        // If service is part of a package
         if (booking.package_id) {
-          // Check if this service is a part of the base package or a customized one
           const basePackage = packageIds.includes(booking.package_id);
           if (basePackage) {
             const pkgDetails = appointment.bookings.find(b => 
@@ -169,7 +161,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                 ps => ps.service.id === booking.service_id
               );
 
-              // If not in base services, it's a customized service
               if (!isBaseService) {
                 if (!customizedServicesMap[booking.package_id]) {
                   customizedServicesMap[booking.package_id] = [];
@@ -179,15 +170,11 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
             }
           }
 
-          // Add stylist to this service if available
           if (booking.employee_id) {
             stylists[booking.service_id] = booking.employee_id;
           }
         } else {
-          // This is a standalone service, not part of any package
           services.push(booking.service_id);
-          
-          // Add stylist to this service if available
           if (booking.employee_id) {
             stylists[booking.service_id] = booking.employee_id;
           }
@@ -256,7 +243,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     notes: appointmentNotes,
     customizedServices,
     currentScreen,
-    locationId // Pass the locationId to the hook
+    locationId
   });
 
   const handleProceedToCheckout = async () => {

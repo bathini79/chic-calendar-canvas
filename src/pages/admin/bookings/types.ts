@@ -69,6 +69,7 @@ export interface Employee {
   employment_type: "stylist" | "operations";
   created_at: string;
   updated_at: string;
+  avatar?: string; // Add avatar property for TimeSlots component
 }
 
 export interface Booking {
@@ -117,4 +118,23 @@ export interface Appointment {
   total_duration?: number;
   customer?: Customer;
   bookings: Booking[];
+}
+
+// Add the missing types for refund and transaction details
+export interface RefundData {
+  reason: "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | 
+          "health_concern" | "price_dispute" | "other" | "booking_error" | 
+          "service_unavailable" | "customer_emergency" | "customer_no_show";
+  notes: string;
+  refundedBy: string;
+}
+
+export interface TransactionDetails {
+  id: string;
+  amount: number;
+  status: AppointmentStatus;
+  payment_method?: string;
+  created_at: string;
+  originalSale: Appointment;
+  refunds: Appointment[];
 }

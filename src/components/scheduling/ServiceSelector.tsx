@@ -27,8 +27,14 @@ interface PackageService {
   package_selling_price?: number;
 }
 
+interface Package {
+  id: string;
+  name: string;
+  package_services?: PackageService[];
+}
+
 interface PackageGroup {
-  package: any;
+  package: Package;
   cartItemId: string;
   services: PackageService[];
 }
@@ -149,7 +155,7 @@ export function ServiceSelector({
       
       if (item.customized_services?.length && services) {
         const customizedServiceObjects = item.customized_services
-          .map(serviceId => {
+          .map((serviceId: string) => {
             const service = services.find(s => s.id === serviceId);
             return service ? { service } : null;
           })
@@ -159,7 +165,7 @@ export function ServiceSelector({
       }
 
       acc.packages[item.package_id] = {
-        package: item.package,
+        package: item.package as Package,
         cartItemId: item.id,
         services: packageServices
       };
@@ -195,12 +201,14 @@ export function ServiceSelector({
             </div>
             <div className="space-y-3 pl-4">
               {packageData.services.map((ps: PackageService) => {
-                const isPackageService = packageData.package.package_services.some(
-                  basePs => basePs.service.id === ps.service.id
+                const isPackageService = packageData.package.package_services?.some(
+                  (basePs: PackageService) => basePs.service.id === ps.service.id
                 );
                 
                 const basePackageService = isPackageService 
-                  ? packageData.package.package_services.find(basePs => basePs.service.id === ps.service.id)
+                  ? packageData.package.package_services?.find(
+                      (basePs: PackageService) => basePs.service.id === ps.service.id
+                    )
                   : undefined;
                 
                 const displayPrice = getServicePrice(ps.service, basePackageService);
