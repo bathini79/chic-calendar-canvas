@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +79,14 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
       console.error('Error fetching service locations:', error);
       toast.error('Failed to load service locations');
     }
+  };
+
+  const handleCategorySelect = (categoryId: string) => {
+    setSelectedCategories([...selectedCategories, categoryId]);
+  };
+
+  const handleCategoryRemove = (categoryId: string) => {
+    setSelectedCategories(selectedCategories.filter(id => id !== categoryId));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -279,9 +288,8 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
         <div>
           <Label>Categories</Label>
           <CategoryMultiSelect 
-            selectedCategories={selectedCategories}
-            onCategorySelect={handleCategorySelect}
-            onCategoryRemove={handleCategoryRemove}
+            selectedValues={selectedCategories}
+            onChange={setSelectedCategories}
           />
         </div>
         

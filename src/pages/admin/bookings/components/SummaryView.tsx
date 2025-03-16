@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from 'sonner';
 import { Appointment, Service, Package, RefundData } from '../types';
-import { useAppointmentActions } from '../hooks/useAppointmentActions';
+import useAppointmentActions, { useAppointmentActions } from '../hooks/useAppointmentActions';
 
 interface SummaryViewProps {
   appointmentId?: string;

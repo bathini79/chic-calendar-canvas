@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Appointment, AppointmentStatus } from '../types';
-import { useAppointmentActions } from '../hooks/useAppointmentActions';
+import useAppointmentActions, { useAppointmentActions } from '../hooks/useAppointmentActions';
 import { StatusBadge } from './StatusBadge';
 
 interface AppointmentDetailsDialogProps {

@@ -76,3 +76,76 @@ export const calculateDuration = (
 
   return totalDuration;
 };
+
+// Additional utility functions needed by other components
+
+export const calculatePackagePrice = (
+  pkg: Package,
+  additionalServices: string[] = [],
+  services: Service[]
+): number => {
+  let total = pkg.price;
+
+  // Add prices for any additional services
+  additionalServices.forEach(serviceId => {
+    const service = services.find(s => s.id === serviceId);
+    if (service) {
+      total += service.selling_price;
+    }
+  });
+
+  return total;
+};
+
+export const calculatePackageDuration = (
+  pkg: Package,
+  additionalServices: string[] = [],
+  services: Service[]
+): number => {
+  let duration = pkg.duration || 0;
+
+  // Add durations for any additional services
+  additionalServices.forEach(serviceId => {
+    const service = services.find(s => s.id === serviceId);
+    if (service) {
+      duration += service.duration;
+    }
+  });
+
+  return duration;
+};
+
+// Utility functions for checkout section
+export const getTotalPrice = calculateTotal;
+export const getTotalDuration = calculateDuration;
+
+export const getFinalPrice = (
+  subtotal: number,
+  discountType: 'none' | 'fixed' | 'percentage' | string,
+  discountValue: number
+): number => {
+  if (discountType === 'fixed') {
+    return Math.max(0, subtotal - discountValue);
+  } else if (discountType === 'percentage') {
+    return subtotal * (1 - discountValue / 100);
+  }
+  return subtotal;
+};
+
+export const getServicePriceInPackage = (
+  serviceId: string,
+  packageId: string,
+  packages: Package[],
+  services: Service[]
+): number => {
+  const pkg = packages.find(p => p.id === packageId);
+  if (!pkg || !pkg.package_services) return 0;
+
+  const packageService = pkg.package_services.find(ps => ps.service.id === serviceId);
+  if (packageService?.package_selling_price !== undefined) {
+    return packageService.package_selling_price;
+  }
+
+  const service = services.find(s => s.id === serviceId);
+  return service ? service.selling_price : 0;
+};

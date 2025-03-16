@@ -33,6 +33,21 @@ export function AppointmentManager({
   onAppointmentCreated,
   locationId
 }: AppointmentManagerProps) {
+  const [activeScreen, setActiveScreen] = useState<SCREEN>(SCREEN.SERVICE_SELECTION);
+  const [appointmentId, setAppointmentId] = useState<string | undefined>(existingAppointment?.id);
+  const [appointmentDate, setAppointmentDate] = useState<Date>(selectedDate || new Date());
+  const [appointmentTime, setAppointmentTime] = useState<string>(selectedTime || '09:00');
+  const [discountType, setDiscountType] = useState<'none' | 'fixed' | 'percentage'>(
+    existingAppointment?.discount_type || 'none'
+  );
+  const [discountValue, setDiscountValue] = useState<number>(
+    existingAppointment?.discount_value || 0
+  );
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>(
+    existingAppointment?.payment_method || 'cash'
+  );
+  const [notes, setNotes] = useState<string>(existingAppointment?.notes || '');
+
   const appointmentState = useAppointmentState({
     initialDate: selectedDate,
     initialTime: selectedTime,
@@ -50,22 +65,6 @@ export function AppointmentManager({
     setSelectedPackages,
     selectedStylists,
     setSelectedStylists,
-    activeScreen,
-    setActiveScreen,
-    appointmentId,
-    setAppointmentId,
-    appointmentDate,
-    setAppointmentDate,
-    appointmentTime,
-    setAppointmentTime,
-    discountType,
-    setDiscountType,
-    discountValue,
-    setDiscountValue,
-    paymentMethod,
-    setPaymentMethod,
-    notes,
-    setNotes,
     customizedServices,
     setCustomizedServices
   } = appointmentState;
@@ -224,7 +223,7 @@ export function AppointmentManager({
                 <h3 className="text-lg font-medium mb-4">Select Customer</h3>
                 <SelectCustomer
                   selectedCustomer={selectedCustomer}
-                  onSelectCustomer={setSelectedCustomer}
+                  onSelect={setSelectedCustomer}
                   onCreateNew={() => setShowCreateForm(true)}
                 />
               </div>
@@ -279,23 +278,18 @@ export function AppointmentManager({
               notes={notes}
               setNotes={setNotes}
               customizedServices={customizedServices}
-              setCustomizedServices={setCustomizedServices}
-              calculateTotal={() => calculateTotal(
-                selectedServices,
-                selectedPackages,
-                services as Service[],
-                packages as Package[],
-                customizedServices
-              )}
-              calculateDiscountedTotal={() => calculateTotal(
-                selectedServices,
-                selectedPackages,
-                services as Service[],
-                packages as Package[],
-                customizedServices
-              )}
-              onContinue={handleProceedToSummary}
+              onPaymentComplete={() => {}}
+              selectedTimeSlots={{}}
+              onSaveAppointment={async () => ""}
+              onRemoveService={() => {}}
+              onRemovePackage={() => {}}
+              onBackToServices={() => setActiveScreen(SCREEN.SERVICE_SELECTION)}
               locationId={locationId}
+              onContinue={handleProceedToSummary}
+              onDiscountTypeChange={setDiscountType}
+              onDiscountValueChange={setDiscountValue}
+              onPaymentMethodChange={(method) => setPaymentMethod(method as 'cash' | 'online')}
+              onNotesChange={setNotes}
             />
           </TabsContent>
           
@@ -339,7 +333,7 @@ export function AppointmentManager({
               setSelectedCustomer(newCustomer);
               setShowCreateForm(false);
             }}
-            onCancel={() => setShowCreateForm(false)}
+            onClose={() => setShowCreateForm(false)}
           />
         )}
       </DialogContent>

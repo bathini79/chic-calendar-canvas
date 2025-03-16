@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,7 +43,7 @@ export function ServiceSelector({
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [filteredPackages, setFilteredPackages] = useState<Package[]>([]);
   const cart = useCart();
-  const cartItems = cart?.cartItems || [];
+  const cartItems = cart?.items || [];
   
   // Filter services and packages based on search query
   useEffect(() => {

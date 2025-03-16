@@ -14,11 +14,13 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface CategoryMultiSelectProps {
+  // Original props
   selectedCategories?: string[];
   onCategorySelect?: (categoryId: string) => void;
   onCategoryRemove?: (categoryId: string) => void;
   maxSelections?: number;
-  // Add props used in ServiceForm
+  
+  // New props used in ServiceForm
   selectedValues?: string[];
   onChange?: (values: string[]) => void;
 }
