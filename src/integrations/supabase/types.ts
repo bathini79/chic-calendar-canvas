@@ -694,6 +694,7 @@ export type Database = {
           categories: string[] | null
           created_at: string
           description: string | null
+          has_location_specific_data: boolean | null
           id: string
           max_quantity: number
           minimum_quantity: number
@@ -710,6 +711,7 @@ export type Database = {
           categories?: string[] | null
           created_at?: string
           description?: string | null
+          has_location_specific_data?: boolean | null
           id?: string
           max_quantity?: number
           minimum_quantity?: number
@@ -726,6 +728,7 @@ export type Database = {
           categories?: string[] | null
           created_at?: string
           description?: string | null
+          has_location_specific_data?: boolean | null
           id?: string
           max_quantity?: number
           minimum_quantity?: number
@@ -774,6 +777,73 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_location_items: {
+        Row: {
+          categories: string[] | null
+          created_at: string
+          id: string
+          item_id: string
+          location_id: string
+          max_quantity: number
+          minimum_quantity: number
+          quantity: number
+          status: string
+          supplier_id: string | null
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          categories?: string[] | null
+          created_at?: string
+          id?: string
+          item_id: string
+          location_id: string
+          max_quantity?: number
+          minimum_quantity?: number
+          quantity?: number
+          status?: string
+          supplier_id?: string | null
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          categories?: string[] | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          location_id?: string
+          max_quantity?: number
+          minimum_quantity?: number
+          quantity?: number
+          status?: string
+          supplier_id?: string | null
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_location_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_location_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_location_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
