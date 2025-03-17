@@ -1,76 +1,41 @@
-
-import React, { useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  MoreVertical, 
-  IndianRupee, 
-  Percent, 
-  Clock,
-  User,
-  Plus,
-  ArrowLeft,
-  Trash2
-} from "lucide-react";
-import { toast } from "sonner";
-import type { Service, Package, Customer } from "../types";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { 
-  getTotalPrice, 
-  getTotalDuration, 
-  getFinalPrice, 
-  getServicePriceInPackage,
-  calculatePackagePrice 
-} from "../utils/bookingUtils";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { toast } from 'sonner';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn, formatPrice } from '@/lib/utils';
+import { CalendarIcon, CheckCheck, DollarSign, User } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CheckoutSectionProps {
-  appointmentId?: string;
-  selectedCustomer: Customer | null;
+  appointmentId: string;
+  selectedCustomer: any;
   selectedServices: string[];
   selectedPackages: string[];
-  services: Service[];
-  packages: Package[];
-  discountType: 'none' | 'percentage' | 'fixed';
+  services: any[];
+  packages: any[];
+  discountType: "none" | "fixed" | "percentage";
   discountValue: number;
-  paymentMethod: 'cash' | 'online';
+  paymentMethod: string;
+  startDate: Date;
+  startTime: string;
   notes: string;
-  onDiscountTypeChange: (type: 'none' | 'percentage' | 'fixed') => void;
-  onDiscountValueChange: (value: number) => void;
-  onPaymentMethodChange: (method: 'cash' | 'online') => void;
-  onNotesChange: (notes: string) => void;
-  onPaymentComplete: (appointmentId?: string) => void;
-  selectedStylists: Record<string, string>;
-  selectedTimeSlots: Record<string, string>;
-  onSaveAppointment: () => Promise<string | null>;
-  onRemoveService: (serviceId: string) => void;
-  onRemovePackage: (packageId: string) => void;
-  onBackToServices: () => void;
-  isExistingAppointment?: boolean;
-  customizedServices?: Record<string, string[]>;
-  locationId?: string;
+  onConfirm: (appointment: any) => void;
+  onCancel: () => void;
+  employees: any[];
+  selectedEmployee: { id: string; name: string } | null;
+  setSelectedEmployee: (employee: { id: string; name: string } | null) => void;
+  selectedEmployees: Record<string, { id: string; name: string }>;
+  setSelectedEmployees: (employees: Record<string, { id: string; name: string }>) => void;
+  locationId?: string; // Add locationId prop
 }
 
-export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
+export function CheckoutSection({
   appointmentId,
   selectedCustomer,
   selectedServices,
@@ -80,436 +45,278 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   discountType,
   discountValue,
   paymentMethod,
+  startDate,
+  startTime,
   notes,
-  onDiscountTypeChange,
-  onDiscountValueChange,
-  onPaymentMethodChange,
-  onNotesChange,
-  onPaymentComplete,
-  selectedStylists,
-  selectedTimeSlots,
-  onSaveAppointment,
-  onRemoveService,
-  onRemovePackage,
-  onBackToServices,
-  isExistingAppointment,
-  customizedServices = {}
-}) => {
-  const { data: employees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('employment_type', 'stylist');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
+  onConfirm,
+  onCancel,
+  employees,
+  selectedEmployee,
+  setSelectedEmployee,
+  selectedEmployees,
+  setSelectedEmployees,
+  locationId
+}: CheckoutSectionProps) {
+  const [totalPrice, setTotalPrice] = useState(0);
+  const [discountedPrice, setDiscountedPrice] = useState(0);
+  const [isConfirming, setIsConfirming] = useState(false);
 
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    if (hours > 0) {
-      return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`;
-    }
-    return `${minutes}m`;
-  };
+  useEffect(() => {
+    // Calculate total price based on selected services and packages
+    let calculatedTotalPrice = 0;
 
-  const formatTimeSlot = (timeString: string) => {
-    try {
-      const baseDate = new Date();
-      const [hours, minutes] = timeString.split(':').map(Number);
-      baseDate.setHours(hours, minutes);
-      return format(baseDate, 'hh:mm a');
-    } catch (error) {
-      console.error('Error formatting time:', error);
-      return timeString;
-    }
-  };
-
-  const getStylistName = (stylistId: string) => {
-    if (!employees || !stylistId) return null;
-    const stylist = employees.find(emp => emp.id === stylistId);
-    return stylist ? stylist.name : null;
-  };
-
-  const subtotal = useMemo(() => 
-    getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
-    [selectedServices, selectedPackages, services, packages, customizedServices]
-  );
-
-  const totalDuration = useMemo(() => 
-    getTotalDuration(selectedServices, selectedPackages, services, packages, customizedServices),
-    [selectedServices, selectedPackages, services, packages, customizedServices]
-  );
-
-  const total = useMemo(() => 
-    getFinalPrice(subtotal, discountType, discountValue),
-    [subtotal, discountType, discountValue]
-  );
-  
-  const discountAmount = useMemo(() => 
-    subtotal - total,
-    [subtotal, total]
-  );
-
-  const selectedItems = useMemo(() => {
-    const individualServices = selectedServices.map((id) => {
-      const service = services.find((s) => s.id === id);
-      return service ? {
-        id,
-        name: service.name,
-        price: service.selling_price,
-        duration: service.duration,
-        type: "service" as const,
-        packageId: null as string | null,
-        stylist: selectedStylists[id],
-        stylistName: getStylistName(selectedStylists[id]),
-        time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
-        formattedDuration: formatDuration(service.duration),
-      } : null;
-    }).filter(Boolean);
-
-    const packageItems = selectedPackages.flatMap((packageId) => {
-      const pkg = packages.find((p) => p.id === packageId);
-      if (!pkg) return [];
-      
-      const packageTotalPrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
-      
-      const packageItem = {
-        id: packageId,
-        name: pkg.name,
-        price: packageTotalPrice,
-        duration: getTotalDuration([], [packageId], services, packages, customizedServices),
-        type: "package" as const,
-        packageId: null as string | null,
-        stylist: selectedStylists[packageId],
-        stylistName: getStylistName(selectedStylists[packageId]),
-        time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''],
-        formattedDuration: formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices)),
-        services: [] as Array<{
-          id: string;
-          name: string;
-          price: number;
-          duration: number;
-          stylist: string | null;
-          stylistName: string | null;
-          isCustomized: boolean;
-        }>
-      };
-      
-      if (pkg.package_services) {
-        packageItem.services = pkg.package_services.map(ps => {
-          const adjustedPrice = ps.package_selling_price !== undefined && ps.package_selling_price !== null
-            ? ps.package_selling_price 
-            : ps.service.selling_price;
-            
-          return {
-            id: ps.service.id,
-            name: ps.service.name,
-            price: adjustedPrice,
-            duration: ps.service.duration,
-            stylist: selectedStylists[ps.service.id] || selectedStylists[packageId] || null,
-            stylistName: getStylistName(selectedStylists[ps.service.id] || selectedStylists[packageId] || ''),
-            isCustomized: false
-          };
-        });
+    // Add prices from selected services
+    selectedServices.forEach(serviceId => {
+      const service = services.find(s => s.id === serviceId);
+      if (service) {
+        calculatedTotalPrice += service.selling_price;
       }
-      
-      if (customizedServices[packageId] && customizedServices[packageId].length > 0) {
-        const additionalServices = customizedServices[packageId]
-          .filter(serviceId => {
-            return !pkg.package_services.some(ps => ps.service.id === serviceId);
-          })
-          .map(serviceId => {
-            const service = services.find(s => s.id === serviceId);
-            if (!service) return null;
-            
-            return {
-              id: service.id,
-              name: service.name,
-              price: service.selling_price,
-              duration: service.duration,
-              stylist: selectedStylists[service.id] || selectedStylists[packageId] || null,
-              stylistName: getStylistName(selectedStylists[service.id] || selectedStylists[packageId] || ''),
-              isCustomized: true
-            };
-          })
-          .filter(Boolean);
-        
-        packageItem.services.push(...additionalServices);
-      }
-      
-      return [packageItem];
     });
 
-    return [...individualServices, ...packageItems] as Array<any>;
-  }, [
-    selectedServices, 
-    selectedPackages, 
-    services, 
-    packages, 
-    selectedStylists, 
-    selectedTimeSlots, 
-    appointmentId, 
-    customizedServices,
-    employees
-  ]);
+    // Add prices from selected packages
+    selectedPackages.forEach(packageId => {
+      const packageItem = packages.find(p => p.id === packageId);
+      if (packageItem) {
+        calculatedTotalPrice += packageItem.price;
+      }
+    });
 
-  const handlePayment = async () => {
+    setTotalPrice(calculatedTotalPrice);
+
+    // Apply discount
+    let calculatedDiscountedPrice = calculatedTotalPrice;
+    if (discountType === "fixed") {
+      calculatedDiscountedPrice = Math.max(0, calculatedTotalPrice - discountValue);
+    } else if (discountType === "percentage") {
+      const discountAmount = (discountValue / 100) * calculatedTotalPrice;
+      calculatedDiscountedPrice = Math.max(0, calculatedTotalPrice - discountAmount);
+    }
+    setDiscountedPrice(calculatedDiscountedPrice);
+  }, [selectedServices, selectedPackages, services, packages, discountType, discountValue]);
+
+  const confirmAppointment = async () => {
+    setIsConfirming(true);
     try {
-      if (!selectedCustomer) {
-        toast.error("Please select a customer");
-        return;
-      }
-      const savedAppointmentId = await onSaveAppointment();
-      if (!savedAppointmentId) {
-        toast.error("Failed to complete payment");
-        return;
-      }
+      // Format start time
+      const [hours, minutes] = startTime.split(':');
+      const startDateTime = new Date(startDate);
+      startDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
 
-      toast.success("Payment completed successfully");
-      onPaymentComplete(savedAppointmentId);
+      // Calculate end time
+      let totalDuration = 0;
+      selectedServices.forEach(serviceId => {
+        const service = services.find(s => s.id === serviceId);
+        if (service) {
+          totalDuration += service.duration;
+        }
+      });
+      selectedPackages.forEach(packageId => {
+        const packageItem = packages.find(p => p.id === packageId);
+        if (packageItem) {
+          packageItem.services.forEach(service => {
+            totalDuration += service.duration;
+          });
+        }
+      });
+      const endDateTime = new Date(startDateTime.getTime() + totalDuration * 60000);
+
+      // Prepare bookings data
+      const bookingsData = [];
+
+      // Add bookings for selected services
+      selectedServices.forEach(serviceId => {
+        const service = services.find(s => s.id === serviceId);
+        if (service) {
+          bookingsData.push({
+            service_id: service.id,
+            price_paid: service.selling_price,
+            employee_id: selectedEmployees[service.id]?.id || selectedEmployee?.id,
+            status: 'booked'
+          });
+        }
+      });
+
+      // Add bookings for selected packages
+      selectedPackages.forEach(packageId => {
+        const packageItem = packages.find(p => p.id === packageId);
+        if (packageItem) {
+          packageItem.services.forEach(service => {
+            bookingsData.push({
+              service_id: service.id,
+              price_paid: service.selling_price,
+              employee_id: selectedEmployees[service.id]?.id || selectedEmployee?.id,
+              status: 'booked'
+            });
+          });
+        }
+      });
+
+      // Create appointment data
+      const appointmentData = {
+        customer_id: selectedCustomer.id,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        total_price: discountedPrice,
+        payment_method: paymentMethod,
+        notes: notes,
+        status: 'booked',
+        discount_type: discountType,
+        discount_value: discountValue,
+        total_duration: totalDuration,
+        location: locationId
+      };
+
+      if (appointmentId) {
+        // Update existing appointment
+        const { data: updatedAppointment, error: updateError } = await supabase
+          .from('appointments')
+          .update(appointmentData)
+          .eq('id', appointmentId)
+          .select()
+          .single();
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        // Delete existing bookings and create new ones
+        const { error: deleteError } = await supabase
+          .from('bookings')
+          .delete()
+          .eq('appointment_id', appointmentId);
+
+        if (deleteError) {
+          throw deleteError;
+        }
+
+        const { data: newBookings, error: bookingError } = await supabase
+          .from('bookings')
+          .insert(
+            bookingsData.map(booking => ({
+              ...booking,
+              appointment_id: appointmentId
+            }))
+          )
+          .select();
+
+        if (bookingError) {
+          throw bookingError;
+        }
+
+        toast.success('Appointment updated successfully');
+        onConfirm(updatedAppointment);
+      } else {
+        // Create new appointment
+        const { data: newAppointment, error: appointmentError } = await supabase
+          .from('appointments')
+          .insert([appointmentData])
+          .select()
+          .single();
+
+        if (appointmentError) {
+          throw appointmentError;
+        }
+
+        const { data: newBookings, error: bookingError } = await supabase
+          .from('bookings')
+          .insert(
+            bookingsData.map(booking => ({
+              ...booking,
+              appointment_id: newAppointment.id
+            }))
+          )
+          .select();
+
+        if (bookingError) {
+          throw bookingError;
+        }
+
+        toast.success('Appointment created successfully');
+        onConfirm(newAppointment);
+      }
     } catch (error: any) {
-      console.error("Error completing payment:", error);
-      toast.error(error.message || "Failed to complete payment");
+      console.error('Error creating appointment:', error);
+      toast.error(error.message || 'Failed to create appointment');
+    } finally {
+      setIsConfirming(false);
     }
   };
 
   return (
-    <div className="h-full w-full bg-gray-50 p-6">
-      <Card className="h-full">
-        <CardContent className="p-6 h-full flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold">Checkout Summary</h2>
-            <Button
-              variant="outline"
-              onClick={onBackToServices}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add Service
-            </Button>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Checkout</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <div className="flex items-center space-x-4">
+          <User className="w-4 h-4 text-gray-500" />
+          <div>
+            <p className="text-sm font-medium text-gray-700">{selectedCustomer?.full_name}</p>
+            <p className="text-sm text-gray-500">{selectedCustomer?.email}</p>
           </div>
-
-          <div className="flex-1 space-y-6 overflow-hidden flex flex-col">
-            {selectedItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full space-y-4">
-                <p className="text-muted-foreground text-center">
-                  No services or packages selected
-                </p>
-                <Button
-                  variant="default"
-                  onClick={onBackToServices}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Go to Services
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-                {selectedItems.map((item) => (
-                  item && (
-                    <div
-                      key={`${item.type}-${item.id}`}
-                      className="flex flex-col py-4 border-b border-gray-100"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="space-y-1">
-                          <p className="text-lg font-semibold tracking-tight">{item.name}</p>
-                          <div className="flex flex-wrap text-sm text-muted-foreground gap-2">
-                            <div className="flex items-center">
-                              <Clock className="mr-1 h-4 w-4" />
-                              {item.time && (
-                                <span>{item.time} • {item.formattedDuration}</span>
-                              )}
-                              {!item.time && (
-                                <span>{item.formattedDuration}</span>
-                              )}
-                            </div>
-                            {item.stylistName && (
-                              <div className="flex items-center">
-                                <User className="mr-1 h-4 w-4" />
-                                {item.stylistName}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          {item.type === "package" && (
-                            <p className="font-semibold text-lg">
-                              <IndianRupee className="inline h-4 w-4" />
-                              {item.price}
-                            </p>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => {
-                              if (item.type === 'service') {
-                                onRemoveService(item.id);
-                              } else {
-                                onRemovePackage(item.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {item.type === "package" && item.services && item.services.length > 0 && (
-                        <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
-                          {item.services.map(service => (
-                            <div key={service.id} className="flex items-center justify-between py-1">
-                              <div className="space-y-1">
-                                <p className="text-sm font-medium">
-                                  {service.name}
-                                  {service.isCustomized && (
-                                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                                      Added
-                                    </span>
-                                  )}
-                                </p>
-                                <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
-                                  <span>{formatDuration(service.duration)}</span>
-                                  {service.stylistName && (
-                                    <div className="flex items-center">
-                                      <User className="mr-1 h-3 w-3" />
-                                      {service.stylistName}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-sm">
-                                <IndianRupee className="inline h-3 w-3" />
-                                {service.price}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {item.type === "service" && (
-                        <div className="flex justify-end">
-                          <p className="font-semibold text-lg">
-                            <IndianRupee className="inline h-4 w-4" />
-                            {item.price}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )
-                ))}
-              </div>
-            )}
-
-            <Separator />
-
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>₹{subtotal}</span>
-              </div>
-              {discountType !== "none" && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span className="flex items-center">
-                    <Percent className="mr-2 h-4 w-4" />
-                    Discount
-                    {discountType === "percentage" && ` (${discountValue}%)`}
-                  </span>
-                  <span>-₹{discountAmount}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-lg font-bold pt-2">
-                <span>Total</span>
-                <span>₹{total}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-6 space-y-4 mt-auto">
-            <div>
-              <h4 className="text-sm font-medium mb-2">Payment Method</h4>
-              <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select payment method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="online">Online</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-2">
-              <Button 
-                className="flex-1" 
-                size="lg"
-                onClick={handlePayment}
-                disabled={selectedItems.length === 0}
-              >
-                Complete Payment
-              </Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="lg">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80" align="end">
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Discount</h3>
-                    <div className="flex gap-4">
-                      <Select
-                        value={discountType}
-                        onValueChange={onDiscountTypeChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Discount type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No Discount</SelectItem>
-                          <SelectItem value="percentage">Percentage</SelectItem>
-                          <SelectItem value="fixed">Fixed Amount</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {discountType !== "none" && (
-                        <Input
-                          type="number"
-                          placeholder={
-                            discountType === "percentage"
-                              ? "Enter %"
-                              : "Enter amount"
-                          }
-                          value={discountValue}
-                          onChange={(e) =>
-                            onDiscountValueChange(Number(e.target.value))
-                          }
-                          className="w-24"
-                        />
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="font-semibold">Notes</h3>
-                      <Textarea
-                        placeholder="Add appointment notes..."
-                        value={notes}
-                        onChange={(e) => onNotesChange(e.target.value)}
-                        rows={3}
-                      />
-                    </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Services</Label>
+          <div className="flex flex-wrap gap-2">
+            {selectedServices.map(serviceId => {
+              const service = services.find(s => s.id === serviceId);
+              return (
+                service && (
+                  <div
+                    key={service.id}
+                    className="px-2 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700"
+                  >
+                    {service.name}
                   </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+                )
+              );
+            })}
+            {selectedPackages.map(packageId => {
+              const packageItem = packages.find(p => p.id === packageId);
+              return (
+                packageItem && (
+                  <div
+                    key={packageItem.id}
+                    className="px-2 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700"
+                  >
+                    {packageItem.name}
+                  </div>
+                )
+              );
+            })}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Date and Time</Label>
+          <p className="text-sm text-gray-700">
+            {format(startDate, 'MMMM dd, yyyy')} at {startTime}
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label>Payment Method</Label>
+          <p className="text-sm text-gray-700">{paymentMethod}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Notes</Label>
+          <p className="text-sm text-gray-700">{notes}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Total Price</Label>
+          <p className="text-xl font-semibold">{formatPrice(totalPrice)}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Discounted Price</Label>
+          <p className="text-xl font-semibold">{formatPrice(discountedPrice)}</p>
+        </div>
+        <div className="flex justify-end space-x-2">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button onClick={confirmAppointment} disabled={isConfirming}>
+            {isConfirming ? 'Confirming...' : 'Confirm'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
-};
+}

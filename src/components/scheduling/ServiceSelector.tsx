@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,15 +53,22 @@ interface ServiceSelectorProps {
   selectedStylists: Record<string, string>;
   onStylistSelect: (serviceId: string, stylistId: string) => void;
   locationId?: string;
+  onSelectPackage?: (packageId: string) => void;
+  addToCart?: (cartItem: any) => void;
+  placeholderImage?: string;
 }
 
-export function ServiceSelector({
+export default function ServiceSelector({ 
   items,
   selectedStylists,
   onStylistSelect,
-  locationId
+  locationId,
+  onSelectPackage,
+  addToCart,
+  placeholderImage
 }: ServiceSelectorProps) {
   const [itemsWithServices, setItemsWithServices] = useState<any[]>([]);
+  const [selectedServices, setSelectedServices] = useState<PackageService[]>([]);
 
   const { data: employees } = useQuery({
     queryKey: ["employees", locationId],
@@ -78,7 +84,6 @@ export function ServiceSelector({
         .eq("employment_type", "stylist");
       
       if (locationId) {
-        // Proper query using the employee_locations junction table
         query = query.contains('employee_locations', [{ location_id: locationId }]);
       }
       
@@ -186,6 +191,40 @@ export function ServiceSelector({
       return packageService.package_selling_price;
     }
     return service.selling_price;
+  };
+
+  const handlePackageSelect = (pkg: unknown) => {
+    if (!pkg) return;
+    
+    const typedPackage = pkg as { 
+      id: string;
+      name: string;
+      price: number;
+      description: string;
+      services: any[];
+      image?: string;
+    };
+    
+    const packageServices = typedPackage.services?.map(service => ({
+      ...service,
+      package: typedPackage,
+    })) || [];
+    
+    setSelectedServices(packageServices);
+    
+    onSelectPackage?.(typedPackage.id);
+    
+    const cartItem = {
+      cartItemId: `pkg-${typedPackage.id}-${Date.now()}`,
+      id: typedPackage.id,
+      name: typedPackage.name,
+      type: 'package',
+      price: typedPackage.price,
+      image: typedPackage.image || placeholderImage,
+      services: packageServices
+    };
+    
+    addToCart?.(cartItem);
   };
 
   return (
