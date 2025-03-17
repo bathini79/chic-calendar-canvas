@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MetricCard } from '@/components/admin/dashboard/MetricCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DailyRevenueChart } from './DailyRevenueChart';
-import { ServiceRevenueChart } from './ServiceRevenueChart';
+import ServiceRevenueChart from './ServiceRevenueChart';
 import { RevenueDataTable } from './RevenueDataTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 

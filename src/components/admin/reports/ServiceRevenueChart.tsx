@@ -1,18 +1,21 @@
+
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface ServiceRevenueChartProps {
-  data: { name: string; revenue: number }[];
+  data?: { name: string; revenue: number }[];
+  selectedDate?: Date;
+  locationId?: string;
 }
 
-const ServiceRevenueChart: React.FC<ServiceRevenueChartProps> = ({ data }) => {
+const ServiceRevenueChart: React.FC<ServiceRevenueChartProps> = ({ data = [], selectedDate, locationId }) => {
   // Custom tooltip to display revenue
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white border rounded shadow p-2">
           <p className="font-semibold">{`${label}`}</p>
-          <p className="text-gray-700">{`Revenue: $${payload[0].value.toFixed(2)}`}</p>
+          <p className="text-gray-700">{`Revenue: ₹${Number(payload[0].value).toFixed(2)}`}</p>
         </div>
       );
     }

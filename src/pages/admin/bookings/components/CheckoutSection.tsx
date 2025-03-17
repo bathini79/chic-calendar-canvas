@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,7 @@ interface CheckoutSectionProps {
   onBackToServices: () => void;
   isExistingAppointment?: boolean;
   customizedServices?: Record<string, string[]>;
+  locationId?: string;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({

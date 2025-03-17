@@ -1,3 +1,4 @@
+
 // First line replaces the existing first lines
 // This component now takes locationId as a prop
 import React, { useState, useEffect } from "react";
@@ -401,7 +402,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
             {currentScreen === SCREEN.CHECKOUT && (
               <CheckoutSection
-                appointmentId={newAppointmentId}
+                appointmentId={newAppointmentId || ""}
                 selectedCustomer={selectedCustomer}
                 selectedServices={selectedServices}
                 selectedPackages={selectedPackages}

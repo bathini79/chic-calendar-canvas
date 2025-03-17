@@ -45,8 +45,14 @@ export function useAppointmentActions() {
 
       if (appointmentError) throw appointmentError;
 
+      // Cast the data to match our expected types
+      const typedAppointment = {
+        ...appointment,
+        discount_type: appointment.discount_type as Appointment['discount_type']
+      } as Appointment;
+
       // If this is a refund, get the original sale
-      if (appointment.transaction_type === 'refund') {
+      if (typedAppointment.transaction_type === 'refund') {
         const { data: originalSale, error: originalError } = await supabase
           .from('appointments')
           .select(`
@@ -59,10 +65,16 @@ export function useAppointmentActions() {
               employee:employees!bookings_employee_id_fkey(*)
             )
           `)
-          .eq('id', appointment.original_appointment_id)
+          .eq('id', typedAppointment.original_appointment_id)
           .single();
 
         if (originalError) throw originalError;
+
+        // Cast the original sale data
+        const typedOriginalSale = {
+          ...originalSale,
+          discount_type: originalSale.discount_type as Appointment['discount_type']
+        } as Appointment;
 
         // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
@@ -77,20 +89,26 @@ export function useAppointmentActions() {
               employee:employees!bookings_employee_id_fkey(*)
             )
           `)
-          .eq('original_appointment_id', originalSale.id)
+          .eq('original_appointment_id', typedOriginalSale.id)
           .eq('transaction_type', 'refund');
 
         if (refundsError) throw refundsError;
 
+        // Cast the refunds data
+        const typedRefunds = refunds?.map(refund => ({
+          ...refund,
+          discount_type: refund.discount_type as Appointment['discount_type']
+        })) as Appointment[];
+
         // Create TransactionDetails with all required properties
         return {
-          id: originalSale.id,
-          amount: originalSale.total_price,
-          status: originalSale.status,
-          payment_method: originalSale.payment_method,
-          created_at: originalSale.created_at,
-          originalSale,
-          refunds: refunds || []
+          id: typedOriginalSale.id,
+          amount: typedOriginalSale.total_price,
+          status: typedOriginalSale.status,
+          payment_method: typedOriginalSale.payment_method,
+          created_at: typedOriginalSale.created_at,
+          originalSale: typedOriginalSale,
+          refunds: typedRefunds || []
         };
       } else {
         // This is the original sale, get all its refunds
@@ -111,15 +129,21 @@ export function useAppointmentActions() {
 
         if (refundsError) throw refundsError;
 
+        // Cast the refunds data
+        const typedRefunds = refunds?.map(refund => ({
+          ...refund,
+          discount_type: refund.discount_type as Appointment['discount_type']
+        })) as Appointment[];
+
         // Create TransactionDetails with all required properties
         return {
-          id: appointment.id,
-          amount: appointment.total_price,
-          status: appointment.status,
-          payment_method: appointment.payment_method,
-          created_at: appointment.created_at,
-          originalSale: appointment,
-          refunds: refunds || []
+          id: typedAppointment.id,
+          amount: typedAppointment.total_price,
+          status: typedAppointment.status,
+          payment_method: typedAppointment.payment_method,
+          created_at: typedAppointment.created_at,
+          originalSale: typedAppointment,
+          refunds: typedRefunds || []
         };
       }
     } catch (error: any) {
