@@ -1,24 +1,28 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CalendarDate } from '@/components/ui/calendar';
+import { Calendar } from '@/components/ui/calendar';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import DailyRevenueChart from './DailyRevenueChart';
-import ServiceRevenueChart from './ServiceRevenueChart';
-import RevenueDataTable from './RevenueDataTable';
+import { DailyRevenueChart } from './DailyRevenueChart';
+import { ServiceRevenueChart } from './ServiceRevenueChart';
+import { RevenueDataTable } from './RevenueDataTable';
 
 interface DailyRevenueProps {
   locationId?: string;
+  expanded?: boolean;
+  onExpand?: () => void;
+  locations?: Array<{ id: string; name: string }>;
 }
 
-const DailyRevenue: React.FC<DailyRevenueProps> = ({ locationId }) => {
+const DailyRevenue: React.FC<DailyRevenueProps> = ({ locationId, expanded, onExpand, locations }) => {
   const [date, setDate] = useState<Date>(new Date());
   const formattedDate = format(date, 'PPP');
 
@@ -43,10 +47,10 @@ const DailyRevenue: React.FC<DailyRevenueProps> = ({ locationId }) => {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="center">
-              <CalendarDate
+              <Calendar
                 mode="single"
                 selected={date}
-                onSelect={setDate}
+                onSelect={(date) => date && setDate(date)}
                 disabled={(date) =>
                   date > new Date() || date < new Date('2020-01-01')
                 }

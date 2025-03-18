@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -32,7 +33,10 @@ interface CheckoutSectionProps {
   setSelectedEmployee: (employee: { id: string; name: string } | null) => void;
   selectedEmployees: Record<string, { id: string; name: string }>;
   setSelectedEmployees: (employees: Record<string, { id: string; name: string }>) => void;
-  locationId?: string; // Add locationId prop
+  locationId?: string;
+  onDiscountTypeChange?: (type: "none" | "fixed" | "percentage") => void;
+  onDiscountValueChange?: (value: number) => void;
+  onPaymentMethodChange?: (method: string) => void;
 }
 
 export function CheckoutSection({
@@ -55,7 +59,10 @@ export function CheckoutSection({
   setSelectedEmployee,
   selectedEmployees,
   setSelectedEmployees,
-  locationId
+  locationId,
+  onDiscountTypeChange,
+  onDiscountValueChange,
+  onPaymentMethodChange
 }: CheckoutSectionProps) {
   const [totalPrice, setTotalPrice] = useState(0);
   const [discountedPrice, setDiscountedPrice] = useState(0);
@@ -159,7 +166,7 @@ export function CheckoutSection({
         total_price: discountedPrice,
         payment_method: paymentMethod,
         notes: notes,
-        status: 'booked',
+        status: 'booked' as "pending" | "confirmed" | "canceled" | "completed" | "inprogress" | "voided" | "refunded" | "partially_refunded" | "noshow" | "booked",
         discount_type: discountType,
         discount_value: discountValue,
         total_duration: totalDuration,
