@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,6 +7,7 @@ import { ChevronLeft, Edit2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { LocationDialog } from "./LocationDialog";
+import { TaxDefaultsDialog } from "./TaxDefaultsDialog";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,19 @@ interface LocationHours {
   is_closed: boolean;
   id?: string;
   location_id?: string;
+}
+
+interface TaxRate {
+  id: string;
+  name: string;
+  percentage: number;
+}
+
+interface TaxSettings {
+  service_tax_id: string | null;
+  product_tax_id: string | null;
+  service_tax?: TaxRate | null;
+  product_tax?: TaxRate | null;
 }
 
 interface Location {
@@ -40,6 +53,7 @@ interface Location {
     prefix: string;
     next_number: number;
   };
+  tax_settings?: TaxSettings;
 }
 
 interface ReceiptSettingsFormData {
@@ -58,6 +72,7 @@ export function LocationDetails() {
     next_number: 1
   });
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [taxDialogOpen, setTaxDialogOpen] = useState(false);
   const [locationHours, setLocationHours] = useState<LocationHours[]>([]);
   
   const fetchLocationDetails = async () => {
@@ -89,11 +104,40 @@ export function LocationDetails() {
       if (receiptError && receiptError.code !== "PGRST116") { // Not found is ok
         throw receiptError;
       }
+
+      const { data: taxSettingsData, error: taxSettingsError } = await supabase
+        .from("location_tax_settings")
+        .select("*")
+        .eq("location_id", locationId)
+        .single();
+        
+      if (taxSettingsError && taxSettingsError.code !== "PGRST116") { // Not found is ok
+        throw taxSettingsError;
+      }
+
+      let taxSettings: TaxSettings | undefined;
+      
+      if (taxSettingsData) {
+        const serviceTaxId = taxSettingsData.service_tax_id;
+        const productTaxId = taxSettingsData.product_tax_id;
+        
+        const [serviceTaxResponse, productTaxResponse] = await Promise.all([
+          serviceTaxId ? supabase.from("tax_rates").select("*").eq("id", serviceTaxId).single() : null,
+          productTaxId ? supabase.from("tax_rates").select("*").eq("id", productTaxId).single() : null
+        ]);
+        
+        taxSettings = {
+          ...taxSettingsData,
+          service_tax: serviceTaxResponse?.data || null,
+          product_tax: productTaxResponse?.data || null
+        };
+      }
       
       const mappedLocation: Location = {
         ...locationData,
         hours: hoursData || [],
-        receipt_settings: receiptData || { prefix: "", next_number: 1 }
+        receipt_settings: receiptData || { prefix: "", next_number: 1 },
+        tax_settings: taxSettings
       };
       
       setLocation(mappedLocation);
@@ -126,6 +170,7 @@ export function LocationDetails() {
     fetchLocationDetails();
     setEditDialogOpen(false);
     setReceiptDialogOpen(false);
+    setTaxDialogOpen(false);
   };
   
   const handleSaveReceiptSettings = async () => {
@@ -187,6 +232,20 @@ export function LocationDetails() {
   ].filter(Boolean).join(", ");
   
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  const getServiceTaxDisplay = () => {
+    if (location.tax_settings?.service_tax) {
+      return `${location.tax_settings.service_tax.name} (${location.tax_settings.service_tax.percentage}%)`;
+    }
+    return "No tax";
+  };
+
+  const getProductTaxDisplay = () => {
+    if (location.tax_settings?.product_tax) {
+      return `${location.tax_settings.product_tax.name} (${location.tax_settings.product_tax.percentage}%)`;
+    }
+    return "No tax";
+  };
   
   return (
     <div className="container py-6 max-w-6xl">
@@ -341,7 +400,7 @@ export function LocationDetails() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Tax defaults</CardTitle>
-            <Button variant="ghost" size="sm" className="text-primary">
+            <Button variant="ghost" size="sm" className="text-primary" onClick={() => setTaxDialogOpen(true)}>
               Edit
             </Button>
           </CardHeader>
@@ -353,11 +412,11 @@ export function LocationDetails() {
             <div className="space-y-4">
               <div>
                 <div className="font-medium">Services</div>
-                <div>GST (5%)</div>
+                <div>{getServiceTaxDisplay()}</div>
               </div>
               <div>
                 <div className="font-medium">Products</div>
-                <div>No tax</div>
+                <div>{getProductTaxDisplay()}</div>
               </div>
             </div>
           </CardContent>
@@ -391,6 +450,13 @@ export function LocationDetails() {
         locationId={locationId}
         onSuccess={handleEditSuccess}
         mode={editDialogMode}
+      />
+      
+      <TaxDefaultsDialog
+        isOpen={taxDialogOpen}
+        onClose={() => setTaxDialogOpen(false)}
+        locationId={locationId || ''}
+        onSuccess={handleEditSuccess}
       />
       
       {receiptDialogOpen && (

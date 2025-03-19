@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -177,6 +178,15 @@ export function ServiceSelector({
   // Fix the type issues in the existing ServiceSelector component
   const handleAddPackageToCart = async (packageItem: any) => {
     try {
+      // Get the user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please login to continue");
+        return;
+      }
+
+      const user = session.user;
+      
       // Get the selected package's services
       const packageServices = packageItem.package_services.map((ps: any) => ps.service);
       
