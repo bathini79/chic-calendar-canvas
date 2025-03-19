@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
@@ -28,7 +29,8 @@ import {
   LucideCalendarClock, 
   AlertCircle,
   ChevronRight,
-  Zap
+  Zap,
+  MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { adminSupabase, supabase } from "@/integrations/supabase/client";
@@ -114,14 +116,53 @@ export default function AdminDashboard() {
     totalItems: 0
   });
 
+  // Location filters for each section
+  const [locations, setLocations] = useState([]);
+  const [recentSalesLocationId, setRecentSalesLocationId] = useState("all");
+  const [todayAppointmentsLocationId, setTodayAppointmentsLocationId] = useState("all");
+  const [upcomingAppointmentsLocationId, setUpcomingAppointmentsLocationId] = useState("all");
+  const [inventoryLocationId, setInventoryLocationId] = useState("all");
+  const [topServicesLocationId, setTopServicesLocationId] = useState("all");
+  const [topStylistsLocationId, setTopStylistsLocationId] = useState("all");
+
   const today = new Date();
-  const { data: todayAppointmentsData = [] } = useAppointmentsByDate(today);
+  const { data: todayAppointmentsData = [], isLoading: isTodayAppointmentsLoading, refetch: refetchTodayAppointments } = 
+    useAppointmentsByDate(today, todayAppointmentsLocationId !== "all" ? todayAppointmentsLocationId : undefined);
+
+  useEffect(() => {
+    fetchLocations();
+    fetchEmployees();
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();
-    fetchEmployees();
-    fetchLowStockItems();
-  }, [timeRange]);
+  }, [
+    timeRange, 
+    recentSalesLocationId, 
+    upcomingAppointmentsLocationId, 
+    inventoryLocationId,
+    topServicesLocationId,
+    topStylistsLocationId
+  ]);
+
+  useEffect(() => {
+    refetchTodayAppointments();
+  }, [todayAppointmentsLocationId]);
+
+  const fetchLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, name")
+        .eq("status", "active");
+      
+      if (error) throw error;
+      setLocations(data || []);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+      toast.error("Failed to load locations");
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -146,9 +187,19 @@ export default function AdminDashboard() {
 
   const fetchLowStockItems = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("inventory_items")
         .select("id, quantity, minimum_quantity");
+      
+      if (inventoryLocationId !== "all") {
+        // If a location is selected, use location-specific inventory
+        query = supabase
+          .from("inventory_location_items")
+          .select("id, quantity, minimum_quantity")
+          .eq("location_id", inventoryLocationId);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
 
@@ -173,12 +224,12 @@ export default function AdminDashboard() {
         fetchRevenueData(),
         fetchAppointmentsStats(),
         fetchUpcomingAppointments(),
-        fetchTodayAppointments(),
         fetchAppointmentsActivity(),
         fetchTopServices(),
         fetchTopStylists(),
         fetchBusinessMetrics(),
-        fetchQuickActionsData()
+        fetchQuickActionsData(),
+        fetchLowStockItems()
       ]);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -208,11 +259,17 @@ export default function AdminDashboard() {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("appointments")
         .select("id, total_price, created_at, status")
         .gte("created_at", startDate.toISOString())
         .order("created_at", { ascending: true });
+      
+      if (recentSalesLocationId !== "all") {
+        query = query.eq("location", recentSalesLocationId);
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -276,7 +333,7 @@ export default function AdminDashboard() {
       const nextWeek = addDays(tomorrow, 7);
       nextWeek.setHours(23, 59, 59, 999);
       
-      const { data, error } = await supabase
+      let query = supabase
         .from("appointments")
         .select(`
           id, 
@@ -287,6 +344,12 @@ export default function AdminDashboard() {
         .gte("start_time", tomorrow.toISOString())
         .lt("start_time", nextWeek.toISOString())
         .order("start_time", { ascending: true });
+      
+      if (upcomingAppointmentsLocationId !== "all") {
+        query = query.eq("location", upcomingAppointmentsLocationId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -342,14 +405,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchTodayAppointments = async () => {
-    // Now using the useAppointmentsByDate hook which is already fetching data
-    // No need to duplicate the fetch here
-  };
-
   const fetchAppointmentsActivity = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("appointments")
         .select(`
           id, 
@@ -368,6 +426,12 @@ export default function AdminDashboard() {
         `)
         .order("start_time", { ascending: false })
         .limit(10);
+      
+      if (todayAppointmentsLocationId !== "all") {
+        query = query.eq("location", todayAppointmentsLocationId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setAppointmentsActivity(data || []);
@@ -385,25 +449,43 @@ export default function AdminDashboard() {
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
-      const { data: thisMonthData, error: thisMonthError } = await supabase
+      let thisMonthQuery = supabase
         .from("bookings")
         .select(`
           service:services (id, name),
-          created_at
+          created_at,
+          appointment:appointments (location)
         `)
         .gte("created_at", firstDayThisMonth.toISOString())
         .lte("created_at", lastDayThisMonth.toISOString())
         .not("service", "is", null);
-
-      const { data: lastMonthData, error: lastMonthError } = await supabase
+      
+      let lastMonthQuery = supabase
         .from("bookings")
         .select(`
           service:services (id, name),
-          created_at
+          created_at,
+          appointment:appointments (location)
         `)
         .gte("created_at", firstDayLastMonth.toISOString())
         .lte("created_at", lastDayLastMonth.toISOString())
         .not("service", "is", null);
+      
+      // Apply location filter if needed
+      if (topServicesLocationId !== "all") {
+        thisMonthQuery = thisMonthQuery.eq("appointment.location", topServicesLocationId);
+        lastMonthQuery = lastMonthQuery.eq("appointment.location", topServicesLocationId);
+      }
+
+      const [thisMonthResult, lastMonthResult] = await Promise.all([
+        thisMonthQuery,
+        lastMonthQuery
+      ]);
+
+      const thisMonthError = thisMonthResult.error;
+      const lastMonthError = lastMonthResult.error;
+      const thisMonthData = thisMonthResult.data;
+      const lastMonthData = lastMonthResult.data;
 
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
 
@@ -446,27 +528,45 @@ export default function AdminDashboard() {
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
-      const { data: thisMonthData, error: thisMonthError } = await supabase
+      let thisMonthQuery = supabase
         .from("bookings")
         .select(`
           price_paid,
           employee:employees!bookings_employee_id_fkey (id, name),
-          created_at
+          created_at,
+          appointment:appointments (location)
         `)
         .gte("created_at", firstDayThisMonth.toISOString())
         .lte("created_at", lastDayThisMonth.toISOString())
         .not("employee", "is", null);
-
-      const { data: lastMonthData, error: lastMonthError } = await supabase
+      
+      let lastMonthQuery = supabase
         .from("bookings")
         .select(`
           price_paid,
           employee:employees!bookings_employee_id_fkey (id, name),
-          created_at
+          created_at,
+          appointment:appointments (location)
         `)
         .gte("created_at", firstDayLastMonth.toISOString())
         .lte("created_at", lastDayLastMonth.toISOString())
         .not("employee", "is", null);
+      
+      // Apply location filter if needed
+      if (topStylistsLocationId !== "all") {
+        thisMonthQuery = thisMonthQuery.eq("appointment.location", topStylistsLocationId);
+        lastMonthQuery = lastMonthQuery.eq("appointment.location", topStylistsLocationId);
+      }
+
+      const [thisMonthResult, lastMonthResult] = await Promise.all([
+        thisMonthQuery,
+        lastMonthQuery
+      ]);
+
+      const thisMonthError = thisMonthResult.error;
+      const lastMonthError = lastMonthResult.error;
+      const thisMonthData = thisMonthResult.data;
+      const lastMonthData = lastMonthResult.data;
 
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
 
@@ -512,19 +612,39 @@ export default function AdminDashboard() {
       const lastMonth = subMonths(today, 1);
       
       // Get available employees (stylists)
-      const { data: employees, error: empError } = await supabase
+      let empQuery = supabase
         .from("employees")
         .select("*")
         .eq("employment_type", "stylist");
       
+      if (recentSalesLocationId !== "all") {
+        // Filter employees by location if a specific location is selected
+        empQuery = supabase
+          .from("employees")
+          .select(`
+            *,
+            employee_locations!inner(location_id)
+          `)
+          .eq("employment_type", "stylist")
+          .eq("employee_locations.location_id", recentSalesLocationId);
+      }
+      
+      const { data: employees, error: empError } = await empQuery;
+      
       if (empError) throw empError;
       
       // Get appointments for current period
-      const { data: currentAppointments, error: currentAppError } = await supabase
+      let currentAppQuery = supabase
         .from("appointments")
         .select("*")
         .gte("start_time", startDate.toISOString())
         .lte("start_time", endOfDay(today).toISOString());
+      
+      if (recentSalesLocationId !== "all") {
+        currentAppQuery = currentAppQuery.eq("location", recentSalesLocationId);
+      }
+      
+      const { data: currentAppointments, error: currentAppError } = await currentAppQuery;
       
       if (currentAppError) throw currentAppError;
       
@@ -545,11 +665,17 @@ export default function AdminDashboard() {
         comparisonEndDate = subYears(endOfDay(today), 1);
       }
       
-      const { data: comparisonAppointments, error: compAppError } = await supabase
+      let compAppQuery = supabase
         .from("appointments")
         .select("*")
         .gte("start_time", comparisonStartDate.toISOString())
         .lte("start_time", comparisonEndDate.toISOString());
+      
+      if (recentSalesLocationId !== "all") {
+        compAppQuery = compAppQuery.eq("location", recentSalesLocationId);
+      }
+      
+      const { data: comparisonAppointments, error: compAppError } = await compAppQuery;
       
       if (compAppError) throw compAppError;
       
@@ -627,19 +753,31 @@ export default function AdminDashboard() {
       const occupancyRateChange = currentOccupancyRate - comparisonOccupancyRate;
       
       // Calculate returning customer rate
-      const { data: currentCustomerData, error: currentCustError } = await supabase
+      let currentCustQuery = supabase
         .from("appointments")
-        .select("customer_id")
+        .select("customer_id, location")
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endOfDay(today).toISOString());
       
+      if (recentSalesLocationId !== "all") {
+        currentCustQuery = currentCustQuery.eq("location", recentSalesLocationId);
+      }
+      
+      const { data: currentCustomerData, error: currentCustError } = await currentCustQuery;
+      
       if (currentCustError) throw currentCustError;
       
-      const { data: comparisonCustomerData, error: compCustError } = await supabase
+      let compCustQuery = supabase
         .from("appointments")
-        .select("customer_id")
+        .select("customer_id, location")
         .gte("created_at", comparisonStartDate.toISOString())
         .lte("created_at", comparisonEndDate.toISOString());
+      
+      if (recentSalesLocationId !== "all") {
+        compCustQuery = compCustQuery.eq("location", recentSalesLocationId);
+      }
+      
+      const { data: comparisonCustomerData, error: compCustError } = await compCustQuery;
       
       if (compCustError) throw compCustError;
       
@@ -706,35 +844,63 @@ export default function AdminDashboard() {
 
   const fetchQuickActionsData = async () => {
     try {
-      const { data: pendingConfirmations, error: pendingError } = await supabase
+      let pendingQuery = supabase
         .from("appointments")
         .select("id")
         .eq("status", "pending");
+      
+      if (todayAppointmentsLocationId !== "all") {
+        pendingQuery = pendingQuery.eq("location", todayAppointmentsLocationId);
+      }
+      
+      const { data: pendingConfirmations, error: pendingError } = await pendingQuery;
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       
-      const { data: todayBookings, error: todayError } = await supabase
+      let todayBookingsQuery = supabase
         .from("appointments")
         .select("id")
         .gte("start_time", today.toISOString())
         .lt("start_time", tomorrow.toISOString());
+      
+      if (todayAppointmentsLocationId !== "all") {
+        todayBookingsQuery = todayBookingsQuery.eq("location", todayAppointmentsLocationId);
+      }
+      
+      const { data: todayBookings, error: todayError } = await todayBookingsQuery;
 
       const nextWeek = new Date(today);
       nextWeek.setDate(today.getDate() + 7);
       
-      const { data: upcomingBookings, error: upcomingError } = await supabase
+      let upcomingQuery = supabase
         .from("appointments")
         .select("id")
         .gt("start_time", tomorrow.toISOString())
         .lte("start_time", nextWeek.toISOString());
+      
+      if (upcomingAppointmentsLocationId !== "all") {
+        upcomingQuery = upcomingQuery.eq("location", upcomingAppointmentsLocationId);
+      }
+      
+      const { data: upcomingBookings, error: upcomingError } = await upcomingQuery;
 
-      const { data: lowStockItems, error: lowStockError } = await supabase
+      let lowStockQuery = supabase
         .from("inventory_items")
         .select("id")
         .lte("quantity", "minimum_quantity");
+      
+      if (inventoryLocationId !== "all") {
+        lowStockQuery = supabase
+          .from("inventory_location_items")
+          .select("id")
+          .eq("location_id", inventoryLocationId)
+          .lte("quantity", "minimum_quantity");
+      }
+      
+      const { data: lowStockItems, error: lowStockError } = await lowStockQuery;
 
       if (pendingError || todayError || upcomingError || lowStockError) 
         throw pendingError || todayError || upcomingError || lowStockError;
@@ -817,6 +983,24 @@ export default function AdminDashboard() {
         return <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">BOOKED</span>;
     }
   };
+  
+  // Create a location selector component for reuse
+  const LocationSelector = ({ value, onChange, className = "" }) => (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={`w-[180px] ${className}`}>
+        <div className="flex items-center">
+          <MapPin className="mr-2 h-4 w-4" />
+          <SelectValue placeholder="All Locations" />
+        </div>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All Locations</SelectItem>
+        {locations.map(location => (
+          <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 
   return (
     <div className="p-8 space-y-6">
@@ -830,20 +1014,26 @@ export default function AdminDashboard() {
               <CardTitle className="text-lg">Recent sales</CardTitle>
               <CardDescription>{getTimeRangeLabel()}</CardDescription>
             </div>
-            <Select
-              value={timeRange}
-              onValueChange={setTimeRange}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Select..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Week</SelectItem>
-                <SelectItem value="month">Month</SelectItem>
-                <SelectItem value="year">Year</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <LocationSelector 
+                value={recentSalesLocationId} 
+                onChange={setRecentSalesLocationId}
+              />
+              <Select
+                value={timeRange}
+                onValueChange={setTimeRange}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Select..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">Week</SelectItem>
+                  <SelectItem value="month">Month</SelectItem>
+                  <SelectItem value="year">Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -928,7 +1118,10 @@ export default function AdminDashboard() {
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg">Today's next appointments</CardTitle>
-            <MoreHorizontal className="h-5 w-5 text-gray-400" />
+            <LocationSelector 
+              value={todayAppointmentsLocationId} 
+              onChange={setTodayAppointmentsLocationId}
+            />
           </CardHeader>
           <CardContent>
             <div className="mb-4">
@@ -943,7 +1136,11 @@ export default function AdminDashboard() {
             </div>
             
             <ScrollArea className="h-[300px] pr-4">
-              {todayAppointmentsData.length > 0 ? (
+              {isTodayAppointmentsLoading ? (
+                <div className="flex justify-center items-center h-40">
+                  <p>Loading appointments...</p>
+                </div>
+              ) : todayAppointmentsData.length > 0 ? (
                 <div className="space-y-4">
                   {todayAppointmentsData.map((appointment) => {
                     const mainBooking = appointment.bookings[0];
@@ -995,22 +1192,48 @@ export default function AdminDashboard() {
       {/* Second row: Upcoming appointments and Inventory */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <React.Suspense fallback={<div className="h-[400px] flex items-center justify-center">Loading...</div>}>
-          <LazyStatsPanel 
-            stats={[]} 
-            chartData={upcomingAppointmentsChart}
-            totalBooked={upcomingStats.total}
-            confirmedCount={upcomingStats.confirmed}
-            bookedCount={upcomingStats.booked}
-            cancelledCount={upcomingStats.cancelled}
-          />
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-lg">Upcoming appointments</CardTitle>
+              <LocationSelector 
+                value={upcomingAppointmentsLocationId} 
+                onChange={setUpcomingAppointmentsLocationId}
+              />
+            </CardHeader>
+            <CardContent>
+              {upcomingAppointmentsChart.length > 0 ? (
+                <LazyStatsPanel 
+                  stats={[]} 
+                  chartData={upcomingAppointmentsChart}
+                  totalBooked={upcomingStats.total}
+                  confirmedCount={upcomingStats.confirmed}
+                  bookedCount={upcomingStats.booked}
+                  cancelledCount={upcomingStats.cancelled}
+                />
+              ) : (
+                <div className="h-[300px] flex flex-col items-center justify-center">
+                  <div className="text-4xl mb-4">📊</div>
+                  <h3 className="text-xl font-semibold">Your schedule is empty</h3>
+                  <p className="text-gray-500 mt-2">Make some appointments for schedule data to appear</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </React.Suspense>
 
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg">Inventory Status</CardTitle>
-            <Link to="/admin/inventory" className="text-sm text-blue-600 hover:underline flex items-center">
-              View Inventory <ChevronRight className="h-4 w-4 ml-1" />
-            </Link>
+            <div className="flex items-center justify-between gap-2">
+              <LocationSelector 
+                value={inventoryLocationId} 
+                onChange={setInventoryLocationId}
+                className="w-[160px]"
+              />
+              <Link to="/admin/inventory" className="text-sm text-blue-600 hover:underline flex items-center">
+                View Inventory <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1038,8 +1261,12 @@ export default function AdminDashboard() {
       {/* Third row: Top services and Top team members */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Top services</CardTitle>
+            <LocationSelector 
+              value={topServicesLocationId} 
+              onChange={setTopServicesLocationId}
+            />
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -1074,8 +1301,12 @@ export default function AdminDashboard() {
         </Card>
         
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Top team member</CardTitle>
+            <LocationSelector 
+              value={topStylistsLocationId} 
+              onChange={setTopStylistsLocationId}
+            />
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -1115,7 +1346,7 @@ export default function AdminDashboard() {
         appointment={selectedAppointment}
         open={isDetailsDialogOpen}
         onOpenChange={setIsDetailsDialogOpen}
-        onUpdated={fetchTodayAppointments}
+        onUpdated={refetchTodayAppointments}
         onCheckout={handleCheckoutFromAppointment}
         onEdit={() => {
           handleCheckoutFromAppointment(selectedAppointment as Appointment);
@@ -1124,14 +1355,33 @@ export default function AdminDashboard() {
 
       {isAddAppointmentOpen && appointmentDate && (
         <AppointmentManager
-          isOpen={isAddAppointmentOpen}
           onClose={closeAppointmentManager}
           selectedDate={appointmentDate}
           selectedTime={appointmentTime}
           employees={employees}
           existingAppointment={selectedAppointment}
+          locationId={todayAppointmentsLocationId !== "all" ? todayAppointmentsLocationId : undefined}
         />
       )}
+
+      <style>
+        {`
+          .widget-small {
+            grid-column: span 1;
+          }
+          .widget-medium {
+            grid-column: span 1;
+          }
+          .widget-large {
+            grid-column: span 2;
+          }
+          @media (max-width: 768px) {
+            .widget-large {
+              grid-column: span 1;
+            }
+          }
+        `}
+      </style>
     </div>
   );
 }
