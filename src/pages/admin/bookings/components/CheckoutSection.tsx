@@ -249,13 +249,6 @@ export function CheckoutSection({
     }
   };
 
-  // Custom handler for paymentMethod changes
-  const handlePaymentMethodChange = (value: string) => {
-    if (onPaymentMethodChange) {
-      onPaymentMethodChange(value);
-    }
-  };
-
   return (
     <Card className="w-full">
       <CardHeader>

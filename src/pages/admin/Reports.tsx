@@ -24,6 +24,7 @@ import FinancialSummary from "@/components/admin/reports/FinancialSummary";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { FinancialDashboard } from "@/components/admin/dashboard/FinancialDashboard";
 
 const reportCategories = [
   {
@@ -152,18 +153,11 @@ export default function Reports() {
     if (expandedReport === "summary") {
       return (
         <div className="space-y-4">
-          <div className="flex items-center">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setExpandedReport(null)}
-              className="mr-2"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" /> Back
-            </Button>
-            <h2 className="text-2xl font-bold">Financial Summary</h2>
-          </div>
-          <FinancialSummary />
+          <FinancialSummary 
+            onBack={() => setExpandedReport(null)} 
+            expanded={true} 
+            locations={locations}
+          />
         </div>
       );
     }
@@ -227,7 +221,7 @@ export default function Reports() {
               <TabsContent value="all" className="mt-6">
                 {activeCategory === "all" && searchQuery === "" && !expandedReport && (
                   <div className="mb-6">
-                    <FinancialSummary />
+                    <FinancialSummary onExpand={() => handleReportClick("summary")} locations={locations} />
                   </div>
                 )}
                 {renderReportContent()}
@@ -283,7 +277,7 @@ function ReportCard({ title, description, category, icon, onClick }: ReportCardP
   }
   
   if (title === "Summary") {
-    return <FinancialSummary />;
+    return <FinancialSummary onExpand={onClick} />;
   }
   
   return (

@@ -10,21 +10,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Check, Search, ShoppingCart, Package } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '@/components/cart/CartContext';
+import { useCartContext } from '@/components/cart/CartContext';
 
 interface Service {
   id: string;
   name: string;
   description: string;
   duration: number;
+  price: number;
   selling_price: number;
-  original_price: number;
+  max_clients: number;
   category_id: string;
-  image_urls: string[];
-  status: 'active' | 'inactive' | 'archived';
-  gender: string;
+  image_url: string;
   created_at: string;
   updated_at: string;
+  is_active: boolean;
 }
 
 interface ServicePackage {
@@ -33,18 +33,17 @@ interface ServicePackage {
   description: string;
   price: number;
   discount_percentage: number;
-  image_urls: string[];
+  image_url: string;
   created_at: string;
   updated_at: string;
+  is_active: boolean;
   services: Service[];
-  status: 'active' | 'inactive' | 'archived';
-  is_customizable: boolean;
 }
 
 interface Category {
   id: string;
   name: string;
-  description?: string;
+  description: string;
   created_at: string;
   updated_at: string;
 }
@@ -55,10 +54,6 @@ interface ServiceSelectorProps {
   selectedServices?: string[];
   selectedPackages?: string[];
   isBookingFlow?: boolean;
-  items?: any[];
-  selectedStylists?: Record<string, string>;
-  onStylistSelect?: (serviceId: string, stylistId: string) => void;
-  locationId?: string;
 }
 
 interface CartItem {
@@ -76,41 +71,22 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   selectedServices = [],
   selectedPackages = [],
   isBookingFlow = false,
-  items = [],
-  selectedStylists = {},
-  onStylistSelect,
-  locationId,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('services');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { items: cartItems, addItem } = useCart();
+  const { addToCart, cartItems } = useCartContext();
 
   // Fetch services
   const { data: services = [], isLoading: isServicesLoading } = useQuery({
-    queryKey: ['services', locationId],
+    queryKey: ['services'],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('services')
         .select('*')
         .eq('is_active', true)
         .order('name');
-      
-      if (locationId) {
-        // Filter by location if specified
-        const { data: serviceLocations } = await supabase
-          .from('service_locations')
-          .select('service_id')
-          .eq('location_id', locationId);
-        
-        if (serviceLocations && serviceLocations.length > 0) {
-          const serviceIds = serviceLocations.map(sl => sl.service_id);
-          query = query.in('id', serviceIds);
-        }
-      }
-      
-      const { data, error } = await query;
       
       if (error) throw error;
       return data as Service[];
@@ -119,9 +95,9 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
   // Fetch packages
   const { data: packages = [], isLoading: isPackagesLoading } = useQuery({
-    queryKey: ['packages', locationId],
+    queryKey: ['packages'],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('packages')
         .select(`
           *,
@@ -131,21 +107,6 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         `)
         .eq('is_active', true)
         .order('name');
-      
-      if (locationId) {
-        // Filter by location if specified
-        const { data: packageLocations } = await supabase
-          .from('package_locations')
-          .select('package_id')
-          .eq('location_id', locationId);
-        
-        if (packageLocations && packageLocations.length > 0) {
-          const packageIds = packageLocations.map(pl => pl.package_id);
-          query = query.in('id', packageIds);
-        }
-      }
-      
-      const { data, error } = await query;
       
       if (error) throw error;
       
@@ -161,7 +122,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     queryKey: ['service-categories'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('categories')
+        .from('service_categories')
         .select('*')
         .order('name');
       
@@ -198,14 +159,11 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     } else {
       const service = services.find(s => s.id === serviceId);
       if (service) {
-        addItem({
+        addToCart({
           id: service.id,
-          name: service.name,
-          price: service.selling_price,
-          duration: service.duration,
           type: 'service',
           service: service,
-          service_id: service.id
+          price: service.selling_price
         });
       }
     }
@@ -218,13 +176,11 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     } else {
       const pkg = packages.find(p => p.id === packageId);
       if (pkg) {
-        addItem({
+        addToCart({
           id: pkg.id,
-          name: pkg.name,
-          price: pkg.price,
           type: 'package',
           package: pkg,
-          package_id: pkg.id
+          price: pkg.price
         });
       }
     }
@@ -232,15 +188,15 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
   // Check if a service is in the cart
   const isServiceInCart = (serviceId: string) => {
-    return cartItems.some(item => 
-      item.type === 'service' && item.service_id === serviceId
+    return cartItems.some((item: CartItem) => 
+      item.type === 'service' && item.id === serviceId
     );
   };
 
   // Check if a package is in the cart
   const isPackageInCart = (packageId: string) => {
-    return cartItems.some(item => 
-      item.type === 'package' && item.package_id === packageId
+    return cartItems.some((item: CartItem) => 
+      item.type === 'package' && item.id === packageId
     );
   };
 
@@ -255,8 +211,17 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   };
 
   // Handle view package details
-  const handleViewPackageDetails = (packageId: string) => {
-    navigate(`/packages/${packageId}`);
+  const handleViewPackageDetails = (item: CartItem) => {
+    if (item.package) {
+      navigate(`/packages/${item.package.id}`);
+    }
+  };
+
+  // Handle removing an item from cart
+  const handleRemoveFromCart = (item: CartItem) => {
+    if (item.cartItemId) {
+      // Your remove from cart logic here
+    }
   };
 
   return (
@@ -316,10 +281,10 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredServices.map(service => (
                 <Card key={service.id} className="overflow-hidden">
-                  {service.image_urls && service.image_urls.length > 0 && (
+                  {service.image_url && (
                     <div className="aspect-[4/3] relative">
                       <img 
-                        src={service.image_urls[0]} 
+                        src={service.image_url} 
                         alt={service.name} 
                         className="object-cover w-full h-full"
                       />
@@ -379,10 +344,10 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredPackages.map(pkg => (
                 <Card key={pkg.id} className="overflow-hidden">
-                  {pkg.image_urls && pkg.image_urls.length > 0 && (
+                  {pkg.image_url && (
                     <div className="aspect-[4/3] relative">
                       <img 
-                        src={pkg.image_urls[0]} 
+                        src={pkg.image_url} 
                         alt={pkg.name} 
                         className="object-cover w-full h-full"
                       />

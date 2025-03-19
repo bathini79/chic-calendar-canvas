@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { DailyRevenueChart } from './DailyRevenueChart';
-import ServiceRevenueChart from './ServiceRevenueChart';
+import { ServiceRevenueChart } from './ServiceRevenueChart';
 import { RevenueDataTable } from './RevenueDataTable';
 
 interface DailyRevenueProps {
