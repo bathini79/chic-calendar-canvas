@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useUser } from '@/components/auth/UserContext';
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -63,7 +62,6 @@ export function ServiceSelector({
   const [services, setServices] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const { user } = useUser();
 
   useEffect(() => {
     fetchServices();
@@ -115,7 +113,15 @@ export function ServiceSelector({
     }
 
     onServicesChange(updatedServices);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error("Please login to continue");
+      return;
+    }
 
+    const user = session.user;
     if (user) {
       try {
         if (isSelected) {
