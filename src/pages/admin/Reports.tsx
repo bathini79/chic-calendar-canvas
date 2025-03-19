@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Card, 
@@ -221,7 +222,9 @@ export default function Reports() {
               <TabsContent value="all" className="mt-6">
                 {activeCategory === "all" && searchQuery === "" && !expandedReport && (
                   <div className="mb-6">
-                    <FinancialSummary onExpand={() => handleReportClick("summary")} locations={locations} />
+                    <FinancialSummary 
+                      locations={locations} 
+                    />
                   </div>
                 )}
                 {renderReportContent()}
@@ -277,7 +280,7 @@ function ReportCard({ title, description, category, icon, onClick }: ReportCardP
   }
   
   if (title === "Summary") {
-    return <FinancialSummary onExpand={onClick} />;
+    return <FinancialSummary />;
   }
   
   return (

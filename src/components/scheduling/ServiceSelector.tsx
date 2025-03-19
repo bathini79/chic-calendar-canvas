@@ -10,21 +10,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Check, Search, ShoppingCart, Package } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
-import { useCartContext } from '@/components/cart/CartContext';
+import { useCart } from '@/components/cart/CartContext';
 
 interface Service {
   id: string;
   name: string;
   description: string;
   duration: number;
-  price: number;
   selling_price: number;
-  max_clients: number;
+  original_price: number;
   category_id: string;
-  image_url: string;
+  image_urls: string[];
+  status: 'active' | 'inactive' | 'archived';
+  gender: string;
   created_at: string;
   updated_at: string;
-  is_active: boolean;
 }
 
 interface ServicePackage {
@@ -33,17 +33,18 @@ interface ServicePackage {
   description: string;
   price: number;
   discount_percentage: number;
-  image_url: string;
+  image_urls: string[];
   created_at: string;
   updated_at: string;
-  is_active: boolean;
   services: Service[];
+  status: 'active' | 'inactive' | 'archived';
+  is_customizable: boolean;
 }
 
 interface Category {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   created_at: string;
   updated_at: string;
 }
@@ -54,6 +55,10 @@ interface ServiceSelectorProps {
   selectedServices?: string[];
   selectedPackages?: string[];
   isBookingFlow?: boolean;
+  items?: any[];
+  selectedStylists?: Record<string, string>;
+  onStylistSelect?: (serviceId: string, stylistId: string) => void;
+  locationId?: string;
 }
 
 interface CartItem {
@@ -71,33 +76,49 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   selectedServices = [],
   selectedPackages = [],
   isBookingFlow = false,
+  items = [],
+  selectedStylists = {},
+  onStylistSelect,
+  locationId,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('services');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { addToCart, cartItems } = useCartContext();
+  const { addToCart, cartItems } = useCart();
 
   // Fetch services
   const { data: services = [], isLoading: isServicesLoading } = useQuery({
-    queryKey: ['services'],
+    queryKey: ['services', locationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('services')
         .select('*')
         .eq('is_active', true)
         .order('name');
       
+      if (locationId) {
+        // Filter by location if specified
+        query = query.in('id', (
+          await supabase
+            .from('service_locations')
+            .select('service_id')
+            .eq('location_id', locationId)
+        ).data?.map(sl => sl.service_id) || []);
+      }
+      
+      const { data, error } = await query;
+      
       if (error) throw error;
-      return data as Service[];
+      return data as unknown as Service[];
     },
   });
 
   // Fetch packages
   const { data: packages = [], isLoading: isPackagesLoading } = useQuery({
-    queryKey: ['packages'],
+    queryKey: ['packages', locationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('packages')
         .select(`
           *,
@@ -108,12 +129,24 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         .eq('is_active', true)
         .order('name');
       
+      if (locationId) {
+        // Filter by location if specified
+        query = query.in('id', (
+          await supabase
+            .from('package_locations')
+            .select('package_id')
+            .eq('location_id', locationId)
+        ).data?.map(pl => pl.package_id) || []);
+      }
+      
+      const { data, error } = await query;
+      
       if (error) throw error;
       
       return data.map((pkg: any) => ({
         ...pkg,
         services: pkg.services.map((s: any) => s.services)
-      })) as ServicePackage[];
+      })) as unknown as ServicePackage[];
     },
   });
 
@@ -122,7 +155,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     queryKey: ['service-categories'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('service_categories')
+        .from('categories')
         .select('*')
         .order('name');
       
@@ -281,10 +314,10 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredServices.map(service => (
                 <Card key={service.id} className="overflow-hidden">
-                  {service.image_url && (
+                  {service.image_urls && service.image_urls.length > 0 && (
                     <div className="aspect-[4/3] relative">
                       <img 
-                        src={service.image_url} 
+                        src={service.image_urls[0]} 
                         alt={service.name} 
                         className="object-cover w-full h-full"
                       />
@@ -344,10 +377,10 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredPackages.map(pkg => (
                 <Card key={pkg.id} className="overflow-hidden">
-                  {pkg.image_url && (
+                  {pkg.image_urls && pkg.image_urls.length > 0 && (
                     <div className="aspect-[4/3] relative">
                       <img 
-                        src={pkg.image_url} 
+                        src={pkg.image_urls[0]} 
                         alt={pkg.name} 
                         className="object-cover w-full h-full"
                       />
