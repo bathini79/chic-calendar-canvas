@@ -52,7 +52,7 @@ import { formatPrice } from "@/lib/utils";
 const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
 
 // Location selector component for reuse
-const LocationSelector = ({ value, onChange, className = "" }) => (
+const LocationSelector = ({ locations, value, onChange, className = "" }) => (
   <Select value={value} onValueChange={onChange}>
     <SelectTrigger className={`w-[180px] ${className}`}>
       <div className="flex items-center">
@@ -62,7 +62,7 @@ const LocationSelector = ({ value, onChange, className = "" }) => (
     </SelectTrigger>
     <SelectContent>
       <SelectItem value="all">All Locations</SelectItem>
-      {locations.map(location => (
+      {locations?.map(location => (
         <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
       ))}
     </SelectContent>
@@ -1126,6 +1126,7 @@ export default function AdminDashboard() {
               <LocationSelector 
                 value={recentSalesLocationId} 
                 onChange={setRecentSalesLocationId}
+                locations={locations}
               />
               <Select
                 value={timeRange}
@@ -1229,6 +1230,7 @@ export default function AdminDashboard() {
             <LocationSelector 
               value={todayAppointmentsLocationId} 
               onChange={setTodayAppointmentsLocationId}
+              locations={locations}
             />
           </CardHeader>
           <CardContent>
@@ -1306,6 +1308,7 @@ export default function AdminDashboard() {
               <LocationSelector 
                 value={upcomingAppointmentsLocationId} 
                 onChange={setUpcomingAppointmentsLocationId}
+                locations={locations}
               />
             </CardHeader>
             <CardContent>
@@ -1337,6 +1340,8 @@ export default function AdminDashboard() {
                 value={inventoryLocationId} 
                 onChange={setInventoryLocationId}
                 className="w-[160px]"
+              locations={locations}
+
               />
               <Link to="/admin/inventory" className="text-sm text-blue-600 hover:underline flex items-center">
                 View Inventory <ChevronRight className="h-4 w-4 ml-1" />
@@ -1374,6 +1379,8 @@ export default function AdminDashboard() {
             <LocationSelector 
               value={topServicesLocationId} 
               onChange={setTopServicesLocationId}
+              locations={locations}
+
             />
           </CardHeader>
           <CardContent>
@@ -1414,6 +1421,8 @@ export default function AdminDashboard() {
             <LocationSelector 
               value={topStylistsLocationId} 
               onChange={setTopStylistsLocationId}
+              locations={locations}
+
             />
           </CardHeader>
           <CardContent>
