@@ -23,8 +23,8 @@ interface TaxDefaultsDialogProps {
 
 export function TaxDefaultsDialog({ isOpen, onClose, locationId, onSuccess }: TaxDefaultsDialogProps) {
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
-  const [serviceTaxId, setServiceTaxId] = useState<string>('');
-  const [productTaxId, setProductTaxId] = useState<string>('');
+  const [serviceTaxId, setServiceTaxId] = useState<string>('none');
+  const [productTaxId, setProductTaxId] = useState<string>('none');
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
 
@@ -69,8 +69,12 @@ export function TaxDefaultsDialog({ isOpen, onClose, locationId, onSuccess }: Ta
       }
       
       if (data) {
-        setServiceTaxId(data.service_tax_id || '');
-        setProductTaxId(data.product_tax_id || '');
+        setServiceTaxId(data.service_tax_id || 'none');
+        setProductTaxId(data.product_tax_id || 'none');
+      } else {
+        // Set defaults if no data exists
+        setServiceTaxId('none');
+        setProductTaxId('none');
       }
     } catch (error) {
       console.error('Error fetching location tax settings:', error);
@@ -101,8 +105,8 @@ export function TaxDefaultsDialog({ isOpen, onClose, locationId, onSuccess }: Ta
         const { error } = await supabase
           .from('location_tax_settings')
           .update({
-            service_tax_id: serviceTaxId || null,
-            product_tax_id: productTaxId || null
+            service_tax_id: serviceTaxId === 'none' ? null : serviceTaxId,
+            product_tax_id: productTaxId === 'none' ? null : productTaxId
           })
           .eq('location_id', locationId);
           
@@ -113,8 +117,8 @@ export function TaxDefaultsDialog({ isOpen, onClose, locationId, onSuccess }: Ta
           .from('location_tax_settings')
           .insert({
             location_id: locationId,
-            service_tax_id: serviceTaxId || null,
-            product_tax_id: productTaxId || null
+            service_tax_id: serviceTaxId === 'none' ? null : serviceTaxId,
+            product_tax_id: productTaxId === 'none' ? null : productTaxId
           });
           
         saveError = error;
@@ -131,11 +135,6 @@ export function TaxDefaultsDialog({ isOpen, onClose, locationId, onSuccess }: Ta
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const getTaxLabel = (taxId: string) => {
-    const tax = taxRates.find(tax => tax.id === taxId);
-    return tax ? `${tax.name} (${tax.percentage}%)` : 'No Tax';
   };
 
   return (
@@ -159,7 +158,7 @@ export function TaxDefaultsDialog({ isOpen, onClose, locationId, onSuccess }: Ta
                   <SelectValue placeholder="Select tax rate for services" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No Tax</SelectItem>
+                  <SelectItem value="none">No Tax</SelectItem>
                   {taxRates.map((tax) => (
                     <SelectItem key={tax.id} value={tax.id}>
                       {tax.name} ({tax.percentage}%)
@@ -182,7 +181,7 @@ export function TaxDefaultsDialog({ isOpen, onClose, locationId, onSuccess }: Ta
                   <SelectValue placeholder="Select tax rate for products" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No Tax</SelectItem>
+                  <SelectItem value="none">No Tax</SelectItem>
                   {taxRates.map((tax) => (
                     <SelectItem key={tax.id} value={tax.id}>
                       {tax.name} ({tax.percentage}%)
