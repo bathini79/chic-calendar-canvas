@@ -20,8 +20,7 @@ import {
   Search,
   ArrowLeft
 } from "lucide-react";
-import DailyRevenue from "@/components/admin/reports/DailyRevenue";
-import FinancialSummary from "@/components/admin/reports/FinancialSummary";
+import { DailyRevenue } from "@/components/admin/reports/DailyRevenue";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -146,7 +145,7 @@ export default function Reports() {
             </Button>
             <h2 className="text-2xl font-bold">Daily Revenue Report</h2>
           </div>
-          <DailyRevenue locations={locations} />
+          <DailyRevenue expanded={true} locations={locations} />
         </div>
       );
     }
@@ -154,11 +153,18 @@ export default function Reports() {
     if (expandedReport === "summary") {
       return (
         <div className="space-y-4">
-          <FinancialSummary 
-            onBack={() => setExpandedReport(null)} 
-            expanded={true} 
-            locations={locations}
-          />
+          <div className="flex items-center">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setExpandedReport(null)}
+              className="mr-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+            <h2 className="text-2xl font-bold">Financial Dashboard</h2>
+          </div>
+          <FinancialDashboard />
         </div>
       );
     }
@@ -222,9 +228,7 @@ export default function Reports() {
               <TabsContent value="all" className="mt-6">
                 {activeCategory === "all" && searchQuery === "" && !expandedReport && (
                   <div className="mb-6">
-                    <FinancialSummary 
-                      locations={locations} 
-                    />
+                    <DailyRevenue onExpand={() => handleReportClick("daily-revenue")} locations={locations} />
                   </div>
                 )}
                 {renderReportContent()}
@@ -277,10 +281,6 @@ interface ReportCardProps {
 function ReportCard({ title, description, category, icon, onClick }: ReportCardProps) {
   if (title === "Daily Revenue") {
     return <DailyRevenue onExpand={onClick} />;
-  }
-  
-  if (title === "Summary") {
-    return <FinancialSummary />;
   }
   
   return (

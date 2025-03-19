@@ -1,6 +1,6 @@
 
 import { useCart } from "@/components/cart/CartContext";
-import ServiceSelector from "@/components/scheduling/ServiceSelector";
+import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
 import { UnifiedCalendar } from "@/components/scheduling/UnifiedCalendar";
 import { CartSummary } from "@/components/cart/CartSummary";
 import { MobileCartBar } from "@/components/cart/MobileCartBar";

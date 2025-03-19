@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -33,10 +32,7 @@ interface CheckoutSectionProps {
   setSelectedEmployee: (employee: { id: string; name: string } | null) => void;
   selectedEmployees: Record<string, { id: string; name: string }>;
   setSelectedEmployees: (employees: Record<string, { id: string; name: string }>) => void;
-  locationId?: string;
-  onDiscountTypeChange?: (type: "none" | "fixed" | "percentage") => void;
-  onDiscountValueChange?: (value: number) => void;
-  onPaymentMethodChange?: (method: string) => void;
+  locationId?: string; // Add locationId prop
 }
 
 export function CheckoutSection({
@@ -59,10 +55,7 @@ export function CheckoutSection({
   setSelectedEmployee,
   selectedEmployees,
   setSelectedEmployees,
-  locationId,
-  onDiscountTypeChange,
-  onDiscountValueChange,
-  onPaymentMethodChange
+  locationId
 }: CheckoutSectionProps) {
   const [totalPrice, setTotalPrice] = useState(0);
   const [discountedPrice, setDiscountedPrice] = useState(0);
@@ -166,7 +159,7 @@ export function CheckoutSection({
         total_price: discountedPrice,
         payment_method: paymentMethod,
         notes: notes,
-        status: 'booked' as "pending" | "confirmed" | "canceled" | "completed" | "inprogress" | "voided" | "refunded" | "partially_refunded" | "noshow" | "booked",
+        status: 'booked',
         discount_type: discountType,
         discount_value: discountValue,
         total_duration: totalDuration,
@@ -246,13 +239,6 @@ export function CheckoutSection({
       toast.error(error.message || 'Failed to create appointment');
     } finally {
       setIsConfirming(false);
-    }
-  };
-
-  // Custom handler for paymentMethod changes
-  const handlePaymentMethodChange = (value: string) => {
-    if (onPaymentMethodChange) {
-      onPaymentMethodChange(value);
     }
   };
 
