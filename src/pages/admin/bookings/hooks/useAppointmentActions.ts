@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment } from '../types';
+import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
 
 // Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
@@ -17,23 +17,6 @@ interface SelectedItem {
     name: string;
   };
   duration?: number;
-}
-
-// Add these type definitions that were previously missing
-export interface RefundData {
-  reason: string;
-  notes: string;
-  refundedBy: string;
-}
-
-export interface TransactionDetails {
-  id: string;
-  amount: number;
-  status: string;
-  payment_method: string;
-  created_at: string;
-  originalSale: Appointment;
-  refunds: Appointment[];
 }
 
 export function useAppointmentActions() {
