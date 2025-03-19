@@ -96,7 +96,7 @@ export default function useSaveAppointment({
 
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
-        currentScreen === SCREEN.CHECKOUT ? 'confirmed' : 'pending';
+        currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
 
       const appointmentData = {
         customer_id: selectedCustomer.id,
@@ -149,7 +149,7 @@ export default function useSaveAppointment({
 
         const serviceStartTime = new Date(startTime);
         const bookingStatus: AppointmentStatus = 
-          currentScreen === SCREEN.CHECKOUT ? 'confirmed' : 'pending';
+          currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
 
         const bookingData = {
           appointment_id: createdAppointmentId,
@@ -189,7 +189,7 @@ export default function useSaveAppointment({
             service_id: packageServiceId,
             package_id: packageId,
             employee_id: selectedStylists[packageServiceId] === 'any' ? null : selectedStylists[packageServiceId],
-            status: currentScreen === SCREEN.CHECKOUT ? 'confirmed' : 'pending',
+            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
             start_time: packageServiceStartTime.toISOString(),
             end_time: addMinutes(packageServiceStartTime, packageService.duration).toISOString(),
             price_paid: 0, // Package services typically don't have individual prices
@@ -217,7 +217,7 @@ export default function useSaveAppointment({
             service_id: customServiceId,
             package_id: packageId,
             employee_id: selectedStylists[customServiceId] === 'any' ? null : selectedStylists[customServiceId],
-            status: currentScreen === SCREEN.CHECKOUT ? 'confirmed' : 'pending',
+            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
             start_time: customServiceStartTime.toISOString(),
             end_time: addMinutes(customServiceStartTime, customService.duration).toISOString(),
             price_paid: customService.selling_price,
