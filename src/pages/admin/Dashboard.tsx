@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
+import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears } from "date-fns";
 import { 
   Card, 
   CardContent, 
@@ -11,29 +11,18 @@ import {
 } from "@/components/ui/card";
 import { 
   MoreHorizontal, 
-  BarChart3, 
-  Calendar, 
   Clock, 
   CheckCircle, 
   XCircle, 
-  Package, 
-  Users, 
-  ArrowRight, 
-  CreditCard, 
-  Percent, 
-  User, 
-  DollarSign, 
+  MapPin,
   TrendingDown, 
   TrendingUp, 
-  Info, 
-  LucideCalendarClock, 
-  AlertCircle,
+  Percent, 
+  User, 
   ChevronRight,
-  Zap,
-  MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { adminSupabase, supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   LineChart, 
   Line, 
@@ -43,8 +32,6 @@ import {
   Tooltip, 
   Legend, 
   ResponsiveContainer,
-  BarChart,
-  Bar
 } from "recharts";
 import { 
   Select, 
@@ -53,7 +40,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { AdminRoute } from "@/components/auth/AdminRoute";
 import { toast } from "sonner";
 import { StatsPanel } from "./bookings/components/StatsPanel";
 import { Appointment } from "./bookings/types";
@@ -64,6 +50,24 @@ import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import { formatPrice } from "@/lib/utils";
 
 const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
+
+// Location selector component for reuse
+const LocationSelector = ({ value, onChange, className = "" }) => (
+  <Select value={value} onValueChange={onChange}>
+    <SelectTrigger className={`w-[180px] ${className}`}>
+      <div className="flex items-center">
+        <MapPin className="mr-2 h-4 w-4" />
+        <SelectValue placeholder="All Locations" />
+      </div>
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">All Locations</SelectItem>
+      {locations.map(location => (
+        <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+);
 
 export default function AdminDashboard() {
   const [timeRange, setTimeRange] = useState("today");
@@ -116,7 +120,7 @@ export default function AdminDashboard() {
     totalItems: 0
   });
 
-  // Location filters for each section
+  // Location state variables
   const [locations, setLocations] = useState([]);
   const [recentSalesLocationId, setRecentSalesLocationId] = useState("all");
   const [todayAppointmentsLocationId, setTodayAppointmentsLocationId] = useState("all");
@@ -147,7 +151,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     refetchTodayAppointments();
-  }, [todayAppointmentsLocationId]);
+  }, [todayAppointmentsLocationId, refetchTodayAppointments]);
 
   const fetchLocations = async () => {
     try {
@@ -185,44 +189,63 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchLowStockItems = async () => {
+  const fetchLowStockItems = useCallback(async () => {
     try {
-      let query = supabase
-        .from("inventory_items")
-        .select("id, quantity, minimum_quantity");
-      
-      if (inventoryLocationId !== "all") {
-        // If a location is selected, use location-specific inventory
-        query = supabase
+      if (inventoryLocationId === "all") {
+        // For all locations, query from inventory_items
+        const { data, error } = await supabase
+          .from("inventory_items")
+          .select("id, quantity, minimum_quantity");
+          
+        if (error) throw error;
+  
+        const totalItems = data.length;
+        const lowStockCount = data.filter(item => 
+          item.quantity <= item.minimum_quantity).length;
+        const criticalCount = data.filter(item => 
+          item.quantity <= item.minimum_quantity * 0.5).length;
+        
+        setLowStockItems({
+          count: lowStockCount,
+          criticalCount,
+          totalItems
+        });
+      } else {
+        // For specific location, query from inventory_location_items
+        const { data, error } = await supabase
           .from("inventory_location_items")
           .select("id, quantity, minimum_quantity")
           .eq("location_id", inventoryLocationId);
+          
+        if (error) throw error;
+  
+        const totalItems = data.length;
+        const lowStockCount = data.filter(item => 
+          item.quantity <= item.minimum_quantity).length;
+        const criticalCount = data.filter(item => 
+          item.quantity <= item.minimum_quantity * 0.5).length;
+        
+        setLowStockItems({
+          count: lowStockCount,
+          criticalCount,
+          totalItems
+        });
       }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-
-      const totalItems = data.length;
-      const lowStockCount = data.filter(item => item.quantity <= item.minimum_quantity).length;
-      const criticalCount = data.filter(item => item.quantity <= item.minimum_quantity * 0.5).length;
-      
-      setLowStockItems({
-        count: lowStockCount,
-        criticalCount,
-        totalItems
-      });
     } catch (error) {
       console.error("Error fetching low stock items:", error);
+      setLowStockItems({
+        count: 0,
+        criticalCount: 0,
+        totalItems: 0
+      });
     }
-  };
+  }, [inventoryLocationId]);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
       await Promise.all([
         fetchRevenueData(),
-        fetchAppointmentsStats(),
         fetchUpcomingAppointments(),
         fetchAppointmentsActivity(),
         fetchTopServices(),
@@ -239,7 +262,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchRevenueData = async () => {
+  const fetchRevenueData = useCallback(async () => {
     let startDate;
     switch (timeRange) {
       case "today":
@@ -318,14 +341,18 @@ export default function AdminDashboard() {
       });
     } catch (error) {
       console.error("Error fetching revenue data:", error);
+      setRevenueData([]);
+      setTotalRevenue(0);
+      setAppointmentsStats({
+        count: 0,
+        value: 0,
+        completed: 0,
+        completedValue: 0
+      });
     }
-  };
+  }, [timeRange, recentSalesLocationId, today]);
 
-  const fetchAppointmentsStats = async () => {
-    // Functionality moved to fetchRevenueData
-  };
-
-  const fetchUpcomingAppointments = async () => {
+  const fetchUpcomingAppointments = useCallback(async () => {
     try {
       const tomorrow = addDays(new Date(), 1);
       tomorrow.setHours(0, 0, 0, 0);
@@ -402,10 +429,18 @@ export default function AdminDashboard() {
       
     } catch (error) {
       console.error("Error fetching upcoming appointments:", error);
+      setUpcomingAppointments([]);
+      setUpcomingAppointmentsChart([]);
+      setUpcomingStats({
+        total: 0,
+        confirmed: 0,
+        booked: 0,
+        cancelled: 0
+      });
     }
-  };
+  }, [upcomingAppointmentsLocationId]);
 
-  const fetchAppointmentsActivity = async () => {
+  const fetchAppointmentsActivity = useCallback(async () => {
     try {
       let query = supabase
         .from("appointments")
@@ -437,10 +472,11 @@ export default function AdminDashboard() {
       setAppointmentsActivity(data || []);
     } catch (error) {
       console.error("Error fetching appointments activity:", error);
+      setAppointmentsActivity([]);
     }
-  };
+  }, [todayAppointmentsLocationId]);
 
-  const fetchTopServices = async () => {
+  const fetchTopServices = useCallback(async () => {
     try {
       const today = new Date();
       const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -449,77 +485,134 @@ export default function AdminDashboard() {
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
+      // Always get services first
+      const { data: servicesData, error: servicesError } = await supabase
+        .from("services")
+        .select("id, name");
+      
+      if (servicesError) throw servicesError;
+      
+      // Create query for this month's bookings
       let thisMonthQuery = supabase
         .from("bookings")
         .select(`
-          service:services (id, name),
+          service_id,
           created_at,
-          appointment:appointments (location)
+          appointment_id
         `)
         .gte("created_at", firstDayThisMonth.toISOString())
         .lte("created_at", lastDayThisMonth.toISOString())
-        .not("service", "is", null);
+        .not("service_id", "is", null);
       
+      // Create query for last month's bookings
       let lastMonthQuery = supabase
         .from("bookings")
         .select(`
-          service:services (id, name),
+          service_id,
           created_at,
-          appointment:appointments (location)
+          appointment_id
         `)
         .gte("created_at", firstDayLastMonth.toISOString())
         .lte("created_at", lastDayLastMonth.toISOString())
-        .not("service", "is", null);
+        .not("service_id", "is", null);
       
-      // Apply location filter if needed
+      // If location is selected, get appointment IDs for that location
       if (topServicesLocationId !== "all") {
-        thisMonthQuery = thisMonthQuery.eq("appointment.location", topServicesLocationId);
-        lastMonthQuery = lastMonthQuery.eq("appointment.location", topServicesLocationId);
+        // Get appointments for the selected location (this month)
+        const { data: thisMonthAppointments, error: thisMonthAppError } = await supabase
+          .from("appointments")
+          .select("id")
+          .eq("location", topServicesLocationId)
+          .gte("created_at", firstDayThisMonth.toISOString())
+          .lte("created_at", lastDayThisMonth.toISOString());
+        
+        if (thisMonthAppError) throw thisMonthAppError;
+        
+        // Get appointments for the selected location (last month)
+        const { data: lastMonthAppointments, error: lastMonthAppError } = await supabase
+          .from("appointments")
+          .select("id")
+          .eq("location", topServicesLocationId)
+          .gte("created_at", firstDayLastMonth.toISOString())
+          .lte("created_at", lastDayLastMonth.toISOString());
+        
+        if (lastMonthAppError) throw lastMonthAppError;
+        
+        // Get appointment IDs
+        const thisMonthAppIds = thisMonthAppointments.map(app => app.id);
+        const lastMonthAppIds = lastMonthAppointments.map(app => app.id);
+        
+        // Filter bookings by these appointment IDs
+        if (thisMonthAppIds.length > 0) {
+          thisMonthQuery = thisMonthQuery.in("appointment_id", thisMonthAppIds);
+        } else {
+          // If no appointments match, return empty array for this month
+          thisMonthQuery = thisMonthQuery.eq("appointment_id", "no-results");
+        }
+        
+        if (lastMonthAppIds.length > 0) {
+          lastMonthQuery = lastMonthQuery.in("appointment_id", lastMonthAppIds);
+        } else {
+          // If no appointments match, return empty array for last month
+          lastMonthQuery = lastMonthQuery.eq("appointment_id", "no-results");
+        }
       }
-
+      
+      // Execute both queries in parallel
       const [thisMonthResult, lastMonthResult] = await Promise.all([
         thisMonthQuery,
         lastMonthQuery
       ]);
-
+      
       const thisMonthError = thisMonthResult.error;
       const lastMonthError = lastMonthResult.error;
-      const thisMonthData = thisMonthResult.data;
-      const lastMonthData = lastMonthResult.data;
-
+      const thisMonthData = thisMonthResult.data || [];
+      const lastMonthData = lastMonthResult.data || [];
+      
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
-
+      
+      // Create a map of service_id to service name for easier lookup
+      const serviceMap = {};
+      servicesData.forEach(service => {
+        serviceMap[service.id] = service.name;
+      });
+      
+      // Calculate counts for current month
       const thisMonthCounts = {};
-      thisMonthData?.forEach(booking => {
-        if (booking.service) {
-          const serviceName = booking.service.name;
+      thisMonthData.forEach(booking => {
+        if (booking.service_id && serviceMap[booking.service_id]) {
+          const serviceName = serviceMap[booking.service_id];
           thisMonthCounts[serviceName] = (thisMonthCounts[serviceName] || 0) + 1;
         }
       });
-
+      
+      // Calculate counts for last month
       const lastMonthCounts = {};
-      lastMonthData?.forEach(booking => {
-        if (booking.service) {
-          const serviceName = booking.service.name;
+      lastMonthData.forEach(booking => {
+        if (booking.service_id && serviceMap[booking.service_id]) {
+          const serviceName = serviceMap[booking.service_id];
           lastMonthCounts[serviceName] = (lastMonthCounts[serviceName] || 0) + 1;
         }
       });
-
+      
+      // Create the final array with both months' data
       const servicesArray = Object.keys(thisMonthCounts).map(serviceName => ({
         name: serviceName,
         thisMonth: thisMonthCounts[serviceName],
         lastMonth: lastMonthCounts[serviceName] || 0
       }));
-
-      servicesArray.sort((a, b) => b.thisMonth - a.thisMonth);
       
+      // Sort by this month's bookings and take top 5
+      servicesArray.sort((a, b) => b.thisMonth - a.thisMonth);
       setTopServices(servicesArray.slice(0, 5));
+      
     } catch (error) {
       console.error("Error fetching top services:", error);
+      setTopServices([]);
     }
-  };
+  }, [topServicesLocationId]);
 
-  const fetchTopStylists = async () => {
+  const fetchTopStylists = useCallback(async () => {
     try {
       const today = new Date();
       const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -528,79 +621,137 @@ export default function AdminDashboard() {
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
+      // Always get employees first
+      const { data: employeesData, error: employeesError } = await supabase
+        .from("employees")
+        .select("id, name")
+        .eq("employment_type", "stylist");
+      
+      if (employeesError) throw employeesError;
+      
+      // Create query for this month's bookings
       let thisMonthQuery = supabase
         .from("bookings")
         .select(`
+          employee_id,
           price_paid,
-          employee:employees!bookings_employee_id_fkey (id, name),
           created_at,
-          appointment:appointments (location)
+          appointment_id
         `)
         .gte("created_at", firstDayThisMonth.toISOString())
         .lte("created_at", lastDayThisMonth.toISOString())
-        .not("employee", "is", null);
+        .not("employee_id", "is", null);
       
+      // Create query for last month's bookings
       let lastMonthQuery = supabase
         .from("bookings")
         .select(`
+          employee_id,
           price_paid,
-          employee:employees!bookings_employee_id_fkey (id, name),
           created_at,
-          appointment:appointments (location)
+          appointment_id
         `)
         .gte("created_at", firstDayLastMonth.toISOString())
         .lte("created_at", lastDayLastMonth.toISOString())
-        .not("employee", "is", null);
+        .not("employee_id", "is", null);
       
-      // Apply location filter if needed
+      // If location is selected, filter by appointments at that location
       if (topStylistsLocationId !== "all") {
-        thisMonthQuery = thisMonthQuery.eq("appointment.location", topStylistsLocationId);
-        lastMonthQuery = lastMonthQuery.eq("appointment.location", topStylistsLocationId);
+        // Get appointments for the selected location (this month)
+        const { data: thisMonthAppointments, error: thisMonthAppError } = await supabase
+          .from("appointments")
+          .select("id")
+          .eq("location", topStylistsLocationId)
+          .gte("created_at", firstDayThisMonth.toISOString())
+          .lte("created_at", lastDayThisMonth.toISOString());
+        
+        if (thisMonthAppError) throw thisMonthAppError;
+        
+        // Get appointments for the selected location (last month)
+        const { data: lastMonthAppointments, error: lastMonthAppError } = await supabase
+          .from("appointments")
+          .select("id")
+          .eq("location", topStylistsLocationId)
+          .gte("created_at", firstDayLastMonth.toISOString())
+          .lte("created_at", lastDayLastMonth.toISOString());
+        
+        if (lastMonthAppError) throw lastMonthAppError;
+        
+        // Get appointment IDs
+        const thisMonthAppIds = thisMonthAppointments.map(app => app.id);
+        const lastMonthAppIds = lastMonthAppointments.map(app => app.id);
+        
+        // Filter bookings by these appointment IDs
+        if (thisMonthAppIds.length > 0) {
+          thisMonthQuery = thisMonthQuery.in("appointment_id", thisMonthAppIds);
+        } else {
+          // If no appointments match, return empty array for this month
+          thisMonthQuery = thisMonthQuery.eq("appointment_id", "no-results");
+        }
+        
+        if (lastMonthAppIds.length > 0) {
+          lastMonthQuery = lastMonthQuery.in("appointment_id", lastMonthAppIds);
+        } else {
+          // If no appointments match, return empty array for last month
+          lastMonthQuery = lastMonthQuery.eq("appointment_id", "no-results");
+        }
       }
-
+      
+      // Execute both queries in parallel
       const [thisMonthResult, lastMonthResult] = await Promise.all([
         thisMonthQuery,
         lastMonthQuery
       ]);
-
+      
       const thisMonthError = thisMonthResult.error;
       const lastMonthError = lastMonthResult.error;
-      const thisMonthData = thisMonthResult.data;
-      const lastMonthData = lastMonthResult.data;
-
+      const thisMonthData = thisMonthResult.data || [];
+      const lastMonthData = lastMonthResult.data || [];
+      
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
-
+      
+      // Create a map of employee_id to employee name for easier lookup
+      const employeeMap = {};
+      employeesData.forEach(employee => {
+        employeeMap[employee.id] = employee.name;
+      });
+      
+      // Calculate revenue for current month
       const thisMonthRevenue = {};
-      thisMonthData?.forEach(booking => {
-        if (booking.employee) {
-          const stylistName = booking.employee.name;
+      thisMonthData.forEach(booking => {
+        if (booking.employee_id && employeeMap[booking.employee_id]) {
+          const stylistName = employeeMap[booking.employee_id];
           thisMonthRevenue[stylistName] = (thisMonthRevenue[stylistName] || 0) + (booking.price_paid || 0);
         }
       });
-
+      
+      // Calculate revenue for last month
       const lastMonthRevenue = {};
-      lastMonthData?.forEach(booking => {
-        if (booking.employee) {
-          const stylistName = booking.employee.name;
+      lastMonthData.forEach(booking => {
+        if (booking.employee_id && employeeMap[booking.employee_id]) {
+          const stylistName = employeeMap[booking.employee_id];
           lastMonthRevenue[stylistName] = (lastMonthRevenue[stylistName] || 0) + (booking.price_paid || 0);
         }
       });
-
+      
+      // Create the final array with both months' data
       const stylistsArray = Object.keys(thisMonthRevenue).map(stylistName => ({
         name: stylistName,
         thisMonth: thisMonthRevenue[stylistName],
         lastMonth: lastMonthRevenue[stylistName] || 0
       }));
-
-      stylistsArray.sort((a, b) => b.thisMonth - a.thisMonth);
       
+      // Sort by this month's revenue and take top 5
+      stylistsArray.sort((a, b) => b.thisMonth - a.thisMonth);
       setTopStylists(stylistsArray.slice(0, 5));
+      
     } catch (error) {
       console.error("Error fetching top stylists:", error);
+      setTopStylists([]);
     }
-  };
+  }, [topStylistsLocationId]);
 
-  const fetchBusinessMetrics = async () => {
+  const fetchBusinessMetrics = useCallback(async () => {
     try {
       // Calculate revenue
       const revenue = totalRevenue;
@@ -608,8 +759,6 @@ export default function AdminDashboard() {
       // Calculate occupancy rate
       const startDate = getStartDateForTimeRange(timeRange);
       const yesterday = subDays(today, 1);
-      const lastWeek = subDays(today, 7);
-      const lastMonth = subMonths(today, 1);
       
       // Get available employees (stylists)
       let empQuery = supabase
@@ -620,13 +769,11 @@ export default function AdminDashboard() {
       if (recentSalesLocationId !== "all") {
         // Filter employees by location if a specific location is selected
         empQuery = supabase
-          .from("employees")
+          .from("employee_locations")
           .select(`
-            *,
-            employee_locations!inner(location_id)
+            employee_id
           `)
-          .eq("employment_type", "stylist")
-          .eq("employee_locations.location_id", recentSalesLocationId);
+          .eq("location_id", recentSalesLocationId);
       }
       
       const { data: employees, error: empError } = await empQuery;
@@ -680,7 +827,9 @@ export default function AdminDashboard() {
       if (compAppError) throw compAppError;
       
       // Calculate occupancy rates
-      const employeeCount = employees?.length || 1;
+      const employeeCount = recentSalesLocationId !== "all" 
+        ? (employees?.length || 1) 
+        : (employees?.length || 1);
       const workingHoursPerDay = 8; // Assuming 8 working hours per day
       
       let totalPossibleSlots;
@@ -689,63 +838,32 @@ export default function AdminDashboard() {
       
       if (timeRange === "today") {
         totalPossibleSlots = employeeCount * workingHoursPerDay;
-        
-        // Calculate actual hours booked
-        currentAppointments?.forEach(app => {
-          if (app.total_duration) {
-            currentAppointmentHours += app.total_duration / 60; // Convert minutes to hours
-          } else {
-            // Estimate 1 hour if duration not specified
-            currentAppointmentHours += 1;
-          }
-        });
-        
-        comparisonAppointments?.forEach(app => {
-          if (app.total_duration) {
-            comparisonAppointmentHours += app.total_duration / 60;
-          } else {
-            comparisonAppointmentHours += 1;
-          }
-        });
       } else if (timeRange === "week") {
         totalPossibleSlots = employeeCount * workingHoursPerDay * 7;
-        
-        currentAppointments?.forEach(app => {
-          if (app.total_duration) {
-            currentAppointmentHours += app.total_duration / 60;
-          } else {
-            currentAppointmentHours += 1;
-          }
-        });
-        
-        comparisonAppointments?.forEach(app => {
-          if (app.total_duration) {
-            comparisonAppointmentHours += app.total_duration / 60;
-          } else {
-            comparisonAppointmentHours += 1;
-          }
-        });
       } else {
         // Month or year
         const daysInPeriod = timeRange === "month" ? 30 : 365;
         totalPossibleSlots = employeeCount * workingHoursPerDay * daysInPeriod;
-        
-        currentAppointments?.forEach(app => {
-          if (app.total_duration) {
-            currentAppointmentHours += app.total_duration / 60;
-          } else {
-            currentAppointmentHours += 1;
-          }
-        });
-        
-        comparisonAppointments?.forEach(app => {
-          if (app.total_duration) {
-            comparisonAppointmentHours += app.total_duration / 60;
-          } else {
-            comparisonAppointmentHours += 1;
-          }
-        });
       }
+      
+      // Calculate actual hours booked for current period
+      currentAppointments?.forEach(app => {
+        if (app.total_duration) {
+          currentAppointmentHours += app.total_duration / 60; // Convert minutes to hours
+        } else {
+          // Estimate 1 hour if duration not specified
+          currentAppointmentHours += 1;
+        }
+      });
+      
+      // Calculate actual hours booked for comparison period
+      comparisonAppointments?.forEach(app => {
+        if (app.total_duration) {
+          comparisonAppointmentHours += app.total_duration / 60;
+        } else {
+          comparisonAppointmentHours += 1;
+        }
+      });
       
       const currentOccupancyRate = (currentAppointmentHours / totalPossibleSlots) * 100;
       const comparisonOccupancyRate = (comparisonAppointmentHours / totalPossibleSlots) * 100;
@@ -824,8 +942,18 @@ export default function AdminDashboard() {
       });
     } catch (error) {
       console.error("Error calculating business metrics:", error);
+      setBusinessMetrics({
+        revenue: "0.00",
+        occupancyRate: "0.00",
+        returningCustomerRate: "0.00",
+        tips: "0.00",
+        revenueChange: "0.00",
+        occupancyChange: "0.00",
+        returningCustomerChange: "0.00",
+        tipsChange: "--"
+      });
     }
-  };
+  }, [timeRange, recentSalesLocationId, totalRevenue, today]);
   
   const getStartDateForTimeRange = (range) => {
     switch (range) {
@@ -842,79 +970,77 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchQuickActionsData = async () => {
+  const fetchQuickActionsData = useCallback(async () => {
     try {
-      let pendingQuery = supabase
+      // Create queries
+      const pendingQuery = supabase
         .from("appointments")
         .select("id")
         .eq("status", "pending");
       
-      if (todayAppointmentsLocationId !== "all") {
-        pendingQuery = pendingQuery.eq("location", todayAppointmentsLocationId);
-      }
-      
-      const { data: pendingConfirmations, error: pendingError } = await pendingQuery;
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       
-      let todayBookingsQuery = supabase
+      const todayBookingsQuery = supabase
         .from("appointments")
         .select("id")
         .gte("start_time", today.toISOString())
         .lt("start_time", tomorrow.toISOString());
       
-      if (todayAppointmentsLocationId !== "all") {
-        todayBookingsQuery = todayBookingsQuery.eq("location", todayAppointmentsLocationId);
-      }
-      
-      const { data: todayBookings, error: todayError } = await todayBookingsQuery;
-
       const nextWeek = new Date(today);
       nextWeek.setDate(today.getDate() + 7);
       
-      let upcomingQuery = supabase
+      const upcomingQuery = supabase
         .from("appointments")
         .select("id")
         .gt("start_time", tomorrow.toISOString())
         .lte("start_time", nextWeek.toISOString());
       
+      // Apply location filters if needed
+      if (todayAppointmentsLocationId !== "all") {
+        pendingQuery.eq("location", todayAppointmentsLocationId);
+        todayBookingsQuery.eq("location", todayAppointmentsLocationId);
+      }
+      
       if (upcomingAppointmentsLocationId !== "all") {
-        upcomingQuery = upcomingQuery.eq("location", upcomingAppointmentsLocationId);
+        upcomingQuery.eq("location", upcomingAppointmentsLocationId);
       }
       
-      const { data: upcomingBookings, error: upcomingError } = await upcomingQuery;
-
-      let lowStockQuery = supabase
-        .from("inventory_items")
-        .select("id")
-        .lte("quantity", "minimum_quantity");
+      // Execute all queries in parallel
+      const [pendingResult, todayResult, upcomingResult] = await Promise.all([
+        pendingQuery,
+        todayBookingsQuery,
+        upcomingQuery
+      ]);
       
-      if (inventoryLocationId !== "all") {
-        lowStockQuery = supabase
-          .from("inventory_location_items")
-          .select("id")
-          .eq("location_id", inventoryLocationId)
-          .lte("quantity", "minimum_quantity");
-      }
+      const pendingError = pendingResult.error;
+      const todayError = todayResult.error;
+      const upcomingError = upcomingResult.error;
       
-      const { data: lowStockItems, error: lowStockError } = await lowStockQuery;
-
-      if (pendingError || todayError || upcomingError || lowStockError) 
-        throw pendingError || todayError || upcomingError || lowStockError;
-
+      if (pendingError || todayError || upcomingError) 
+        throw pendingError || todayError || upcomingError;
+      
+      // Get low stock items count
+      const lowStockCount = lowStockItems.count;
+      
       setQuickActions({
-        pendingConfirmations: pendingConfirmations?.length || 0,
-        todayBookings: todayBookings?.length || 0,
-        upcomingBookings: upcomingBookings?.length || 0,
-        lowStockItems: lowStockItems?.length || 0
+        pendingConfirmations: pendingResult.data?.length || 0,
+        todayBookings: todayResult.data?.length || 0,
+        upcomingBookings: upcomingResult.data?.length || 0,
+        lowStockItems: lowStockCount
       });
     } catch (error) {
       console.error("Error fetching quick actions data:", error);
+      setQuickActions({
+        pendingConfirmations: 0,
+        todayBookings: 0,
+        upcomingBookings: 0,
+        lowStockItems: 0
+      });
     }
-  };
+  }, [todayAppointmentsLocationId, upcomingAppointmentsLocationId, lowStockItems]);
 
   const handleAppointmentClick = (appointment) => {
     setSelectedAppointment(appointment);
@@ -983,24 +1109,6 @@ export default function AdminDashboard() {
         return <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">BOOKED</span>;
     }
   };
-  
-  // Create a location selector component for reuse
-  const LocationSelector = ({ value, onChange, className = "" }) => (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={`w-[180px] ${className}`}>
-        <div className="flex items-center">
-          <MapPin className="mr-2 h-4 w-4" />
-          <SelectValue placeholder="All Locations" />
-        </div>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">All Locations</SelectItem>
-        {locations.map(location => (
-          <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
 
   return (
     <div className="p-8 space-y-6">
@@ -1143,7 +1251,7 @@ export default function AdminDashboard() {
               ) : todayAppointmentsData.length > 0 ? (
                 <div className="space-y-4">
                   {todayAppointmentsData.map((appointment) => {
-                    const mainBooking = appointment.bookings[0];
+                    const mainBooking = appointment.bookings?.[0];
                     const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
                     const price = mainBooking?.price_paid || appointment.total_price || 0;
                     const stylist = mainBooking?.employee?.name;
@@ -1355,6 +1463,7 @@ export default function AdminDashboard() {
 
       {isAddAppointmentOpen && appointmentDate && (
         <AppointmentManager
+          isOpen={true}
           onClose={closeAppointmentManager}
           selectedDate={appointmentDate}
           selectedTime={appointmentTime}
@@ -1385,3 +1494,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
