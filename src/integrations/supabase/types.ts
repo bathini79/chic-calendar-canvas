@@ -946,6 +946,55 @@ export type Database = {
           },
         ]
       }
+      location_tax_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          location_id: string | null
+          product_tax_id: string | null
+          service_tax_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          location_id?: string | null
+          product_tax_id?: string | null
+          service_tax_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          location_id?: string | null
+          product_tax_id?: string | null
+          service_tax_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_tax_settings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_tax_settings_product_tax_id_fkey"
+            columns: ["product_tax_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_tax_settings_service_tax_id_fkey"
+            columns: ["service_tax_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string | null

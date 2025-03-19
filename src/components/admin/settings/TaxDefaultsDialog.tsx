@@ -133,11 +133,6 @@ export function TaxDefaultsDialog({ isOpen, onClose, locationId, onSuccess }: Ta
     }
   };
 
-  const getTaxLabel = (taxId: string) => {
-    const tax = taxRates.find(tax => tax.id === taxId);
-    return tax ? `${tax.name} (${tax.percentage}%)` : 'No Tax';
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
