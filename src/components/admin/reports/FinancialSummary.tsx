@@ -14,7 +14,7 @@ interface FinancialSummaryProps {
 const FinancialSummary: React.FC<FinancialSummaryProps> = ({ locationId }) => {
   const [timeRange, setTimeRange] = useState('6months');
   
-  // Define sales data
+  // Define sales data before it's used
   const salesData = [
     { month: "January", amount: 45000 },
     { month: "February", amount: 52000 },
