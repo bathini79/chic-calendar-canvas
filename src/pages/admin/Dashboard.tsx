@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { format, subDays, isToday, addDays, parseISO, startOfDay, endOfDay, subMonths, subYears, subHours } from "date-fns";
@@ -29,8 +28,7 @@ import {
   LucideCalendarClock, 
   AlertCircle,
   ChevronRight,
-  Zap,
-  MapPin
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { adminSupabase, supabase } from "@/integrations/supabase/client";
@@ -115,57 +113,22 @@ export default function AdminDashboard() {
     criticalCount: 0,
     totalItems: 0
   });
-  
-  // Add state for locations
-  const [locations, setLocations] = useState([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>("all");
 
   const today = new Date();
-  const { data: todayAppointmentsData = [] } = useAppointmentsByDate(today, selectedLocation !== "all" ? selectedLocation : undefined);
+  const { data: todayAppointmentsData = [] } = useAppointmentsByDate(today);
 
   useEffect(() => {
     fetchDashboardData();
     fetchEmployees();
     fetchLowStockItems();
-    fetchLocations();
-  }, [timeRange, selectedLocation]);
-
-  const fetchLocations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("locations")
-        .select("id, name")
-        .eq("status", "active");
-      
-      if (error) throw error;
-      setLocations(data || []);
-    } catch (error) {
-      console.error("Error fetching locations:", error);
-      setLocations([]);
-    }
-  };
+  }, [timeRange]);
 
   const fetchEmployees = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("employees")
         .select("*")
         .eq("employment_type", "stylist");
-      
-      if (selectedLocation !== "all") {
-        // Join with employee_locations to filter by location
-        query = supabase
-          .from("employees")
-          .select(`
-            *,
-            employee_locations!inner(location_id)
-          `)
-          .eq("employment_type", "stylist")
-          .eq("employee_locations.location_id", selectedLocation);
-      }
-      
-      const { data, error } = await query;
-      
       if (error) throw error;
       const employeeWithAvatar = data.map((employee) => ({
         ...employee,
@@ -183,50 +146,15 @@ export default function AdminDashboard() {
 
   const fetchLowStockItems = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("inventory_items")
         .select("id, quantity, minimum_quantity");
-      
-      if (selectedLocation !== "all") {
-        // Filter inventory items by location
-        query = supabase
-          .from("inventory_location_items")
-          .select(`
-            inventory_item_id,
-            quantity,
-            inventory_items(minimum_quantity)
-          `)
-          .eq("location_id", selectedLocation);
-      }
-      
-      const { data, error } = await query;
       
       if (error) throw error;
 
       const totalItems = data.length;
-      
-      let lowStockCount = 0;
-      let criticalCount = 0;
-      
-      if (selectedLocation !== "all") {
-        // For location-specific items
-        lowStockCount = data.filter(item => 
-          item.quantity <= (item.inventory_items?.minimum_quantity || 0)
-        ).length;
-        
-        criticalCount = data.filter(item => 
-          item.quantity <= (item.inventory_items?.minimum_quantity || 0) * 0.5
-        ).length;
-      } else {
-        // For all items
-        lowStockCount = data.filter(item => 
-          item.quantity <= item.minimum_quantity
-        ).length;
-        
-        criticalCount = data.filter(item => 
-          item.quantity <= item.minimum_quantity * 0.5
-        ).length;
-      }
+      const lowStockCount = data.filter(item => item.quantity <= item.minimum_quantity).length;
+      const criticalCount = data.filter(item => item.quantity <= item.minimum_quantity * 0.5).length;
       
       setLowStockItems({
         count: lowStockCount,
@@ -280,18 +208,11 @@ export default function AdminDashboard() {
     }
 
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("appointments")
         .select("id, total_price, created_at, status")
         .gte("created_at", startDate.toISOString())
         .order("created_at", { ascending: true });
-      
-      // Add location filter if specific location is selected
-      if (selectedLocation !== "all") {
-        query = query.eq("location", selectedLocation);
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -355,7 +276,7 @@ export default function AdminDashboard() {
       const nextWeek = addDays(tomorrow, 7);
       nextWeek.setHours(23, 59, 59, 999);
       
-      let query = supabase
+      const { data, error } = await supabase
         .from("appointments")
         .select(`
           id, 
@@ -366,13 +287,6 @@ export default function AdminDashboard() {
         .gte("start_time", tomorrow.toISOString())
         .lt("start_time", nextWeek.toISOString())
         .order("start_time", { ascending: true });
-      
-      // Add location filter if specific location is selected
-      if (selectedLocation !== "all") {
-        query = query.eq("location", selectedLocation);
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -429,12 +343,13 @@ export default function AdminDashboard() {
   };
 
   const fetchTodayAppointments = async () => {
-    // Now using the useAppointmentsByDate hook which is already fetching data with location filtering
+    // Now using the useAppointmentsByDate hook which is already fetching data
+    // No need to duplicate the fetch here
   };
 
   const fetchAppointmentsActivity = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("appointments")
         .select(`
           id, 
@@ -453,13 +368,6 @@ export default function AdminDashboard() {
         `)
         .order("start_time", { ascending: false })
         .limit(10);
-      
-      // Add location filter if specific location is selected
-      if (selectedLocation !== "all") {
-        query = query.eq("location", selectedLocation);
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       setAppointmentsActivity(data || []);
@@ -477,51 +385,25 @@ export default function AdminDashboard() {
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
-      // Query for this month's data with location filter
-      let thisMonthQuery = supabase
+      const { data: thisMonthData, error: thisMonthError } = await supabase
         .from("bookings")
         .select(`
           service:services (id, name),
-          appointment:appointments (location),
           created_at
         `)
         .gte("created_at", firstDayThisMonth.toISOString())
         .lte("created_at", lastDayThisMonth.toISOString())
         .not("service", "is", null);
-      
-      // Add location filter if specific location is selected
-      if (selectedLocation !== "all") {
-        thisMonthQuery = thisMonthQuery
-          .not("appointment", "is", null)
-          .eq("appointment.location", selectedLocation);
-      }
 
-      // Query for last month's data with location filter
-      let lastMonthQuery = supabase
+      const { data: lastMonthData, error: lastMonthError } = await supabase
         .from("bookings")
         .select(`
           service:services (id, name),
-          appointment:appointments (location),
           created_at
         `)
         .gte("created_at", firstDayLastMonth.toISOString())
         .lte("created_at", lastDayLastMonth.toISOString())
         .not("service", "is", null);
-      
-      // Add location filter if specific location is selected
-      if (selectedLocation !== "all") {
-        lastMonthQuery = lastMonthQuery
-          .not("appointment", "is", null)
-          .eq("appointment.location", selectedLocation);
-      }
-
-      const [thisMonthResult, lastMonthResult] = await Promise.all([
-        thisMonthQuery,
-        lastMonthQuery
-      ]);
-      
-      const { data: thisMonthData, error: thisMonthError } = thisMonthResult;
-      const { data: lastMonthData, error: lastMonthError } = lastMonthResult;
 
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
 
@@ -564,53 +446,27 @@ export default function AdminDashboard() {
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
-      // Query for this month's data with location filter
-      let thisMonthQuery = supabase
+      const { data: thisMonthData, error: thisMonthError } = await supabase
         .from("bookings")
         .select(`
           price_paid,
           employee:employees!bookings_employee_id_fkey (id, name),
-          appointment:appointments (location),
           created_at
         `)
         .gte("created_at", firstDayThisMonth.toISOString())
         .lte("created_at", lastDayThisMonth.toISOString())
         .not("employee", "is", null);
-      
-      // Add location filter if specific location is selected
-      if (selectedLocation !== "all") {
-        thisMonthQuery = thisMonthQuery
-          .not("appointment", "is", null)
-          .eq("appointment.location", selectedLocation);
-      }
 
-      // Query for last month's data with location filter
-      let lastMonthQuery = supabase
+      const { data: lastMonthData, error: lastMonthError } = await supabase
         .from("bookings")
         .select(`
           price_paid,
           employee:employees!bookings_employee_id_fkey (id, name),
-          appointment:appointments (location),
           created_at
         `)
         .gte("created_at", firstDayLastMonth.toISOString())
         .lte("created_at", lastDayLastMonth.toISOString())
         .not("employee", "is", null);
-      
-      // Add location filter if specific location is selected
-      if (selectedLocation !== "all") {
-        lastMonthQuery = lastMonthQuery
-          .not("appointment", "is", null)
-          .eq("appointment.location", selectedLocation);
-      }
-
-      const [thisMonthResult, lastMonthResult] = await Promise.all([
-        thisMonthQuery,
-        lastMonthQuery
-      ]);
-      
-      const { data: thisMonthData, error: thisMonthError } = thisMonthResult;
-      const { data: lastMonthData, error: lastMonthError } = lastMonthResult;
 
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
 
@@ -655,43 +511,24 @@ export default function AdminDashboard() {
       const lastWeek = subDays(today, 7);
       const lastMonth = subMonths(today, 1);
       
-      // Get available employees (stylists) - filter by location if needed
-      let empQuery = supabase
+      // Get available employees (stylists)
+      const { data: employees, error: empError } = await supabase
         .from("employees")
         .select("*")
         .eq("employment_type", "stylist");
-        
-      if (selectedLocation !== "all") {
-        empQuery = supabase
-          .from("employees")
-          .select(`
-            *,
-            employee_locations!inner(location_id)
-          `)
-          .eq("employment_type", "stylist")
-          .eq("employee_locations.location_id", selectedLocation);
-      }
-      
-      const { data: employees, error: empError } = await empQuery;
       
       if (empError) throw empError;
       
-      // Get appointments for current period - filter by location if needed
-      let currentAppQuery = supabase
+      // Get appointments for current period
+      const { data: currentAppointments, error: currentAppError } = await supabase
         .from("appointments")
         .select("*")
         .gte("start_time", startDate.toISOString())
         .lte("start_time", endOfDay(today).toISOString());
       
-      if (selectedLocation !== "all") {
-        currentAppQuery = currentAppQuery.eq("location", selectedLocation);
-      }
-      
-      const { data: currentAppointments, error: currentAppError } = await currentAppQuery;
-      
       if (currentAppError) throw currentAppError;
       
-      // Get appointments for comparison period - filter by location if needed
+      // Get appointments for comparison period (yesterday, last week, or last month)
       let comparisonStartDate, comparisonEndDate;
       
       if (timeRange === "today") {
@@ -708,17 +545,11 @@ export default function AdminDashboard() {
         comparisonEndDate = subYears(endOfDay(today), 1);
       }
       
-      let compAppQuery = supabase
+      const { data: comparisonAppointments, error: compAppError } = await supabase
         .from("appointments")
         .select("*")
         .gte("start_time", comparisonStartDate.toISOString())
         .lte("start_time", comparisonEndDate.toISOString());
-      
-      if (selectedLocation !== "all") {
-        compAppQuery = compAppQuery.eq("location", selectedLocation);
-      }
-      
-      const { data: comparisonAppointments, error: compAppError } = await compAppQuery;
       
       if (compAppError) throw compAppError;
       
@@ -796,31 +627,19 @@ export default function AdminDashboard() {
       const occupancyRateChange = currentOccupancyRate - comparisonOccupancyRate;
       
       // Calculate returning customer rate
-      let currentCustQuery = supabase
+      const { data: currentCustomerData, error: currentCustError } = await supabase
         .from("appointments")
-        .select("customer_id, location")
+        .select("customer_id")
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endOfDay(today).toISOString());
       
-      if (selectedLocation !== "all") {
-        currentCustQuery = currentCustQuery.eq("location", selectedLocation);
-      }
-      
-      const { data: currentCustomerData, error: currentCustError } = await currentCustQuery;
-      
       if (currentCustError) throw currentCustError;
       
-      let compCustQuery = supabase
+      const { data: comparisonCustomerData, error: compCustError } = await supabase
         .from("appointments")
-        .select("customer_id, location")
+        .select("customer_id")
         .gte("created_at", comparisonStartDate.toISOString())
         .lte("created_at", comparisonEndDate.toISOString());
-      
-      if (selectedLocation !== "all") {
-        compCustQuery = compCustQuery.eq("location", selectedLocation);
-      }
-      
-      const { data: comparisonCustomerData, error: compCustError } = await compCustQuery;
       
       if (compCustError) throw compCustError;
       
@@ -887,67 +706,35 @@ export default function AdminDashboard() {
 
   const fetchQuickActionsData = async () => {
     try {
-      // Query for pending confirmations with location filter
-      let pendingQuery = supabase
+      const { data: pendingConfirmations, error: pendingError } = await supabase
         .from("appointments")
         .select("id")
         .eq("status", "pending");
-      
-      if (selectedLocation !== "all") {
-        pendingQuery = pendingQuery.eq("location", selectedLocation);
-      }
-      
-      const { data: pendingConfirmations, error: pendingError } = await pendingQuery;
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       
-      // Query for today's bookings with location filter
-      let todayQuery = supabase
+      const { data: todayBookings, error: todayError } = await supabase
         .from("appointments")
         .select("id")
         .gte("start_time", today.toISOString())
         .lt("start_time", tomorrow.toISOString());
-      
-      if (selectedLocation !== "all") {
-        todayQuery = todayQuery.eq("location", selectedLocation);
-      }
-      
-      const { data: todayBookings, error: todayError } = await todayQuery;
 
       const nextWeek = new Date(today);
       nextWeek.setDate(today.getDate() + 7);
       
-      // Query for upcoming bookings with location filter
-      let upcomingQuery = supabase
+      const { data: upcomingBookings, error: upcomingError } = await supabase
         .from("appointments")
         .select("id")
         .gt("start_time", tomorrow.toISOString())
         .lte("start_time", nextWeek.toISOString());
-      
-      if (selectedLocation !== "all") {
-        upcomingQuery = upcomingQuery.eq("location", selectedLocation);
-      }
-      
-      const { data: upcomingBookings, error: upcomingError } = await upcomingQuery;
 
-      // Query for low stock items with location filter
-      let lowStockQuery = supabase
+      const { data: lowStockItems, error: lowStockError } = await supabase
         .from("inventory_items")
         .select("id")
         .lte("quantity", "minimum_quantity");
-        
-      if (selectedLocation !== "all") {
-        lowStockQuery = supabase
-          .from("inventory_location_items")
-          .select(`id, inventory_items!inner(minimum_quantity)`)
-          .eq("location_id", selectedLocation)
-          .lte("quantity", "inventory_items.minimum_quantity");
-      }
-
-      const { data: lowStockItems, error: lowStockError } = await lowStockQuery;
 
       if (pendingError || todayError || upcomingError || lowStockError) 
         throw pendingError || todayError || upcomingError || lowStockError;
@@ -1034,29 +821,6 @@ export default function AdminDashboard() {
   return (
     <div className="p-8 space-y-6">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-      
-      {/* Location Filter */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center space-x-2">
-          <MapPin className="h-5 w-5 text-gray-500" />
-          <Select
-            value={selectedLocation}
-            onValueChange={setSelectedLocation}
-          >
-            <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="All Locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
       
       {/* First row: Recent sales and Today's next appointments */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
