@@ -85,7 +85,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   const [activeTab, setActiveTab] = useState('services');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { addToCart, cartItems } = useCart();
+  const { items: cartItems, addItem } = useCart();
 
   // Fetch services
   const { data: services = [], isLoading: isServicesLoading } = useQuery({
@@ -99,18 +99,21 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       
       if (locationId) {
         // Filter by location if specified
-        query = query.in('id', (
-          await supabase
-            .from('service_locations')
-            .select('service_id')
-            .eq('location_id', locationId)
-        ).data?.map(sl => sl.service_id) || []);
+        const { data: serviceLocations } = await supabase
+          .from('service_locations')
+          .select('service_id')
+          .eq('location_id', locationId);
+        
+        if (serviceLocations && serviceLocations.length > 0) {
+          const serviceIds = serviceLocations.map(sl => sl.service_id);
+          query = query.in('id', serviceIds);
+        }
       }
       
       const { data, error } = await query;
       
       if (error) throw error;
-      return data as unknown as Service[];
+      return data as Service[];
     },
   });
 
@@ -131,12 +134,15 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       
       if (locationId) {
         // Filter by location if specified
-        query = query.in('id', (
-          await supabase
-            .from('package_locations')
-            .select('package_id')
-            .eq('location_id', locationId)
-        ).data?.map(pl => pl.package_id) || []);
+        const { data: packageLocations } = await supabase
+          .from('package_locations')
+          .select('package_id')
+          .eq('location_id', locationId);
+        
+        if (packageLocations && packageLocations.length > 0) {
+          const packageIds = packageLocations.map(pl => pl.package_id);
+          query = query.in('id', packageIds);
+        }
       }
       
       const { data, error } = await query;
@@ -146,7 +152,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       return data.map((pkg: any) => ({
         ...pkg,
         services: pkg.services.map((s: any) => s.services)
-      })) as unknown as ServicePackage[];
+      })) as ServicePackage[];
     },
   });
 
@@ -192,11 +198,14 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     } else {
       const service = services.find(s => s.id === serviceId);
       if (service) {
-        addToCart({
+        addItem({
           id: service.id,
+          name: service.name,
+          price: service.selling_price,
+          duration: service.duration,
           type: 'service',
           service: service,
-          price: service.selling_price
+          service_id: service.id
         });
       }
     }
@@ -209,11 +218,13 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     } else {
       const pkg = packages.find(p => p.id === packageId);
       if (pkg) {
-        addToCart({
+        addItem({
           id: pkg.id,
+          name: pkg.name,
+          price: pkg.price,
           type: 'package',
           package: pkg,
-          price: pkg.price
+          package_id: pkg.id
         });
       }
     }
@@ -221,15 +232,15 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
   // Check if a service is in the cart
   const isServiceInCart = (serviceId: string) => {
-    return cartItems.some((item: CartItem) => 
-      item.type === 'service' && item.id === serviceId
+    return cartItems.some(item => 
+      item.type === 'service' && item.service_id === serviceId
     );
   };
 
   // Check if a package is in the cart
   const isPackageInCart = (packageId: string) => {
-    return cartItems.some((item: CartItem) => 
-      item.type === 'package' && item.id === packageId
+    return cartItems.some(item => 
+      item.type === 'package' && item.package_id === packageId
     );
   };
 
@@ -244,17 +255,8 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   };
 
   // Handle view package details
-  const handleViewPackageDetails = (item: CartItem) => {
-    if (item.package) {
-      navigate(`/packages/${item.package.id}`);
-    }
-  };
-
-  // Handle removing an item from cart
-  const handleRemoveFromCart = (item: CartItem) => {
-    if (item.cartItemId) {
-      // Your remove from cart logic here
-    }
+  const handleViewPackageDetails = (packageId: string) => {
+    navigate(`/packages/${packageId}`);
   };
 
   return (
