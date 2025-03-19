@@ -23,6 +23,8 @@ interface SaveAppointmentProps {
   customizedServices: Record<string, string[]>;
   currentScreen: SCREEN;
   locationId?: string;
+  appliedTaxId?: string | null;
+  taxAmount?: number;
 }
 
 export default function useSaveAppointment({
@@ -42,7 +44,9 @@ export default function useSaveAppointment({
   notes,
   customizedServices,
   currentScreen,
-  locationId
+  locationId,
+  appliedTaxId,
+  taxAmount = 0
 }: SaveAppointmentProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -86,13 +90,15 @@ export default function useSaveAppointment({
       const totalDuration = getTotalDuration(selectedServiceObjects, selectedPackageObjects);
       const endTime = addMinutes(startTime, totalDuration);
 
-      // Calculate total price
-      const totalPrice = getTotalPrice(
+      // Calculate total price including tax
+      const subtotal = getTotalPrice(
         selectedServiceObjects, 
         selectedPackageObjects,
         discountType,
         discountValue
       );
+      
+      const totalPrice = subtotal + taxAmount;
 
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
@@ -109,6 +115,8 @@ export default function useSaveAppointment({
         payment_method: paymentMethod,
         notes: notes,
         location: locationId,
+        tax_id: appliedTaxId,  // Store the applied tax ID
+        tax_amount: taxAmount  // Store the calculated tax amount
       };
 
       let createdAppointmentId;

@@ -1,5 +1,5 @@
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +42,8 @@ import {
 } from "../utils/bookingUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTaxRates } from "@/hooks/use-tax-rates";
+import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -93,7 +95,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onRemovePackage,
   onBackToServices,
   isExistingAppointment,
-  customizedServices = {}
+  customizedServices = {},
+  locationId
 }) => {
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -107,6 +110,51 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       return data;
     },
   });
+
+  const { taxRates, fetchTaxRates, isLoading: taxRatesLoading } = useTaxRates();
+  const { fetchLocationTaxSettings } = useLocationTaxSettings();
+  const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
+  const [appliedTaxRate, setAppliedTaxRate] = useState<number>(0);
+  const [appliedTaxName, setAppliedTaxName] = useState<string>("");
+
+  // Load tax rates and default tax settings for location
+  useEffect(() => {
+    const loadTaxData = async () => {
+      await fetchTaxRates();
+      
+      if (locationId) {
+        const settings = await fetchLocationTaxSettings(locationId);
+        
+        if (settings && settings.service_tax_id) {
+          setAppliedTaxId(settings.service_tax_id);
+        }
+      }
+    };
+    
+    loadTaxData();
+  }, [locationId]);
+
+  // Update tax rate details when tax ID changes
+  useEffect(() => {
+    if (appliedTaxId && taxRates.length > 0) {
+      const tax = taxRates.find(t => t.id === appliedTaxId);
+      if (tax) {
+        setAppliedTaxRate(tax.percentage);
+        setAppliedTaxName(tax.name);
+      }
+    } else {
+      setAppliedTaxRate(0);
+      setAppliedTaxName("");
+    }
+  }, [appliedTaxId, taxRates]);
+
+  const handleTaxChange = (taxId: string) => {
+    if (taxId === "none") {
+      setAppliedTaxId(null);
+      return;
+    }
+    setAppliedTaxId(taxId);
+  };
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -145,14 +193,27 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  const total = useMemo(() => 
+  // Calculate tax amount
+  const taxAmount = useMemo(() => 
+    appliedTaxId ? subtotal * (appliedTaxRate / 100) : 0,
+    [subtotal, appliedTaxId, appliedTaxRate]
+  );
+
+  // Apply discount after calculating tax
+  const discountedSubtotal = useMemo(() => 
     getFinalPrice(subtotal, discountType, discountValue),
     [subtotal, discountType, discountValue]
   );
+
+  // Total with tax and discount
+  const total = useMemo(() => 
+    discountedSubtotal + taxAmount,
+    [discountedSubtotal, taxAmount]
+  );
   
   const discountAmount = useMemo(() => 
-    subtotal - total,
-    [subtotal, total]
+    subtotal - discountedSubtotal,
+    [subtotal, discountedSubtotal]
   );
 
   const selectedItems = useMemo(() => {
@@ -415,6 +476,28 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 <span className="text-muted-foreground">Subtotal</span>
                 <span>₹{subtotal}</span>
               </div>
+              
+              {/* Tax information */}
+              <div className="flex justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Tax</span>
+                  <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
+                    <SelectTrigger className="h-7 w-[120px]">
+                      <SelectValue placeholder="No Tax" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Tax</SelectItem>
+                      {taxRates.map(tax => (
+                        <SelectItem key={tax.id} value={tax.id}>
+                          {tax.name} ({tax.percentage}%)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <span>₹{taxAmount.toFixed(2)}</span>
+              </div>
+              
               {discountType !== "none" && (
                 <div className="flex justify-between text-sm text-green-600">
                   <span className="flex items-center">
@@ -425,9 +508,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   <span>-₹{discountAmount}</span>
                 </div>
               )}
+              
               <div className="flex justify-between text-lg font-bold pt-2">
                 <span>Total</span>
-                <span>₹{total}</span>
+                <span>₹{total.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -512,4 +596,4 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       </Card>
     </div>
   );
-};
+}

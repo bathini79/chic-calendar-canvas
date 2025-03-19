@@ -28,6 +28,8 @@ interface CartContextType {
   setSelectedStylists: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   selectedLocation: string;
   setSelectedLocation: React.Dispatch<React.SetStateAction<string>>;
+  appliedTaxId: string | null;
+  setAppliedTaxId: React.Dispatch<React.SetStateAction<string | null>>;
   // Add missing methods
   addToCart: (serviceId?: string, packageId?: string, extraData?: any) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
@@ -43,6 +45,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
   const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
 
   const addItem = (item: CartItem) => {
     // Check if item already exists
@@ -144,6 +147,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setSelectedTimeSlots({});
     setSelectedStylists({});
     setSelectedDate(null);
+    setAppliedTaxId(null);
   };
 
   return (
@@ -161,6 +165,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setSelectedStylists,
         selectedLocation,
         setSelectedLocation,
+        appliedTaxId,
+        setAppliedTaxId,
         // Add new methods to context
         addToCart,
         removeFromCart,
