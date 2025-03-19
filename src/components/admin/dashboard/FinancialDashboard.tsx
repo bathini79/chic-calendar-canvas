@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,7 +15,7 @@ import { toast } from 'sonner';
 import RevenueChart from './RevenueChart';
 import TopServicesChart from './TopServicesChart';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DailyRevenue } from '@/components/admin/reports/DailyRevenue';
+import DailyRevenue from '@/components/admin/reports/DailyRevenue';
 
 type DashboardConfig = {
   id: string;
@@ -52,10 +51,8 @@ export function FinancialDashboard() {
   const [newWidgetTitle, setNewWidgetTitle] = useState('');
   const [newWidgetSize, setNewWidgetSize] = useState('medium');
   
-  // Get the current user ID from Supabase session
   const [userId, setUserId] = useState<string | null>(null);
-  
-  // Initialize user ID on component mount
+
   React.useEffect(() => {
     const getUserId = async () => {
       const { data } = await supabase.auth.getSession();
@@ -66,7 +63,6 @@ export function FinancialDashboard() {
     getUserId();
   }, []);
 
-  // Fetch dashboard configurations
   const { data: dashboards, isLoading: isDashboardsLoading, refetch: refetchDashboards } = useQuery({
     queryKey: ['dashboards'],
     queryFn: async () => {
@@ -80,7 +76,6 @@ export function FinancialDashboard() {
     }
   });
 
-  // Fetch widgets for the selected dashboard
   const { data: widgets, isLoading: isWidgetsLoading, refetch: refetchWidgets } = useQuery({
     queryKey: ['dashboard-widgets', selectedDashboard],
     queryFn: async () => {
@@ -98,7 +93,6 @@ export function FinancialDashboard() {
     enabled: !!selectedDashboard
   });
 
-  // Fetch locations for filtering
   const { data: locations = [] } = useQuery({
     queryKey: ['locations'],
     queryFn: async () => {
@@ -111,7 +105,6 @@ export function FinancialDashboard() {
     }
   });
 
-  // Create a new dashboard
   const handleCreateDashboard = async () => {
     if (!newDashboardName.trim()) {
       toast.error('Dashboard name is required');
@@ -142,7 +135,6 @@ export function FinancialDashboard() {
       setNewDashboardDescription('');
       refetchDashboards();
       
-      // Set the newly created dashboard as active
       if (data && data.length > 0) {
         setSelectedDashboard(data[0].id);
         setActiveTab('custom');
@@ -153,7 +145,6 @@ export function FinancialDashboard() {
     }
   };
 
-  // Add a new widget to the dashboard
   const handleAddWidget = async () => {
     if (!selectedDashboard) {
       toast.error('No dashboard selected');
@@ -166,7 +157,6 @@ export function FinancialDashboard() {
     }
 
     try {
-      // Get the next position
       const nextPosition = widgets ? widgets.length : 0;
 
       const { error } = await supabase
@@ -192,7 +182,6 @@ export function FinancialDashboard() {
     }
   };
 
-  // Delete a widget
   const handleDeleteWidget = async (widgetId: string) => {
     try {
       const { error } = await supabase
@@ -210,7 +199,6 @@ export function FinancialDashboard() {
     }
   };
 
-  // Delete a dashboard
   const handleDeleteDashboard = async (dashboardId: string) => {
     try {
       const { error } = await supabase
@@ -223,7 +211,6 @@ export function FinancialDashboard() {
       toast.success('Dashboard deleted successfully');
       refetchDashboards();
       
-      // Reset selected dashboard if it was deleted
       if (selectedDashboard === dashboardId) {
         setSelectedDashboard(null);
         setActiveTab('overview');
@@ -234,7 +221,6 @@ export function FinancialDashboard() {
     }
   };
 
-  // Render widget based on type
   const renderWidget = (widget: DashboardWidget) => {
     switch (widget.widget_type) {
       case 'revenue-chart':
