@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
@@ -27,6 +28,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils";
+import { toast } from 'sonner';
 
 interface Appointment {
   id: string;
@@ -93,90 +95,130 @@ export default function Dashboard() {
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
     queryKey: ['appointments', formattedDateForQuery, selectedLocation],
     queryFn: async () => {
-      let query = supabase
-        .from('appointments')
-        .select(`
-          *,
-          customer:customers(*)
-        `)
-        .gte('start_time', startOfDay(date).toISOString())
-        .lte('start_time', endOfDay(date).toISOString())
-        .order('start_time');
+      try {
+        let query = supabase
+          .from('appointments')
+          .select(`
+            *,
+            customer:profiles(*)
+          `)
+          .gte('start_time', startOfDay(date).toISOString())
+          .lte('start_time', endOfDay(date).toISOString())
+          .order('start_time');
 
-      if (selectedLocation !== 'all') {
-        query = query.eq('location', selectedLocation);
+        if (selectedLocation !== 'all') {
+          query = query.eq('location', selectedLocation);
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error('Error fetching appointments:', error);
+          throw error;
+        }
+
+        // Fetch bookings for each appointment
+        const appointmentsWithBookings = await Promise.all(
+          (data || []).map(async (appointment) => {
+            const { data: bookings, error: bookingsError } = await supabase
+              .from('bookings')
+              .select(`
+                *,
+                service:services(*),
+                package:packages(*)
+              `)
+              .eq('appointment_id', appointment.id);
+
+            if (bookingsError) {
+              console.error('Error fetching bookings:', bookingsError);
+              return { ...appointment, bookings: [] };
+            }
+
+            return { ...appointment, bookings: bookings || [] };
+          })
+        );
+
+        return appointmentsWithBookings as Appointment[];
+      } catch (error) {
+        console.error('Error in appointment query:', error);
+        toast.error('Failed to load appointments');
+        return [];
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data as Appointment[];
     },
   });
 
   const { data: recentCustomers = [], isLoading: customersLoading } = useQuery({
     queryKey: ['recent-customers'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'customer')
+          .order('created_at', { ascending: false })
+          .limit(5);
 
-      if (error) throw error;
-      return data || [];
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching recent customers:', error);
+        toast.error('Failed to load recent customers');
+        return [];
+      }
     },
   });
 
-  // Update the inventory query
-  const { data: lowInventoryItems, isLoading: inventoryLoading } = useQuery({
+  // Update the inventory query to fix the type issues
+  const { data: lowInventoryItems = [], isLoading: inventoryLoading } = useQuery({
     queryKey: ['low-inventory', selectedLocation],
     queryFn: async () => {
-      let query = supabase
-        .from('inventory_items')
-        .select('id, name, quantity, minimum_quantity')
-        .lt('quantity', supabase.raw('minimum_quantity'))
-        .limit(5);
-    
-      if (selectedLocation !== 'all') {
-        // For location-specific inventory
+      try {
+        if (selectedLocation !== 'all') {
+          // For location-specific inventory
+          const { data, error } = await supabase
+            .from('inventory_location_items')
+            .select(`
+              id, 
+              quantity, 
+              minimum_quantity,
+              item_id,
+              inventory_items:inventory_items(id, name)
+            `)
+            .eq('location_id', selectedLocation)
+            .lt('quantity', supabase.sql('minimum_quantity'))
+            .limit(5);
+        
+          if (error) {
+            console.error('Error fetching location inventory:', error);
+            throw error;
+          }
+        
+          return data.map(item => ({
+            id: item.id,
+            name: item.inventory_items?.name || 'Unknown Item',
+            quantity: item.quantity,
+            minimum_quantity: item.minimum_quantity
+          })) as InventoryItem[];
+        }
+      
+        // Default for all locations or if no location-specific inventory
         const { data, error } = await supabase
-          .from('inventory_location_items')
-          .select('id, item_id, quantity, minimum_quantity')
-          .eq('location_id', selectedLocation)
-          .lt('quantity', supabase.raw('minimum_quantity'))
+          .from('inventory_items')
+          .select('id, name, quantity, minimum_quantity')
+          .lt('quantity', supabase.sql('minimum_quantity'))
           .limit(5);
       
-        if (error) throw error;
-      
-        // If location-specific inventory exists, get the item details
-        if (data && data.length > 0) {
-          const itemIds = data.map(item => item.item_id);
-          const { data: itemDetails, error: itemError } = await supabase
-            .from('inventory_items')
-            .select('id, name')
-            .in('id', itemIds);
-        
-          if (itemError) throw itemError;
-        
-          // Combine the item details with the location-specific inventory
-          return data.map(item => {
-            const details = itemDetails.find(i => i.id === item.item_id);
-            return {
-              id: item.id,
-              item_id: item.item_id,
-              name: details?.name || 'Unknown Item',
-              quantity: item.quantity,
-              minimum_quantity: item.minimum_quantity
-            };
-          });
+        if (error) {
+          console.error('Error fetching inventory:', error);
+          throw error;
         }
+      
+        return data as InventoryItem[];
+      } catch (error) {
+        console.error('Error fetching low stock items:', error);
+        toast.error('Failed to load inventory data');
+        return [];
       }
-    
-      // Default for all locations or if no location-specific inventory
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
     }
   });
 
@@ -230,7 +272,7 @@ export default function Dashboard() {
                   <Calendar
                     mode="single"
                     selected={date}
-                    onSelect={setDate}
+                    onSelect={(newDate) => newDate && setDate(newDate)}
                     disabled={(date) =>
                       date > new Date() || date < new Date('2020-01-01')
                     }
@@ -289,19 +331,18 @@ export default function Dashboard() {
                         <TableCell>
                           <div className="flex items-center space-x-2">
                             <Avatar>
-                              <AvatarImage src={appointment.customer?.avatar} />
-                              <AvatarFallback>{appointment.customer?.full_name?.charAt(0)}</AvatarFallback>
+                              <AvatarFallback>{appointment.customer?.full_name?.charAt(0) || '?'}</AvatarFallback>
                             </Avatar>
-                            <span>{appointment.customer?.full_name}</span>
+                            <span>{appointment.customer?.full_name || 'Unknown'}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           {format(new Date(appointment.start_time), 'h:mm a')}
                         </TableCell>
                         <TableCell>
-                          {appointment.bookings.map((booking: any) => (
+                          {appointment.bookings && appointment.bookings.map((booking: any) => (
                             <div key={booking.id} className="flex items-center space-x-1">
-                              <Badge variant="secondary">{booking.service?.name}</Badge>
+                              <Badge variant="secondary">{booking.service?.name || booking.package?.name || 'Unknown'}</Badge>
                             </div>
                           ))}
                         </TableCell>
