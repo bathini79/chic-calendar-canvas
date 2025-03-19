@@ -45,11 +45,6 @@ interface ServiceSelectorProps {
   setSelectedPackage: (pkg: any | null) => void;
   isCustomizeOpen: boolean;
   setIsCustomizeOpen: (open: boolean) => void;
-  // Add the new properties needed for UnifiedScheduling.tsx
-  items?: any[];
-  selectedStylists?: Record<string, string>;
-  onStylistSelect?: (serviceId: string, stylistId: string) => void;
-  locationId?: string;
 }
 
 export function ServiceSelector({
@@ -63,12 +58,7 @@ export function ServiceSelector({
   selectedPackage,
   setSelectedPackage,
   isCustomizeOpen,
-  setIsCustomizeOpen,
-  // Initialize new props with defaults
-  items = [],
-  selectedStylists = {},
-  onStylistSelect = () => {},
-  locationId = ''
+  setIsCustomizeOpen
 }: ServiceSelectorProps) {
   const [services, setServices] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
