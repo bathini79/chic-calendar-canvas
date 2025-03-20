@@ -23,13 +23,11 @@ export default function UnifiedScheduling() {
             <div>
               <h2 className="text-xl font-semibold mb-4">Select Service Provider</h2>
               <ServiceSelector
-                selectedStylists={selectedStylists}
                 onStylistSelect={handleStylistSelect}
                 locationId={selectedLocation}
               />
             </div>
             
-            {/* ... keep existing code */}
           </div>
         </div>
         
