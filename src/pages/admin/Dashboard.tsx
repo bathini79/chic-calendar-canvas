@@ -74,9 +74,8 @@ export default function Dashboard() {
       const end = format(periodEnd, 'yyyy-MM-dd');
 
       const { data, error } = await supabase
-        .from("profiles")
+        .from("customers")
         .select("id")
-        .eq('role', 'customer')
         .gte('created_at', today)
         .lte('created_at', end);
 

@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Card, 
@@ -19,11 +20,11 @@ import {
   Search,
   ArrowLeft
 } from "lucide-react";
+import { DailyRevenue } from "@/components/admin/reports/DailyRevenue";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FinancialDashboard } from "@/components/admin/dashboard/FinancialDashboard";
-import { FinancialSummary } from "@/components/admin/reports/FinancialSummary";
 
 const reportCategories = [
   {
@@ -32,7 +33,7 @@ const reportCategories = [
     icon: <DollarSign className="h-5 w-5" />,
     reports: [
       { id: "summary", name: "Summary", description: "Key business financial metrics" },
-      { id: "finance-summary", name: "Finance Summary", description: "High-level summary of sales, payments and liabilities" },
+      { id: "daily-revenue", name: "Daily Revenue", description: "Includes tips, outstanding balances, and collected payments" },
       { id: "payment-source", name: "Payment by Source", description: "Breakdown of income by payment method (cash, card, online)" },
       { id: "collected-payments", name: "Collected Outstanding Payments", description: "Shows collected outstanding balances" },
       { id: "expenses", name: "Expenses", description: "Lists expenses with date, amount, and payment method" }
@@ -130,10 +131,21 @@ export default function Reports() {
   };
 
   const renderReportContent = () => {
-    if (expandedReport === "finance-summary") {
+    if (expandedReport === "daily-revenue") {
       return (
         <div className="space-y-4">
-          <FinancialSummary onBack={() => setExpandedReport(null)} />
+          <div className="flex items-center">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setExpandedReport(null)}
+              className="mr-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+            <h2 className="text-2xl font-bold">Daily Revenue Report</h2>
+          </div>
+          <DailyRevenue expanded={true} locations={locations} />
         </div>
       );
     }
@@ -216,29 +228,7 @@ export default function Reports() {
               <TabsContent value="all" className="mt-6">
                 {activeCategory === "all" && searchQuery === "" && !expandedReport && (
                   <div className="mb-6">
-                    <Card 
-                      className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => handleReportClick("finance-summary")}
-                    >
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">Financial Overview</p>
-                          </div>
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <CardTitle className="text-xl">Finance Summary</CardTitle>
-                        <CardDescription>High-level summary of sales, payments and liabilities</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-40 flex items-center justify-center bg-muted/30 rounded-md">
-                          <p className="text-muted-foreground text-center">
-                            Preview data will appear here
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <DailyRevenue onExpand={() => handleReportClick("daily-revenue")} locations={locations} />
                   </div>
                 )}
                 {renderReportContent()}
@@ -289,6 +279,10 @@ interface ReportCardProps {
 }
 
 function ReportCard({ title, description, category, icon, onClick }: ReportCardProps) {
+  if (title === "Daily Revenue") {
+    return <DailyRevenue onExpand={onClick} />;
+  }
+  
   return (
     <Card className="overflow-hidden hover:shadow-md transition-all cursor-pointer" onClick={onClick}>
       <CardHeader className="pb-2">
