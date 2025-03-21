@@ -116,8 +116,19 @@ export default function useSaveAppointment({
         couponDiscount,
         afterCouponDiscount,
         taxAmount: calculatedTaxAmount,
-        totalPrice
+        totalPrice,
+        couponId: couponId,
+        taxId: appliedTaxId
       });
+
+      // Ensure couponId and taxId are string or null, not objects
+      const safeAppliedTaxId = appliedTaxId ? 
+        (typeof appliedTaxId === 'object' ? (appliedTaxId as any).id || null : appliedTaxId) : 
+        null;
+        
+      const safeCouponId = couponId ? 
+        (typeof couponId === 'object' ? (couponId as any).id || null : couponId) : 
+        null;
 
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
@@ -134,9 +145,9 @@ export default function useSaveAppointment({
         payment_method: paymentMethod,
         notes: notes,
         location: locationId,
-        tax_id: appliedTaxId,
+        tax_id: safeAppliedTaxId,
         tax_amount: calculatedTaxAmount,
-        coupon_id: couponId
+        coupon_id: safeCouponId
       };
 
       let createdAppointmentId;
