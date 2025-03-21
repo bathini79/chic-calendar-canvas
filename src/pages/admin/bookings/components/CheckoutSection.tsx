@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +63,7 @@ interface CheckoutSectionProps {
   onPaymentComplete: (appointmentId?: string) => void;
   selectedStylists: Record<string, string>;
   selectedTimeSlots: Record<string, string>;
-  onSaveAppointment: () => Promise<string | null>;
+  onSaveAppointment: (params?: any) => Promise<string | null>;
   onRemoveService: (serviceId: string) => void;
   onRemovePackage: (packageId: string) => void;
   onBackToServices: () => void;
@@ -400,11 +401,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         total
       });
       
+      // Pass the summary data with values already calculated
       const saveAppointmentParams = {
-        appliedTaxId,
-        taxAmount,
+        appointmentId: appointmentId, // Include the appointmentId in the params
+        appliedTaxId: appliedTaxId,
+        taxAmount: taxAmount,
         couponId: selectedCouponId,
-        couponDiscount
+        couponDiscount: couponDiscount,
+        total: total
       };
       
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);

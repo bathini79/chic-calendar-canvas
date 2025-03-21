@@ -54,9 +54,27 @@ export default function useSaveAppointment({
 }: SaveAppointmentProps) {
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSaveAppointment = async (appointmentId?: string): Promise<string | undefined> => {
+  const handleSaveAppointment = async (params?: any): Promise<string | undefined> => {
     try {
       setIsLoading(true);
+      
+      // Extract appointment ID if it was passed as first parameter (backward compatibility)
+      let appointmentId: string | undefined;
+      let summaryParams: any = {};
+      
+      if (params) {
+        if (typeof params === 'string') {
+          // If params is a string, it's an appointmentId from the old function signature
+          appointmentId = params;
+        } else if (typeof params === 'object') {
+          // If params is an object, it contains summary values AND might contain appointmentId
+          summaryParams = params;
+          
+          if (params.appointmentId) {
+            appointmentId = params.appointmentId;
+          }
+        }
+      }
 
       if (!selectedCustomer) {
         toast.error("Please select a customer");
@@ -94,41 +112,36 @@ export default function useSaveAppointment({
       const totalDuration = getTotalDuration(selectedServiceObjects, selectedPackageObjects);
       const endTime = addMinutes(startTime, totalDuration);
 
-      // Calculate total price including tax and coupon discount
-      const subtotal = getTotalPrice(
-        selectedServiceObjects, 
-        selectedPackageObjects,
-        discountType,
-        discountValue
-      );
+      // Use the values from summary params if available, otherwise calculate
+      const calculatedTaxAmount = summaryParams.taxAmount !== undefined ? 
+        summaryParams.taxAmount : 
+        taxAmount;
       
-      // Apply coupon discount if any
-      const afterCouponDiscount = couponDiscount > 0 ? Math.max(0, subtotal - couponDiscount) : subtotal;
-      
-      // Calculate tax on the post-coupon amount
-      const calculatedTaxAmount = appliedTaxId && taxAmount ? taxAmount : 0;
-      
-      // Final total price calculation
-      const totalPrice = afterCouponDiscount + calculatedTaxAmount;
-
-      console.log("Appointment calculation:", {
-        subtotal,
-        couponDiscount,
-        afterCouponDiscount,
-        taxAmount: calculatedTaxAmount,
-        totalPrice,
-        couponId: couponId,
-        taxId: appliedTaxId
-      });
-
-      // Ensure couponId and taxId are string or null, not objects
-      const safeAppliedTaxId = appliedTaxId ? 
-        (typeof appliedTaxId === 'object' ? (appliedTaxId as any).id || null : appliedTaxId) : 
-        null;
+      const calculatedCouponDiscount = summaryParams.couponDiscount !== undefined ? 
+        summaryParams.couponDiscount : 
+        couponDiscount;
         
-      const safeCouponId = couponId ? 
-        (typeof couponId === 'object' ? (couponId as any).id || null : couponId) : 
-        null;
+      // Use provided summary total price or calculate it
+      const totalPrice = summaryParams.total !== undefined ? 
+        summaryParams.total : 
+        getTotalPrice(selectedServiceObjects, selectedPackageObjects, discountType, discountValue) - calculatedCouponDiscount + calculatedTaxAmount;
+      
+      // Use provided tax and coupon IDs or fall back to props
+      const usedTaxId = summaryParams.appliedTaxId !== undefined ? 
+        summaryParams.appliedTaxId : 
+        appliedTaxId;
+        
+      const usedCouponId = summaryParams.couponId !== undefined ? 
+        summaryParams.couponId : 
+        couponId;
+
+      console.log("Appointment data for saving:", {
+        total: totalPrice,
+        taxAmount: calculatedTaxAmount,
+        couponDiscount: calculatedCouponDiscount,
+        taxId: usedTaxId,
+        couponId: usedCouponId
+      });
 
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
@@ -145,9 +158,9 @@ export default function useSaveAppointment({
         payment_method: paymentMethod,
         notes: notes,
         location: locationId,
-        tax_id: safeAppliedTaxId,
+        tax_id: usedTaxId,
         tax_amount: calculatedTaxAmount,
-        coupon_id: safeCouponId
+        coupon_id: usedCouponId
       };
 
       let createdAppointmentId;

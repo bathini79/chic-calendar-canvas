@@ -1,11 +1,35 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
 import { useCart } from "@/components/cart/CartContext";
 import { CartSummary } from "@/components/cart/CartSummary";
 
+// Define the props interface for ServiceSelector
+interface ServiceSelectorProps {
+  selectedServices: string[];
+  selectedPackages: string[];
+  onServicesChange: (services: string[]) => void;
+  onPackagesChange: (packages: string[]) => void;
+  locationId?: string;
+  // Add any other required props based on the ServiceSelector component requirements
+}
+
 export default function UnifiedScheduling() {
-  const { selectedStylists, setSelectedStylists, selectedLocation } = useCart();
+  const { 
+    selectedLocation,
+    items,
+    addToCart,
+    removeFromCart
+  } = useCart();
+  
+  // Create the required props for ServiceSelector
+  const serviceSelectorProps: ServiceSelectorProps = {
+    selectedServices: [],
+    selectedPackages: [],
+    onServicesChange: () => {},
+    onPackagesChange: () => {},
+    locationId: selectedLocation
+  };
 
   return (
     <div className="container py-8">
@@ -16,7 +40,7 @@ export default function UnifiedScheduling() {
           <div className="space-y-8">
             <div>
               <h2 className="text-xl font-semibold mb-4">Select Service Provider</h2>
-              <ServiceSelector />
+              <ServiceSelector {...serviceSelectorProps} />
             </div>
           </div>
         </div>
