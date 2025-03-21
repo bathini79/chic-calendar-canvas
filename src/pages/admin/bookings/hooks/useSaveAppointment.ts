@@ -94,7 +94,7 @@ export default function useSaveAppointment({
       const totalDuration = getTotalDuration(selectedServiceObjects, selectedPackageObjects);
       const endTime = addMinutes(startTime, totalDuration);
 
-      // Calculate total price including tax
+      // Calculate total price including tax and coupon discount
       const subtotal = getTotalPrice(
         selectedServiceObjects, 
         selectedPackageObjects,
@@ -103,8 +103,21 @@ export default function useSaveAppointment({
       );
       
       // Apply coupon discount if any
-      const afterCouponDiscount = Math.max(0, subtotal - (couponDiscount || 0));
-      const totalPrice = afterCouponDiscount + (taxAmount || 0);
+      const afterCouponDiscount = couponDiscount > 0 ? Math.max(0, subtotal - couponDiscount) : subtotal;
+      
+      // Calculate tax on the post-coupon amount
+      const calculatedTaxAmount = appliedTaxId && taxAmount ? taxAmount : 0;
+      
+      // Final total price calculation
+      const totalPrice = afterCouponDiscount + calculatedTaxAmount;
+
+      console.log("Appointment calculation:", {
+        subtotal,
+        couponDiscount,
+        afterCouponDiscount,
+        taxAmount: calculatedTaxAmount,
+        totalPrice
+      });
 
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
@@ -121,9 +134,9 @@ export default function useSaveAppointment({
         payment_method: paymentMethod,
         notes: notes,
         location: locationId,
-        tax_id: appliedTaxId,  // Store the applied tax ID
-        tax_amount: taxAmount,  // Store the calculated tax amount
-        coupon_id: couponId     // Store the applied coupon ID
+        tax_id: appliedTaxId,
+        tax_amount: calculatedTaxAmount,
+        coupon_id: couponId
       };
 
       let createdAppointmentId;

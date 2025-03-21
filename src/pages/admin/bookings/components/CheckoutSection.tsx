@@ -199,7 +199,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         
         const discountAmount = coupon.discount_type === 'percentage' 
           ? subtotal * (coupon.discount_value / 100)
-          : coupon.discount_value;
+          : Math.min(coupon.discount_value, subtotal);
         
         setCouponDiscount(discountAmount);
       }
@@ -257,10 +257,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  const taxAmount = useMemo(() => 
-    appliedTaxId ? subtotal * (appliedTaxRate / 100) : 0,
-    [subtotal, appliedTaxId, appliedTaxRate]
-  );
+  const taxAmount = useMemo(() => {
+    const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
+    const afterAllDiscounts = couponDiscount > 0 
+      ? Math.max(0, regularDiscountedPrice - couponDiscount) 
+      : regularDiscountedPrice;
+    
+    return appliedTaxId ? afterAllDiscounts * (appliedTaxRate / 100) : 0;
+  }, [subtotal, appliedTaxId, appliedTaxRate, discountType, discountValue, couponDiscount]);
 
   const discountedSubtotal = useMemo(() => {
     const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
@@ -387,7 +391,23 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         toast.error("Please select a customer");
         return;
       }
-      const savedAppointmentId = await onSaveAppointment();
+      
+      console.log("Payment data:", {
+        taxId: appliedTaxId,
+        taxAmount,
+        couponId: selectedCouponId,
+        couponDiscount,
+        total
+      });
+      
+      const saveAppointmentParams = {
+        appliedTaxId,
+        taxAmount,
+        couponId: selectedCouponId,
+        couponDiscount
+      };
+      
+      const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
       if (!savedAppointmentId) {
         toast.error("Failed to complete payment");
         return;

@@ -41,8 +41,11 @@ export default function BookingConfirmation() {
         
         if (!error && data) {
           setTax(data);
-          const subtotal = getTotalPrice() - couponDiscount;
-          setTaxAmount(subtotal * (data.percentage / 100));
+          
+          const subtotal = getTotalPrice();
+          const afterCoupon = subtotal - couponDiscount;
+          const newTaxAmount = afterCoupon * (data.percentage / 100);
+          setTaxAmount(newTaxAmount);
         }
       }
 
@@ -56,14 +59,16 @@ export default function BookingConfirmation() {
         if (!error && data) {
           setCoupon(data);
           const subtotal = getTotalPrice();
-          const discount = data.discount_type === 'percentage' 
+          const newDiscount = data.discount_type === 'percentage' 
             ? subtotal * (data.discount_value / 100)
             : Math.min(data.discount_value, subtotal);
           
-          setCouponDiscount(discount);
+          setCouponDiscount(newDiscount);
           
           if (tax) {
-            setTaxAmount((subtotal - discount) * (tax.percentage / 100));
+            const afterCoupon = subtotal - newDiscount;
+            const newTaxAmount = afterCoupon * (tax.percentage / 100);
+            setTaxAmount(newTaxAmount);
           }
         }
       }
@@ -137,6 +142,16 @@ export default function BookingConfirmation() {
         return;
       }
       const endDateTime = addMinutes(startDateTime, totalDuration);
+
+      console.log("Creating appointment with:", {
+        subtotal,
+        couponDiscount,
+        discountedSubtotal,
+        taxAmount,
+        totalPrice,
+        couponId: appliedCouponId,
+        taxId: appliedTaxId
+      });
 
       const { data: appointmentData, error: appointmentError } = await supabase
         .from("appointments")

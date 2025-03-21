@@ -16,11 +16,8 @@ export default function UnifiedScheduling() {
           <div className="space-y-8">
             <div>
               <h2 className="text-xl font-semibold mb-4">Select Service Provider</h2>
-              <ServiceSelector
-                locationId={selectedLocation}
-              />
+              <ServiceSelector />
             </div>
-            
           </div>
         </div>
         
