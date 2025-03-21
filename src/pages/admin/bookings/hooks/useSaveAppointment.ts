@@ -128,11 +128,13 @@ export default function useSaveAppointment({
       
       // Use provided tax and coupon IDs or fall back to props
       const usedTaxId = summaryParams.appliedTaxId !== undefined ? 
-        summaryParams.appliedTaxId : 
+        (typeof summaryParams.appliedTaxId === 'object' && summaryParams.appliedTaxId !== null ? 
+          summaryParams.appliedTaxId.id || summaryParams.appliedTaxId : summaryParams.appliedTaxId) : 
         appliedTaxId;
         
       const usedCouponId = summaryParams.couponId !== undefined ? 
-        summaryParams.couponId : 
+        (typeof summaryParams.couponId === 'object' && summaryParams.couponId !== null ? 
+          summaryParams.couponId.id || summaryParams.couponId : summaryParams.couponId) : 
         couponId;
 
       console.log("Appointment data for saving:", {
@@ -158,7 +160,6 @@ export default function useSaveAppointment({
         payment_method: paymentMethod,
         notes: notes,
         location: locationId,
-        tax_id: usedTaxId,
         tax_amount: calculatedTaxAmount,
         coupon_id: usedCouponId
       };

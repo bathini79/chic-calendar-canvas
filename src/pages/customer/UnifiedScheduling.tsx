@@ -4,16 +4,6 @@ import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
 import { useCart } from "@/components/cart/CartContext";
 import { CartSummary } from "@/components/cart/CartSummary";
 
-// Define the props interface for ServiceSelector
-interface ServiceSelectorProps {
-  selectedServices: string[];
-  selectedPackages: string[];
-  onServicesChange: (services: string[]) => void;
-  onPackagesChange: (packages: string[]) => void;
-  locationId?: string;
-  // Add any other required props based on the ServiceSelector component requirements
-}
-
 export default function UnifiedScheduling() {
   const { 
     selectedLocation,
@@ -22,14 +12,9 @@ export default function UnifiedScheduling() {
     removeFromCart
   } = useCart();
   
-  // Create the required props for ServiceSelector
-  const serviceSelectorProps: ServiceSelectorProps = {
-    selectedServices: [],
-    selectedPackages: [],
-    onServicesChange: () => {},
-    onPackagesChange: () => {},
-    locationId: selectedLocation
-  };
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
+  const [cartItemId, setCartItemId] = useState<string | null>(null);
 
   return (
     <div className="container py-8">
@@ -40,7 +25,20 @@ export default function UnifiedScheduling() {
           <div className="space-y-8">
             <div>
               <h2 className="text-xl font-semibold mb-4">Select Service Provider</h2>
-              <ServiceSelector {...serviceSelectorProps} />
+              <ServiceSelector 
+                selectedServices={selectedServices}
+                selectedPackages={selectedPackages}
+                onServicesChange={setSelectedServices}
+                onPackagesChange={setSelectedPackages}
+                locationId={selectedLocation}
+                refreshCart={() => {}}
+                cartItemId={cartItemId}
+                setCartItemId={setCartItemId}
+                selectedPackage={null}
+                selectedCardToCustomize={null}
+                onSelectedCardToCustomizeChange={() => {}}
+                isCustomizing={false}
+              />
             </div>
           </div>
         </div>
