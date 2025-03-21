@@ -8,8 +8,6 @@ export type TaxRate = {
   name: string;
   percentage: number;
   is_default?: boolean;
-  created_at?: string;
-  updated_at?: string;
 };
 
 export function useTaxRates() {
@@ -35,74 +33,5 @@ export function useTaxRates() {
     }
   }
 
-  async function createTaxRate(newTaxRate: Omit<TaxRate, "id">) {
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from("tax_rates")
-        .insert([newTaxRate])
-        .select()
-        .single();
-
-      if (error) throw error;
-      toast.success("Tax rate created successfully");
-      await fetchTaxRates();
-      return data;
-    } catch (error: any) {
-      toast.error(`Error creating tax rate: ${error.message}`);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function updateTaxRate(id: string, updatedTaxRate: Partial<TaxRate>) {
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from("tax_rates")
-        .update(updatedTaxRate)
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      toast.success("Tax rate updated successfully");
-      await fetchTaxRates();
-      return data;
-    } catch (error: any) {
-      toast.error(`Error updating tax rate: ${error.message}`);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function deleteTaxRate(id: string) {
-    try {
-      setIsLoading(true);
-      const { error } = await supabase
-        .from("tax_rates")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-      toast.success("Tax rate deleted successfully");
-      await fetchTaxRates();
-    } catch (error: any) {
-      toast.error(`Error deleting tax rate: ${error.message}`);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  return {
-    taxRates,
-    isLoading,
-    fetchTaxRates,
-    createTaxRate,
-    updateTaxRate,
-    deleteTaxRate,
-  };
+  return { taxRates, fetchTaxRates, isLoading };
 }

@@ -9,6 +9,14 @@ import { formatPrice } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { useTaxRates } from "@/hooks/use-tax-rates";
+import { useCoupons } from "@/hooks/use-coupons";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 
 export function CartSummary() {
   const { 
@@ -19,21 +27,27 @@ export function CartSummary() {
     getTotalPrice,
     selectedLocation,
     appliedTaxId,
-    setAppliedTaxId
+    setAppliedTaxId,
+    appliedCouponId,
+    setAppliedCouponId
   } = useCart();
   
   const [taxAmount, setTaxAmount] = useState(0);
+  const [couponDiscount, setCouponDiscount] = useState(0);
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
   const { taxRates, fetchTaxRates } = useTaxRates();
+  const { coupons, fetchCoupons, isLoading: couponsLoading } = useCoupons();
   
   const navigate = useNavigate();
   const location = useLocation();
   const isSchedulingPage = location.pathname === '/schedule';
 
   const subtotal = getTotalPrice();
-  const totalPrice = subtotal + taxAmount;
+  const afterCouponSubtotal = subtotal - couponDiscount;
+  const totalPrice = afterCouponSubtotal + taxAmount;
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
   
+  // Load tax data
   useEffect(() => {
     const loadTaxData = async () => {
       await fetchTaxRates();
@@ -50,17 +64,38 @@ export function CartSummary() {
     loadTaxData();
   }, [selectedLocation]);
 
+  // Load coupons
+  useEffect(() => {
+    fetchCoupons();
+  }, []);
+
   // Calculate tax amount whenever appliedTaxId or subtotal changes
   useEffect(() => {
     if (appliedTaxId && taxRates.length > 0) {
       const taxRate = taxRates.find(tax => tax.id === appliedTaxId);
       if (taxRate) {
-        setTaxAmount(subtotal * (taxRate.percentage / 100));
+        setTaxAmount(afterCouponSubtotal * (taxRate.percentage / 100));
       }
     } else {
       setTaxAmount(0);
     }
-  }, [appliedTaxId, subtotal, taxRates]);
+  }, [appliedTaxId, afterCouponSubtotal, taxRates]);
+  
+  // Calculate coupon discount
+  useEffect(() => {
+    if (appliedCouponId && coupons.length > 0) {
+      const coupon = coupons.find(c => c.id === appliedCouponId);
+      if (coupon) {
+        const discount = coupon.discount_type === 'percentage' 
+          ? subtotal * (coupon.discount_value / 100)
+          : Math.min(coupon.discount_value, subtotal); // Don't discount more than the subtotal
+        
+        setCouponDiscount(discount);
+      }
+    } else {
+      setCouponDiscount(0);
+    }
+  }, [appliedCouponId, subtotal, coupons]);
   
   // Sort items by their scheduled start time
   const sortedItems = [...items].sort((a, b) => {
@@ -76,6 +111,22 @@ export function CartSummary() {
       }
     } else {
       navigate('/schedule');
+    }
+  };
+
+  const handleTaxChange = (taxId: string) => {
+    if (taxId === "none") {
+      setAppliedTaxId(null);
+    } else {
+      setAppliedTaxId(taxId);
+    }
+  };
+
+  const handleCouponChange = (couponId: string) => {
+    if (couponId === "none") {
+      setAppliedCouponId(null);
+    } else {
+      setAppliedCouponId(couponId);
     }
   };
 
@@ -149,10 +200,55 @@ export function CartSummary() {
             <span>{formatPrice(subtotal)}</span>
           </div>
           
+          {/* Coupon selection */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-sm items-center">
+              <span className="text-muted-foreground">Coupon</span>
+              <Select value={appliedCouponId || "none"} onValueChange={handleCouponChange} disabled={couponsLoading}>
+                <SelectTrigger className="h-8 w-[150px]">
+                  <SelectValue placeholder="No Coupon" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Coupon</SelectItem>
+                  {coupons.map(coupon => (
+                    <SelectItem key={coupon.id} value={coupon.id}>
+                      {coupon.code} ({coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : formatPrice(coupon.discount_value)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {couponDiscount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Discount</span>
+                <span>-{formatPrice(couponDiscount)}</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Tax selection */}
+          <div className="flex justify-between text-sm items-center">
+            <span className="text-muted-foreground">Tax</span>
+            <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
+              <SelectTrigger className="h-8 w-[150px]">
+                <SelectValue placeholder="No Tax" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Tax</SelectItem>
+                {taxRates.map(tax => (
+                  <SelectItem key={tax.id} value={tax.id}>
+                    {tax.name} ({tax.percentage}%)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
           {appliedTaxId && taxAmount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                Tax
+                Tax Amount
               </span>
               <span>{formatPrice(taxAmount)}</span>
             </div>

@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,8 +115,26 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
   const [appliedTaxRate, setAppliedTaxRate] = useState<number>(0);
   const [appliedTaxName, setAppliedTaxName] = useState<string>("");
+  const { data: paymentMethods = [], isLoading: paymentMethodsLoading } = useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('is_enabled', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+  
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
+  const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
+  const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState<number>(0);
+  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
 
-  // Load tax rates and default tax settings for location
   useEffect(() => {
     const loadTaxData = async () => {
       await fetchTaxRates();
@@ -134,7 +151,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     loadTaxData();
   }, [locationId]);
 
-  // Update tax rate details when tax ID changes
   useEffect(() => {
     if (appliedTaxId && taxRates.length > 0) {
       const tax = taxRates.find(t => t.id === appliedTaxId);
@@ -148,12 +164,60 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   }, [appliedTaxId, taxRates]);
 
+  useEffect(() => {
+    const fetchCoupons = async () => {
+      setIsLoadingCoupons(true);
+      try {
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("*")
+          .eq("is_active", true)
+          .order("code");
+
+        if (error) throw error;
+        setAvailableCoupons(data || []);
+      } catch (error) {
+        console.error("Error fetching coupons:", error);
+      } finally {
+        setIsLoadingCoupons(false);
+      }
+    };
+
+    fetchCoupons();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCouponId && availableCoupons.length > 0) {
+      const coupon = availableCoupons.find(c => c.id === selectedCouponId);
+      if (coupon) {
+        setSelectedCoupon(coupon);
+        
+        const discountAmount = coupon.discount_type === 'percentage' 
+          ? subtotal * (coupon.discount_value / 100)
+          : coupon.discount_value;
+        
+        setCouponDiscount(discountAmount);
+      }
+    } else {
+      setSelectedCoupon(null);
+      setCouponDiscount(0);
+    }
+  }, [selectedCouponId, availableCoupons, subtotal]);
+
   const handleTaxChange = (taxId: string) => {
     if (taxId === "none") {
       setAppliedTaxId(null);
       return;
     }
     setAppliedTaxId(taxId);
+  };
+
+  const handleCouponChange = (couponId: string) => {
+    if (couponId === "none") {
+      setSelectedCouponId(null);
+      return;
+    }
+    setSelectedCouponId(couponId);
   };
 
   const formatDuration = (minutes: number) => {
@@ -193,27 +257,25 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  // Calculate tax amount
   const taxAmount = useMemo(() => 
     appliedTaxId ? subtotal * (appliedTaxRate / 100) : 0,
     [subtotal, appliedTaxId, appliedTaxRate]
   );
 
-  // Apply discount after calculating tax
-  const discountedSubtotal = useMemo(() => 
-    getFinalPrice(subtotal, discountType, discountValue),
-    [subtotal, discountType, discountValue]
-  );
+  const discountedSubtotal = useMemo(() => {
+    const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
+    
+    return couponDiscount > 0 ? Math.max(0, regularDiscountedPrice - couponDiscount) : regularDiscountedPrice;
+  }, [subtotal, discountType, discountValue, couponDiscount]);
 
-  // Total with tax and discount
   const total = useMemo(() => 
     discountedSubtotal + taxAmount,
     [discountedSubtotal, taxAmount]
   );
   
   const discountAmount = useMemo(() => 
-    subtotal - discountedSubtotal,
-    [subtotal, discountedSubtotal]
+    subtotal - discountedSubtotal + couponDiscount,
+    [subtotal, discountedSubtotal, couponDiscount]
   );
 
   const selectedItems = useMemo(() => {
@@ -477,7 +539,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 <span>₹{subtotal}</span>
               </div>
               
-              {/* Tax information */}
               <div className="flex justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">Tax</span>
@@ -498,6 +559,26 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 <span>₹{taxAmount.toFixed(2)}</span>
               </div>
               
+              <div className="flex justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Coupon</span>
+                  <Select value={selectedCouponId || "none"} onValueChange={handleCouponChange} disabled={isLoadingCoupons}>
+                    <SelectTrigger className="h-7 w-[120px]">
+                      <SelectValue placeholder="No Coupon" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Coupon</SelectItem>
+                      {availableCoupons.map(coupon => (
+                        <SelectItem key={coupon.id} value={coupon.id}>
+                          {coupon.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <span>{selectedCoupon ? `-₹${couponDiscount.toFixed(2)}` : "₹0.00"}</span>
+              </div>
+
               {discountType !== "none" && (
                 <div className="flex justify-between text-sm text-green-600">
                   <span className="flex items-center">
@@ -505,7 +586,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     Discount
                     {discountType === "percentage" && ` (${discountValue}%)`}
                   </span>
-                  <span>-₹{discountAmount}</span>
+                  <span>-₹{discountAmount - couponDiscount}</span>
                 </div>
               )}
               
@@ -524,8 +605,20 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="online">Online</SelectItem>
+                  {paymentMethodsLoading ? (
+                    <SelectItem value="loading">Loading...</SelectItem>
+                  ) : paymentMethods.length > 0 ? (
+                    paymentMethods.map(method => (
+                      <SelectItem key={method.id} value={method.name}>
+                        {method.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>

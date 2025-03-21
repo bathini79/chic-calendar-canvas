@@ -1,11 +1,10 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { format, addMinutes, parseISO } from "date-fns";
 import { ArrowRight, Calendar, Clock, Package, Store } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -19,17 +18,64 @@ export default function BookingConfirmation() {
     getTotalPrice,
     getTotalDuration,
     removeFromCart,
+    appliedTaxId,
+    appliedCouponId
   } = useCart();
   const navigate = useNavigate();
   const [notes, setNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [taxAmount, setTaxAmount] = useState(0);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [tax, setTax] = useState<any>(null);
+  const [coupon, setCoupon] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchTaxAndCouponDetails = async () => {
+      if (appliedTaxId) {
+        const { data, error } = await supabase
+          .from('tax_rates')
+          .select('*')
+          .eq('id', appliedTaxId)
+          .single();
+        
+        if (!error && data) {
+          setTax(data);
+          const subtotal = getTotalPrice() - couponDiscount;
+          setTaxAmount(subtotal * (data.percentage / 100));
+        }
+      }
+
+      if (appliedCouponId) {
+        const { data, error } = await supabase
+          .from('coupons')
+          .select('*')
+          .eq('id', appliedCouponId)
+          .single();
+        
+        if (!error && data) {
+          setCoupon(data);
+          const subtotal = getTotalPrice();
+          const discount = data.discount_type === 'percentage' 
+            ? subtotal * (data.discount_value / 100)
+            : Math.min(data.discount_value, subtotal);
+          
+          setCouponDiscount(discount);
+          
+          if (tax) {
+            setTaxAmount((subtotal - discount) * (tax.percentage / 100));
+          }
+        }
+      }
+    };
+
+    fetchTaxAndCouponDetails();
+  }, [appliedTaxId, appliedCouponId, getTotalPrice]);
 
   if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
     navigate("/schedule");
     return null;
   }
 
-  // Sort items by their start times
   const sortedItems = [...items].sort((a, b) => {
     const aTime = selectedTimeSlots[a.id] || "00:00";
     const bTime = selectedTimeSlots[b.id] || "00:00";
@@ -53,12 +99,15 @@ export default function BookingConfirmation() {
     return format(endDateTime, "HH:mm");
   };
 
-  // Calculate the end time based on the first service's start time and the total duration
   const firstItemStartTime = selectedTimeSlots[sortedItems[0]?.id] || "00:00";
   const lastItemEndTime = addMinutes(
     new Date(`${format(selectedDate, "yyyy-MM-dd")} ${firstItemStartTime}`),
     totalDuration
   );
+
+  const subtotal = getTotalPrice();
+  const discountedSubtotal = subtotal - couponDiscount;
+  const totalPrice = discountedSubtotal + taxAmount;
 
   const handleBookingConfirmation = async () => {
     setIsLoading(true);
@@ -88,7 +137,6 @@ export default function BookingConfirmation() {
       }
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
-      // 1. Insert into appointments table
       const { data: appointmentData, error: appointmentError } = await supabase
         .from("appointments")
         .insert({
@@ -98,10 +146,13 @@ export default function BookingConfirmation() {
           notes: notes,
           status: "booked",
           number_of_bookings: items.length,
-          total_price: getTotalPrice(),
+          total_price: totalPrice,
           total_duration: totalDuration,
+          tax_id: appliedTaxId,
+          tax_amount: taxAmount,
+          coupon_id: appliedCouponId
         })
-        .select(); // Fetch the inserted appointment data
+        .select();
 
       if (appointmentError) {
         console.error("Error inserting appointment:", appointmentError);
@@ -112,10 +163,8 @@ export default function BookingConfirmation() {
       const appointmentId = appointmentData[0].id;
       let currentStartTime = startDateTime;
       
-      // Array to hold all booking promises
       const bookingPromises = [];
 
-      // 2. Process each item in the cart to create bookings
       for (const item of sortedItems) {
         const itemStartTimeString = selectedTimeSlots[item.id];
         let currentStartTime = new Date(
@@ -127,7 +176,6 @@ export default function BookingConfirmation() {
             selectedStylists[item.id] && selectedStylists[item.id] !== "any"
               ? selectedStylists[item.id]
               : null;
-          // This is a regular service - add a single booking
           const itemDuration = item.service?.duration || 0;
           const itemEndTime = addMinutes(currentStartTime, itemDuration);
 
@@ -144,8 +192,6 @@ export default function BookingConfirmation() {
 
           bookingPromises.push(bookingPromise);
         } else if (item.package_id) {
-          // This is a package - we need to add a booking for each service in the package
-          // Step 1: Process the base package services first
           if (
             item.package?.package_services &&
             item.package.package_services.length > 0
@@ -162,7 +208,6 @@ export default function BookingConfirmation() {
                 serviceDuration
               );
 
-              // Use package_selling_price if available, otherwise fall back to service selling_price
               const servicePriceInPackage = 
                 packageService.package_selling_price !== undefined && 
                 packageService.package_selling_price !== null
@@ -182,14 +227,11 @@ export default function BookingConfirmation() {
 
               bookingPromises.push(bookingPromise);
 
-              // Update start time for the next service
               currentStartTime = serviceEndTime;
             }
           }
 
-          // Step 2: Handle customized services if present
           if (item.customized_services && item.customized_services.length > 0) {
-            // Fetch all services to get details for customized services
             const { data: allServices } = await supabase
               .from("services")
               .select("*")
@@ -197,7 +239,6 @@ export default function BookingConfirmation() {
 
             if (allServices) {
               for (const serviceId of item.customized_services) {
-                // Check if this service is not already part of the base package
                 const isBaseService = item.package?.package_services.some(
                   (ps) => ps.service.id === serviceId
                 );
@@ -232,7 +273,6 @@ export default function BookingConfirmation() {
 
                     bookingPromises.push(bookingPromise);
 
-                    // Update start time for the next service
                     currentStartTime = serviceEndTime;
                   }
                 }
@@ -242,10 +282,8 @@ export default function BookingConfirmation() {
         }
       }
 
-      // Wait for all booking operations to complete
       const bookingResults = await Promise.all(bookingPromises);
 
-      // Check if any booking operations failed
       const bookingErrors = bookingResults.filter((result) => result.error);
       if (bookingErrors.length > 0) {
         console.error("Errors inserting bookings:", bookingErrors);
@@ -254,7 +292,7 @@ export default function BookingConfirmation() {
 
       toast.success("Booking confirmed successfully!");
       clearCart();
-      navigate("/profile"); // Redirect to profile
+      navigate("/profile");
     } catch (error: any) {
       console.error("Booking error:", error);
       toast.error(error.message || "Failed to confirm booking");
@@ -353,10 +391,41 @@ export default function BookingConfirmation() {
               );
             })}
 
-            <Card className="p-4">
-              <div className="flex items-center gap-2 ">
+            <Card className="p-4 space-y-4">
+              <div className="flex items-center gap-2">
                 <Store className="h-4 w-4" />
                 <span className="font-bold">Pay at Salon</span>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>₹{subtotal}</span>
+                </div>
+                
+                {coupon && couponDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span className="flex items-center gap-1">
+                      Coupon: {coupon.code}
+                      {coupon.discount_type === 'percentage' && ` (${coupon.discount_value}%)`}
+                    </span>
+                    <span>-₹{couponDiscount.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {tax && taxAmount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {tax.name} ({tax.percentage}%)
+                    </span>
+                    <span>₹{taxAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                <div className="flex justify-between text-base font-medium pt-1 border-t">
+                  <span>Total</span>
+                  <span>₹{totalPrice.toFixed(2)}</span>
+                </div>
               </div>
             </Card>
 
@@ -379,7 +448,7 @@ export default function BookingConfirmation() {
           <div className="py-4 space-y-3">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <div className="text-2xl font-bold text-foreground">
-                ₹{getTotalPrice()}
+                ₹{totalPrice.toFixed(2)}
               </div>
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4" />

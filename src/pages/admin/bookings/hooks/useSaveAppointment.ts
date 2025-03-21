@@ -25,6 +25,8 @@ interface SaveAppointmentProps {
   locationId?: string;
   appliedTaxId?: string | null;
   taxAmount?: number;
+  couponId?: string | null;
+  couponDiscount?: number;
 }
 
 export default function useSaveAppointment({
@@ -46,7 +48,9 @@ export default function useSaveAppointment({
   currentScreen,
   locationId,
   appliedTaxId,
-  taxAmount = 0
+  taxAmount = 0,
+  couponId = null,
+  couponDiscount = 0
 }: SaveAppointmentProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -98,7 +102,9 @@ export default function useSaveAppointment({
         discountValue
       );
       
-      const totalPrice = subtotal + taxAmount;
+      // Apply coupon discount if any
+      const afterCouponDiscount = Math.max(0, subtotal - (couponDiscount || 0));
+      const totalPrice = afterCouponDiscount + (taxAmount || 0);
 
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
@@ -116,7 +122,8 @@ export default function useSaveAppointment({
         notes: notes,
         location: locationId,
         tax_id: appliedTaxId,  // Store the applied tax ID
-        tax_amount: taxAmount  // Store the calculated tax amount
+        tax_amount: taxAmount,  // Store the calculated tax amount
+        coupon_id: couponId     // Store the applied coupon ID
       };
 
       let createdAppointmentId;

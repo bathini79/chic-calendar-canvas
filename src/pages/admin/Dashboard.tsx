@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -46,7 +47,7 @@ export default function Dashboard() {
   }
 
   const { data: totalRevenue = [] } = useQuery({
-    queryKey: ["total-revenue"],
+    queryKey: ["total-revenue", periodStart, periodEnd],
     queryFn: async () => {
       const today = format(periodStart, 'yyyy-MM-dd');
       const end = format(periodEnd, 'yyyy-MM-dd');
@@ -68,7 +69,7 @@ export default function Dashboard() {
   });
 
   const { data: newCustomers = [] } = useQuery({
-    queryKey: ["new-customers"],
+    queryKey: ["new-customers", periodStart, periodEnd],
     queryFn: async () => {
       const today = format(periodStart, 'yyyy-MM-dd');
       const end = format(periodEnd, 'yyyy-MM-dd');
@@ -87,7 +88,7 @@ export default function Dashboard() {
   });
 
   const { data: employeeRevenue = [] } = useQuery({
-    queryKey: ['employee-revenue'],
+    queryKey: ['employee-revenue', periodStart, periodEnd],
     queryFn: async () => {
       const today = format(periodStart, 'yyyy-MM-dd');
       const end = format(periodEnd, 'yyyy-MM-dd');

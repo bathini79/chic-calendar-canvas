@@ -28,6 +28,7 @@ export type Database = {
           refunded_by: string | null
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"] | null
+          tax_amount: number | null
           total_duration: number | null
           total_price: number
           transaction_type: string | null
@@ -51,6 +52,7 @@ export type Database = {
           refunded_by?: string | null
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
+          tax_amount?: number | null
           total_duration?: number | null
           total_price: number
           transaction_type?: string | null
@@ -74,6 +76,7 @@ export type Database = {
           refunded_by?: string | null
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
+          tax_amount?: number | null
           total_duration?: number | null
           total_price?: number
           transaction_type?: string | null
