@@ -7,13 +7,6 @@ import { CartSummary } from "@/components/cart/CartSummary";
 export default function UnifiedScheduling() {
   const { selectedStylists, setSelectedStylists, selectedLocation } = useCart();
 
-  const handleStylistSelect = (serviceId: string, stylistId: string) => {
-    setSelectedStylists(prev => ({
-      ...prev,
-      [serviceId]: stylistId
-    }));
-  };
-
   return (
     <div className="container py-8">
       <h1 className="text-3xl font-bold mb-6">Schedule Your Appointment</h1>
@@ -24,7 +17,6 @@ export default function UnifiedScheduling() {
             <div>
               <h2 className="text-xl font-semibold mb-4">Select Service Provider</h2>
               <ServiceSelector
-                onStylistSelect={handleStylistSelect}
                 locationId={selectedLocation}
               />
             </div>

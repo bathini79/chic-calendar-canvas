@@ -135,6 +135,11 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [couponDiscount, setCouponDiscount] = useState<number>(0);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
 
+  const subtotal = useMemo(() => 
+    getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
+    [selectedServices, selectedPackages, services, packages, customizedServices]
+  );
+
   useEffect(() => {
     const loadTaxData = async () => {
       await fetchTaxRates();
@@ -246,11 +251,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     const stylist = employees.find(emp => emp.id === stylistId);
     return stylist ? stylist.name : null;
   };
-
-  const subtotal = useMemo(() => 
-    getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
-    [selectedServices, selectedPackages, services, packages, customizedServices]
-  );
 
   const totalDuration = useMemo(() => 
     getTotalDuration(selectedServices, selectedPackages, services, packages, customizedServices),

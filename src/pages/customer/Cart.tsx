@@ -43,7 +43,7 @@ export default function Cart() {
         if (selectedLocation) {
           const settings = await fetchLocationTaxSettings(selectedLocation);
           
-          if (settings && settings.service_tax) {
+          if (settings && settings.service_tax_id) {
             // Apply service tax by default (we can make this configurable)
             setAppliedTaxId(settings.service_tax_id);
             
