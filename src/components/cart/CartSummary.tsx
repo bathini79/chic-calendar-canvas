@@ -17,6 +17,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 export function CartSummary() {
   const { 
@@ -130,6 +131,12 @@ export function CartSummary() {
     }
   };
 
+  const getSelectedCoupon = () => {
+    return coupons.find(c => c.id === appliedCouponId);
+  };
+
+  const selectedCoupon = getSelectedCoupon();
+
   return (
     <Card className="flex flex-col h-full">
       <div className="p-4 border-b">
@@ -212,17 +219,26 @@ export function CartSummary() {
                   <SelectItem value="none">No Coupon</SelectItem>
                   {coupons.map(coupon => (
                     <SelectItem key={coupon.id} value={coupon.id}>
-                      {coupon.code} ({coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : formatPrice(coupon.discount_value)})
+                      {coupon.code}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             
-            {couponDiscount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>Discount</span>
-                <span>-{formatPrice(couponDiscount)}</span>
+            {selectedCoupon && (
+              <div className="flex flex-col gap-1">
+                <Badge variant="outline" className="w-fit">
+                  <span className="text-xs font-medium">
+                    {selectedCoupon.discount_type === 'percentage' 
+                      ? `${selectedCoupon.discount_value}% off` 
+                      : `${formatPrice(selectedCoupon.discount_value)} off`}
+                  </span>
+                </Badge>
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>Discount</span>
+                  <span>-{formatPrice(couponDiscount)}</span>
+                </div>
               </div>
             )}
           </div>

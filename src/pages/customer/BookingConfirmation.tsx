@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { format, addMinutes, parseISO } from "date-fns";
-import { ArrowRight, Calendar, Clock, Package, Store } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Package, Store, Tag } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export default function BookingConfirmation() {
   const {
@@ -404,12 +405,19 @@ export default function BookingConfirmation() {
                 </div>
                 
                 {coupon && couponDiscount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span className="flex items-center gap-1">
-                      Coupon: {coupon.code}
-                      {coupon.discount_type === 'percentage' && ` (${coupon.discount_value}%)`}
-                    </span>
-                    <span>-₹{couponDiscount.toFixed(2)}</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <Tag className="h-3 w-3 text-green-600" />
+                      <Badge variant="outline" className="text-xs font-medium text-green-600">
+                        {coupon.code} - {coupon.discount_type === 'percentage' 
+                          ? `${coupon.discount_value}% off` 
+                          : `₹${coupon.discount_value} off`}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Discount</span>
+                      <span>-₹{couponDiscount.toFixed(2)}</span>
+                    </div>
                   </div>
                 )}
                 

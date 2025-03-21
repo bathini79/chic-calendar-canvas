@@ -18,17 +18,25 @@ type TaxRate = {
 };
 
 export default function Cart() {
-  const { items, getTotalPrice, selectedLocation } = useCart();
-  const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
+  const { items, getTotalPrice, selectedLocation, appliedTaxId, setAppliedTaxId, appliedCouponId, setAppliedCouponId } = useCart();
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTaxRate, setSelectedTaxRate] = useState<TaxRate | null>(null);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
+  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
   const { fetchTaxRates } = useTaxRates();
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
   
   const subtotal = getTotalPrice();
-  const taxAmount = selectedTaxRate ? (subtotal * selectedTaxRate.percentage / 100) : 0;
-  const total = subtotal + taxAmount;
+  const couponDiscount = selectedCoupon ? (
+    selectedCoupon.discount_type === 'percentage' 
+      ? (subtotal * selectedCoupon.discount_value / 100)
+      : Math.min(selectedCoupon.discount_value, subtotal)
+  ) : 0;
+  const discountedSubtotal = subtotal - couponDiscount;
+  const taxAmount = selectedTaxRate ? (discountedSubtotal * selectedTaxRate.percentage / 100) : 0;
+  const total = discountedSubtotal + taxAmount;
 
   // Fetch tax rates and default tax settings
   useEffect(() => {
@@ -65,6 +73,38 @@ export default function Cart() {
     loadData();
   }, [selectedLocation]);
 
+  // Fetch available coupons
+  useEffect(() => {
+    const fetchCoupons = async () => {
+      setIsLoadingCoupons(true);
+      try {
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("*")
+          .eq("is_active", true)
+          .order("code");
+
+        if (error) throw error;
+        setCoupons(data || []);
+        
+        // If a coupon is already selected in the cart context, find its details
+        if (appliedCouponId) {
+          const coupon = data?.find(c => c.id === appliedCouponId);
+          if (coupon) {
+            setSelectedCoupon(coupon);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching coupons:", error);
+        toast.error("Failed to load coupons");
+      } finally {
+        setIsLoadingCoupons(false);
+      }
+    };
+
+    fetchCoupons();
+  }, [appliedCouponId]);
+
   const handleTaxChange = (taxId: string) => {
     if (taxId === "none") {
       setAppliedTaxId(null);
@@ -76,6 +116,20 @@ export default function Cart() {
     const taxRate = taxRates.find(tax => tax.id === taxId);
     if (taxRate) {
       setSelectedTaxRate(taxRate);
+    }
+  };
+  
+  const handleCouponChange = (couponId: string) => {
+    if (couponId === "none") {
+      setAppliedCouponId(null);
+      setSelectedCoupon(null);
+      return;
+    }
+    
+    setAppliedCouponId(couponId);
+    const coupon = coupons.find(c => c.id === couponId);
+    if (coupon) {
+      setSelectedCoupon(coupon);
     }
   };
 
@@ -126,6 +180,39 @@ export default function Cart() {
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>{formatPrice(subtotal)}</span>
                   </div>
+                  
+                  {/* Coupon selection */}
+                  <div className="space-y-2 pt-2">
+                    <Label htmlFor="coupon-selection">Coupon</Label>
+                    <Select
+                      value={appliedCouponId || "none"}
+                      onValueChange={handleCouponChange}
+                      disabled={isLoadingCoupons}
+                    >
+                      <SelectTrigger id="coupon-selection">
+                        <SelectValue placeholder="Select coupon" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Coupon</SelectItem>
+                        {coupons.map((coupon) => (
+                          <SelectItem key={coupon.id} value={coupon.id}>
+                            {coupon.code}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {selectedCoupon && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span className="text-muted-foreground">
+                        {selectedCoupon.code} ({selectedCoupon.discount_type === 'percentage' 
+                          ? `${selectedCoupon.discount_value}%` 
+                          : formatPrice(selectedCoupon.discount_value)})
+                      </span>
+                      <span>-{formatPrice(couponDiscount)}</span>
+                    </div>
+                  )}
                   
                   {/* Tax selection */}
                   <div className="space-y-2 pt-2">

@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       appointments: {
         Row: {
+          coupon_id: string | null
           created_at: string | null
           customer_id: string
           discount_type: string | null
@@ -35,6 +36,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          coupon_id?: string | null
           created_at?: string | null
           customer_id: string
           discount_type?: string | null
@@ -59,6 +61,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          coupon_id?: string | null
           created_at?: string | null
           customer_id?: string
           discount_type?: string | null
@@ -83,6 +86,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "appointments_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "appointments_customer_id_fkey"
             columns: ["customer_id"]

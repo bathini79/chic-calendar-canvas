@@ -578,6 +578,16 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </div>
                 <span>{selectedCoupon ? `-₹${couponDiscount.toFixed(2)}` : "₹0.00"}</span>
               </div>
+              
+              {selectedCoupon && (
+                <div className="flex justify-between text-xs text-green-600 -mt-2 ml-16">
+                  <span>
+                    {selectedCoupon.discount_type === 'percentage' 
+                      ? `${selectedCoupon.discount_value}% off` 
+                      : `Fixed ₹${selectedCoupon.discount_value} off`}
+                  </span>
+                </div>
+              )}
 
               {discountType !== "none" && (
                 <div className="flex justify-between text-sm text-green-600">
