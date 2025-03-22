@@ -15,14 +15,6 @@ export default function UnifiedScheduling() {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [cartItemId, setCartItemId] = useState<string | null>(null);
-  const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
-  const [isCustomizeOpen, setIsCustomizeOpen] = useState<boolean>(false);
-
-  // Create an async function to comply with the expected Promise<void> type
-  const asyncRefreshCart = async () => {
-    // This can be an empty async function since we're not using it
-    return Promise.resolve();
-  };
 
   return (
     <div className="container py-8">
@@ -38,14 +30,11 @@ export default function UnifiedScheduling() {
                 selectedPackages={selectedPackages}
                 onServicesChange={setSelectedServices}
                 onPackagesChange={setSelectedPackages}
-                locationId={selectedLocation || ""}
-                refreshCart={asyncRefreshCart}
+                locationId={selectedLocation}
+                refreshCart={() => {}}
                 cartItemId={cartItemId}
                 setCartItemId={setCartItemId}
-                selectedPackage={selectedPackage}
-                setSelectedPackage={setSelectedPackage}
-                isCustomizeOpen={isCustomizeOpen}
-                setIsCustomizeOpen={setIsCustomizeOpen}
+                selectedPackage={null}
                 selectedCardToCustomize={null}
                 onSelectedCardToCustomizeChange={() => {}}
                 isCustomizing={false}

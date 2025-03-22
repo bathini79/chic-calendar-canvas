@@ -654,32 +654,46 @@ export default function AdminDashboard() {
         .lte("created_at", lastDayLastMonth.toISOString())
         .not("employee_id", "is", null);
       
+      // If location is selected, filter by appointments at that location
       if (topStylistsLocationId !== "all") {
-        // Get employees associated with this location
-        const { data: employees, error: empError } = await supabase
-          .from("employee_locations")
-          .select(`
-            employee_id,
-            employee:employees(id, name)
-          `)
-          .eq("location_id", topStylistsLocationId);
+        // Get appointments for the selected location (this month)
+        const { data: thisMonthAppointments, error: thisMonthAppError } = await supabase
+          .from("appointments")
+          .select("id")
+          .eq("location", topStylistsLocationId)
+          .gte("created_at", firstDayThisMonth.toISOString())
+          .lte("created_at", lastDayThisMonth.toISOString());
         
-        if (empError) throw empError;
+        if (thisMonthAppError) throw thisMonthAppError;
         
-        // Extract employee IDs
-        const employeeIds = employees?.map(item => item.employee_id) || [];
+        // Get appointments for the selected location (last month)
+        const { data: lastMonthAppointments, error: lastMonthAppError } = await supabase
+          .from("appointments")
+          .select("id")
+          .eq("location", topStylistsLocationId)
+          .gte("created_at", firstDayLastMonth.toISOString())
+          .lte("created_at", lastDayLastMonth.toISOString());
         
-        // If we have employee IDs, filter by them
-        if (employeeIds.length > 0) {
-          thisMonthQuery = thisMonthQuery.in("employee_id", employeeIds);
-          lastMonthQuery = lastMonthQuery.in("employee_id", employeeIds);
+        if (lastMonthAppError) throw lastMonthAppError;
+        
+        // Get appointment IDs
+        const thisMonthAppIds = thisMonthAppointments.map(app => app.id);
+        const lastMonthAppIds = lastMonthAppointments.map(app => app.id);
+        
+        // Filter bookings by these appointment IDs
+        if (thisMonthAppIds.length > 0) {
+          thisMonthQuery = thisMonthQuery.in("appointment_id", thisMonthAppIds);
         } else {
-          // No employees at this location
-          thisMonthQuery = thisMonthQuery.eq("employee_id", "no-results");
-          lastMonthQuery = lastMonthQuery.eq("employee_id", "no-results");
+          // If no appointments match, return empty array for this month
+          thisMonthQuery = thisMonthQuery.eq("appointment_id", "no-results");
         }
-      } else {
-        // No location filter, proceed with all employees
+        
+        if (lastMonthAppIds.length > 0) {
+          lastMonthQuery = lastMonthQuery.in("appointment_id", lastMonthAppIds);
+        } else {
+          // If no appointments match, return empty array for last month
+          lastMonthQuery = lastMonthQuery.eq("appointment_id", "no-results");
+        }
       }
       
       // Execute both queries in parallel
@@ -903,4 +917,589 @@ export default function AdminDashboard() {
       
       const comparisonCustomerCount = {};
       comparisonCustomerData?.forEach(a => {
-        comparisonCustomerCount[a
+        comparisonCustomerCount[a.customer_id] = (comparisonCustomerCount[a.customer_id] || 0) + 1;
+      });
+      
+      const comparisonReturningCustomers = Object.values(comparisonCustomerCount).filter(count => Number(count) > 1).length;
+      const comparisonReturningRate = (comparisonReturningCustomers / comparisonTotalCustomers) * 100;
+      
+      const returningRateChange = currentReturningRate - comparisonReturningRate;
+      
+      // Calculate revenue change
+      const comparisonRevenue = comparisonAppointments?.reduce((sum, app) => sum + (app.total_price || 0), 0) || 0;
+      const revenueChange = comparisonRevenue > 0 ? ((revenue - comparisonRevenue) / comparisonRevenue) * 100 : 0;
+      
+      setBusinessMetrics({
+        revenue: revenue.toFixed(2),
+        occupancyRate: currentOccupancyRate.toFixed(2),
+        returningCustomerRate: currentReturningRate.toFixed(2),
+        tips: "0.00", // Not implemented yet
+        revenueChange: revenueChange.toFixed(2),
+        occupancyChange: occupancyRateChange.toFixed(2),
+        returningCustomerChange: returningRateChange.toFixed(2),
+        tipsChange: "--"
+      });
+    } catch (error) {
+      console.error("Error calculating business metrics:", error);
+      setBusinessMetrics({
+        revenue: "0.00",
+        occupancyRate: "0.00",
+        returningCustomerRate: "0.00",
+        tips: "0.00",
+        revenueChange: "0.00",
+        occupancyChange: "0.00",
+        returningCustomerChange: "0.00",
+        tipsChange: "--"
+      });
+    }
+  }, [timeRange, recentSalesLocationId, totalRevenue, today]);
+  
+  const getStartDateForTimeRange = (range) => {
+    switch (range) {
+      case "today":
+        return startOfDay(today);
+      case "week":
+        return subDays(today, 7);
+      case "month":
+        return subDays(today, 30);
+      case "year":
+        return subDays(today, 365);
+      default:
+        return startOfDay(today);
+    }
+  };
+
+  const fetchQuickActionsData = useCallback(async () => {
+    try {
+      // Create queries
+      const pendingQuery = supabase
+        .from("appointments")
+        .select("id")
+        .eq("status", "pending");
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const todayBookingsQuery = supabase
+        .from("appointments")
+        .select("id")
+        .gte("start_time", today.toISOString())
+        .lt("start_time", tomorrow.toISOString());
+      
+      const nextWeek = new Date(today);
+      nextWeek.setDate(today.getDate() + 7);
+      
+      const upcomingQuery = supabase
+        .from("appointments")
+        .select("id")
+        .gt("start_time", tomorrow.toISOString())
+        .lte("start_time", nextWeek.toISOString());
+      
+      // Apply location filters if needed
+      if (todayAppointmentsLocationId !== "all") {
+        pendingQuery.eq("location", todayAppointmentsLocationId);
+        todayBookingsQuery.eq("location", todayAppointmentsLocationId);
+      }
+      
+      if (upcomingAppointmentsLocationId !== "all") {
+        upcomingQuery.eq("location", upcomingAppointmentsLocationId);
+      }
+      
+      // Execute all queries in parallel
+      const [pendingResult, todayResult, upcomingResult] = await Promise.all([
+        pendingQuery,
+        todayBookingsQuery,
+        upcomingQuery
+      ]);
+      
+      const pendingError = pendingResult.error;
+      const todayError = todayResult.error;
+      const upcomingError = upcomingResult.error;
+      
+      if (pendingError || todayError || upcomingError) 
+        throw pendingError || todayError || upcomingError;
+      
+      // Get low stock items count
+      const lowStockCount = lowStockItems.count;
+      
+      setQuickActions({
+        pendingConfirmations: pendingResult.data?.length || 0,
+        todayBookings: todayResult.data?.length || 0,
+        upcomingBookings: upcomingResult.data?.length || 0,
+        lowStockItems: lowStockCount
+      });
+    } catch (error) {
+      console.error("Error fetching quick actions data:", error);
+      setQuickActions({
+        pendingConfirmations: 0,
+        todayBookings: 0,
+        upcomingBookings: 0,
+        lowStockItems: 0
+      });
+    }
+  }, [todayAppointmentsLocationId, upcomingAppointmentsLocationId, lowStockItems]);
+
+  const handleAppointmentClick = (appointment) => {
+    setSelectedAppointment(appointment);
+    setIsDetailsDialogOpen(true);
+  };
+
+  const handleCheckoutFromAppointment = (appointment) => {
+    setSelectedAppointment(appointment);
+    
+    const startDate = new Date(appointment.start_time);
+    setAppointmentDate(startDate);
+    setAppointmentTime(format(startDate, 'HH:mm'));
+    
+    setIsDetailsDialogOpen(false);
+    setIsAddAppointmentOpen(true);
+  };
+
+  const closeAppointmentManager = () => {
+    setIsAddAppointmentOpen(false);
+    setSelectedAppointment(null);
+  };
+
+  const getTimeRangeLabel = () => {
+    switch (timeRange) {
+      case "today":
+        return "Today";
+      case "week":
+        return "Last 7 days";
+      case "month":
+        return "Last 30 days";
+      case "year":
+        return "Last 365 days";
+      default:
+        return "Today";
+    }
+  };
+
+  const getComparisonLabel = () => {
+    switch (timeRange) {
+      case "today":
+        return "vs Yesterday";
+      case "week":
+        return "vs Last Week";
+      case "month":
+        return "vs Last Month";
+      case "year":
+        return "vs Last Year";
+      default:
+        return "vs Yesterday";
+    }
+  };
+
+  const formatAppointmentStatus = (status) => {
+    switch (status) {
+      case "confirmed":
+        return <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">CONFIRMED</span>;
+      case "pending":
+        return <span className="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">PENDING</span>;
+      case "canceled":
+        return <span className="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800">CANCELED</span>;
+      case "completed":
+        return <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">COMPLETED</span>;
+      case "booked":
+        return <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">BOOKED</span>;
+      default:
+        return <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">BOOKED</span>;
+    }
+  };
+
+  return (
+    <div className="p-8 space-y-6">
+      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      
+      {/* First row: Recent sales and Today's next appointments */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-lg">Recent sales</CardTitle>
+              <CardDescription>{getTimeRangeLabel()}</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <LocationSelector 
+                value={recentSalesLocationId} 
+                onChange={setRecentSalesLocationId}
+                locations={locations}
+              />
+              <Select
+                value={timeRange}
+                onValueChange={setTimeRange}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Select..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">Week</SelectItem>
+                  <SelectItem value="month">Month</SelectItem>
+                  <SelectItem value="year">Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <div className="text-3xl font-bold text-gray-900">₹{appointmentsStats.completedValue.toFixed(2)}</div>
+              <div>
+                <div className="text-sm text-gray-500">Appointments {appointmentsStats.count}</div>
+                <div className="text-lg font-semibold">Appointments value ₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 my-6">
+                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-medium text-gray-600">Occupancy Rate</div>
+                    <Percent className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-indigo-700">{businessMetrics.occupancyRate}%</div>
+                  <div className={`text-sm flex items-center mt-1 ${parseFloat(businessMetrics.occupancyChange) < 0 ? 'text-red-500' : 'text-green-500'} font-medium`}>
+                    {parseFloat(businessMetrics.occupancyChange) < 0 ? (
+                      <TrendingDown className="h-3 w-3 mr-1" />
+                    ) : (
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                    )}
+                    {parseFloat(businessMetrics.occupancyChange) < 0 ? businessMetrics.occupancyChange : `+${businessMetrics.occupancyChange}`}% {getComparisonLabel()}
+                  </div>
+                </div>
+                
+                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-medium text-gray-600">Returning Customer Rate</div>
+                    <User className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-indigo-700">{businessMetrics.returningCustomerRate}%</div>
+                  <div className={`text-sm flex items-center mt-1 ${parseFloat(businessMetrics.returningCustomerChange) < 0 ? 'text-red-500' : 'text-green-500'} font-medium`}>
+                    {parseFloat(businessMetrics.returningCustomerChange) < 0 ? (
+                      <TrendingDown className="h-3 w-3 mr-1" />
+                    ) : (
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                    )}
+                    {parseFloat(businessMetrics.returningCustomerChange) < 0 ? businessMetrics.returningCustomerChange : `+${businessMetrics.returningCustomerChange}`}% {getComparisonLabel()}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="h-[300px] mt-6">
+              {revenueData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={revenueData}
+                    margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="sales" 
+                      stroke="#8884d8" 
+                      name="Sales" 
+                      dot={{ r: 4 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="appointments" 
+                      stroke="#82ca9d" 
+                      name="Appointments"
+                      dot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground">No data available for the selected period</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg">Today's next appointments</CardTitle>
+            <LocationSelector 
+              value={todayAppointmentsLocationId} 
+              onChange={setTodayAppointmentsLocationId}
+              locations={locations}
+            />
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Today's Schedule</h2>
+                <div className="space-x-1">
+                  <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Booked: {todayAppointmentsData.filter(a => a.status === 'booked').length}</span>
+                  <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Confirmed: {todayAppointmentsData.filter(a => a.status === 'confirmed').length}</span>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">Total appointments: {todayAppointmentsData.length}</p>
+            </div>
+            
+            <ScrollArea className="h-[300px] pr-4">
+              {isTodayAppointmentsLoading ? (
+                <div className="flex justify-center items-center h-40">
+                  <p>Loading appointments...</p>
+                </div>
+              ) : todayAppointmentsData.length > 0 ? (
+                <div className="space-y-4">
+                  {todayAppointmentsData.map((appointment) => {
+                    const mainBooking = appointment.bookings?.[0];
+                    const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
+                    const price = mainBooking?.price_paid || appointment.total_price || 0;
+                    const stylist = mainBooking?.employee?.name;
+                    
+                    return (
+                      <div 
+                        key={appointment.id} 
+                        className="flex items-start hover:bg-gray-50 p-2 rounded cursor-pointer transition-colors"
+                        onClick={() => handleAppointmentClick(appointment)}
+                      >
+                        <div className="mr-4 text-center">
+                          <div className="font-bold">
+                            {format(new Date(appointment.start_time), "HH:mm")}
+                          </div>
+                        </div>
+                        <div className="flex flex-1 justify-between">
+                          <div>
+                            <div className="font-medium">{serviceName}</div>
+                            <div className="text-sm text-gray-500">
+                              {appointment.customer?.full_name} {stylist && `with ${stylist}`}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold">₹{price.toFixed(2)}</div>
+                            <div className="mt-1">{formatAppointmentStatus(appointment.status)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Clock className="w-12 h-12 mb-4 text-gray-300" />
+                  <h3 className="text-lg font-semibold mb-2">No Appointments Today</h3>
+                  <p className="text-sm text-gray-500 text-center mb-4">
+                    Visit the <a href="/admin/bookings" className="text-blue-500 hover:underline">calendar</a> section to add some appointments
+                  </p>
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Second row: Upcoming appointments and Inventory */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <React.Suspense fallback={<div className="h-[400px] flex items-center justify-center">Loading...</div>}>
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-lg">Upcoming appointments</CardTitle>
+              <LocationSelector 
+                value={upcomingAppointmentsLocationId} 
+                onChange={setUpcomingAppointmentsLocationId}
+                locations={locations}
+              />
+            </CardHeader>
+            <CardContent>
+              {upcomingAppointmentsChart.length > 0 ? (
+                <LazyStatsPanel 
+                  stats={[]} 
+                  chartData={upcomingAppointmentsChart}
+                  totalBooked={upcomingStats.total}
+                  confirmedCount={upcomingStats.confirmed}
+                  bookedCount={upcomingStats.booked}
+                  cancelledCount={upcomingStats.cancelled}
+                />
+              ) : (
+                <div className="h-[300px] flex flex-col items-center justify-center">
+                  <div className="text-4xl mb-4">📊</div>
+                  <h3 className="text-xl font-semibold">Your schedule is empty</h3>
+                  <p className="text-gray-500 mt-2">Make some appointments for schedule data to appear</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </React.Suspense>
+
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg">Inventory Status</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <LocationSelector 
+                value={inventoryLocationId} 
+                onChange={setInventoryLocationId}
+                className="w-[160px]"
+              locations={locations}
+
+              />
+              <Link to="/admin/inventory" className="text-sm text-blue-600 hover:underline flex items-center">
+                View Inventory <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-card p-4 rounded-lg border">
+                <h3 className="font-medium mb-2 text-gray-500">Total Items</h3>
+                <p className="text-2xl font-bold">{lowStockItems.totalItems || 0}</p>
+              </div>
+              <div className="bg-card p-4 rounded-lg border">
+                <h3 className="font-medium mb-2 text-gray-500">Low Stock Items</h3>
+                <Link to="/admin/inventory" className="text-2xl font-bold text-yellow-500 hover:text-yellow-600">
+                  {lowStockItems.count || 0}
+                </Link>
+              </div>
+              <div className="bg-card p-4 rounded-lg border">
+                <h3 className="font-medium mb-2 text-gray-500">Critical Stock</h3>
+                <Link to="/admin/inventory" className="text-2xl font-bold text-red-500 hover:text-red-600">
+                  {lowStockItems.criticalCount || 0}
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Third row: Top services and Top team members */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg">Top services</CardTitle>
+            <LocationSelector 
+              value={topServicesLocationId} 
+              onChange={setTopServicesLocationId}
+              locations={locations}
+
+            />
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left font-medium text-gray-500 pb-3">Service</th>
+                    <th className="text-right font-medium text-gray-500 pb-3">This month</th>
+                    <th className="text-right font-medium text-gray-500 pb-3">Last month</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topServices.length > 0 ? (
+                    topServices.map((service, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="py-3">{service.name}</td>
+                        <td className="py-3 text-right">{service.thisMonth}</td>
+                        <td className="py-3 text-right">{service.lastMonth}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                        No service data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg">Top team member</CardTitle>
+            <LocationSelector 
+              value={topStylistsLocationId} 
+              onChange={setTopStylistsLocationId}
+              locations={locations}
+
+            />
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left font-medium text-gray-500 pb-3">Team member</th>
+                    <th className="text-right font-medium text-gray-500 pb-3">This month</th>
+                    <th className="text-right font-medium text-gray-500 pb-3">Last month</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topStylists.length > 0 ? (
+                    topStylists.map((stylist, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="py-3">{stylist.name}</td>
+                        <td className="py-3 text-right">{formatPrice(stylist.thisMonth)}</td>
+                        <td className="py-3 text-right">{formatPrice(stylist.lastMonth)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                        No team member data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Keep the appointment detail dialogs */}
+      <AppointmentDetailsDialog 
+        appointment={selectedAppointment}
+        open={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+        onUpdated={refetchTodayAppointments}
+        onCheckout={handleCheckoutFromAppointment}
+        onEdit={() => {
+          handleCheckoutFromAppointment(selectedAppointment as Appointment);
+        }}
+      />
+
+      {isAddAppointmentOpen && appointmentDate && (
+        <AppointmentManager
+          isOpen={true}
+          onClose={closeAppointmentManager}
+          selectedDate={appointmentDate}
+          selectedTime={appointmentTime}
+          employees={employees}
+          existingAppointment={selectedAppointment}
+          locationId={todayAppointmentsLocationId !== "all" ? todayAppointmentsLocationId : undefined}
+        />
+      )}
+
+      <style>
+        {`
+          .widget-small {
+            grid-column: span 1;
+          }
+          .widget-medium {
+            grid-column: span 1;
+          }
+          .widget-large {
+            grid-column: span 2;
+          }
+          @media (max-width: 768px) {
+            .widget-large {
+              grid-column: span 1;
+            }
+          }
+        `}
+      </style>
+    </div>
+  );
+}
+

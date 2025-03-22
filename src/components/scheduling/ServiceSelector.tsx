@@ -33,22 +33,18 @@ import {
 import { Label } from "@/components/ui/label"
 import { formatPrice } from '@/lib/utils';
 
-export interface ServiceSelectorProps {
+interface ServiceSelectorProps {
   selectedServices: string[];
   selectedPackages: string[];
   onServicesChange: (services: string[]) => void;
   onPackagesChange: (packages: string[]) => void;
-  locationId: string;
   refreshCart: () => Promise<void>;
   cartItemId: string | null;
   setCartItemId: (id: string | null) => void;
   selectedPackage: any | null;
-  selectedCardToCustomize?: any | null;
-  onSelectedCardToCustomizeChange?: (card: any | null) => void;
-  isCustomizing: boolean;
-  setSelectedPackage?: (pkg: any | null) => void;
-  isCustomizeOpen?: boolean;
-  setIsCustomizeOpen?: (open: boolean) => void;
+  setSelectedPackage: (pkg: any | null) => void;
+  isCustomizeOpen: boolean;
+  setIsCustomizeOpen: (open: boolean) => void;
 }
 
 export function ServiceSelector({
@@ -56,14 +52,10 @@ export function ServiceSelector({
   selectedPackages,
   onServicesChange,
   onPackagesChange,
-  locationId,
   refreshCart,
   cartItemId,
   setCartItemId,
   selectedPackage,
-  selectedCardToCustomize,
-  onSelectedCardToCustomizeChange = () => {},
-  isCustomizing,
   setSelectedPackage,
   isCustomizeOpen,
   setIsCustomizeOpen
