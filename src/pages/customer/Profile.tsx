@@ -187,7 +187,7 @@ const Profile = () => {
                   })}
                 </p>
                 <p>Status: {appointment.status}</p>
-                <p>Total Price: {formatPrice(appointment.total_price)}</p>
+                <p>Total Price: {formatPrice(appointment.total_price || 0)}</p>
                 <AppointmentDisplay appointment={appointment} totalDuration={durationDisplay} />
 
                 <h3 className="text-md font-semibold mt-2">Bookings:</h3>
@@ -199,7 +199,7 @@ const Profile = () => {
                         : `Package: ${booking.package?.name} (${booking.package?.duration} minutes)`}
                     </p>
                     {booking.employee && <p>Employee: {booking.employee.name}</p>}
-                    <p>Price Paid: {formatPrice(booking.price_paid)}</p>
+                    <p>Price Paid: {formatPrice(booking.price_paid || 0)}</p>
                   </div>
                 ))}
               </div>

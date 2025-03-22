@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
@@ -134,11 +133,10 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         const { data, error } = await supabase
           .from("receipt_settings")
           .select("*")
-          .eq("location_id", locationId)
-          .single();
+          .eq("location_id", locationId);
         
-        if (!error && data) {
-          settings = data;
+        if (!error && data && data.length > 0) {
+          settings = data[0];
         }
       }
       
@@ -147,11 +145,10 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         const { data, error } = await supabase
           .from("receipt_settings")
           .select("*")
-          .is("location_id", null)
-          .single();
+          .is("location_id", null);
           
-        if (!error && data) {
-          settings = data;
+        if (!error && data && data.length > 0) {
+          settings = data[0];
         }
       }
       
@@ -308,7 +305,12 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         <SummaryView
           isOpen={saleComplete}
           onClose={onClose}
-          customer={selectedCustomer}
+          customer={{
+            id: selectedCustomer.id,
+            full_name: selectedCustomer.full_name || "",
+            email: selectedCustomer.email || "",
+            phone_number: selectedCustomer.phone_number
+          }}
           totalPrice={totalAmount}
           items={[{
             id: selectedMembership.id,
@@ -316,7 +318,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
             price: subtotal,
             type: "membership"
           }]}
-          paymentMethod={paymentMethod}
+          paymentMethod={paymentMethod === "card" ? "online" : "cash"}
           onAddAnother={handleReset}
           receiptNumber={receiptNumber}
           taxAmount={taxAmount}
