@@ -126,7 +126,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
 
   const generateReceiptNumber = async () => {
     try {
-      let settings;
+      let settings = null;
       
       // Get receipt settings for the location
       if (locationId) {
@@ -303,13 +303,12 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         }`}
       >
         <SummaryView
-          isOpen={saleComplete}
-          onClose={onClose}
+          appointmentId=""
           customer={{
             id: selectedCustomer.id,
             full_name: selectedCustomer.full_name || "",
             email: selectedCustomer.email || "",
-            phone_number: selectedCustomer.phone_number
+            phone_number: selectedCustomer.phone_number || ""
           }}
           totalPrice={totalAmount}
           items={[{
