@@ -137,17 +137,17 @@ export function MembershipSale({ isOpen, onClose }: MembershipSaleProps) {
       if (error) throw error;
       
       // Update customer's membership status
-      const customerUpdate = {
-        membership_id: selectedMembership.id,
-        membership_start_date: new Date().toISOString(),
-        membership_end_date: selectedMembership.duration_days 
-          ? new Date(Date.now() + selectedMembership.duration_days * 24 * 60 * 60 * 1000).toISOString() 
-          : null
-      };
-      
+      const membershipEndDate = selectedMembership.duration_days 
+        ? new Date(Date.now() + selectedMembership.duration_days * 24 * 60 * 60 * 1000).toISOString() 
+        : null;
+        
       const { error: customerError } = await supabase
         .from("profiles")
-        .update(customerUpdate)
+        .update({
+          membership_id: selectedMembership.id,
+          membership_start_date: new Date().toISOString(),
+          membership_end_date: membershipEndDate
+        })
         .eq("id", selectedCustomer.id);
         
       if (customerError) throw customerError;
