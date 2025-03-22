@@ -903,4 +903,4 @@ export default function AdminDashboard() {
       
       const comparisonCustomerCount = {};
       comparisonCustomerData?.forEach(a => {
-        comparisonCustomerCount[a.customer_
+        comparisonCustomerCount[a
