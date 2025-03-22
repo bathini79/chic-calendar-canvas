@@ -143,13 +143,15 @@ export function MembershipSale({ isOpen, onClose }: MembershipSaleProps) {
         : null;
         
       const { error: customerError } = await supabase
-        .from("profiles")
-        .update({
+        .from("customer_memberships")
+        .insert({
+          customer_id: selectedCustomer.id,
           membership_id: selectedMembership.id,
-          membership_start_date: new Date().toISOString(),
-          membership_end_date: membershipEndDate
-        })
-        .eq("id", selectedCustomer.id);
+          start_date: new Date().toISOString(),
+          end_date: membershipEndDate,
+          amount_paid: parseFloat(selectedMembership.price) + taxAmount,
+          status: "active"
+        });
         
       if (customerError) throw customerError;
       
@@ -251,7 +253,7 @@ export function MembershipSale({ isOpen, onClose }: MembershipSaleProps) {
                             </p>
                             <div className="mt-2">
                               <span className="text-sm">
-                                Duration: {membership.duration_days} days
+                                Duration: {membership.validity_period} {membership.validity_unit}
                               </span>
                             </div>
                           </div>
