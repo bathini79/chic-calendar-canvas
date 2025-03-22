@@ -15,6 +15,8 @@ export default function UnifiedScheduling() {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [cartItemId, setCartItemId] = useState<string | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState<boolean>(false);
 
   // Create an async function to comply with the expected Promise<void> type
   const asyncRefreshCart = async () => {
@@ -40,7 +42,10 @@ export default function UnifiedScheduling() {
                 refreshCart={asyncRefreshCart}
                 cartItemId={cartItemId}
                 setCartItemId={setCartItemId}
-                selectedPackage={null}
+                selectedPackage={selectedPackage}
+                setSelectedPackage={setSelectedPackage}
+                isCustomizeOpen={isCustomizeOpen}
+                setIsCustomizeOpen={setIsCustomizeOpen}
                 selectedCardToCustomize={null}
                 onSelectedCardToCustomizeChange={() => {}}
                 isCustomizing={false}
