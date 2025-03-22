@@ -1,342 +1,393 @@
 
-import React from 'react';
-import { useState } from "react";
-import { Package as PackageIcon, Plus, Minus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
-import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { 
+  Package, 
+  Search, 
+  Check, 
+  ChevronRight, 
+  Clock, 
+  User, 
+  Tag,
+  Sparkles
+} from "lucide-react";
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from "@/components/ui/tabs";
+import { 
+  Select, 
+  SelectTrigger, 
+  SelectValue, 
+  SelectContent, 
+  SelectItem 
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { formatPrice } from "@/lib/utils";
+import { 
+  Collapsible, 
+  CollapsibleContent, 
+  CollapsibleTrigger 
+} from "@/components/ui/collapsible";
+import type { Service, Package } from "../types";
+import { useActiveServices } from "../hooks/useActiveServices";
+import { useActivePackages } from "../hooks/useActivePackages";
 
-type Stylist = {
-  id: string;
-  name: string;
-  employment_type: 'stylist';
-  status: 'active' | 'inactive';
-};
-
-export interface ServiceSelectorProps {
-  onServiceSelect?: (serviceId: string) => void;
-  onPackageSelect?: (packageId: string, serviceIds?: string[]) => void;
+interface ServiceSelectorProps {
+  onServiceSelect: (serviceId: string) => void;
+  onPackageSelect: (packageId: string) => void;
   onStylistSelect: (itemId: string, stylistId: string) => void;
+  onCustomPackage: (packageId: string, serviceId: string) => void;
   selectedServices: string[];
   selectedPackages: string[];
   selectedStylists: Record<string, string>;
-  stylists: Stylist[];
-  onCustomPackage?: (packageId: string, serviceId: string) => void;
-  customizedServices?: Record<string, string[]>;
+  customizedServices: Record<string, string[]>;
+  stylists: any[];
   locationId?: string;
+  membershipEligibleServices?: string[];
+  membershipEligiblePackages?: string[];
+  hasMembershipBenefits?: boolean;
 }
 
 export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   onServiceSelect,
   onPackageSelect,
   onStylistSelect,
+  onCustomPackage,
   selectedServices,
   selectedPackages,
   selectedStylists,
+  customizedServices,
   stylists,
-  onCustomPackage,
-  customizedServices = {},
-  locationId
+  locationId,
+  membershipEligibleServices = [],
+  membershipEligiblePackages = [],
+  hasMembershipBenefits = false
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("services");
+  const [expandedPackage, setExpandedPackage] = useState<string | null>(null);
+  
+  const { data: services = [], isLoading: servicesLoading } = useActiveServices(locationId);
+  const { data: packages = [], isLoading: packagesLoading } = useActivePackages(locationId);
+  
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: services } = useQuery({
-    queryKey: ['services', locationId],
-    queryFn: async () => {
-      let query = supabase
-        .from('services')
-        .select(`
-          *,
-          services_categories!inner(
-            categories(id, name)
-          )
-        `)
-        .eq('status', 'active');
-      
-      if (locationId) {
-        // Get services associated with this location
-        const { data: serviceLocations, error: serviceLocationsError } = await supabase
-          .from('service_locations')
-          .select('service_id')
-          .eq('location_id', locationId);
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("categories")
+          .select("*")
+          .order("name");
         
-        if (serviceLocationsError) throw serviceLocationsError;
-        
-        // If we have service locations, filter by them
-        if (serviceLocations && serviceLocations.length > 0) {
-          const serviceIds = serviceLocations.map(sl => sl.service_id);
-          query = query.in('id', serviceIds);
-        }
+        if (error) throw error;
+        setCategories(data || []);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
       }
+    };
+    
+    fetchCategories();
+  }, []);
+  
+  const filteredServices = services
+    .filter((service) => {
+      // Filter by search query
+      const matchesSearch = 
+        service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (service.description && service.description.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      const { data, error } = await query;
+      // Filter by category
+      const matchesCategory = 
+        selectedCategory === "all" || 
+        (service.category_id === selectedCategory);
       
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: packages } = useQuery({
-    queryKey: ['packages', locationId],
-    queryFn: async () => {
-      let query = supabase
-        .from('packages')
-        .select(`
-          *,
-          package_services(
-            service:services(*),
-            package_selling_price
-          )
-        `)
-        .eq('status', 'active');
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  
+  const filteredPackages = packages
+    .filter((pkg) => {
+      // Filter by search query
+      const matchesSearch = 
+        pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (pkg.description && pkg.description.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      if (locationId) {
-        // Get packages associated with this location
-        const { data: packageLocations, error: packageLocationsError } = await supabase
-          .from('package_locations')
-          .select('package_id')
-          .eq('location_id', locationId);
-        
-        if (packageLocationsError) throw packageLocationsError;
-        
-        // If we have package locations, filter by them
-        if (packageLocations && packageLocations.length > 0) {
-          const packageIds = packageLocations.map(pl => pl.package_id);
-          query = query.in('id', packageIds);
-        }
-      }
+      // Filter by category if categories are defined for packages
+      const matchesCategory = 
+        selectedCategory === "all" || 
+        (pkg.categories && pkg.categories.includes(selectedCategory));
       
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const filteredServices = selectedCategory
-    ? services?.filter(service => 
-        service.services_categories.some(sc => sc.categories.id === selectedCategory)
-      )
-    : services;
-
-  const filteredPackages = selectedCategory
-    ? packages?.filter(pkg => 
-        pkg.package_services.some(ps => 
-          services?.find(s => s.id === ps.service.id)?.services_categories.some(
-            sc => sc.categories.id === selectedCategory
-          )
-        )
-      )
-    : packages;
-
-  const allItems = [
-    ...(filteredPackages || []).map(pkg => ({
-      type: 'package' as const,
-      ...pkg
-    })),
-    ...(filteredServices || []).map(service => ({
-      type: 'service' as const,
-      ...service
-    }))
-  ];
-
-  const calculatePackagePrice = (pkg: any) => {
-    const basePrice = pkg.price || 0;
-    const customServices = customizedServices[pkg.id] || [];
-    const additionalPrice = customServices.reduce((sum, serviceId) => {
-      const service = services?.find(s => s.id === serviceId);
-      return sum + (service?.selling_price || 0);
-    }, 0);
-    return basePrice + additionalPrice;
-  };
-
-  const handlePackageSelect = (pkg: any) => {
-    // Extract base service IDs from the package
-    const baseServices = pkg?.package_services.map((ps: any) => ps.service.id);
-    const currentCustomServices = customizedServices[pkg.id] || [];
-
-    if (selectedPackages.includes(pkg.id)) {
-      // If already selected, deselect the package
-      onPackageSelect(pkg.id);
-      setExpandedPackages(prev => prev.filter(id => id !== pkg.id));
-    } else {
-      // Expand the package view even if not selecting yet
-      setExpandedPackages(prev => [...prev, pkg.id]);
-      // Select the package and provide all service IDs (base + custom)
-      onPackageSelect(pkg.id, [...baseServices, ...currentCustomServices]);
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  
+  // Check if a service is eligible for membership discount
+  const isServiceEligible = (serviceId: string) => {
+    if (!hasMembershipBenefits) return false;
+    
+    // If no specific services are listed, all are eligible
+    if (membershipEligibleServices.length === 0 && membershipEligiblePackages.length === 0) {
+      return true;
     }
+    
+    return membershipEligibleServices.includes(serviceId);
   };
-
-  // Get the price of a service within a package
-  const getServicePriceInPackage = (packageId: string, serviceId: string) => {
-    const pkg = packages?.find(p => p.id === packageId);
-    if (!pkg) return 0;
-
-    const packageService = pkg.package_services?.find(ps => ps.service.id === serviceId);
-    if (packageService) {
-      // Use package_selling_price if available, otherwise fall back to the service's selling_price
-      return packageService.package_selling_price !== null && packageService.package_selling_price !== undefined
-        ? packageService.package_selling_price
-        : packageService.service.selling_price;
+  
+  // Check if a package is eligible for membership discount
+  const isPackageEligible = (packageId: string) => {
+    if (!hasMembershipBenefits) return false;
+    
+    // If no specific packages are listed, all are eligible
+    if (membershipEligibleServices.length === 0 && membershipEligiblePackages.length === 0) {
+      return true;
     }
-
-    // For customized services not in the base package
-    const service = services?.find(s => s.id === serviceId);
-    return service?.selling_price || 0;
+    
+    return membershipEligiblePackages.includes(packageId);
   };
-
+  
   return (
-    <div className="space-y-6">
-      <CategoryFilter
-        categories={categories || []}
-        selectedCategory={selectedCategory}
-        onCategorySelect={setSelectedCategory}
-      />
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input
+          placeholder="Search services or packages..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
 
-      <ScrollArea className="border rounded-md">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead className="w-[200px]">Stylist</TableHead>
-              <TableHead className="w-[100px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {allItems.map((item) => {
-              const isService = item.type === 'service';
-              const isPackage = item.type === 'package';
-              const isExpanded = isPackage && (selectedPackages.includes(item.id) || expandedPackages.includes(item.id));
-              const isSelected = isService 
-                ? selectedServices.includes(item.id)
-                : isExpanded;
+      <div>
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="All categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All categories</SelectItem>
+            {categories.map((category) => (
+              <SelectItem key={category.id} value={category.id}>
+                {category.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-              return (
-                <React.Fragment key={`${item.type}-${item.id}`}>
-                  <TableRow 
-                    className={cn(
-                      "transition-colors",
-                      isSelected && "bg-red-50 hover:bg-red-100"
-                    )}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-2 mb-4">
+          <TabsTrigger value="services">Services</TabsTrigger>
+          <TabsTrigger value="packages">Packages</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="services" className="focus-visible:outline-none">
+          {servicesLoading ? (
+            <div className="text-center py-6">Loading services...</div>
+          ) : filteredServices.length === 0 ? (
+            <div className="text-center py-6 text-gray-500">
+              No services found
+            </div>
+          ) : (
+            <ScrollArea className="h-[600px] pr-4">
+              <div className="space-y-2">
+                {filteredServices.map((service) => (
+                  <div
+                    key={service.id}
+                    className={`p-4 border rounded-md cursor-pointer transition-colors ${
+                      selectedServices.includes(service.id)
+                        ? "border-primary bg-primary/10"
+                        : isServiceEligible(service.id)
+                          ? "border-green-300 bg-green-50 hover:bg-green-100/60"
+                          : "hover:bg-gray-50"
+                    }`}
+                    onClick={() => onServiceSelect(service.id)}
                   >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {isPackage && (
-                          <div className="flex items-center gap-1">
-                            <PackageIcon className="h-4 w-4" />
-                            <Badge variant="default">Package</Badge>
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <div className="flex items-center">
+                          <h3 className="font-medium">{service.name}</h3>
+                          {isServiceEligible(service.id) && (
+                            <Badge className="ml-2 bg-green-500 hover:bg-green-600 text-white text-xs flex items-center gap-0.5">
+                              <Sparkles className="h-3 w-3" />
+                              <span>Membership</span>
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <Clock className="mr-1 h-3 w-3" />
+                            {service.duration} min
+                          </div>
+                          <div className="flex items-center">
+                            <Tag className="mr-1 h-3 w-3" />
+                            {formatPrice(service.selling_price)}
+                          </div>
+                        </div>
+                        {selectedServices.includes(service.id) && (
+                          <div className="mt-2">
+                            <label className="text-xs text-gray-500 mb-1 block">
+                              Assign Stylist
+                            </label>
+                            <Select
+                              value={selectedStylists[service.id] || ""}
+                              onValueChange={(value) => onStylistSelect(service.id, value)}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue placeholder="Select a stylist" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="any">Any Available</SelectItem>
+                                {stylists.map((stylist) => (
+                                  <SelectItem key={stylist.id} value={stylist.id}>
+                                    {stylist.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         )}
-                        <span className="font-medium">{item.name}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {isService ? item.duration : 
-                        item.package_services?.reduce((sum: number, ps: any) => 
-                          sum + (ps.service?.duration || 0), 0)
-                      } min
-                    </TableCell>
-                    <TableCell>
-                      ₹{isService ? item.selling_price : calculatePackagePrice(item)}
-                    </TableCell>
-                    <TableCell>
-                      {isService && isSelected && (
-                        <Select 
-                          value={selectedStylists[item.id] || ''} 
-                          onValueChange={(value) => onStylistSelect(item.id, value)}
-                        >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Select stylist" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stylists.map((stylist) => (
-                              <SelectItem key={stylist.id} value={stylist.id}>
-                                {stylist.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (isPackage) {
-                            handlePackageSelect(item);
-                          } else {
-                            onServiceSelect(item.id);
-                          }
-                        }}
-                      >
-                        {isSelected ? (
-                          <Minus className="h-4 w-4 text-destructive" />
-                        ) : (
-                          <Plus className="h-4 w-4" />
+                      <div className="flex items-center h-5">
+                        {selectedServices.includes(service.id) && (
+                          <Check className="h-5 w-5 text-primary" />
                         )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                  {isPackage && isExpanded && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="bg-slate-50">
-                        <div className="pl-8 pr-4 py-2 space-y-2">
-                          {item.package_services?.map((ps: any) => (
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </TabsContent>
+
+        <TabsContent value="packages" className="focus-visible:outline-none">
+          {packagesLoading ? (
+            <div className="text-center py-6">Loading packages...</div>
+          ) : filteredPackages.length === 0 ? (
+            <div className="text-center py-6 text-gray-500">
+              No packages found
+            </div>
+          ) : (
+            <ScrollArea className="h-[600px] pr-4">
+              <div className="space-y-2">
+                {filteredPackages.map((pkg) => (
+                  <Collapsible
+                    key={pkg.id}
+                    open={expandedPackage === pkg.id}
+                    onOpenChange={(isOpen) => setExpandedPackage(isOpen ? pkg.id : null)}
+                  >
+                    <div
+                      className={`p-4 border rounded-md cursor-pointer transition-colors ${
+                        selectedPackages.includes(pkg.id)
+                          ? "border-primary bg-primary/5"
+                          : isPackageEligible(pkg.id)
+                            ? "border-green-300 bg-green-50 hover:bg-green-100/60"
+                            : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-1">
+                        <div
+                          className="flex-1"
+                          onClick={() => onPackageSelect(pkg.id)}
+                        >
+                          <div className="flex items-center">
+                            <h3 className="font-medium">{pkg.name}</h3>
+                            {isPackageEligible(pkg.id) && (
+                              <Badge className="ml-2 bg-green-500 hover:bg-green-600 text-white text-xs flex items-center gap-0.5">
+                                <Sparkles className="h-3 w-3" />
+                                <span>Membership</span>
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-1">
+                            <div className="flex items-center">
+                              <Package className="mr-1 h-3 w-3" />
+                              {pkg.package_services?.length || 0} services
+                            </div>
+                            {pkg.duration && (
+                              <div className="flex items-center">
+                                <Clock className="mr-1 h-3 w-3" />
+                                {pkg.duration} min
+                              </div>
+                            )}
+                            <div className="flex items-center">
+                              <Tag className="mr-1 h-3 w-3" />
+                              {formatPrice(pkg.price)}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          {selectedPackages.includes(pkg.id) && (
+                            <Check className="h-5 w-5 text-primary" />
+                          )}
+                          <CollapsibleTrigger asChild>
+                            <ChevronRight
+                              className={`h-5 w-5 text-gray-400 transition-transform ${
+                                expandedPackage === pkg.id ? "rotate-90" : ""
+                              }`}
+                            />
+                          </CollapsibleTrigger>
+                        </div>
+                      </div>
+                      
+                      {selectedPackages.includes(pkg.id) && (
+                        <div className="mt-2">
+                          <label className="text-xs text-gray-500 mb-1 block">
+                            Assign Stylist
+                          </label>
+                          <Select
+                            value={selectedStylists[pkg.id] || ""}
+                            onValueChange={(value) => onStylistSelect(pkg.id, value)}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Select a stylist" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="any">Any Available</SelectItem>
+                              {stylists.map((stylist) => (
+                                <SelectItem key={stylist.id} value={stylist.id}>
+                                  {stylist.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <CollapsibleContent className="px-4 py-2 border-x border-b rounded-b-md -mt-[1px]">
+                      <div className="space-y-2 py-2">
+                        <h4 className="text-sm font-medium">Included Services</h4>
+                        <div className="space-y-1">
+                          {pkg.package_services?.map((ps) => (
                             <div
                               key={ps.service.id}
-                              className="flex items-center justify-between py-2 border-b last:border-0"
+                              className="flex items-center justify-between py-1 px-2 text-sm rounded hover:bg-gray-50"
                             >
-                              <div className="flex items-center gap-4">
-                                <span className="text-sm font-medium">{ps.service.name}</span>
-                                <span className="text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <span>{ps.service.name}</span>
+                                <span className="text-xs text-gray-500">
                                   ({ps.service.duration} min)
                                 </span>
                               </div>
-                              <div className="flex items-center gap-4">
-                                <span className="text-sm font-medium">
-                                  ₹{ps.package_selling_price !== null && ps.package_selling_price !== undefined
-                                    ? ps.package_selling_price
-                                    : ps.service.selling_price}
-                                </span>
-                                <Select 
-                                  value={selectedStylists[ps.service.id] || ''} 
+                              {selectedPackages.includes(pkg.id) && (
+                                <Select
+                                  value={selectedStylists[ps.service.id] || selectedStylists[pkg.id] || ""}
                                   onValueChange={(value) => onStylistSelect(ps.service.id, value)}
                                 >
-                                  <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Select stylist" />
+                                  <SelectTrigger className="h-7 w-32">
+                                    <SelectValue placeholder="Stylist" />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="any">Any Available</SelectItem>
                                     {stylists.map((stylist) => (
                                       <SelectItem key={stylist.id} value={stylist.id}>
                                         {stylist.name}
@@ -344,65 +395,58 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                                     ))}
                                   </SelectContent>
                                 </Select>
-                              </div>
+                              )}
                             </div>
                           ))}
-                          {item.is_customizable && (
-                            <div className="pt-4 space-y-4">
-                              <h4 className="font-medium text-sm">Additional Services</h4>
-                              {services?.filter(service => 
-                                item.customizable_services.includes(service.id)
-                              ).map(service => (
-                                <div
-                                  key={service.id}
-                                  className="flex items-center justify-between py-2"
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <Checkbox
-                                      checked={customizedServices[item.id]?.includes(service.id)}
-                                      onCheckedChange={() => onCustomPackage(item.id, service.id)}
-                                    />
-                                    <span className="text-sm font-medium">{service.name}</span>
-                                    <span className="text-sm text-muted-foreground">
-                                      ({service.duration} min)
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-4">
-                                    <span className="text-sm font-medium">
-                                      +₹{service.selling_price}
-                                    </span>
-                                    {customizedServices[item.id]?.includes(service.id) && (
-                                      <Select 
-                                        value={selectedStylists[service.id] || ''} 
-                                        onValueChange={(value) => onStylistSelect(service.id, value)}
-                                      >
-                                        <SelectTrigger className="w-[180px]">
-                                          <SelectValue placeholder="Select stylist" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {stylists.map((stylist) => (
-                                            <SelectItem key={stylist.id} value={stylist.id}>
-                                              {stylist.name}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </ScrollArea>
+                        
+                        {pkg.is_customizable && (
+                          <div className="mt-4 pt-2 border-t">
+                            <h4 className="text-sm font-medium mb-2">Additional Services</h4>
+                            <div className="space-y-1">
+                              {pkg.customizable_services?.filter(id => {
+                                // Only show services that aren't already part of the package
+                                const isIncluded = pkg.package_services?.some(ps => ps.service.id === id);
+                                return !isIncluded;
+                              }).map((serviceId) => {
+                                const service = services.find(s => s.id === serviceId);
+                                if (!service) return null;
+                                
+                                const isSelected = customizedServices[pkg.id]?.includes(serviceId);
+                                
+                                return (
+                                  <div
+                                    key={serviceId}
+                                    className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() => onCustomPackage(pkg.id, serviceId)}
+                                      />
+                                      <span className="text-sm">{service.name}</span>
+                                      <span className="text-xs text-gray-500">
+                                        ({service.duration} min)
+                                      </span>
+                                    </div>
+                                    <div className="text-sm">
+                                      {formatPrice(service.selling_price)}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
