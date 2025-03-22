@@ -16,6 +16,12 @@ export default function UnifiedScheduling() {
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [cartItemId, setCartItemId] = useState<string | null>(null);
 
+  // Create an async function to comply with the expected Promise<void> type
+  const asyncRefreshCart = async () => {
+    // This can be an empty async function since we're not using it
+    return Promise.resolve();
+  };
+
   return (
     <div className="container py-8">
       <h1 className="text-3xl font-bold mb-6">Schedule Your Appointment</h1>
@@ -31,7 +37,7 @@ export default function UnifiedScheduling() {
                 onServicesChange={setSelectedServices}
                 onPackagesChange={setSelectedPackages}
                 locationId={selectedLocation}
-                refreshCart={() => {}}
+                refreshCart={asyncRefreshCart}
                 cartItemId={cartItemId}
                 setCartItemId={setCartItemId}
                 selectedPackage={null}
