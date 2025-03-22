@@ -37,6 +37,7 @@ export function MembershipSale({ isOpen, onClose }: MembershipSaleProps) {
   const { taxRates } = useTaxRates();
   const [selectedTaxRate, setSelectedTaxRate] = useState<any | null>(null);
   const [taxAmount, setTaxAmount] = useState(0);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   // Fetch memberships
   useEffect(() => {
@@ -204,7 +205,7 @@ export function MembershipSale({ isOpen, onClose }: MembershipSaleProps) {
               <SelectCustomer
                 selectedCustomer={selectedCustomer}
                 setSelectedCustomer={setSelectedCustomer}
-                setShowCreateForm={() => {}}
+                setShowCreateForm={setShowCreateForm}
               />
             </div>
 
