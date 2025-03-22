@@ -15,6 +15,13 @@ export default function UnifiedScheduling() {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [cartItemId, setCartItemId] = useState<string | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+
+  const refreshCart = async () => {
+    // This would typically fetch the updated cart
+    // For now it's just a placeholder
+  };
 
   return (
     <div className="container py-8">
@@ -31,13 +38,13 @@ export default function UnifiedScheduling() {
                 onServicesChange={setSelectedServices}
                 onPackagesChange={setSelectedPackages}
                 locationId={selectedLocation}
-                refreshCart={() => {}}
+                refreshCart={refreshCart}
                 cartItemId={cartItemId}
                 setCartItemId={setCartItemId}
-                selectedPackage={null}
-                selectedCardToCustomize={null}
-                onSelectedCardToCustomizeChange={() => {}}
-                isCustomizing={false}
+                selectedPackage={selectedPackage}
+                setSelectedPackage={setSelectedPackage}
+                isCustomizeOpen={isCustomizeOpen}
+                setIsCustomizeOpen={setIsCustomizeOpen}
               />
             </div>
           </div>

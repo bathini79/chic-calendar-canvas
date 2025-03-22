@@ -38,13 +38,14 @@ interface ServiceSelectorProps {
   selectedPackages: string[];
   onServicesChange: (services: string[]) => void;
   onPackagesChange: (packages: string[]) => void;
-  refreshCart: () => Promise<void>;
-  cartItemId: string | null;
-  setCartItemId: (id: string | null) => void;
-  selectedPackage: any | null;
-  setSelectedPackage: (pkg: any | null) => void;
-  isCustomizeOpen: boolean;
-  setIsCustomizeOpen: (open: boolean) => void;
+  refreshCart?: () => Promise<void>;
+  cartItemId?: string | null;
+  setCartItemId?: (id: string | null) => void;
+  selectedPackage?: any | null;
+  setSelectedPackage?: (pkg: any | null) => void;
+  isCustomizeOpen?: boolean;
+  setIsCustomizeOpen?: (open: boolean) => void;
+  locationId?: string;
 }
 
 export function ServiceSelector({
@@ -58,7 +59,8 @@ export function ServiceSelector({
   selectedPackage,
   setSelectedPackage,
   isCustomizeOpen,
-  setIsCustomizeOpen
+  setIsCustomizeOpen,
+  locationId
 }: ServiceSelectorProps) {
   const [services, setServices] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
@@ -114,50 +116,53 @@ export function ServiceSelector({
     }
 
     onServicesChange(updatedServices);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      toast.error("Please login to continue");
-      return;
-    }
+    
+    if (refreshCart) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please login to continue");
+        return;
+      }
 
-    const user = session.user;
-    if (user) {
-      try {
-        if (isSelected) {
-          // Remove service from cart
-          const { error } = await supabase
-            .from('cart_items')
-            .delete()
-            .eq('customer_id', user.id)
-            .eq('service_id', serviceId);
+      const user = session.user;
+      if (user) {
+        try {
+          if (isSelected) {
+            // Remove service from cart
+            const { error } = await supabase
+              .from('cart_items')
+              .delete()
+              .eq('customer_id', user.id)
+              .eq('service_id', serviceId);
 
-          if (error) throw error;
-          toast.success('Service removed from cart');
-        } else {
-          // Add service to cart
-          const service = services.find(s => s.id === serviceId);
-          if (!service) throw new Error('Service not found');
+            if (error) throw error;
+            toast.success('Service removed from cart');
+          } else {
+            // Add service to cart
+            const service = services.find(s => s.id === serviceId);
+            if (!service) throw new Error('Service not found');
 
-          const { error } = await supabase
-            .from('cart_items')
-            .insert({
-              customer_id: user.id,
-              service_id: serviceId,
-              package_id: null,
-              selling_price: service.selling_price,
-              duration: service.duration || 0,
-            });
+            const { error } = await supabase
+              .from('cart_items')
+              .insert({
+                customer_id: user.id,
+                service_id: serviceId,
+                package_id: null,
+                selling_price: service.selling_price,
+                duration: service.duration || 0,
+              });
 
-          if (error) throw error;
-          toast.success(`${service.name} added to cart`);
+            if (error) throw error;
+            toast.success(`${service.name} added to cart`);
+          }
+
+          await refreshCart();
+        } catch (error) {
+          console.error('Error updating cart:', error);
+          toast.error('Failed to update cart');
         }
-
-        await refreshCart();
-      } catch (error) {
-        console.error('Error updating cart:', error);
-        toast.error('Failed to update cart');
       }
     }
   };
@@ -177,6 +182,11 @@ export function ServiceSelector({
 
   // Fix the type issues in the existing ServiceSelector component
   const handleAddPackageToCart = async (packageItem: any) => {
+    if (!refreshCart || !setCartItemId || !setIsCustomizeOpen || !setSelectedPackage) {
+      handlePackageToggle(packageItem.id);
+      return;
+    }
+    
     try {
       // Get the user session
       const { data: { session } } = await supabase.auth.getSession();
@@ -271,9 +281,17 @@ export function ServiceSelector({
                 </Label>
                 <div className="flex items-center space-x-2">
                   <Badge variant="secondary">{formatPrice(packageItem.price)}</Badge>
-                  <Button size="sm" onClick={() => handleAddPackageToCart(packageItem)}>
-                    Add to Cart
-                  </Button>
+                  {refreshCart ? (
+                    <Button size="sm" onClick={() => handleAddPackageToCart(packageItem)}>
+                      Add to Cart
+                    </Button>
+                  ) : (
+                    <Checkbox
+                      id={`package-${packageItem.id}`}
+                      checked={selectedPackages.includes(packageItem.id)}
+                      onCheckedChange={() => handlePackageToggle(packageItem.id)}
+                    />
+                  )}
                 </div>
               </div>
             ))}

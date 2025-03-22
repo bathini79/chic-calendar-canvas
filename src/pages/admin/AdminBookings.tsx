@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
-import { MapPin, Calendar as CalendarIcon } from "lucide-react";
+import { MapPin, Calendar as CalendarIcon, Plus, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
 import { formatTime, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
@@ -21,6 +22,14 @@ import {
 } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { Appointment } from "./bookings/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { MembershipSale } from "@/components/admin/sales/MembershipSale";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -40,6 +49,7 @@ export default function AdminBookings() {
     date?: Date;
   } | null>(null);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
+  const [isAddSaleOpen, setIsAddSaleOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
@@ -124,6 +134,20 @@ export default function AdminBookings() {
     }
   };
 
+  const openAddAppointmentFromButton = () => {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    
+    const timeString = `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}`;
+    
+    setAppointmentTime(timeString);
+    setAppointmentDate(currentDate);
+    setIsAddAppointmentOpen(true);
+  };
+
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
     setSelectedAppointment(null);
@@ -149,23 +173,44 @@ export default function AdminBookings() {
         <header className="p-4 border-b bg-white flex justify-between items-center">
           <div className="font-bold text-xl">Define Salon</div>
           
-          <div className="flex items-center space-x-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <Select 
-              value={selectedLocationId} 
-              onValueChange={setSelectedLocationId}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select location" />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map(location => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center space-x-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button>
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={openAddAppointmentFromButton}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <span>Add Appointment</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsAddSaleOpen(true)}>
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  <span>Add Sale</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="flex items-center space-x-2">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <Select 
+                value={selectedLocationId} 
+                onValueChange={setSelectedLocationId}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map(location => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </header>
         <StatsPanel stats={stats} />
@@ -230,6 +275,12 @@ export default function AdminBookings() {
             locationId={selectedLocationId}
           />
         )}
+
+        <MembershipSale
+          isOpen={isAddSaleOpen}
+          onClose={() => setIsAddSaleOpen(false)}
+          locationId={selectedLocationId}
+        />
       </div>
     </DndProvider>
   );
