@@ -1,8 +1,10 @@
+
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { enUS } from 'date-fns/locale';
+import { formatPrice } from "@/lib/utils";
 
 interface Appointment {
   id: string;
@@ -79,7 +81,7 @@ const Profile = () => {
     const fetchAppointments = async () => {
       setLoading(true);
       try {
-        const { data: profile } = await supabase.auth.getUser()
+        const { data: profile } = await supabase.auth.getUser();
         const customerId = profile.user?.id;
 
         if (!customerId) {
@@ -185,7 +187,7 @@ const Profile = () => {
                   })}
                 </p>
                 <p>Status: {appointment.status}</p>
-                <p>Total Price: ${appointment.total_price}</p>
+                <p>Total Price: {formatPrice(appointment.total_price)}</p>
                 <AppointmentDisplay appointment={appointment} totalDuration={durationDisplay} />
 
                 <h3 className="text-md font-semibold mt-2">Bookings:</h3>
@@ -197,7 +199,7 @@ const Profile = () => {
                         : `Package: ${booking.package?.name} (${booking.package?.duration} minutes)`}
                     </p>
                     {booking.employee && <p>Employee: {booking.employee.name}</p>}
-                    <p>Price Paid: ${booking.price_paid}</p>
+                    <p>Price Paid: {formatPrice(booking.price_paid)}</p>
                   </div>
                 ))}
               </div>

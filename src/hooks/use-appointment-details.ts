@@ -8,6 +8,11 @@ export function useAppointmentDetails() {
   const [isLoading, setIsLoading] = useState(false);
 
   async function fetchAppointmentDetails(appointmentId: string) {
+    if (!appointmentId) {
+      console.log("No appointment ID provided");
+      return null;
+    }
+    
     try {
       setIsLoading(true);
       
@@ -41,6 +46,11 @@ export function useAppointmentDetails() {
   }
 
   async function updateAppointmentStatus(appointmentId: string, status: AppointmentStatus) {
+    if (!appointmentId) {
+      console.log("No appointment ID provided");
+      return false;
+    }
+    
     try {
       setIsLoading(true);
       

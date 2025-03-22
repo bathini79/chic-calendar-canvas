@@ -219,8 +219,8 @@ export const getMembershipDiscount = (
     
     // Check if service/package is in the applicable list
     const isApplicable = 
-      (serviceId && mem.applicable_services.includes(serviceId)) ||
-      (packageId && mem.applicable_packages.includes(packageId));
+      (serviceId && mem.applicable_services?.includes(serviceId)) ||
+      (packageId && mem.applicable_packages?.includes(packageId));
     
     // Check minimum billing amount if set
     const meetsMinBilling = !mem.min_billing_amount || 
