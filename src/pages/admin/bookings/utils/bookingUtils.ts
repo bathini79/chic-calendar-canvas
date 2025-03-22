@@ -1,5 +1,44 @@
 
-import type { Service, Package } from "../types";
+import { type Service, type Package } from "../types";
+
+export const getTotalPrice = (
+  selectedServices: string[],
+  selectedPackages: string[],
+  services: Service[],
+  packages: Package[],
+  customizedServices: Record<string, string[]> = {}
+) => {
+  let total = 0;
+
+  // Calculate price for individual services
+  selectedServices.forEach((serviceId) => {
+    const service = services?.find((s) => s.id === serviceId);
+    if (service) {
+      total += service.selling_price;
+    }
+  });
+
+  // Calculate price for packages including customizations
+  selectedPackages.forEach((packageId) => {
+    const pkg = packages?.find((p) => p.id === packageId);
+    if (pkg) {
+      // Add base package price
+      total += pkg.price;
+
+      // Add price for additional customized services
+      if (pkg.is_customizable && customizedServices[packageId]) {
+        customizedServices[packageId].forEach((serviceId) => {
+          const service = services?.find((s) => s.id === serviceId);
+          if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+            total += service.selling_price;
+          }
+        });
+      }
+    }
+  });
+
+  return total;
+};
 
 export const getTotalDuration = (
   selectedServices: string[],
@@ -7,41 +46,32 @@ export const getTotalDuration = (
   services: Service[],
   packages: Package[],
   customizedServices: Record<string, string[]> = {}
-): number => {
+) => {
   let totalDuration = 0;
 
-  // Add duration for individual services
-  selectedServices.forEach(serviceId => {
-    const service = services.find(s => s.id === serviceId);
+  // Calculate duration for individual services
+  selectedServices.forEach((serviceId) => {
+    const service = services?.find((s) => s.id === serviceId);
     if (service) {
-      totalDuration += service.duration || 0;
+      totalDuration += service.duration;
     }
   });
 
-  // Add duration for packages
-  selectedPackages.forEach(packageId => {
-    const pkg = packages.find(p => p.id === packageId);
+  // Calculate duration for packages including customizations
+  selectedPackages.forEach((packageId) => {
+    const pkg = packages?.find((p) => p.id === packageId);
     if (pkg) {
-      if (pkg.duration) {
-        // Use package duration directly if defined
-        totalDuration += pkg.duration;
-      } else if (pkg.package_services) {
-        // Calculate total duration from included services
-        pkg.package_services.forEach(ps => {
-          totalDuration += ps.service.duration || 0;
-        });
-      }
+      // Add durations of all included services
+      pkg.package_services?.forEach((ps) => {
+        totalDuration += ps.service.duration;
+      });
 
-      // Add duration for custom services added to the package
-      if (customizedServices[packageId]) {
-        customizedServices[packageId].forEach(serviceId => {
-          // Check if it's not already counted in package_services
-          const isBaseService = pkg.package_services.some(ps => ps.service.id === serviceId);
-          if (!isBaseService) {
-            const service = services.find(s => s.id === serviceId);
-            if (service) {
-              totalDuration += service.duration || 0;
-            }
+      // Add duration for additional customized services
+      if (pkg.is_customizable && customizedServices[packageId]) {
+        customizedServices[packageId].forEach((serviceId) => {
+          const service = services?.find((s) => s.id === serviceId);
+          if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+            totalDuration += service.duration;
           }
         });
       }
@@ -51,143 +81,122 @@ export const getTotalDuration = (
   return totalDuration;
 };
 
-export const calculatePackagePrice = (
-  pkg: Package,
-  customServiceIds: string[] = [],
-  services: Service[]
-): number => {
-  let packagePrice = pkg.price || 0;
-  
-  // Add additional services that aren't part of the base package
-  customServiceIds.forEach(serviceId => {
-    const isBaseService = pkg.package_services?.some(ps => ps.service.id === serviceId);
-    if (!isBaseService) {
-      const service = services.find(s => s.id === serviceId);
-      if (service) {
-        packagePrice += service.selling_price || 0;
-      }
-    }
-  });
-  
-  return packagePrice;
-};
-
-export const getServicePriceInPackage = (
-  serviceId: string,
-  packageId: string,
-  packages: Package[]
-): number => {
-  const pkg = packages.find(p => p.id === packageId);
-  if (!pkg) return 0;
-  
-  const packageService = pkg.package_services?.find(ps => ps.service.id === serviceId);
-  if (!packageService) return 0;
-  
-  return packageService.package_selling_price !== undefined && 
-         packageService.package_selling_price !== null
-    ? packageService.package_selling_price
-    : packageService.service.selling_price || 0;
-};
-
-export const getTotalPrice = (
-  selectedServices: string[],
-  selectedPackages: string[],
-  services: Service[],
-  packages: Package[],
-  customizedServices: Record<string, string[]> = {},
-  discountType: string = 'none',
-  discountValue: number = 0,
-  membershipEligibleServices: string[] = [],
-  membershipEligiblePackages: string[] = []
-): number => {
-  let totalPrice = 0;
-  
-  // Add prices for individual services
-  selectedServices.forEach(serviceId => {
-    const service = services.find(s => s.id === serviceId);
-    if (service) {
-      totalPrice += service.selling_price || 0;
-    }
-  });
-  
-  // Add prices for packages
-  selectedPackages.forEach(packageId => {
-    totalPrice += calculatePackagePrice(
-      packages.find(p => p.id === packageId) as Package,
-      customizedServices[packageId] || [],
-      services
-    );
-  });
-  
-  // Return total if no discount
-  if (discountType === 'none' || discountValue <= 0) {
-    return totalPrice;
-  }
-  
-  // Handling membership discounts with eligible services/packages
-  const hasMembershipRestrictions = 
-    membershipEligibleServices.length > 0 || membershipEligiblePackages.length > 0;
-    
-  if (hasMembershipRestrictions) {
-    // Calculate eligible portion
-    let eligibleAmount = 0;
-    
-    // Add eligible service prices
-    selectedServices.forEach(serviceId => {
-      const service = services.find(s => s.id === serviceId);
-      const isEligible = membershipEligibleServices.includes(serviceId);
-      
-      if (service && isEligible) {
-        eligibleAmount += service.selling_price || 0;
-      }
-    });
-    
-    // Add eligible package prices
-    selectedPackages.forEach(packageId => {
-      const isEligible = membershipEligiblePackages.includes(packageId);
-      
-      if (isEligible) {
-        eligibleAmount += calculatePackagePrice(
-          packages.find(p => p.id === packageId) as Package,
-          customizedServices[packageId] || [],
-          services
-        );
-      }
-    });
-    
-    // Calculate discount on eligible amount only
-    let discountAmount = 0;
-    if (discountType === 'percentage') {
-      discountAmount = (eligibleAmount * discountValue) / 100;
-    } else if (discountType === 'fixed') {
-      discountAmount = Math.min(discountValue, eligibleAmount);
-    }
-    
-    // Subtract discount from total
-    return totalPrice - discountAmount;
-  }
-  
-  // Apply discount to full amount if no restrictions
-  return getFinalPrice(totalPrice, discountType, discountValue);
-};
-
 export const getFinalPrice = (
   totalPrice: number,
-  discountType: string,
+  discountType: 'none' | 'percentage' | 'fixed',
   discountValue: number
-): number => {
-  if (discountType === 'none' || discountValue <= 0) {
-    return totalPrice;
-  }
-  
+) => {
   if (discountType === 'percentage') {
-    const discountAmount = (totalPrice * discountValue) / 100;
-    return totalPrice - discountAmount;
+    return totalPrice * (1 - (discountValue / 100));
   }
-  
-  if (discountType === 'fixed') {
-    return Math.max(0, totalPrice - discountValue);
+  return Math.max(0, totalPrice - (discountType === 'fixed' ? discountValue : 0));
+};
+
+export const getAppointmentStatusColor = (status: string) => {
+  switch (status) {
+    case "confirmed":
+      return "bg-green-100 hover:bg-green-200 border-green-300";
+    case "canceled":
+      return "bg-red-100 hover:bg-red-200 border-red-300";
+    default:
+      return "bg-purple-100 hover:bg-purple-200 border-purple-300";
   }
+};
+
+export const calculatePackagePrice = (
+  pkg: Package,
+  customizedServices: string[],
+  services: Service[]
+) => {
+  if (!pkg || !services) return 0;
   
-  return totalPrice;
+  let total = pkg?.price || 0;
+
+  // Add price for additional customized services
+  if (pkg?.is_customizable && customizedServices?.length > 0) {
+    customizedServices.forEach((serviceId) => {
+      // Find the service in the complete list of services
+      const service = services?.find((s) => s.id === serviceId);
+      
+      // Check if this service is not already in the package
+      const isInPackage = pkg.package_services?.some(ps => ps.service.id === serviceId);
+      
+      if (service && !isInPackage) {
+        total += service.selling_price;
+      }
+    });
+  }
+
+  return total;
+};
+
+// Get the price of a service within a package context
+export const getServicePriceInPackage = (
+  serviceId: string,
+  packageId: string | null,
+  packages: Package[],
+  services: Service[]
+) => {
+  // If there's no package context, return the regular service price
+  if (!packageId) {
+    const service = services?.find(s => s.id === serviceId);
+    return service?.selling_price || 0;
+  }
+
+  // Find the package
+  const pkg = packages?.find(p => p.id === packageId);
+  if (!pkg) {
+    const service = services?.find(s => s.id === serviceId);
+    return service?.selling_price || 0;
+  }
+
+  // Check if the service is part of the package
+  const packageService = pkg.package_services?.find(ps => ps.service.id === serviceId);
+  if (packageService) {
+    // Use package_selling_price if available, otherwise fall back to service's selling_price
+    return packageService.package_selling_price !== undefined && packageService.package_selling_price !== null
+      ? packageService.package_selling_price
+      : packageService.service.selling_price;
+  }
+
+  // If it's a customized service not in the base package
+  const service = services?.find(s => s.id === serviceId);
+  return service?.selling_price || 0;
+};
+
+export const calculatePackageDuration = (
+  pkg: Package,
+  customizedServices: string[],
+  services: Service[]
+) => {
+  if (!pkg || !services) return 0;
+  
+  // Initialize duration with the sum of all package service durations
+  let duration = 0;
+  
+  // Add duration for all package services
+  if (pkg.package_services && pkg.package_services.length > 0) {
+    pkg.package_services.forEach((ps) => {
+      if (ps.service && typeof ps.service.duration === 'number') {
+        duration += ps.service.duration;
+      }
+    });
+  }
+
+  // Add duration for additional customized services
+  if (pkg?.is_customizable && customizedServices?.length > 0) {
+    customizedServices.forEach((serviceId) => {
+      // Find the service in the complete list of services
+      const service = services?.find((s) => s.id === serviceId);
+      
+      // Check if this service is not already in the package
+      const isInPackage = pkg.package_services?.some(ps => ps.service.id === serviceId);
+      
+      if (service && !isInPackage && typeof service.duration === 'number') {
+        duration += service.duration;
+      }
+    });
+  }
+
+  return duration;
 };

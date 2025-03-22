@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Tag, CheckCircle, ShoppingCart, Percent } from "lucide-react";
+import { Search, Tag, CheckCircle, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
@@ -49,45 +49,39 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   const [taxRateValue, setTaxRateValue] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
-  
-  // Add discount controls
-  const [discountType, setDiscountType] = useState<"none" | "percentage" | "fixed">("none");
-  const [discountValue, setDiscountValue] = useState(0);
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [subtotalAfterDiscount, setSubtotalAfterDiscount] = useState(0);
 
   useEffect(() => {
     fetchMemberships();
     fetchTaxRates();
   }, [locationId]);
-
+  
+  useEffect(() => {
+    if (taxRates.length > 0) {
+      // Find default tax rate
+      const defaultTax = taxRates.find(tax => tax.is_default);
+      if (defaultTax) {
+        setSelectedTaxRate(defaultTax.id);
+        setTaxRateValue(defaultTax.percentage);
+      } else if (taxRates[0]) {
+        setSelectedTaxRate(taxRates[0].id);
+        setTaxRateValue(taxRates[0].percentage);
+      }
+    }
+  }, [taxRates]);
+  
   useEffect(() => {
     if (selectedMembership) {
       calculateTotals();
     }
-  }, [selectedMembership, taxRateValue, discountType, discountValue]);
+  }, [selectedMembership, taxRateValue]);
   
   const calculateTotals = () => {
     if (!selectedMembership) return;
     
     const subTotal = selectedMembership.discount_value;
-    
-    // Calculate discount
-    let discountAmt = 0;
-    if (discountType === "percentage") {
-      discountAmt = (subTotal * discountValue) / 100;
-    } else if (discountType === "fixed") {
-      discountAmt = Math.min(discountValue, subTotal);
-    }
-    
-    setDiscountAmount(discountAmt);
-    const afterDiscount = subTotal - discountAmt;
-    setSubtotalAfterDiscount(afterDiscount);
-    
-    // Calculate tax
-    const tax = (afterDiscount * taxRateValue) / 100;
+    const tax = (subTotal * taxRateValue) / 100;
     setTaxAmount(tax);
-    setTotalAmount(afterDiscount + tax);
+    setTotalAmount(subTotal + tax);
   };
 
   const fetchMemberships = async () => {
@@ -253,15 +247,10 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   };
   
   const handleTaxRateChange = (taxId: string) => {
-    if (taxId === "none") {
-      setSelectedTaxRate(null);
-      setTaxRateValue(0);
-    } else {
-      setSelectedTaxRate(taxId);
-      const tax = taxRates.find(t => t.id === taxId);
-      if (tax) {
-        setTaxRateValue(tax.percentage);
-      }
+    setSelectedTaxRate(taxId);
+    const tax = taxRates.find(t => t.id === taxId);
+    if (tax) {
+      setTaxRateValue(tax.percentage);
     }
   };
   
@@ -277,11 +266,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     setReceiptNumber("");
     setPaymentMethod("cash");
     setSearchTerm("");
-    setDiscountType("none");
-    setDiscountValue(0);
-    setDiscountAmount(0);
-    setSelectedTaxRate(null);
-    setTaxRateValue(0);
   };
   
   const filteredMemberships = memberships.filter(membership => 
@@ -396,57 +380,14 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
                         <span>{formatPrice(selectedMembership.discount_value)}</span>
                       </div>
                       
-                      {/* Discount section */}
-                      <div className="flex justify-between items-center space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-muted-foreground">Discount</span>
-                          <Select value={discountType} onValueChange={(value) => setDiscountType(value as "none" | "percentage" | "fixed")}>
-                            <SelectTrigger className="w-[120px] h-8">
-                              <SelectValue placeholder="None" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
-                              <SelectItem value="percentage">Percentage</SelectItem>
-                              <SelectItem value="fixed">Fixed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {discountType !== "none" && (
-                          <div className="flex items-center gap-1">
-                            <Input 
-                              className="w-20 h-8"
-                              type="number"
-                              value={discountValue}
-                              onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
-                            />
-                            {discountType === "percentage" && <span>%</span>}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {discountAmount > 0 && (
-                        <div className="flex justify-between text-sm text-green-600">
-                          <span className="text-muted-foreground">Discount Amount</span>
-                          <span>-{formatPrice(discountAmount)}</span>
-                        </div>
-                      )}
-                      
-                      {discountAmount > 0 && (
-                        <div className="flex justify-between text-sm font-medium pt-1 border-t">
-                          <span>Subtotal after discount</span>
-                          <span>{formatPrice(subtotalAfterDiscount)}</span>
-                        </div>
-                      )}
-                      
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-muted-foreground">Tax</span>
-                          <Select value={selectedTaxRate || "none"} onValueChange={handleTaxRateChange}>
+                          <Select value={selectedTaxRate || undefined} onValueChange={handleTaxRateChange}>
                             <SelectTrigger className="w-[180px] h-8">
-                              <SelectValue placeholder="No Tax" />
+                              <SelectValue placeholder="Select tax rate" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="none">No Tax</SelectItem>
                               {taxRates.map((tax) => (
                                 <SelectItem key={tax.id} value={tax.id}>
                                   {tax.name} ({tax.percentage}%)
@@ -492,14 +433,14 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
               </>
             ) : (
               <div className="p-6 flex flex-col items-center justify-center h-full">
-                <div className="w-full max-w-md rounded-lg p-6 shadow-sm border text-center bg-background">
+                <div className="w-full max-w-md bg-white rounded-lg p-6 shadow-sm border text-center">
                   <div className="mb-4 flex justify-center">
                     <CheckCircle className="h-16 w-16 text-green-500" />
                   </div>
                   <h3 className="text-xl font-semibold mb-2">Sale Complete!</h3>
                   <p className="text-muted-foreground mb-6">The membership has been successfully sold and added to the customer's account.</p>
                   
-                  <div className="space-y-3 text-left mb-6 p-4 bg-muted/50 rounded-md">
+                  <div className="space-y-3 text-left mb-6">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Receipt Number:</span>
                       <span className="font-medium">{receiptNumber}</span>

@@ -18,8 +18,7 @@ import {
   User,
   Plus,
   ArrowLeft,
-  Trash2,
-  Sparkles
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Service, Package, Customer } from "../types";
@@ -32,7 +31,6 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 import { 
@@ -72,10 +70,6 @@ interface CheckoutSectionProps {
   isExistingAppointment?: boolean;
   customizedServices?: Record<string, string[]>;
   locationId?: string;
-  membershipId?: string;
-  hasMembershipDiscount?: boolean;
-  membershipEligibleServices?: string[];
-  membershipEligiblePackages?: string[];
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -102,11 +96,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onBackToServices,
   isExistingAppointment,
   customizedServices = {},
-  locationId,
-  membershipId,
-  hasMembershipDiscount = false,
-  membershipEligibleServices = [],
-  membershipEligiblePackages = []
+  locationId
 }) => {
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -268,23 +258,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  // Calculate if an item is eligible for membership benefits
-  const isItemEligibleForMembership = (itemId: string, itemType: 'service' | 'package') => {
-    if (!hasMembershipDiscount) return false;
-    
-    // If membership applies to all items (no specific services/packages listed)
-    if (membershipEligibleServices.length === 0 && membershipEligiblePackages.length === 0) {
-      return true;
-    }
-    
-    // Check specific eligibility
-    if (itemType === 'service') {
-      return membershipEligibleServices.includes(itemId);
-    } else {
-      return membershipEligiblePackages.includes(itemId);
-    }
-  };
-
   const taxAmount = useMemo(() => {
     const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
     const afterAllDiscounts = couponDiscount > 0 
@@ -324,7 +297,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         stylistName: getStylistName(selectedStylists[id]),
         time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
         formattedDuration: formatDuration(service.duration),
-        isMembershipEligible: isItemEligibleForMembership(id, 'service')
       } : null;
     }).filter(Boolean);
 
@@ -333,7 +305,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       if (!pkg) return [];
       
       const packageTotalPrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
-      const isMembershipEligible = isItemEligibleForMembership(packageId, 'package');
       
       const packageItem = {
         id: packageId,
@@ -346,7 +317,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         stylistName: getStylistName(selectedStylists[packageId]),
         time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''],
         formattedDuration: formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices)),
-        isMembershipEligible,
         services: [] as Array<{
           id: string;
           name: string;
@@ -413,10 +383,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     selectedTimeSlots, 
     appointmentId, 
     customizedServices,
-    employees,
-    hasMembershipDiscount,
-    membershipEligibleServices,
-    membershipEligiblePackages
+    employees
   ]);
 
   const handlePayment = async () => {
@@ -431,8 +398,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         taxAmount,
         couponId: selectedCouponId,
         couponDiscount,
-        total,
-        membershipId
+        total
       });
       
       // Pass the summary data with values already calculated
@@ -442,8 +408,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         taxAmount: taxAmount,
         couponId: selectedCouponId,
         couponDiscount: couponDiscount,
-        total: total,
-        membershipId: membershipId
+        total: total
       };
       
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
@@ -501,15 +466,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="space-y-1">
-                          <div className="flex items-center">
-                            <p className="text-lg font-semibold tracking-tight">{item.name}</p>
-                            {item.isMembershipEligible && hasMembershipDiscount && (
-                              <Badge variant="outline" className="ml-2 text-xs flex items-center gap-1 border-green-500 text-green-600">
-                                <Sparkles className="h-3 w-3" />
-                                <span>Membership</span>
-                              </Badge>
-                            )}
-                          </div>
+                          <p className="text-lg font-semibold tracking-tight">{item.name}</p>
                           <div className="flex flex-wrap text-sm text-muted-foreground gap-2">
                             <div className="flex items-center">
                               <Clock className="mr-1 h-4 w-4" />
@@ -551,35 +508,45 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           </Button>
                         </div>
                       </div>
-                      
+
                       {item.type === "package" && item.services && item.services.length > 0 && (
-                        <div className="ml-4 mt-2 pl-2 border-l border-gray-200">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">
-                            Services Included:
-                          </p>
-                          <div className="space-y-1">
-                            {item.services.map((service, index) => (
-                              <div 
-                                key={`${service.id}-${index}`}
-                                className="flex justify-between items-center text-sm"
-                              >
-                                <div className="flex items-center">
-                                  <span className="text-gray-700">• {service.name}</span>
+                        <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
+                          {item.services.map(service => (
+                            <div key={service.id} className="flex items-center justify-between py-1">
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">
+                                  {service.name}
                                   {service.isCustomized && (
-                                    <Badge 
-                                      variant="outline" 
-                                      className="ml-2 px-1 py-0 h-4 text-[10px]"
-                                    >
+                                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
                                       Added
-                                    </Badge>
+                                    </span>
+                                  )}
+                                </p>
+                                <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
+                                  <span>{formatDuration(service.duration)}</span>
+                                  {service.stylistName && (
+                                    <div className="flex items-center">
+                                      <User className="mr-1 h-3 w-3" />
+                                      {service.stylistName}
+                                    </div>
                                   )}
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  {service.stylistName || 'Any stylist'}
-                                </div>
                               </div>
-                            ))}
-                          </div>
+                              <p className="text-sm">
+                                <IndianRupee className="inline h-3 w-3" />
+                                {service.price}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {item.type === "service" && (
+                        <div className="flex justify-end">
+                          <p className="font-semibold text-lg">
+                            <IndianRupee className="inline h-4 w-4" />
+                            {item.price}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -588,168 +555,172 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               </div>
             )}
 
-            <div className="border-t pt-4 space-y-4 mt-auto">
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>{formatPrice(subtotal)}</span>
-                </div>
-                
-                {hasMembershipDiscount && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span className="flex items-center gap-1">
-                      <Sparkles className="h-3 w-3" />
-                      <span>Membership Discount</span>
-                    </span>
-                    <span>-{formatPrice(discountAmount)}</span>
-                  </div>
-                )}
-                
-                {!hasMembershipDiscount && (
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">Discount</span>
-                      <Select 
-                        value={discountType} 
-                        onValueChange={(value) => onDiscountTypeChange(value as 'none' | 'percentage' | 'fixed')}
-                      >
-                        <SelectTrigger className="w-28 h-8">
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="percentage">Percentage</SelectItem>
-                          <SelectItem value="fixed">Fixed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {discountType !== 'none' && (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          value={discountValue}
-                          onChange={(e) => onDiscountValueChange(parseFloat(e.target.value) || 0)}
-                          className="w-16 h-8"
-                        />
-                        {discountType === 'percentage' && <Percent className="h-3 w-3" />}
-                      </div>
-                    )}
-                    {discountAmount > 0 && discountType !== 'none' && (
-                      <span className="text-sm">-{formatPrice(discountAmount)}</span>
-                    )}
-                  </div>
-                )}
-                
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Coupon</span>
-                    <Select
-                      value={selectedCouponId || "none"}
-                      onValueChange={handleCouponChange}
-                      disabled={isLoadingCoupons}
-                    >
-                      <SelectTrigger className="w-[140px] h-8">
-                        <SelectValue placeholder="Select coupon" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {availableCoupons.map((coupon) => (
-                          <SelectItem key={coupon.id} value={coupon.id}>
-                            {coupon.code}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {couponDiscount > 0 && (
-                    <span className="text-sm">-{formatPrice(couponDiscount)}</span>
-                  )}
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Tax</span>
-                    <Select
-                      value={appliedTaxId || "none"}
-                      onValueChange={handleTaxChange}
-                      disabled={taxRatesLoading}
-                    >
-                      <SelectTrigger className="w-[140px] h-8">
-                        <SelectValue placeholder="No tax" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No tax</SelectItem>
-                        {taxRates.map((tax) => (
-                          <SelectItem key={tax.id} value={tax.id}>
-                            {tax.name} ({tax.percentage}%)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {taxAmount > 0 && (
-                    <span className="text-sm">{formatPrice(taxAmount)}</span>
-                  )}
-                </div>
-                
-                <Separator className="my-2" />
-                
-                <div className="flex justify-between font-medium text-lg">
-                  <span>Total</span>
-                  <span>{formatPrice(total)}</span>
-                </div>
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>₹{subtotal}</span>
               </div>
               
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Payment Method</label>
-                  <Select
-                    value={paymentMethod}
-                    onValueChange={(value) => onPaymentMethodChange(value as 'cash' | 'online')}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment method" />
+              <div className="flex justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Tax</span>
+                  <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
+                    <SelectTrigger className="h-7 w-[120px]">
+                      <SelectValue placeholder="No Tax" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="card">Card</SelectItem>
-                      <SelectItem value="online">Online</SelectItem>
+                      <SelectItem value="none">No Tax</SelectItem>
+                      {taxRates.map(tax => (
+                        <SelectItem key={tax.id} value={tax.id}>
+                          {tax.name} ({tax.percentage}%)
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Notes</label>
-                  <Textarea
-                    placeholder="Add notes about this appointment"
-                    value={notes}
-                    onChange={(e) => onNotesChange(e.target.value)}
-                    className="resize-none"
-                    rows={3}
-                  />
-                </div>
-                
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={onBackToServices}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    className="flex-1 bg-black text-white"
-                    onClick={handlePayment}
-                    disabled={selectedItems.length === 0}
-                  >
-                    Pay Now
-                  </Button>
-                </div>
+                <span>₹{taxAmount.toFixed(2)}</span>
               </div>
+              
+              <div className="flex justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Coupon</span>
+                  <Select value={selectedCouponId || "none"} onValueChange={handleCouponChange} disabled={isLoadingCoupons}>
+                    <SelectTrigger className="h-7 w-[120px]">
+                      <SelectValue placeholder="No Coupon" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Coupon</SelectItem>
+                      {availableCoupons.map(coupon => (
+                        <SelectItem key={coupon.id} value={coupon.id}>
+                          {coupon.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <span>{selectedCoupon ? `-₹${couponDiscount.toFixed(2)}` : "₹0.00"}</span>
+              </div>
+              
+              {selectedCoupon && (
+                <div className="flex justify-between text-xs text-green-600 -mt-2 ml-16">
+                  <span>
+                    {selectedCoupon.discount_type === 'percentage' 
+                      ? `${selectedCoupon.discount_value}% off` 
+                      : `Fixed ₹${selectedCoupon.discount_value} off`}
+                  </span>
+                </div>
+              )}
+
+              {discountType !== "none" && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span className="flex items-center">
+                    <Percent className="mr-2 h-4 w-4" />
+                    Discount
+                    {discountType === "percentage" && ` (${discountValue}%)`}
+                  </span>
+                  <span>-₹{discountAmount - couponDiscount}</span>
+                </div>
+              )}
+              
+              <div className="flex justify-between text-lg font-bold pt-2">
+                <span>Total</span>
+                <span>₹{total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-6 space-y-4 mt-auto">
+            <div>
+              <h4 className="text-sm font-medium mb-2">Payment Method</h4>
+              <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentMethodsLoading ? (
+                    <SelectItem value="loading">Loading...</SelectItem>
+                  ) : paymentMethods.length > 0 ? (
+                    paymentMethods.map(method => (
+                      <SelectItem key={method.id} value={method.name}>
+                        {method.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2">
+              <Button 
+                className="flex-1" 
+                size="lg"
+                onClick={handlePayment}
+                disabled={selectedItems.length === 0}
+              >
+                Complete Payment
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="lg">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Discount</h3>
+                    <div className="flex gap-4">
+                      <Select
+                        value={discountType}
+                        onValueChange={onDiscountTypeChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Discount type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Discount</SelectItem>
+                          <SelectItem value="percentage">Percentage</SelectItem>
+                          <SelectItem value="fixed">Fixed Amount</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {discountType !== "none" && (
+                        <Input
+                          type="number"
+                          placeholder={
+                            discountType === "percentage"
+                              ? "Enter %"
+                              : "Enter amount"
+                          }
+                          value={discountValue}
+                          onChange={(e) =>
+                            onDiscountValueChange(Number(e.target.value))
+                          }
+                          className="w-24"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Notes</h3>
+                      <Textarea
+                        placeholder="Add appointment notes..."
+                        value={notes}
+                        onChange={(e) => onNotesChange(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </CardContent>
       </Card>
     </div>
   );
-};
+}
