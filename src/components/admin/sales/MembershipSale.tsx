@@ -63,7 +63,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({ open, onClose })
       const total = subtotal + taxAmount;
       
       // Record the membership sale in the database
-      const { data, error } = await supabase
+      const { error: membershipError } = await supabase
         .from('customer_memberships')
         .insert([
           {
@@ -77,7 +77,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({ open, onClose })
           }
         ]);
         
-      if (error) throw error;
+      if (membershipError) throw membershipError;
       
       // Record the sale transaction
       const { error: transactionError } = await supabase

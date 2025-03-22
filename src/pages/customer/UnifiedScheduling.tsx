@@ -36,7 +36,7 @@ export default function UnifiedScheduling() {
                 selectedPackages={selectedPackages}
                 onServicesChange={setSelectedServices}
                 onPackagesChange={setSelectedPackages}
-                locationId={selectedLocation}
+                locationId={selectedLocation || ""}
                 refreshCart={asyncRefreshCart}
                 cartItemId={cartItemId}
                 setCartItemId={setCartItemId}
