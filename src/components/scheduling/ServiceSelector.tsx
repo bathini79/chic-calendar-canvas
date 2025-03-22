@@ -45,7 +45,6 @@ interface ServiceSelectorProps {
   setSelectedPackage: (pkg: any | null) => void;
   isCustomizeOpen: boolean;
   setIsCustomizeOpen: (open: boolean) => void;
-  locationId?: string;
 }
 
 export function ServiceSelector({
@@ -59,8 +58,7 @@ export function ServiceSelector({
   selectedPackage,
   setSelectedPackage,
   isCustomizeOpen,
-  setIsCustomizeOpen,
-  locationId
+  setIsCustomizeOpen
 }: ServiceSelectorProps) {
   const [services, setServices] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
@@ -69,32 +67,15 @@ export function ServiceSelector({
   useEffect(() => {
     fetchServices();
     fetchPackages();
-  }, [locationId]);
+  }, []);
 
   const fetchServices = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('services')
         .select('*')
         .eq('status', 'active')
         .order('name', { ascending: true });
-
-      // If locationId is provided, filter by location
-      if (locationId) {
-        const { data: serviceLocations, error: locError } = await supabase
-          .from('service_locations')
-          .select('service_id')
-          .eq('location_id', locationId);
-
-        if (locError) throw locError;
-        
-        if (serviceLocations && serviceLocations.length > 0) {
-          const serviceIds = serviceLocations.map(sl => sl.service_id);
-          query = query.in('id', serviceIds);
-        }
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       setServices(data || []);
@@ -107,28 +88,11 @@ export function ServiceSelector({
 
   const fetchPackages = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('packages')
         .select('*, package_services!inner(*, service:services(*))')
         .eq('status', 'active')
         .order('name', { ascending: true });
-
-      // If locationId is provided, filter by location
-      if (locationId) {
-        const { data: packageLocations, error: locError } = await supabase
-          .from('package_locations')
-          .select('package_id')
-          .eq('location_id', locationId);
-
-        if (locError) throw locError;
-        
-        if (packageLocations && packageLocations.length > 0) {
-          const packageIds = packageLocations.map(pl => pl.package_id);
-          query = query.in('id', packageIds);
-        }
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       setPackages(data || []);

@@ -411,57 +411,6 @@ export type Database = {
         }
         Relationships: []
       }
-      customer_memberships: {
-        Row: {
-          amount_paid: number
-          created_at: string
-          customer_id: string
-          end_date: string
-          id: string
-          membership_id: string
-          start_date: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          amount_paid: number
-          created_at?: string
-          customer_id: string
-          end_date: string
-          id?: string
-          membership_id: string
-          start_date: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          amount_paid?: number
-          created_at?: string
-          customer_id?: string
-          end_date?: string
-          id?: string
-          membership_id?: string
-          start_date?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_memberships_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "customer_memberships_membership_id_fkey"
-            columns: ["membership_id"]
-            isOneToOne: false
-            referencedRelation: "memberships"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       dashboard_configs: {
         Row: {
           created_at: string
@@ -1154,83 +1103,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      membership_sales: {
-        Row: {
-          amount: number
-          created_at: string
-          customer_id: string
-          id: string
-          location_id: string
-          membership_id: string
-          payment_method: string
-          sale_date: string
-          status: string
-          tax_amount: number | null
-          tax_rate_id: string | null
-          total_amount: number
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          customer_id: string
-          id?: string
-          location_id: string
-          membership_id: string
-          payment_method: string
-          sale_date?: string
-          status?: string
-          tax_amount?: number | null
-          tax_rate_id?: string | null
-          total_amount: number
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          customer_id?: string
-          id?: string
-          location_id?: string
-          membership_id?: string
-          payment_method?: string
-          sale_date?: string
-          status?: string
-          tax_amount?: number | null
-          tax_rate_id?: string | null
-          total_amount?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "membership_sales_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "membership_sales_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "membership_sales_membership_id_fkey"
-            columns: ["membership_id"]
-            isOneToOne: false
-            referencedRelation: "memberships"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "membership_sales_tax_rate_id_fkey"
-            columns: ["tax_rate_id"]
-            isOneToOne: false
-            referencedRelation: "tax_rates"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       memberships: {
         Row: {
@@ -2043,53 +1915,6 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      transactions: {
-        Row: {
-          amount: number
-          created_at: string
-          customer_id: string
-          id: string
-          item_id: string | null
-          item_type: string | null
-          payment_method: string
-          tax_amount: number | null
-          transaction_type: string
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          customer_id: string
-          id?: string
-          item_id?: string | null
-          item_type?: string | null
-          payment_method?: string
-          tax_amount?: number | null
-          transaction_type: string
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          customer_id?: string
-          id?: string
-          item_id?: string | null
-          item_type?: string | null
-          payment_method?: string
-          tax_amount?: number | null
-          transaction_type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "transactions_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
