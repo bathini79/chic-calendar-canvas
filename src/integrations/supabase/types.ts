@@ -1155,6 +1155,83 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_sales: {
+        Row: {
+          amount: number
+          created_at: string
+          customer_id: string
+          id: string
+          location_id: string
+          membership_id: string
+          payment_method: string
+          sale_date: string
+          status: string
+          tax_amount: number | null
+          tax_rate_id: string | null
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          customer_id: string
+          id?: string
+          location_id: string
+          membership_id: string
+          payment_method: string
+          sale_date?: string
+          status?: string
+          tax_amount?: number | null
+          tax_rate_id?: string | null
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          customer_id?: string
+          id?: string
+          location_id?: string
+          membership_id?: string
+          payment_method?: string
+          sale_date?: string
+          status?: string
+          tax_amount?: number | null
+          tax_rate_id?: string | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_sales_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_sales_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_sales_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_sales_tax_rate_id_fkey"
+            columns: ["tax_rate_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           applicable_packages: string[] | null
