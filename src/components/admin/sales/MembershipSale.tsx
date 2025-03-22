@@ -20,6 +20,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { SummaryView } from "@/pages/admin/bookings/components/SummaryView";
 
 interface MembershipSaleProps {
   isOpen: boolean;
@@ -43,11 +44,14 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   const [saleComplete, setSaleComplete] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState<string>("");
   const [activeTab, setActiveTab] = useState("memberships");
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [discountValue, setDiscountValue] = useState<number>(0);
   
   const { taxRates, fetchTaxRates } = useTaxRates();
   const [selectedTaxRate, setSelectedTaxRate] = useState<string | null>(null);
   const [taxRateValue, setTaxRateValue] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
+  const [subtotal, setSubtotal] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
 
   useEffect(() => {
@@ -73,15 +77,27 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     if (selectedMembership) {
       calculateTotals();
     }
-  }, [selectedMembership, taxRateValue]);
+  }, [selectedMembership, taxRateValue, discountType, discountValue]);
   
   const calculateTotals = () => {
     if (!selectedMembership) return;
     
-    const subTotal = selectedMembership.discount_value;
-    const tax = (subTotal * taxRateValue) / 100;
+    const originalSubtotal = selectedMembership.discount_value;
+    
+    // Apply discount if set
+    let discountedSubtotal = originalSubtotal;
+    if (discountType === 'percentage') {
+      discountedSubtotal = originalSubtotal * (1 - (discountValue / 100));
+    } else if (discountType === 'fixed') {
+      discountedSubtotal = Math.max(0, originalSubtotal - discountValue);
+    }
+    
+    setSubtotal(discountedSubtotal);
+    
+    // Calculate tax
+    const tax = (discountedSubtotal * taxRateValue) / 100;
     setTaxAmount(tax);
-    setTotalAmount(subTotal + tax);
+    setTotalAmount(discountedSubtotal + tax);
   };
 
   const fetchMemberships = async () => {
@@ -194,7 +210,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         .insert({
           customer_id: selectedCustomer.id,
           membership_id: selectedMembership.id,
-          amount: selectedMembership.discount_value,
+          amount: subtotal, // Use the discounted subtotal
           tax_amount: taxAmount,
           total_amount: totalAmount,
           payment_method: paymentMethod,
@@ -247,6 +263,12 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   };
   
   const handleTaxRateChange = (taxId: string) => {
+    if (taxId === "none") {
+      setSelectedTaxRate(null);
+      setTaxRateValue(0);
+      return;
+    }
+    
     setSelectedTaxRate(taxId);
     const tax = taxRates.find(t => t.id === taxId);
     if (tax) {
@@ -256,6 +278,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   
   const handleSelectMembership = (membership: Membership) => {
     setSelectedMembership(membership);
+    setSubtotal(membership.discount_value);
   };
   
   const handleReset = () => {
@@ -266,12 +289,42 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     setReceiptNumber("");
     setPaymentMethod("cash");
     setSearchTerm("");
+    setDiscountType('none');
+    setDiscountValue(0);
   };
   
   const filteredMemberships = memberships.filter(membership => 
     membership.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (membership.description && membership.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  if (saleComplete && selectedMembership && selectedCustomer) {
+    return (
+      <div
+        className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <SummaryView
+          isOpen={saleComplete}
+          onClose={onClose}
+          customer={selectedCustomer}
+          totalPrice={totalAmount}
+          items={[{
+            id: selectedMembership.id,
+            name: selectedMembership.name,
+            price: subtotal,
+            type: "membership"
+          }]}
+          paymentMethod={paymentMethod}
+          onAddAnother={handleReset}
+          receiptNumber={receiptNumber}
+          taxAmount={taxAmount}
+          subTotal={subtotal}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -302,175 +355,161 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
           </div>
 
           <div className="w-[70%] flex flex-col h-full">
-            {!saleComplete ? (
-              <>
-                <div className="p-6 border-b">
-                  <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="memberships" className="flex items-center gap-1">
-                        <Tag size={16} />
-                        <span>Memberships</span>
-                      </TabsTrigger>
-                    </TabsList>
-                    
-                    <div className="mb-4">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                        <Input 
-                          placeholder="Search memberships..." 
-                          className="pl-10"
-                          value={searchTerm}
-                          onChange={e => setSearchTerm(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    
-                    <TabsContent value="memberships" className="m-0">
-                      <ScrollArea className="h-[300px]">
-                        <div className="space-y-3">
-                          {isLoading ? (
-                            <p>Loading memberships...</p>
-                          ) : filteredMemberships.length === 0 ? (
-                            <p>No memberships found</p>
-                          ) : (
-                            filteredMemberships.map((membership) => (
-                              <div
-                                key={membership.id}
-                                onClick={() => handleSelectMembership(membership)}
-                                className={`p-4 border rounded-md cursor-pointer transition-colors ${
-                                  selectedMembership?.id === membership.id
-                                    ? "border-primary bg-primary/5"
-                                    : "hover:bg-gray-50"
-                                }`}
-                              >
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <h3 className="font-medium">{membership.name}</h3>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                      {membership.description || 'No description'}
-                                    </p>
-                                    <p className="text-sm mt-2">
-                                      <span className="text-muted-foreground">Valid for: </span>
-                                      {membership.validity_period} {membership.validity_unit}
-                                    </p>
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                      <Badge variant="outline">
-                                        {membership.discount_type === 'percentage' ? `${membership.discount_value}% off` : formatPrice(membership.discount_value)}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                  <div className="text-lg font-semibold">
-                                    {formatPrice(membership.discount_value)}
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </TabsContent>
-                  </Tabs>
+            <div className="p-6 border-b">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="mb-4">
+                  <TabsTrigger value="memberships" className="flex items-center gap-1">
+                    <Tag size={16} />
+                    <span>Memberships</span>
+                  </TabsTrigger>
+                </TabsList>
+                
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                    <Input 
+                      placeholder="Search memberships..." 
+                      className="pl-10"
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                    />
+                  </div>
                 </div>
                 
-                {selectedMembership && (
-                  <div className="p-6 mt-auto border-t">
-                    <div className="space-y-2 mb-4">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Subtotal</span>
-                        <span>{formatPrice(selectedMembership.discount_value)}</span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-muted-foreground">Tax</span>
-                          <Select value={selectedTaxRate || undefined} onValueChange={handleTaxRateChange}>
-                            <SelectTrigger className="w-[180px] h-8">
-                              <SelectValue placeholder="Select tax rate" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {taxRates.map((tax) => (
-                                <SelectItem key={tax.id} value={tax.id}>
-                                  {tax.name} ({tax.percentage}%)
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <span className="text-sm">{formatPrice(taxAmount)}</span>
-                      </div>
-                      
-                      <div className="flex justify-between font-medium pt-2 border-t">
-                        <span>Total</span>
-                        <span>{formatPrice(totalAmount)}</span>
-                      </div>
+                <TabsContent value="memberships" className="m-0">
+                  <ScrollArea className="h-[300px]">
+                    <div className="space-y-3">
+                      {isLoading ? (
+                        <p>Loading memberships...</p>
+                      ) : filteredMemberships.length === 0 ? (
+                        <p>No memberships found</p>
+                      ) : (
+                        filteredMemberships.map((membership) => (
+                          <div
+                            key={membership.id}
+                            onClick={() => handleSelectMembership(membership)}
+                            className={`p-4 border rounded-md cursor-pointer transition-colors ${
+                              selectedMembership?.id === membership.id
+                                ? "border-primary bg-primary/5"
+                                : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="font-medium">{membership.name}</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {membership.description || 'No description'}
+                                </p>
+                                <p className="text-sm mt-2">
+                                  <span className="text-muted-foreground">Valid for: </span>
+                                  {membership.validity_period} {membership.validity_unit}
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  <Badge variant="outline">
+                                    {membership.discount_type === 'percentage' ? `${membership.discount_value}% off` : formatPrice(membership.discount_value)}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="text-lg font-semibold">
+                                {formatPrice(membership.discount_value)}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Payment Method</label>
-                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select payment method" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cash">Cash</SelectItem>
-                            <SelectItem value="card">Card</SelectItem>
-                            <SelectItem value="online">Online</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <Button 
-                        className="w-full" 
-                        onClick={handleComplete}
-                        disabled={!selectedCustomer || !selectedMembership || isProcessing}
-                      >
-                        {isProcessing ? "Processing..." : "Pay Now"}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="p-6 flex flex-col items-center justify-center h-full">
-                <div className="w-full max-w-md bg-white rounded-lg p-6 shadow-sm border text-center">
-                  <div className="mb-4 flex justify-center">
-                    <CheckCircle className="h-16 w-16 text-green-500" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">Sale Complete!</h3>
-                  <p className="text-muted-foreground mb-6">The membership has been successfully sold and added to the customer's account.</p>
-                  
-                  <div className="space-y-3 text-left mb-6">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Receipt Number:</span>
-                      <span className="font-medium">{receiptNumber}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Customer:</span>
-                      <span className="font-medium">{selectedCustomer?.full_name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Membership:</span>
-                      <span className="font-medium">{selectedMembership?.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Amount:</span>
-                      <span className="font-medium">{formatPrice(totalAmount)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Payment Method:</span>
-                      <span className="font-medium capitalize">{paymentMethod}</span>
-                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+            </div>
+            
+            {selectedMembership && (
+              <div className="p-6 mt-auto border-t">
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{formatPrice(selectedMembership.discount_value)}</span>
                   </div>
                   
-                  <div className="flex flex-col gap-2 mt-4">
-                    <Button onClick={handleReset}>
-                      Create New Sale
-                    </Button>
-                    <Button variant="outline" onClick={onClose}>
-                      Close
-                    </Button>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Discount</span>
+                      <Select value={discountType} onValueChange={(v) => setDiscountType(v as 'none' | 'percentage' | 'fixed')}>
+                        <SelectTrigger className="w-[110px] h-8">
+                          <SelectValue placeholder="Discount" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="percentage">Percentage</SelectItem>
+                          <SelectItem value="fixed">Fixed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {discountType !== 'none' && (
+                        <Input
+                          type="number"
+                          value={discountValue}
+                          onChange={(e) => setDiscountValue(Number(e.target.value))}
+                          className="w-20 h-8"
+                          min={0}
+                          max={discountType === 'percentage' ? 100 : undefined}
+                        />
+                      )}
+                    </div>
+                    {discountType !== 'none' && (
+                      <span className="text-sm text-green-600">
+                        -{formatPrice(selectedMembership.discount_value - subtotal)}
+                      </span>
+                    )}
                   </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Tax</span>
+                      <Select value={selectedTaxRate || "none"} onValueChange={handleTaxRateChange}>
+                        <SelectTrigger className="w-[180px] h-8">
+                          <SelectValue placeholder="No tax" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No tax</SelectItem>
+                          {taxRates.map((tax) => (
+                            <SelectItem key={tax.id} value={tax.id}>
+                              {tax.name} ({tax.percentage}%)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <span className="text-sm">{formatPrice(taxAmount)}</span>
+                  </div>
+                  
+                  <div className="flex justify-between font-medium pt-2 border-t">
+                    <span>Total</span>
+                    <span>{formatPrice(totalAmount)}</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Payment Method</label>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="card">Card</SelectItem>
+                        <SelectItem value="online">Online</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <Button 
+                    className="w-full" 
+                    onClick={handleComplete}
+                    disabled={!selectedCustomer || !selectedMembership || isProcessing}
+                  >
+                    {isProcessing ? "Processing..." : "Pay Now"}
+                  </Button>
                 </div>
               </div>
             )}

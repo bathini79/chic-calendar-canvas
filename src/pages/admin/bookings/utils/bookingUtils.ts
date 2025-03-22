@@ -200,3 +200,71 @@ export const calculatePackageDuration = (
 
   return duration;
 };
+
+// Calculate the best membership discount for a service or package
+export const getMembershipDiscount = (
+  serviceId: string | null,
+  packageId: string | null,
+  amount: number,
+  memberships: any[] | null
+) => {
+  if (!memberships || memberships.length === 0 || (!serviceId && !packageId) || amount <= 0) {
+    return null;
+  }
+
+  // Find all applicable memberships for this service or package
+  const applicableMemberships = memberships.filter(membership => {
+    const mem = membership.membership;
+    if (!mem) return false;
+    
+    // Check if service/package is in the applicable list
+    const isApplicable = 
+      (serviceId && mem.applicable_services.includes(serviceId)) ||
+      (packageId && mem.applicable_packages.includes(packageId));
+    
+    // Check minimum billing amount if set
+    const meetsMinBilling = !mem.min_billing_amount || 
+      amount >= mem.min_billing_amount;
+      
+    return isApplicable && meetsMinBilling;
+  });
+  
+  if (applicableMemberships.length === 0) return null;
+  
+  // Get the best discount
+  let bestDiscount = 0;
+  let bestMembership = null;
+  
+  applicableMemberships.forEach(membership => {
+    const mem = membership.membership;
+    if (!mem) return;
+    
+    let discountAmount = 0;
+    
+    if (mem.discount_type === 'percentage') {
+      discountAmount = amount * (mem.discount_value / 100);
+      
+      // Apply max discount cap if exists
+      if (mem.max_discount_value) {
+        discountAmount = Math.min(discountAmount, mem.max_discount_value);
+      }
+    } else {
+      discountAmount = Math.min(mem.discount_value, amount);
+    }
+    
+    if (discountAmount > bestDiscount) {
+      bestDiscount = discountAmount;
+      bestMembership = membership;
+    }
+  });
+  
+  if (!bestMembership) return null;
+  
+  return {
+    membershipId: bestMembership.membership_id,
+    membershipName: bestMembership.membership?.name,
+    discountType: bestMembership.membership?.discount_type,
+    discountValue: bestMembership.membership?.discount_value,
+    calculatedDiscount: bestDiscount
+  };
+};

@@ -1,26 +1,45 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
-/**
- * Formats a number as an Indian Rupee (INR) currency string.
- *
- * This function takes a number as input and uses the Intl.NumberFormat API
- * to format it as an Indian currency string with the Rupee symbol (₹) and
- * two decimal places.
- *
- * @param price - The number to format as a currency.
- * @returns A string representing the formatted currency (e.g., "₹1,234.56").
- *
- * @example
- * formatPrice(1234.56); // Returns "₹1,234.56"
- */
-export function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(price);
-}
+export const formatPrice = (price: number | null | undefined): string => {
+  if (price === null || price === undefined) {
+    return "₹0.00";
+  }
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+  }).format(price);
+};
+
+export const formatPhoneNumber = (phoneNumber: string | null): string => {
+  if (!phoneNumber) return "";
+  
+  // Keep only digits
+  const digits = phoneNumber.replace(/\D/g, '');
+  
+  // Format for India: +91 XXXXX XXXXX
+  if (digits.length === 10) {
+    return `+91 ${digits.substring(0, 5)} ${digits.substring(5)}`;
+  }
+  
+  // If it already has country code
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+${digits.substring(0, 2)} ${digits.substring(2, 7)} ${digits.substring(7)}`;
+  }
+  
+  return phoneNumber;
+};
+
+export const truncateText = (text: string, maxLength: number): string => {
+  if (!text) return "";
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + "...";
+};
 
 export function generateStrongPassword(length: number = 12): string {
   const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
