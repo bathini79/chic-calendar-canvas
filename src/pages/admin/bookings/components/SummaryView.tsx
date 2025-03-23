@@ -14,7 +14,8 @@ import {
   Ban,
   Clock,
   Package,
-  MapPin
+  MapPin,
+  Percent
 } from "lucide-react";
 import { format } from 'date-fns';
 import {
@@ -62,7 +63,7 @@ export interface SummaryViewProps {
     };
     duration?: number;
   }[];
-  paymentMethod: 'cash' | 'online';
+  paymentMethod: string;
   onAddAnother: () => void;
   receiptNumber: string;
   taxAmount: number;
@@ -123,7 +124,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
-  // Generate a receipt-like view for non-existent transactions (new appointments)
   const renderNewReceipt = () => {
     return (
       <Card className="bg-white h-full border">
@@ -233,7 +233,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     );
   };
 
-  // For existing appointments, we'll still show the full summary view
   if (transactionDetails) {
     const getGroupedBookings = (transaction: any) => {
       if (!transaction) return [];
@@ -540,6 +539,17 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                         <span>-₹{transaction.discount_value.toFixed(2)}</span>
                       </div>
                     )}
+                    
+                    {transaction.membership_discount > 0 && (
+                      <div className="flex justify-between text-xs text-violet-600">
+                        <span className="flex items-center">
+                          <Percent className="h-3 w-3 mr-1" />
+                          Membership Discount ({transaction.membership_name || 'Membership'})
+                        </span>
+                        <span>-₹{transaction.membership_discount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    
                     <div className="flex justify-between text-lg font-bold pt-2">
                       <span>Total</span>
                       <span className={isRefund ? 'text-red-600' : ''}>
@@ -757,6 +767,5 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     );
   }
 
-  // For new appointments, show simplified receipt view
   return renderNewReceipt();
 };

@@ -38,7 +38,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online' | 'card'>('cash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState<string>("");
@@ -498,8 +498,8 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="card">Card</SelectItem>
                         <SelectItem value="online">Online</SelectItem>
+                        <SelectItem value="card">Card</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

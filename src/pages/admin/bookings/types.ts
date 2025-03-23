@@ -106,6 +106,7 @@ export interface Appointment {
   payment_method?: string;
   notes?: string;
   location?: string;
+  location_id?: string; // Added for compatibility
   number_of_bookings?: number;
   created_at: string;
   updated_at: string;
@@ -116,6 +117,11 @@ export interface Appointment {
   original_total_price?: number;
   refund_reason?: string;
   total_duration?: number;
+  tax_amount?: number;
+  coupon_id?: string;
+  membership_id?: string;
+  membership_name?: string;
+  membership_discount?: number;
   customer?: Customer;
   bookings: Booking[];
 }
