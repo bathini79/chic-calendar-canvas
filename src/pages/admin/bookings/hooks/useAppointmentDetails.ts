@@ -34,10 +34,13 @@ export function useAppointmentDetails(appointmentId?: string | null) {
 
       // Convert data to match Appointment type
       if (data) {
+        // Handle location field mapping
         const appointmentData = {
           ...data,
           location_id: data.location || null, // Map location to location_id for compatibility
-          discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none"
+          discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none",
+          // Convert bookings to the correct type
+          bookings: data.bookings as any
         } as Appointment;
         
         setAppointment(appointmentData);

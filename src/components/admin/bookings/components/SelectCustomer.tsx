@@ -1,10 +1,13 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CustomerSearch } from "./CustomerSearch";
 import { Customer } from "@/pages/admin/bookings/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CreateClientDialog } from "./CreateClientDialog";
+import { Badge } from "@/components/ui/badge";
+import { useCustomerMemberships, CustomerMembership } from "@/hooks/use-customer-memberships";
+import { format } from "date-fns";
 
 interface SelectCustomerProps {
   selectedCustomer: Customer | null;
@@ -18,6 +21,22 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
   setShowCreateForm,
 }) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [activeMemberships, setActiveMemberships] = useState<CustomerMembership[]>([]);
+  const { fetchCustomerMemberships } = useCustomerMemberships();
+
+  // Fetch customer memberships when a customer is selected
+  useEffect(() => {
+    const loadMemberships = async () => {
+      if (selectedCustomer?.id) {
+        const memberships = await fetchCustomerMemberships(selectedCustomer.id);
+        setActiveMemberships(memberships);
+      } else {
+        setActiveMemberships([]);
+      }
+    };
+    
+    loadMemberships();
+  }, [selectedCustomer, fetchCustomerMemberships]);
 
   return (
     <div className="w-full h-full overflow-hidden flex flex-col">
@@ -62,6 +81,33 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
               <p className="text-sm text-muted-foreground">
                 {selectedCustomer.email}
               </p>
+
+              {activeMemberships.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {activeMemberships.map(membership => (
+                    <div key={membership.id} className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-primary/5 text-primary">
+                          {membership.membership?.name || 'Membership'}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          Expires: {format(new Date(membership.end_date), 'dd MMM yyyy')}
+                        </span>
+                      </div>
+                      {membership.membership?.discount_type && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {membership.membership.discount_type === 'percentage' 
+                            ? `${membership.membership.discount_value}% discount` 
+                            : `₹${membership.membership.discount_value} discount`}
+                          {membership.membership.max_discount_value && 
+                            ` (max ₹${membership.membership.max_discount_value})`}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <Button
                 variant="link"
                 className="p-0 h-auto text-sm text-gray-600 hover:text-gray-900 mt-2"

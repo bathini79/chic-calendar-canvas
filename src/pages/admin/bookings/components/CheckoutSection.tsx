@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +43,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
+import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -135,6 +135,81 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
   const [couponDiscount, setCouponDiscount] = useState<number>(0);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+  
+  const [appliedMembershipDiscount, setAppliedMembershipDiscount] = useState<number>(0);
+  const [membershipDetails, setMembershipDetails] = useState<{ id: string, name: string } | null>(null);
+  const { customerMemberships, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
+
+  // Fetch customer's memberships
+  useEffect(() => {
+    const loadMemberships = async () => {
+      if (selectedCustomer?.id) {
+        await fetchCustomerMemberships(selectedCustomer.id);
+      }
+    };
+    
+    loadMemberships();
+  }, [selectedCustomer, fetchCustomerMemberships]);
+
+  // Calculate membership discount when services or memberships change
+  useEffect(() => {
+    if (customerMemberships.length === 0 || !selectedCustomer) {
+      setAppliedMembershipDiscount(0);
+      setMembershipDetails(null);
+      return;
+    }
+
+    let bestDiscount = 0;
+    let bestDiscountDetails: { id: string, name: string } | null = null;
+
+    // Check each selected service for membership discount
+    selectedServices.forEach(serviceId => {
+      const service = services.find(s => s.id === serviceId);
+      if (!service) return;
+
+      const discount = getApplicableMembershipDiscount(serviceId, null, service.selling_price);
+      if (discount && discount.calculatedDiscount > 0) {
+        if (discount.calculatedDiscount > bestDiscount) {
+          bestDiscount = discount.calculatedDiscount;
+          bestDiscountDetails = {
+            id: discount.membershipId,
+            name: discount.membershipName || 'Membership'
+          };
+        }
+      }
+    });
+
+    // Check each selected package for membership discount
+    selectedPackages.forEach(packageId => {
+      const pkg = packages.find(p => p.id === packageId);
+      if (!pkg) return;
+
+      const packagePrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
+      const discount = getApplicableMembershipDiscount(null, packageId, packagePrice);
+      
+      if (discount && discount.calculatedDiscount > 0) {
+        if (discount.calculatedDiscount > bestDiscount) {
+          bestDiscount = discount.calculatedDiscount;
+          bestDiscountDetails = {
+            id: discount.membershipId,
+            name: discount.membershipName || 'Membership'
+          };
+        }
+      }
+    });
+
+    setAppliedMembershipDiscount(bestDiscount);
+    setMembershipDetails(bestDiscountDetails);
+  }, [
+    customerMemberships, 
+    selectedServices, 
+    selectedPackages, 
+    services, 
+    packages, 
+    getApplicableMembershipDiscount,
+    customizedServices,
+    selectedCustomer
+  ]);
 
   const subtotal = useMemo(() => 
     getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
@@ -260,18 +335,20 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
 
   const taxAmount = useMemo(() => {
     const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
+    const afterMembershipDiscount = Math.max(0, regularDiscountedPrice - appliedMembershipDiscount);
     const afterAllDiscounts = couponDiscount > 0 
-      ? Math.max(0, regularDiscountedPrice - couponDiscount) 
-      : regularDiscountedPrice;
+      ? Math.max(0, afterMembershipDiscount - couponDiscount) 
+      : afterMembershipDiscount;
     
     return appliedTaxId ? afterAllDiscounts * (appliedTaxRate / 100) : 0;
-  }, [subtotal, appliedTaxId, appliedTaxRate, discountType, discountValue, couponDiscount]);
+  }, [subtotal, appliedTaxId, appliedTaxRate, discountType, discountValue, couponDiscount, appliedMembershipDiscount]);
 
   const discountedSubtotal = useMemo(() => {
     const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
+    const afterMembershipDiscount = Math.max(0, regularDiscountedPrice - appliedMembershipDiscount);
     
-    return couponDiscount > 0 ? Math.max(0, regularDiscountedPrice - couponDiscount) : regularDiscountedPrice;
-  }, [subtotal, discountType, discountValue, couponDiscount]);
+    return couponDiscount > 0 ? Math.max(0, afterMembershipDiscount - couponDiscount) : afterMembershipDiscount;
+  }, [subtotal, discountType, discountValue, couponDiscount, appliedMembershipDiscount]);
 
   const total = useMemo(() => 
     discountedSubtotal + taxAmount,
@@ -398,16 +475,20 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         taxAmount,
         couponId: selectedCouponId,
         couponDiscount,
+        membershipDiscount: appliedMembershipDiscount,
+        membershipId: membershipDetails?.id,
         total
       });
       
       // Pass the summary data with values already calculated
       const saveAppointmentParams = {
-        appointmentId: appointmentId, // Include the appointmentId in the params
+        appointmentId: appointmentId,
         appliedTaxId: appliedTaxId,
         taxAmount: taxAmount,
         couponId: selectedCouponId,
         couponDiscount: couponDiscount,
+        membershipId: membershipDetails?.id,
+        membershipDiscount: appliedMembershipDiscount,
         total: total
       };
       
@@ -425,6 +506,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
+  // Update the summary section to include membership discount
   return (
     <div className="h-full w-full bg-gray-50 p-6">
       <Card className="h-full">
@@ -620,7 +702,19 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     Discount
                     {discountType === "percentage" && ` (${discountValue}%)`}
                   </span>
-                  <span>-₹{discountAmount - couponDiscount}</span>
+                  <span>-₹{discountType !== "none" ? (subtotal - getFinalPrice(subtotal, discountType, discountValue)).toFixed(2) : "0.00"}</span>
+                </div>
+              )}
+              
+              {appliedMembershipDiscount > 0 && membershipDetails && (
+                <div className="flex justify-between text-sm text-blue-600">
+                  <span className="flex items-center">
+                    <span className="mr-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                      {membershipDetails.name}
+                    </span>
+                    Membership Discount
+                  </span>
+                  <span>-₹{appliedMembershipDiscount.toFixed(2)}</span>
                 </div>
               )}
               
