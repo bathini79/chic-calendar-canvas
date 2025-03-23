@@ -36,9 +36,9 @@ export function useAppointmentDetails(appointmentId?: string | null) {
       if (data) {
         // Handle status conversion to match AppointmentStatus type
         let mappedStatus: AppointmentStatus = data.status as AppointmentStatus;
-        // Convert 'noshow' to 'no-show' if needed for consistency
-        if (data.status === 'noshow') {
-          mappedStatus = 'no-show';
+        // Convert 'noshow' to match our enum if needed
+        if (data.status === 'no-show') {
+          mappedStatus = 'noshow';
         }
 
         const appointmentData: Appointment = {

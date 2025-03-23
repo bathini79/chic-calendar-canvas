@@ -91,24 +91,37 @@ console.log("tot",total)
       const yesterday = subDays(today, 1);
       
       // Get available employees (stylists)
-      let empQuery = supabase
-        .from("employees")
-        .select("*")
-        .eq("employment_type", "stylist");
-      
+      let employees = [];
+
       if (recentSalesLocationId !== "all") {
         // Filter employees by location if a specific location is selected
-        empQuery = supabase
+        const { data: employeeIds, error: locationEmpError } = await supabase
           .from("employee_locations")
-          .select(`
-            employee_id
-          `)
+          .select("employee_id")
           .eq("location_id", recentSalesLocationId);
+          
+        if (!locationEmpError && employeeIds?.length > 0) {
+          const { data: empData, error: empError } = await supabase
+            .from("employees")
+            .select("*")
+            .eq("employment_type", "stylist")
+            .in("id", employeeIds.map(e => e.employee_id));
+            
+          if (!empError) {
+            employees = empData || [];
+          }
+        }
+      } else {
+        // Get all stylists
+        const { data: empData, error: empError } = await supabase
+          .from("employees")
+          .select("*")
+          .eq("employment_type", "stylist");
+          
+        if (!empError) {
+          employees = empData || [];
+        }
       }
-      
-      const { data: employees, error: empError } = await empQuery;
-      
-      if (empError) throw empError;
       
       // Get appointments for current period
       let currentAppQuery = supabase

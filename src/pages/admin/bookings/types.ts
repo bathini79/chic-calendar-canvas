@@ -1,10 +1,8 @@
-
 export type AppointmentStatus = 
   | 'pending' 
   | 'confirmed' 
   | 'canceled' 
   | 'completed' 
-  | 'no-show' 
   | 'noshow' 
   | 'inprogress'
   | 'voided'
@@ -37,6 +35,9 @@ export type Appointment = {
   coupon_id?: string | null;
   customer: any;
   bookings: any[];
+  refund_reason?: string;
+  refund_notes?: string;
+  refunded_by?: string;
 };
 
 export type Service = {
@@ -113,7 +114,7 @@ export type Booking = {
   employee_id: string | null;
   start_time: string;
   end_time: string;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'no-show' | 'noshow' | 'refunded';
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'noshow' | 'refunded';
   price: number;
   price_paid?: number;
   original_price?: number;
@@ -160,6 +161,11 @@ export type SummaryViewProps = {
     name: string;
     price: number;
     type: string;
+    employee?: {
+      id: string;
+      name: string;
+    };
+    duration?: number;
   }>;
   paymentMethod?: 'cash' | 'card' | 'online';
   onAddAnother?: () => void;

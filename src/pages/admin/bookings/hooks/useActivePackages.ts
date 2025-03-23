@@ -46,7 +46,19 @@ export const useActivePackages = (locationId?: string) => {
         const typedPackages = data.map((pkg) => ({
           ...pkg,
           is_active: pkg.status === 'active',
-        } as Package));
+          // Transform package_services to match expected format
+          package_services: pkg.package_services.map((ps: any) => ({
+            id: ps.id || `${ps.package_id}_${ps.service_id}`, // Generate an id if not provided
+            package_id: ps.package_id,
+            service_id: ps.service_id,
+            package_selling_price: ps.package_selling_price,
+            service: {
+              ...ps.service,
+              is_active: ps.service.status === 'active',
+              cost_price: ps.service.cost_price || ps.service.selling_price * 0.5 // Default cost price if not present
+            }
+          }))
+        } as unknown as Package));
 
         return typedPackages;
       } catch (error) {
