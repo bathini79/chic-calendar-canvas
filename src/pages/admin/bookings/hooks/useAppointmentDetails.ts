@@ -39,10 +39,10 @@ export function useAppointmentDetails(appointmentId?: string | null) {
           location_id: data.location || null, // Map location to location_id for compatibility
           discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none",
           // Safely add membership fields with default values if they don't exist
-          membership_discount: data.membership_discount || 0,
-          membership_id: data.membership_id || null,
-          membership_name: data.membership_name || null,
-          tax_amount: data.tax_amount || 0,
+          membership_discount: data.membership_discount ?? 0,
+          membership_id: data.membership_id ?? null,
+          membership_name: data.membership_name ?? null,
+          tax_amount: data.tax_amount ?? 0,
           // Ensure bookings status is typed correctly
           bookings: data.bookings.map((booking: any) => ({
             ...booking,

@@ -43,7 +43,7 @@ export function useCustomerMemberships() {
         .from('customer_memberships')
         .select(`
           *,
-          membership:membership_id (
+          membership:memberships (
             id, name, discount_type, discount_value, 
             applicable_services, applicable_packages,
             min_billing_amount, max_discount_value
