@@ -1,10 +1,12 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CustomerSearch } from "./CustomerSearch";
 import { Customer } from "@/pages/admin/bookings/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CreateClientDialog } from "./CreateClientDialog";
+import { Badge } from "@/components/ui/badge";
+import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 
 interface SelectCustomerProps {
   selectedCustomer: Customer | null;
@@ -18,6 +20,13 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
   setShowCreateForm,
 }) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { customerMemberships, fetchCustomerMemberships } = useCustomerMemberships();
+  
+  useEffect(() => {
+    if (selectedCustomer) {
+      fetchCustomerMemberships(selectedCustomer.id);
+    }
+  }, [selectedCustomer]);
 
   return (
     <div className="w-full h-full overflow-hidden flex flex-col">
@@ -62,6 +71,15 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
               <p className="text-sm text-muted-foreground">
                 {selectedCustomer.email}
               </p>
+              {customerMemberships && customerMemberships.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {customerMemberships.map(membership => (
+                    <Badge key={membership.id} variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+                      {membership.membership?.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
               <Button
                 variant="link"
                 className="p-0 h-auto text-sm text-gray-600 hover:text-gray-900 mt-2"

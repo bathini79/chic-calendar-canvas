@@ -38,7 +38,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online' | 'card'>('cash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState<string>("");
@@ -290,6 +290,10 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     setDiscountValue(0);
   };
   
+  const handlePaymentMethodChange = (value: string) => {
+    setPaymentMethod(value as 'cash' | 'online' | 'card');
+  };
+
   const filteredMemberships = memberships.filter(membership => 
     membership.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (membership.description && membership.description.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -317,7 +321,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
             price: subtotal,
             type: "membership"
           }]}
-          paymentMethod={paymentMethod === "card" ? "card" : paymentMethod}
+          paymentMethod={paymentMethod}
           onAddAnother={handleReset}
           receiptNumber={receiptNumber}
           taxAmount={taxAmount}
@@ -492,31 +496,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium mb-1 block">Payment Method</label>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select payment method" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="card">Card</SelectItem>
-                        <SelectItem value="online">Online</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <Button 
-                    className="w-full" 
-                    onClick={handleComplete}
-                    disabled={!selectedCustomer || !selectedMembership || isProcessing}
-                  >
-                    {isProcessing ? "Processing..." : "Pay Now"}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+                    <Select value={paymentMethod} onValueChange={handlePaymentMethodChange}>
+                     
+

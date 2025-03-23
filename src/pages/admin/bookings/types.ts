@@ -1,4 +1,3 @@
-
 export enum SCREEN {
   SERVICE_SELECTION = "service_selection",
   CHECKOUT = "checkout",
@@ -97,16 +96,20 @@ export interface Booking {
 export interface Appointment {
   id: string;
   customer_id: string;
+  customer?: Customer;
   start_time: string;
   end_time: string;
   status: AppointmentStatus;
+  notes?: string;
+  bookings: Booking[];
   total_price: number;
-  discount_type: "none" | "fixed" | "percentage";
+  discount_type: "none" | "percentage" | "fixed";
   discount_value: number;
   payment_method?: string;
-  notes?: string;
-  location?: string;
-  number_of_bookings?: number;
+  location_id?: string | null;
+  membership_discount?: number; // Added for membership discount
+  membership_id?: string;       // Added for membership reference
+  membership_name?: string;     // Added for membership name
   created_at: string;
   updated_at: string;
   original_appointment_id?: string;
@@ -116,11 +119,8 @@ export interface Appointment {
   original_total_price?: number;
   refund_reason?: string;
   total_duration?: number;
-  customer?: Customer;
-  bookings: Booking[];
 }
 
-// Add the missing types for refund and transaction details
 export interface RefundData {
   reason: "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | 
           "health_concern" | "price_dispute" | "other" | "booking_error" | 
