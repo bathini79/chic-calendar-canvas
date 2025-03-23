@@ -56,7 +56,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
           completedCount += 1;
         }
       });
-console.log("tot",total)
+
       setRevenueData(Object.values(groupedData));
       setTotalRevenue(total);
       setAppointmentsStats({ count: data.length, value: total, completed: completedCount, completedValue: completedTotal });
@@ -67,20 +67,17 @@ console.log("tot",total)
       setAppointmentsStats({ count: 0, value: 0, completed: 0, completedValue: 0 });
     }
   }, [timeRange, recentSalesLocationId, today]);
+
   const getStartDateForTimeRange = (range) => {
     switch (range) {
-      case "today":
-        return startOfDay(today);
-      case "week":
-        return subDays(today, 7);
-      case "month":
-        return subDays(today, 30);
-      case "year":
-        return subDays(today, 365);
-      default:
-        return startOfDay(today);
+      case "today": return startOfDay(today);
+      case "week": return subDays(today, 7);
+      case "month": return subDays(today, 30);
+      case "year": return subDays(today, 365);
+      default: return startOfDay(today);
     }
   };
+
   const fetchBusinessMetrics = useCallback(async () => {
     try {
       // Calculate revenue
@@ -91,23 +88,26 @@ console.log("tot",total)
       const yesterday = subDays(today, 1);
       
       // Get available employees (stylists)
-      let empQuery = supabase
+      let { data: employees, error: empError } = await supabase
         .from("employees")
         .select("*")
         .eq("employment_type", "stylist");
       
       if (recentSalesLocationId !== "all") {
-        // Filter employees by location if a specific location is selected
-        empQuery = supabase
+        // Filter employees by location
+        const { data: employeeLocations, error } = await supabase
           .from("employee_locations")
-          .select(`
-            employee_id
-          `)
+          .select("employee_id")
           .eq("location_id", recentSalesLocationId);
+        
+        if (error) throw error;
+        
+        if (employeeLocations && employeeLocations.length > 0) {
+          const employeeIds = employeeLocations.map(el => el.employee_id);
+          employees = employees.filter(emp => employeeIds.includes(emp.id));
+        }
       }
-      
-      const { data: employees, error: empError } = await empQuery;
-      
+
       if (empError) throw empError;
       
       // Get appointments for current period
@@ -289,7 +289,7 @@ console.log("tot",total)
     setIsLoading(true);
     Promise.all([fetchRevenueData(), fetchBusinessMetrics()])
       .finally(() => setIsLoading(false));
-  }, [timeRange,recentSalesLocationId]);
+  }, [timeRange, recentSalesLocationId, fetchRevenueData, fetchBusinessMetrics]);
 
   const getTimeRangeLabel = () => {
     return { "today": "Today", "week": "Last 7 days", "month": "Last 30 days", "year": "Last 365 days" }[timeRange] || "Today";

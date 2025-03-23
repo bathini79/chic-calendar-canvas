@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -62,12 +63,12 @@ export function useSaveAppointment() {
       const coupon_discount = params.couponDiscount || 0;
       
       // Apply membership discount if available
-      const membership_id = params.membershipId || null;
-      const membership_discount = params.membershipDiscount || 0;
-      const membership_name = params.membershipName || null;
+      const membershipDiscount = params.membershipDiscount || 0;
+      const membershipName = params.membershipName || null;
+      const membershipId = params.membershipId || null;
       
       // Calculate final price
-      const total_price = params.total || (discounted_price - coupon_discount - membership_discount + tax_amount);
+      const total_price = params.total || (discounted_price - coupon_discount - membershipDiscount + tax_amount);
       
       // Check if we need to create a new appointment or update an existing one
       let appointment_id: string;
@@ -87,9 +88,11 @@ export function useSaveAppointment() {
             total_duration: duration,
             tax_amount: tax_amount,
             coupon_id: coupon_id,
-            membership_id: membership_id,
-            membership_discount: membership_discount,
-            membership_name: membership_name
+            membership_discount: membershipDiscount,
+            membership_name: membershipName,
+            membership_id: membershipId,
+            start_time: new Date().toISOString(),
+            end_time: new Date().toISOString()
           })
           .select()
           .single();
@@ -113,9 +116,9 @@ export function useSaveAppointment() {
             updated_at: now,
             tax_amount: tax_amount,
             coupon_id: coupon_id,
-            membership_id: membership_id,
-            membership_discount: membership_discount,
-            membership_name: membership_name
+            membership_discount: membershipDiscount,
+            membership_name: membershipName,
+            membership_id: membershipId
           })
           .eq('id', appointmentId);
 

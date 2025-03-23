@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { AppointmentStatus, Appointment } from "@/pages/admin/bookings/types";
+import { AppointmentStatus, Appointment } from "../types";
 
 export function useAppointmentDetails() {
   const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +44,8 @@ export function useAppointmentDetails() {
         tax_amount: data.tax_amount || 0
       };
 
-      return processedData as Appointment;
+      // Type assertion to Appointment - we add the fields that might be missing
+      return processedData as unknown as Appointment;
     } catch (error: any) {
       console.error("Error fetching appointment details:", error);
       toast.error(error.message || "Failed to fetch appointment details");

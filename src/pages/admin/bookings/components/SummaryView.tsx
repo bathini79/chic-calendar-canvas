@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatDate } from "@/lib/utils";
+import { format } from "date-fns";
 import { StatusBadge } from "./StatusBadge";
 import { 
   Ban, 
@@ -82,6 +83,10 @@ interface SummaryViewProps {
   membershipName?: string;
 }
 
+const formatDate = (date: Date) => {
+  return format(date, 'MMM dd, yyyy h:mm a');
+};
+
 export function SummaryView({ 
   appointmentId, 
   customer, 
@@ -127,7 +132,17 @@ export function SummaryView({
         .single();
         
       if (error) throw error;
-      return data;
+      
+      // Add default values for potentially missing fields
+      return {
+        ...data,
+        membership_discount: data.membership_discount || 0,
+        membership_name: data.membership_name || '',
+        tax_amount: data.tax_amount || 0,
+        discount_type: data.discount_type || 'none',
+        discount_value: data.discount_value || 0,
+        original_total_price: data.original_total_price || (data.total_price || 0)
+      };
     },
     enabled: !!appointmentId
   });
@@ -139,7 +154,10 @@ export function SummaryView({
     payment_method: paymentMethod,
     tax_amount: taxAmount,
     membership_discount: membershipDiscount,
-    membership_name: membershipName
+    membership_name: membershipName,
+    discount_type: 'none',
+    discount_value: 0,
+    original_total_price: totalPrice
   };
 
   const calculateTotal = () => {

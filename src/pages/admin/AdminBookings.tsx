@@ -11,7 +11,7 @@ import { formatTime, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
-import { AppointmentManager } from "./bookings/components/AppointmentManager";
+import { useNavigate } from "react-router-dom";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
 import { 
   Select, 
@@ -48,12 +48,12 @@ export default function AdminBookings() {
     y: number;
     date?: Date;
   } | null>(null);
-  const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [isAddSaleOpen, setIsAddSaleOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const navigate = useNavigate();
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -129,7 +129,10 @@ export default function AdminBookings() {
       
       setAppointmentTime(timeString);
       setAppointmentDate(clickedCell.date || currentDate);
-      setIsAddAppointmentOpen(true);
+      
+      // Navigate to AppointmentManager route instead of rendering it directly
+      navigate(`/admin/bookings/appointment/new?date=${clickedCell.date || currentDate}&time=${timeString}`);
+      
       setClickedCell(null);
     }
   };
@@ -145,12 +148,9 @@ export default function AdminBookings() {
     
     setAppointmentTime(timeString);
     setAppointmentDate(currentDate);
-    setIsAddAppointmentOpen(true);
-  };
-
-  const closeAddAppointment = () => {
-    setIsAddAppointmentOpen(false);
-    setSelectedAppointment(null);
+    
+    // Navigate to AppointmentManager route
+    navigate(`/admin/bookings/appointment/new?date=${currentDate}&time=${timeString}`);
   };
 
   const handleCellClick = (cell: { employeeId: string; time: number; x: number; y: number; date: Date }) => {
@@ -164,7 +164,8 @@ export default function AdminBookings() {
     setAppointmentDate(startDate);
     setAppointmentTime(format(startDate, 'HH:mm'));
     
-    setIsAddAppointmentOpen(true);
+    // Navigate to AppointmentManager route with the appointment ID
+    navigate(`/admin/bookings/appointment/${appointment.id}`);
   };
 
   return (
@@ -238,7 +239,7 @@ export default function AdminBookings() {
         
         <AppointmentDetailsDialog
           appointment={selectedAppointment}
-          open={!!selectedAppointment && !isAddAppointmentOpen}
+          open={!!selectedAppointment}
           onOpenChange={() => setSelectedAppointment(null)}
           onCheckout={handleCheckoutFromAppointment}
         />
@@ -262,18 +263,6 @@ export default function AdminBookings() {
               <span className="text-gray-700">Add Appointment</span>
             </div>
           </div>
-        )}
-
-        {isAddAppointmentOpen && appointmentDate && (
-          <AppointmentManager
-            isOpen={isAddAppointmentOpen}
-            onClose={closeAddAppointment}
-            selectedDate={appointmentDate}
-            selectedTime={appointmentTime}
-            employees={employees}
-            existingAppointment={selectedAppointment}
-            locationId={selectedLocationId}
-          />
         )}
 
         <MembershipSale

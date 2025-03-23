@@ -1,9 +1,10 @@
+
 import React, { useState, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SCREEN } from "../types";
-import { SelectCustomer } from "./SelectCustomer";
-import { ServiceSelection } from "./ServiceSelection";
+import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
+import { ServiceSelection } from "@/components/admin/bookings/components/ServiceSelection";
 import { CheckoutSection } from "./CheckoutSection";
 import { SummaryView } from "./SummaryView";
 import { useSaveAppointment } from "../hooks/useSaveAppointment";
@@ -19,7 +20,7 @@ export function AppointmentManager() {
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
   const [discountValue, setDiscountValue] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'online'>('cash');
   const [notes, setNotes] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
@@ -201,7 +202,7 @@ export function AppointmentManager() {
               }}
               totalPrice={totalPrice || 0}
               items={[]}
-              paymentMethod={paymentMethod as 'cash' | 'card' | 'online'}
+              paymentMethod={paymentMethod}
               onAddAnother={handleAddAnother}
               membershipDiscount={membershipDiscount}
               membershipName={membershipName}
