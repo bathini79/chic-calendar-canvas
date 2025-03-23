@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Appointment } from "../types";
@@ -31,12 +32,16 @@ export function useAppointmentDetails(appointmentId?: string | null) {
 
       if (error) throw error;
 
-      // Convert the location field to location_id for compatibility
+      // Convert data to match Appointment type
       if (data) {
-        data.location_id = data.location;
+        const appointmentData = {
+          ...data,
+          location_id: data.location || null, // Map location to location_id for compatibility
+          discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none"
+        } as Appointment;
+        
+        setAppointment(appointmentData);
       }
-
-      setAppointment(data);
     } catch (error) {
       console.error("Error fetching appointment:", error);
       setAppointment(null);
