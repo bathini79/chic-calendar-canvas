@@ -1,173 +1,97 @@
+export type AppointmentStatus = 'pending' | 'confirmed' | 'canceled' | 'completed' | 'no-show';
 
-export enum SCREEN {
-  SERVICE_SELECTION = "service_selection",
-  CHECKOUT = "checkout",
-  SUMMARY = "summary",
-}
-
-export type AppointmentStatus = 
-  | "pending" 
-  | "confirmed" 
-  | "canceled" 
-  | "completed"
-  | "inprogress"
-  | "voided"
-  | "refunded"
-  | "partially_refunded"
-  | "noshow"
-  | "booked";
-
-export interface Service {
-  id: string;
-  name: string;
-  description?: string;
-  duration: number;
-  selling_price: number;
-  original_price: number;
-  category_id?: string;
-  status: "active" | "inactive";
-  created_at: string;
-  updated_at: string;
-  gender?: string;
-  image_urls?: string[];
-}
-
-export interface Package {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  duration?: number;
-  discount_type?: "none" | "fixed" | "percentage";
-  discount_value?: number;
-  status: "active" | "inactive";
-  created_at: string;
-  updated_at: string;
-  image_urls?: string[];
-  is_customizable?: boolean;
-  customizable_services?: string[];
-  categories?: any[];
-  package_services?: any[];
-}
-
-export interface Customer {
-  id: string;
-  full_name?: string;
-  email?: string;
-  phone_number?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  photo_url?: string;
-  status: "active" | "inactive";
-  employment_type: "stylist" | "operations";
-  created_at: string;
-  updated_at: string;
-  avatar?: string;
-}
-
-export interface Booking {
-  id: string;
-  appointment_id: string;
-  service_id?: string;
-  package_id?: string;
-  employee_id?: string;
-  created_at: string;
-  updated_at: string;
-  price_paid: number;
-  original_price?: number;
-  status: AppointmentStatus;
-  start_time: string;
-  end_time?: string;
-  refunded_at?: string;
-  refund_notes?: string;
-  refunded_by?: string;
-  refund_reason?: string;
-  service?: Service;
-  package?: Package;
-  employee?: Employee;
-}
-
-export interface Appointment {
+export type Appointment = {
   id: string;
   customer_id: string;
+  location_id: string | null;
   start_time: string;
   end_time: string;
   status: AppointmentStatus;
+  notes: string | null;
   total_price: number;
-  discount_type: "none" | "fixed" | "percentage";
+  discount_type: 'none' | 'percentage' | 'fixed';
   discount_value: number;
-  payment_method?: string;
-  notes?: string;
-  location?: string;
-  location_id?: string;
-  number_of_bookings?: number;
+  payment_method: string;
+  tax_amount: number;
+  membership_discount: number;
+  membership_id: string | null;
+  membership_name: string | null;
+  customer: any;
+  bookings: any[];
+};
+
+export type Service = {
+  id: string;
+  name: string;
+  description: string;
+  duration: number;
+  selling_price: number;
+  cost_price: number;
+  category_id: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
-  original_appointment_id?: string;
-  refund_notes?: string;
-  transaction_type?: string;
-  refunded_by?: string;
-  original_total_price?: number;
-  refund_reason?: string;
-  total_duration?: number;
-  tax_amount?: number;
-  membership_id?: string | null;
-  membership_name?: string | null;
-  membership_discount?: number;
-  customer?: Customer;
-  bookings: Booking[];
-}
-
-export interface RefundData {
-  reason: "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | 
-          "health_concern" | "price_dispute" | "other" | "booking_error" | 
-          "service_unavailable" | "customer_emergency" | "customer_no_show";
-  notes: string;
-  refundedBy: string;
-}
-
-export interface TransactionDetails {
-  id: string;
-  amount: number;
-  status: AppointmentStatus;
-  payment_method?: string;
-  created_at: string;
-  originalSale: Appointment;
-  refunds: Appointment[];
-}
-
-export interface SummaryViewProps {
-  appointmentId?: string;
-  customer?: {
-    id: string;
-    full_name: string;
-    email: string;
-    phone_number?: string;
-  };
-  totalPrice?: number;
-  items?: {
+  category?: {
     id: string;
     name: string;
-    price: number;
-    type: string;
-    employee?: {
-      id: string;
-      name: string;
-    };
-    duration?: number;
-  }[];
-  paymentMethod?: 'cash' | 'card' | 'online';
-  onAddAnother?: () => void;
-  receiptNumber?: string;
-  taxAmount?: number;
-  subTotal?: number;
-  membershipName?: string;
-  membershipDiscount?: number;
-}
+  };
+};
+
+export type Package = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  duration: number;
+  is_active: boolean;
+  is_customizable: boolean;
+  created_at: string;
+  updated_at: string;
+  package_services: Array<{
+    id: string;
+    package_id: string;
+    service_id: string;
+    package_selling_price: number | null;
+    service: Service;
+  }>;
+};
+
+export type Customer = {
+  id: string;
+  email: string;
+  phone: string;
+  first_name: string;
+  last_name: string;
+  full_name?: string;
+  avatar_url?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Employee = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  employment_type: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Booking = {
+  id: string;
+  appointment_id: string;
+  service_id: string | null;
+  package_id: string | null;
+  employee_id: string | null;
+  start_time: string;
+  end_time: string;
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'no-show';
+  price: number;
+  created_at: string;
+  updated_at: string;
+  service?: Service | null;
+  package?: Package | null;
+  employee?: Employee | null;
+};

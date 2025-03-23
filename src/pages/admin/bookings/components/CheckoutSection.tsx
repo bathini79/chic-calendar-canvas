@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,9 +39,9 @@ import {
   getTotalDuration, 
   getFinalPrice, 
   getServicePriceInPackage,
-  calculatePackagePrice, 
-  getMembershipDiscount
+  calculatePackagePrice
 } from "../utils/bookingUtils";
+import { getMembershipDiscount } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
