@@ -45,7 +45,9 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   const [activeTab, setActiveTab] = useState("memberships");
   const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
   const [discountValue, setDiscountValue] = useState<number>(0);
-  
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
+
   const { taxRates, fetchTaxRates } = useTaxRates();
   const [selectedTaxRate, setSelectedTaxRate] = useState<string | null>(null);
   const [taxRateValue, setTaxRateValue] = useState(0);
@@ -56,6 +58,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   useEffect(() => {
     fetchMemberships();
     fetchTaxRates();
+    fetchPaymentMethods();
   }, [locationId]);
   
   useEffect(() => {
@@ -121,6 +124,24 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
       console.error("Error fetching memberships:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchPaymentMethods = async () => {
+    setIsLoadingPaymentMethods(true);
+    try {
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('is_enabled', true)
+        .order('name');
+      
+      if (error) throw error;
+      setPaymentMethods(data || []);
+    } catch (error: any) {
+      console.error("Error fetching payment methods:", error);
+    } finally {
+      setIsLoadingPaymentMethods(false);
     }
   };
 
@@ -497,9 +518,22 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
                         <SelectValue placeholder="Select payment method" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="card">Card</SelectItem>
-                        <SelectItem value="online">Online</SelectItem>
+                        <SelectItem value="none">No Coupon</SelectItem>
+                        {isLoadingPaymentMethods ? (
+                          <SelectItem value="loading">Loading...</SelectItem>
+                        ) : paymentMethods.length > 0 ? (
+                          paymentMethods.map(method => (
+                            <SelectItem key={method.id} value={method.name}>
+                              {method.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="card">Card</SelectItem>
+                            <SelectItem value="online">Online</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>

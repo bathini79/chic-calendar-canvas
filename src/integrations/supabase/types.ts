@@ -2180,6 +2180,22 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_recent_sales: {
+        Args: {
+          days_param?: number
+          limit_param?: number
+        }
+        Returns: {
+          id: string
+          customer_id: string
+          customer_name: string
+          customer_email: string
+          customer_phone: string
+          amount: number
+          created_at: string
+          sale_type: string
+        }[]
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
