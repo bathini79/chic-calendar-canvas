@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ import {
   FileMinus, 
   FileWarning, 
   MessagesSquare, 
+  Percent,
   Tag, 
   User, 
   UserRound,
@@ -132,29 +132,19 @@ export function SummaryView({
     enabled: !!appointmentId
   });
 
-  // Use either fetched transaction details or provided props
   const displayDetails = transactionDetails || {
     customer,
     total_price: totalPrice,
     status: 'confirmed',
     payment_method: paymentMethod,
     tax_amount: taxAmount,
-  };
-
-  // Handle appointment actions
-  const handleAction = (type: 'cancel' | 'complete' | 'noshow' | 'refund') => {
-    setActionType(type);
-    if (type === 'refund') {
-      setShowRefundDialog(true);
-    } else {
-      setShowActionDialog(true);
-    }
+    membership_discount: membershipDiscount,
+    membership_name: membershipName
   };
 
   const calculateTotal = () => {
     if (transactionDetails) {
-      let total = transactionDetails.total_price || 0;
-      return total;
+      return transactionDetails.total_price || 0;
     }
     return totalPrice;
   };
@@ -174,7 +164,6 @@ export function SummaryView({
           )}
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Customer Information */}
           <div className="space-y-2">
             <h3 className="text-lg font-medium flex items-center gap-2">
               <UserRound className="h-5 w-5" /> Customer Information
@@ -197,7 +186,6 @@ export function SummaryView({
             </div>
           </div>
 
-          {/* Transaction Details */}
           <div className="space-y-2">
             <h3 className="text-lg font-medium flex items-center gap-2">
               <FileCheck className="h-5 w-5" /> Transaction Details
@@ -232,7 +220,6 @@ export function SummaryView({
             </div>
           </div>
 
-          {/* Items Purchased */}
           <div className="space-y-3">
             <h3 className="text-lg font-medium flex items-center gap-2">
               <File className="h-5 w-5" /> Items
@@ -271,7 +258,6 @@ export function SummaryView({
             </div>
           </div>
 
-          {/* Price Breakdown */}
           <div className="space-y-2 border-t pt-4">
             <h3 className="text-lg font-medium flex items-center gap-2">
               <CreditCard className="h-5 w-5" /> Price Breakdown
@@ -279,27 +265,29 @@ export function SummaryView({
             <div className="space-y-1">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatPrice(subTotal > 0 ? subTotal : (calculateTotal() + regularDiscount))}</span>
+                <span>{formatPrice(subTotal > 0 ? subTotal : (calculateTotal() + (displayDetails.membership_discount || 0)))}</span>
               </div>
               
-              {(transactionDetails?.tax_amount || taxAmount > 0) && (
+              {(displayDetails.tax_amount || taxAmount > 0) && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tax</span>
-                  <span>{formatPrice(transactionDetails?.tax_amount || taxAmount)}</span>
+                  <span>{formatPrice(displayDetails.tax_amount || taxAmount)}</span>
                 </div>
               )}
               
-              {(transactionDetails?.discount_type !== 'none' || regularDiscount > 0) && (
+              {(displayDetails.discount_type !== 'none' && displayDetails.discount_type) && (
                 <div className="flex justify-between text-green-600">
                   <span className="flex items-center">
                     <Percent className="mr-2 h-4 w-4" />
                     Discount
-                    {transactionDetails?.discount_type === 'percentage' && 
-                      ` (${transactionDetails.discount_value}%)`}
+                    {displayDetails.discount_type === 'percentage' && 
+                      ` (${displayDetails.discount_value}%)`}
                   </span>
-                  <span>-{formatPrice(regularDiscount > 0 ? regularDiscount : 
-                    (transactionDetails?.original_total_price || 0) - 
-                    (transactionDetails?.total_price || 0))}</span>
+                  <span>-{formatPrice(
+                    (displayDetails.original_total_price || 0) - 
+                    (displayDetails.total_price || 0) -
+                    (displayDetails.membership_discount || 0)
+                  )}</span>
                 </div>
               )}
               
@@ -310,15 +298,15 @@ export function SummaryView({
                 </div>
               )}
               
-              {(membershipDiscount > 0 || transactionDetails?.membership_discount) && (
+              {((membershipDiscount > 0) || (displayDetails.membership_discount && displayDetails.membership_discount > 0)) && (
                 <div className="flex justify-between text-green-600">
                   <span className="flex items-center">
                     <Tag className="mr-2 h-4 w-4" />
                     Membership Discount
-                    {(membershipName || transactionDetails?.membership_name) && 
-                      ` (${membershipName || transactionDetails?.membership_name})`}
+                    {(membershipName || displayDetails.membership_name) && 
+                      ` (${membershipName || displayDetails.membership_name})`}
                   </span>
-                  <span>-{formatPrice(membershipDiscount || transactionDetails?.membership_discount || 0)}</span>
+                  <span>-{formatPrice(membershipDiscount || displayDetails.membership_discount || 0)}</span>
                 </div>
               )}
               

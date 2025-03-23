@@ -28,7 +28,9 @@ export function AppointmentManager() {
   const [totalPrice, setTotalPrice] = useState<number>(0);
   const [totalDuration, setTotalDuration] = useState<number>(0);
   const [locationId, setLocationId] = useState<string | undefined>(undefined);
-  
+  const [membershipDiscount, setMembershipDiscount] = useState<number>(0);
+  const [membershipName, setMembershipName] = useState<string>("");
+
   const navigate = useNavigate();
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const isExistingAppointment = !!appointmentId;
@@ -36,7 +38,6 @@ export function AppointmentManager() {
   const { saveAppointment, isLoading: isSaving } = useSaveAppointment();
   const { fetchAppointmentDetails, isLoading: isFetchingAppointment } = useAppointmentDetails();
 
-  // Fetch appointment details if appointmentId is available
   useEffect(() => {
     if (appointmentId) {
       const fetchDetails = async () => {
@@ -49,7 +50,6 @@ export function AppointmentManager() {
           setPaymentMethod(details.payment_method || 'cash');
           setNotes(details.notes || '');
           
-          // Extract service and package IDs from bookings
           const serviceIds = details.bookings
             .filter(booking => booking.service_id)
             .map(booking => booking.service_id);
@@ -60,7 +60,6 @@ export function AppointmentManager() {
             .map(booking => booking.package_id);
           setSelectedPackages(packageIds);
           
-          // Extract stylist and time slot information
           const stylistSlots = {};
           details.bookings.forEach(booking => {
             stylistSlots[booking.service_id || booking.package_id] = booking.employee_id;
@@ -91,7 +90,6 @@ export function AppointmentManager() {
       return null;
     }
 
-    // Prepare service and package items for saving
     const serviceItems = [];
     const packageItems = [];
 
@@ -205,6 +203,8 @@ export function AppointmentManager() {
               items={[]}
               paymentMethod={paymentMethod as 'cash' | 'card' | 'online'}
               onAddAnother={handleAddAnother}
+              membershipDiscount={membershipDiscount}
+              membershipName={membershipName}
             />
           )}
         </CardContent>

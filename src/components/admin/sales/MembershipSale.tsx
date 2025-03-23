@@ -63,7 +63,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   
   useEffect(() => {
     if (taxRates.length > 0) {
-      // Find default tax rate
       const defaultTax = taxRates.find(tax => tax.is_default);
       if (defaultTax) {
         setSelectedTaxRate(defaultTax.id);
@@ -86,7 +85,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     
     const originalSubtotal = selectedMembership.discount_value;
     
-    // Apply discount if set
     let discountedSubtotal = originalSubtotal;
     if (discountType === 'percentage') {
       discountedSubtotal = originalSubtotal * (1 - (discountValue / 100));
@@ -96,7 +94,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     
     setSubtotal(discountedSubtotal);
     
-    // Calculate tax
     const tax = (discountedSubtotal * taxRateValue) / 100;
     setTaxAmount(tax);
     setTotalAmount(discountedSubtotal + tax);
@@ -149,7 +146,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     try {
       let settings = null;
       
-      // Get receipt settings for the location
       if (locationId) {
         const { data, error } = await supabase
           .from("receipt_settings")
@@ -161,7 +157,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         }
       }
       
-      // If no location-specific settings, get global settings
       if (!settings) {
         const { data, error } = await supabase
           .from("receipt_settings")
@@ -178,7 +173,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         const nextNumber = settings.next_number || 1;
         const receiptNumber = `${prefix}${nextNumber.toString().padStart(6, "0")}`;
         
-        // Update next number
         await supabase
           .from("receipt_settings")
           .update({ next_number: nextNumber + 1 })
@@ -187,7 +181,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         return receiptNumber;
       }
       
-      // Default if no settings found
       return `MS${Math.floor(Math.random() * 1000000).toString().padStart(6, "0")}`;
     } catch (error) {
       console.error("Error generating receipt number:", error);
@@ -212,7 +205,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
       const receipt = await generateReceiptNumber();
       setReceiptNumber(receipt);
       
-      // Calculate membership end date based on validity period and unit
       const startDate = new Date();
       const endDate = new Date(startDate);
       
@@ -222,13 +214,12 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         endDate.setMonth(endDate.getMonth() + selectedMembership.validity_period);
       }
       
-      // Create membership sale record
       const { data: saleData, error: saleError } = await supabase
         .from("membership_sales")
         .insert({
           customer_id: selectedCustomer.id,
           membership_id: selectedMembership.id,
-          amount: subtotal, // Use the discounted subtotal
+          amount: subtotal,
           tax_amount: taxAmount,
           total_amount: totalAmount,
           payment_method: paymentMethod,
@@ -241,7 +232,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         
       if (saleError) throw saleError;
       
-      // Create customer membership record
       const { error: membershipError } = await supabase
         .from("customer_memberships")
         .insert({
@@ -255,7 +245,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         
       if (membershipError) throw membershipError;
       
-      // Create transaction record
       const { error: transactionError } = await supabase
         .from("transactions")
         .insert({
@@ -338,7 +327,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
             price: subtotal,
             type: "membership"
           }]}
-          paymentMethod={paymentMethod === "card" ? "card" : paymentMethod}
+          paymentMethod={paymentMethod === "card" ? "card" : (paymentMethod as 'cash' | 'card' | 'online')}
           onAddAnother={handleReset}
           receiptNumber={receiptNumber}
           taxAmount={taxAmount}
@@ -518,7 +507,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
                         <SelectValue placeholder="Select payment method" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">No Coupon</SelectItem>
                         {isLoadingPaymentMethods ? (
                           <SelectItem value="loading">Loading...</SelectItem>
                         ) : paymentMethods.length > 0 ? (
