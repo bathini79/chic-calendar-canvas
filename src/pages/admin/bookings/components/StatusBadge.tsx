@@ -60,12 +60,6 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
           icon: <Ban className="h-3 w-3 mr-1" />,
           variant: 'destructive' as const
         };
-      case 'booked':
-        return {
-          label: 'Booked',
-          icon: <CheckCircle className="h-3 w-3 mr-1" />,
-          variant: 'default' as const
-        };
       default:
         return {
           label: 'Pending',

@@ -1,221 +1,414 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { SCREEN } from "../types";
-import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
-import { ServiceSelection } from "@/pages/admin/bookings/components/ServiceSelection";
+
+// First line replaces the existing first lines
+// This component now takes locationId as a prop
+import React, { useState, useEffect } from "react";
+import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { ServiceSelector } from "./ServiceSelector";
 import { CheckoutSection } from "./CheckoutSection";
 import { SummaryView } from "./SummaryView";
-import { useToast } from "@/components/ui/use-toast";
-import { v4 as uuidv4 } from 'uuid';
-import { useSaveAppointment } from "../hooks/useSaveAppointment";
+import { useAppointmentState } from "../hooks/useAppointmentState";
+import { useActiveServices } from "../hooks/useActiveServices";
+import { useActivePackages } from "../hooks/useActivePackages";
+import useSaveAppointment from "../hooks/useSaveAppointment";
+import { toast } from "sonner";
+import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
+import { Appointment, SCREEN, Service, Package } from "../types";
+import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 
 interface AppointmentManagerProps {
-  appointmentId?: string;
-  isExistingAppointment?: boolean;
+  isOpen: boolean;
+  onClose: () => void;
+  selectedDate: Date;
+  selectedTime: string;
+  employees: any[];
+  existingAppointment?: Appointment | null;
   locationId?: string;
 }
-
 export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
-  appointmentId,
-  isExistingAppointment,
+  isOpen,
+  onClose,
+  selectedDate,
+  selectedTime,
+  employees,
+  existingAppointment,
   locationId
 }) => {
-  const [screen, setScreen] = useState<SCREEN>(SCREEN.SERVICE_SELECTION);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
-  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
-  const [discountValue, setDiscountValue] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online' | 'card'>('cash');
-  const [notes, setNotes] = useState('');
-  const [receiptNumber, setReceiptNumber] = useState('');
-  const [savedAppointmentId, setSavedAppointmentId] = useState<string | null>(null);
-  const [items, setItems] = useState<any[]>([]);
-  const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
-  const [selectedTimeSlots, setSelectedTimeSlots] = useState<Record<string, string>>({});
-  const [customizedServices, setCustomizedServices] = useState<Record<string, string[]>>({});
-  const { toast } = useToast();
-  const { saveAppointment } = useSaveAppointment();
+  const [currentScreen, setCurrentScreen] = useState(
+    SCREEN.SERVICE_SELECTION
+  );
+  const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
 
-  const subtotal = useMemo(() => {
-    return items.reduce((acc, item) => acc + item.price, 0);
-  }, [items]);
+  const { data: services } = useActiveServices(locationId);
+  const { data: packages } = useActivePackages(locationId);
 
-  const taxAmount = 0; // Replace with actual tax calculation if needed
-  const finalTotal = subtotal + taxAmount;
-
-  const handleAddAnother = () => {
-    setScreen(SCREEN.SERVICE_SELECTION);
-    setSelectedServices([]);
-    setSelectedPackages([]);
-    setDiscountType('none');
-    setDiscountValue(0);
-    setNotes('');
-    setReceiptNumber('');
-    setSavedAppointmentId(null);
-    setItems([]);
-    setSelectedStylists({});
-    setSelectedTimeSlots({});
-    setCustomizedServices({});
-  };
+  const {
+    selectedCustomer,
+    setSelectedCustomer,
+    setShowCreateForm,
+    selectedServices,
+    setSelectedServices,
+    selectedPackages,
+    setSelectedPackages,
+    selectedStylists,
+    setSelectedStylists,
+    selectedDate: stateSelectedDate,
+    setSelectedDate,
+    selectedTime: stateSelectedTime,
+    setSelectedTime,
+    paymentMethod,
+    setPaymentMethod,
+    discountType,
+    setDiscountType,
+    discountValue,
+    setDiscountValue,
+    appointmentNotes,
+    setAppointmentNotes,
+    resetState,
+    customizedServices,
+    setCustomizedServices,
+  } = useAppointmentState();
 
   useEffect(() => {
-    if (selectedServices.length > 0 || selectedPackages.length > 0) {
-      setScreen(SCREEN.CHECKOUT);
+    if (selectedDate) {
+      setSelectedDate(selectedDate);
     }
-  }, [selectedServices, selectedPackages]);
+    
+    if (selectedTime) {
+      setSelectedTime(selectedTime);
+    }
 
-  const handleSaveAppointment = async (params?: any) => {
-    try {
-      if (!selectedCustomer) {
-        toast({
-          title: "Error",
-          description: "Please select a customer",
-          variant: "destructive",
-        });
-        return null;
+    if (existingAppointment) {
+      processExistingAppointment(existingAppointment);
+      setCurrentScreen(SCREEN.CHECKOUT);
+    }
+  }, [selectedDate, selectedTime, existingAppointment]);
+
+  const processExistingAppointment = (appointment: Appointment) => {
+    const services: string[] = [];
+    const packages: string[] = [];
+    const stylists: Record<string, string> = {};
+    const customizedServicesMap: Record<string, string[]> = {};
+
+    const packageIdsSet = new Set<string>();
+    appointment.bookings.forEach(booking => {
+      if (booking.package_id) {
+        packageIdsSet.add(booking.package_id);
+        if (booking.employee_id) {
+          stylists[booking.package_id] = booking.employee_id;
+        }
       }
+    });
 
-      const appointmentId = await saveAppointment({
-        selectedCustomer,
-        selectedServices,
-        selectedPackages,
-        discountType,
-        discountValue,
-        paymentMethod,
-        notes,
-        selectedStylists,
-        selectedTimeSlots,
-        existingAppointmentId: savedAppointmentId || appointmentId || null,
-        customizedServices,
-        locationId,
-        params
-      });
+    const packageIds = Array.from(packageIdsSet);
+    packageIds.forEach(pkgId => {
+      packages.push(pkgId);
+    });
 
-      if (appointmentId) {
-        setSavedAppointmentId(appointmentId);
-        setReceiptNumber(uuidv4().substring(0, 8).toUpperCase());
-        setScreen(SCREEN.SUMMARY);
-        return appointmentId;
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to save appointment",
-          variant: "destructive",
-        });
-        return null;
+    appointment.bookings.forEach(booking => {
+      if (booking.service_id) {
+        if (booking.package_id) {
+          const basePackage = packageIds.includes(booking.package_id);
+          if (basePackage) {
+            const pkgDetails = appointment.bookings.find(b => 
+              b.package && b.package.id === booking.package_id
+            )?.package;
+
+            if (pkgDetails) {
+              const isBaseService = pkgDetails?.package_services?.some(
+                ps => ps.service.id === booking.service_id
+              );
+
+              if (!isBaseService) {
+                if (!customizedServicesMap[booking.package_id]) {
+                  customizedServicesMap[booking.package_id] = [];
+                }
+                customizedServicesMap[booking.package_id].push(booking.service_id);
+              }
+            }
+          }
+
+          if (booking.employee_id) {
+            stylists[booking.service_id] = booking.employee_id;
+          }
+        } else {
+          services.push(booking.service_id);
+          if (booking.employee_id) {
+            stylists[booking.service_id] = booking.employee_id;
+          }
+        }
       }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save appointment",
-        variant: "destructive",
-      });
-      return null;
+    });
+
+    setNewAppointmentId(appointment.id);
+    setSelectedServices(services);
+    setSelectedPackages(packages);
+    setSelectedStylists(stylists);
+    setCustomizedServices(customizedServicesMap);
+    setPaymentMethod(appointment.payment_method as 'cash' | 'online' || 'cash');
+    setDiscountType(appointment.discount_type as 'none' | 'percentage' | 'fixed' || 'none');
+    setDiscountValue(appointment.discount_value || 0);
+    setAppointmentNotes(appointment.notes || '');
+    setSelectedCustomer(appointment.customer || null);
+    
+    const startDate = new Date(appointment.start_time);
+    setSelectedDate(startDate);
+    setSelectedTime(format(startDate, 'HH:mm'));
+  };
+
+  const calculateTotalDuration = (
+    services: any[],
+    packages: any[]
+  ): number => {
+    return getTotalDuration(
+      selectedServices,
+      selectedPackages,
+      services,
+      packages,
+      customizedServices
+    );
+  };
+
+  const calculateTotalPrice = (
+    services: any[],
+    packages: any[],
+    discountType: string,
+    discountValue: number
+  ): number => {
+    return getTotalPrice(
+      selectedServices,
+      selectedPackages,
+      services,
+      packages,
+      customizedServices
+    );
+  };
+
+  const { handleSaveAppointment } = useSaveAppointment({
+    selectedDate: stateSelectedDate,
+    selectedTime: stateSelectedTime,
+    selectedCustomer,
+    selectedServices,
+    selectedPackages,
+    services,
+    packages,
+    selectedStylists,
+    getTotalDuration: calculateTotalDuration,
+    getTotalPrice: calculateTotalPrice,
+    discountType,
+    discountValue,
+    paymentMethod,
+    notes: appointmentNotes,
+    customizedServices,
+    currentScreen,
+    locationId
+  });
+
+  const handleProceedToCheckout = async () => {
+    if (!selectedCustomer) {
+      toast.error("Please select a customer");
+      return;
+    }
+    if (selectedServices.length === 0 && selectedPackages.length === 0) {
+      toast.error("Please select at least one service or package");
+      return;
+    }
+    setCurrentScreen(SCREEN.CHECKOUT);
+  };
+
+  const handleServiceSelect = (serviceId: string) => {
+    setSelectedServices((prev) =>
+      prev.includes(serviceId)
+        ? prev.filter((id) => id !== serviceId)
+        : [...prev, serviceId]
+    );
+  };
+  
+  const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
+    const pkg = packages?.find((p) => p.id === packageId);
+    if (!pkg) return;
+    setCustomizedServices((prev) => {
+      const currentServices = prev[packageId] || [];
+      const newServices = currentServices.includes(serviceId)
+        ? currentServices.filter((id) => id !== serviceId)
+        : [...currentServices, serviceId];
+      return {
+        ...prev,
+        [packageId]: newServices,
+      };
+    });
+  };
+  
+  const handlePackageSelect = (packageId: string) => {
+    setSelectedPackages((prev) =>
+      prev.includes(packageId)
+        ? prev.filter((id) => id !== packageId)
+        : [...prev, packageId]
+    );
+  };
+
+  const handleStylistSelect = (itemId: string, stylistId: string) => {
+    setSelectedStylists((prev) => ({
+      ...prev,
+      [itemId]: stylistId,
+    }));
+  };
+
+  const handleRemoveService = (serviceId: string) => {
+    setSelectedServices(prev => prev.filter(id => id !== serviceId));
+    const updatedStylists = { ...selectedStylists };
+    delete updatedStylists[serviceId];
+    setSelectedStylists(updatedStylists);
+  };
+
+  const handleRemovePackage = (packageId: string) => {
+    setSelectedPackages(prev => prev.filter(id => id !== packageId));
+    const updatedStylists = { ...selectedStylists };
+    delete updatedStylists[packageId];
+    setSelectedStylists(updatedStylists);
+  };
+
+  const handleBackToServices = () => {
+    setCurrentScreen(SCREEN.SERVICE_SELECTION);
+  };
+
+  const handlePaymentComplete = (appointmentId?: string) => {  
+    setNewAppointmentId(appointmentId || null);
+    setCurrentScreen(SCREEN.SUMMARY);
+    resetState();
+  };
+
+  const onHandleSaveAppointment = async() => {
+    const appointmentId = await handleSaveAppointment();
+    if(appointmentId){
+      onClose();
+      resetState();
     }
   };
 
   return (
-    <div className="h-full w-full">
-      {screen === SCREEN.SERVICE_SELECTION && (
-        <ServiceSelection
-          selectedCustomer={selectedCustomer}
-          selectedServices={selectedServices}
-          selectedPackages={selectedPackages}
-          selectedStylists={selectedStylists}
-          selectedTimeSlots={selectedTimeSlots}
-          customizedServices={customizedServices}
-          onSelectServices={(services) => {
-            setSelectedServices(services);
-          }}
-          onSelectPackages={(packages) => {
-            setSelectedPackages(packages);
-          }}
-          onSetItems={(items) => {
-            setItems(items);
-          }}
-          onSetSelectedStylists={(stylists) => {
-            setSelectedStylists(stylists);
-          }}
-          onSetSelectedTimeSlots={(timeSlots) => {
-            setSelectedTimeSlots(timeSlots);
-          }}
-          onSetCustomizedServices={(customServices) => {
-            setCustomizedServices(customServices);
-          }}
-        />
-      )}
+    <div
+      className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
+        isOpen ? "translate-x-0" : "translate-x-full"
+      }`}
+    >
+      <div className="flex flex-col h-full">
+        <div className="p-6 border-b flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold">
+              {existingAppointment ? "Edit Appointment" : "New Appointment"}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              ✕
+            </button>
+          </div>
+          {stateSelectedDate && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {format(stateSelectedDate, "MMMM d, yyyy")} at {stateSelectedTime}
+            </p>
+          )}
+        </div>
 
-      {screen === SCREEN.CHECKOUT && (
-        <CheckoutSection
-          appointmentId={appointmentId}
-          selectedCustomer={selectedCustomer}
-          selectedServices={selectedServices}
-          selectedPackages={selectedPackages}
-          services={items.filter((item) => item.type === 'service')}
-          packages={items.filter((item) => item.type === 'package')}
-          discountType={discountType}
-          discountValue={discountValue}
-          paymentMethod={paymentMethod}
-          notes={notes}
-          onDiscountTypeChange={(type) => setDiscountType(type)}
-          onDiscountValueChange={(value) => setDiscountValue(value)}
-          onPaymentMethodChange={(method) => setPaymentMethod(method)}
-          onNotesChange={(notes) => setNotes(notes)}
-          onPaymentComplete={() => setScreen(SCREEN.SUMMARY)}
-          selectedStylists={selectedStylists}
-          selectedTimeSlots={selectedTimeSlots}
-          onSaveAppointment={handleSaveAppointment}
-          onRemoveService={(serviceId) => {
-            setSelectedServices(selectedServices.filter((id) => id !== serviceId));
-            setItems(items.filter((item) => item.id !== serviceId));
-          }}
-          onRemovePackage={(packageId) => {
-            setSelectedPackages(selectedPackages.filter((id) => id !== packageId));
-            setItems(items.filter((item) => item.id !== packageId));
-          }}
-          onBackToServices={() => setScreen(SCREEN.SERVICE_SELECTION)}
-          isExistingAppointment={isExistingAppointment}
-          customizedServices={customizedServices}
-          locationId={locationId}
-        />
-      )}
+        <div className="flex flex-1 min-h-0">
+          <div className="w-[30%] border-r">
+            <SelectCustomer
+              selectedCustomer={selectedCustomer}
+              setSelectedCustomer={setSelectedCustomer}
+              setShowCreateForm={setShowCreateForm}
+            />
+          </div>
 
-      {screen === SCREEN.SUMMARY && savedAppointmentId && (
-        <SummaryView
-          appointmentId={savedAppointmentId}
-          customer={{
-            id: selectedCustomer!.id,
-            full_name: selectedCustomer!.full_name || '',
-            email: selectedCustomer!.email || '',
-            phone_number: selectedCustomer!.phone_number
-          }}
-          totalPrice={finalTotal}
-          items={items.map(item => ({
-            id: item.id,
-            name: item.name,
-            price: item.price,
-            type: item.type,
-            employee: item.stylist ? {
-              id: item.stylist,
-              name: item.stylistName || ''
-            } : undefined,
-            duration: item.duration
-          }))}
-          paymentMethod={paymentMethod}
-          onAddAnother={handleAddAnother}
-          receiptNumber={receiptNumber}
-          taxAmount={taxAmount || 0}
-          subTotal={subtotal}
-        />
-      )}
+          <div className="w-[70%] flex flex-col h-full">
+            {currentScreen === SCREEN.SERVICE_SELECTION && (
+              <div className="flex flex-col h-full">
+                <div className="p-6 flex-shrink-0">
+                  <h3 className="text-lg font-semibold">Select Services</h3>
+                </div>
 
-      {!selectedCustomer && screen === SCREEN.SERVICE_SELECTION && (
-        <SelectCustomer
-          selectedCustomer={selectedCustomer}
-          setSelectedCustomer={setSelectedCustomer}
-          setShowCreateForm={() => { }}
-        />
-      )}
+                <div className="flex-1 overflow-y-auto px-6">
+                  <ServiceSelector
+                    onServiceSelect={handleServiceSelect}
+                    onPackageSelect={handlePackageSelect}
+                    onStylistSelect={handleStylistSelect}
+                    selectedServices={selectedServices}
+                    selectedPackages={selectedPackages}
+                    selectedStylists={selectedStylists}
+                    stylists={employees}
+                    onCustomPackage={handleCustomServiceToggle}
+                    customizedServices={customizedServices}
+                    locationId={locationId}
+                  />
+                </div>
+
+                <div className="p-6 border-t mt-auto flex justify-end gap-4">
+                  <Button variant="outline" onClick={onHandleSaveAppointment}>
+                    Save Appointment
+                  </Button>
+                  <Button
+                    className="bg-black text-white"
+                    onClick={handleProceedToCheckout}
+                  >
+                    Checkout
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {currentScreen === SCREEN.CHECKOUT && (
+              <CheckoutSection
+                appointmentId={newAppointmentId || ""}
+                selectedCustomer={selectedCustomer}
+                selectedServices={selectedServices}
+                selectedPackages={selectedPackages}
+                services={services || []}
+                packages={packages || []}
+                discountType={discountType}
+                discountValue={discountValue}
+                paymentMethod={paymentMethod}
+                notes={appointmentNotes}
+                onDiscountTypeChange={setDiscountType}
+                onDiscountValueChange={setDiscountValue}
+                onPaymentMethodChange={setPaymentMethod}
+                onNotesChange={setAppointmentNotes}
+                onPaymentComplete={handlePaymentComplete}
+                selectedStylists={selectedStylists}
+                selectedTimeSlots={{ [newAppointmentId || '']: stateSelectedTime }}
+                onSaveAppointment={handleSaveAppointment}
+                onRemoveService={handleRemoveService}
+                onRemovePackage={handleRemovePackage}
+                onBackToServices={handleBackToServices}
+                customizedServices={customizedServices}
+                isExistingAppointment={!!existingAppointment}
+                locationId={locationId}
+              />
+            )}
+
+            {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
+              <div className="p-6">
+                <h3 className="text-xl font-semibold mb-6">
+                  Appointment Summary
+                </h3>
+                <SummaryView
+                  appointmentId={newAppointmentId}
+                />
+                <div className="mt-6 flex justify-end">
+                  <Button
+                    onClick={() => {
+                      setCurrentScreen(SCREEN.SERVICE_SELECTION);
+                      setNewAppointmentId(null);
+                    }}
+                  >
+                    Create New Appointment
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

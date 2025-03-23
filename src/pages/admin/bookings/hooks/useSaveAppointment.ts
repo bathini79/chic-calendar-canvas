@@ -1,210 +1,315 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useRouter } from 'next/navigation';
-import type { AppointmentStatus } from "../types";
+import { startOfDay, format, parse, addMinutes } from "date-fns";
+import { SCREEN, AppointmentStatus } from "../types";
 
-export function useSaveAppointment() {
+interface SaveAppointmentProps {
+  selectedDate: Date | null;
+  selectedTime: string;
+  selectedCustomer: any;
+  selectedServices: string[];
+  selectedPackages: string[];
+  services: any[];
+  packages: any[];
+  selectedStylists: Record<string, string>;
+  getTotalDuration: (services: any[], packages: any[]) => number;
+  getTotalPrice: (services: any[], packages: any[], discountType: string, discountValue: number) => number;
+  discountType: string;
+  discountValue: number;
+  paymentMethod: string;
+  notes: string;
+  customizedServices: Record<string, string[]>;
+  currentScreen: SCREEN;
+  locationId?: string;
+  appliedTaxId?: string | null;
+  taxAmount?: number;
+  couponId?: string | null;
+  couponDiscount?: number;
+}
+
+export default function useSaveAppointment({
+  selectedDate,
+  selectedTime,
+  selectedCustomer,
+  selectedServices,
+  selectedPackages,
+  services,
+  packages,
+  selectedStylists,
+  getTotalDuration,
+  getTotalPrice,
+  discountType,
+  discountValue,
+  paymentMethod,
+  notes,
+  customizedServices,
+  currentScreen,
+  locationId,
+  appliedTaxId,
+  taxAmount = 0,
+  couponId = null,
+  couponDiscount = 0
+}: SaveAppointmentProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
 
-  const saveAppointment = async (params?: any) => {
+  const handleSaveAppointment = async (params?: any): Promise<string | undefined> => {
     try {
       setIsLoading(true);
+      
+      // Extract appointment ID if it was passed as first parameter (backward compatibility)
+      let appointmentId: string | undefined;
+      let summaryParams: any = {};
+      
+      if (params) {
+        if (typeof params === 'string') {
+          // If params is a string, it's an appointmentId from the old function signature
+          appointmentId = params;
+        } else if (typeof params === 'object') {
+          // If params is an object, it contains summary values AND might contain appointmentId
+          summaryParams = params;
+          
+          if (params.appointmentId) {
+            appointmentId = params.appointmentId;
+          }
+        }
+      }
 
-      const selectedServices = (localStorage.getItem('selectedServices') || '').split(',').filter(Boolean);
-      const selectedPackages = (localStorage.getItem('selectedPackages') || '').split(',').filter(Boolean);
-      const selectedCustomer = JSON.parse(localStorage.getItem('selectedCustomer') || '{}');
-      const selectedStylists = JSON.parse(localStorage.getItem('selectedStylists') || '{}');
-      const selectedTimeSlots = JSON.parse(localStorage.getItem('selectedTimeSlots') || '{}');
-      const selectedDate = localStorage.getItem('selectedDate') || '';
-      const discountType = localStorage.getItem('discountType') as "none" | "fixed" | "percentage" || 'none';
-      const discountValue = Number(localStorage.getItem('discountValue') || '0');
-      const paymentMethod = localStorage.getItem('paymentMethod') || 'cash';
-      const notes = localStorage.getItem('notes') || '';
-      const existingAppointmentId = localStorage.getItem('appointmentId') || null;
-      const selectedLocation = localStorage.getItem('selectedLocation') || null;
-      const appointmentStatus = localStorage.getItem('appointmentStatus') as AppointmentStatus || 'pending';
-      const subtotal = Number(localStorage.getItem('subtotal')) || 0;
-      const finalTotal = Number(localStorage.getItem('finalTotal')) || 0;
-      const taxAmount = Number(localStorage.getItem('taxAmount')) || 0;
-      const receiptNumber = localStorage.getItem('receiptNumber') || '';
-      const customizedServices = JSON.parse(localStorage.getItem('customizedServices') || '{}');
+      if (!selectedCustomer) {
+        toast.error("Please select a customer");
+        return;
+      }
 
-      if (!selectedCustomer?.id) {
-        throw new Error("Customer is required");
+      if (selectedServices.length === 0 && selectedPackages.length === 0) {
+        toast.error("Please select at least one service or package");
+        return;
       }
 
       if (!selectedDate) {
-        throw new Error("Date is required");
+        toast.error("Please select a date");
+        return;
       }
 
-      const startDateTime = new Date(`${selectedDate}T${selectedTimeSlots[selectedServices[0] || selectedPackages[0]]}:00`);
-      let endDateTime = new Date(startDateTime);
+      // Parse the time string and combine it with the selected date
+      const timeComponents = selectedTime.split(':');
+      const hours = parseInt(timeComponents[0], 10);
+      const minutes = parseInt(timeComponents[1], 10);
+      
+      const startTime = new Date(selectedDate);
+      startTime.setHours(hours, minutes, 0, 0);
 
-      // Fetch service and package details
-      const { data: services, error: servicesError } = await supabase
-        .from('services')
-        .select('*')
-        .in('id', selectedServices);
+      // Get all selected services and packages
+      const selectedServiceObjects = selectedServices.map(id => 
+        services.find(s => s.id === id)
+      ).filter(Boolean);
+      
+      const selectedPackageObjects = selectedPackages.map(id => 
+        packages.find(p => p.id === id)
+      ).filter(Boolean);
 
-      if (servicesError) throw servicesError;
+      // Calculate total duration and end time
+      const totalDuration = getTotalDuration(selectedServiceObjects, selectedPackageObjects);
+      const endTime = addMinutes(startTime, totalDuration);
 
-      const { data: packages, error: packagesError } = await supabase
-        .from('packages')
-        .select('*')
-        .in('id', selectedPackages);
+      // Use the values from summary params if available, otherwise calculate
+      const calculatedTaxAmount = summaryParams.taxAmount !== undefined ? 
+        summaryParams.taxAmount : 
+        taxAmount;
+      
+      const calculatedCouponDiscount = summaryParams.couponDiscount !== undefined ? 
+        summaryParams.couponDiscount : 
+        couponDiscount;
+        
+      // Use provided summary total price or calculate it
+      const totalPrice = summaryParams.total !== undefined ? 
+        summaryParams.total : 
+        getTotalPrice(selectedServiceObjects, selectedPackageObjects, discountType, discountValue) - calculatedCouponDiscount + calculatedTaxAmount;
+      
+      // Use provided tax and coupon IDs or fall back to props
+      const usedTaxId = summaryParams.appliedTaxId !== undefined ? 
+        (typeof summaryParams.appliedTaxId === 'object' && summaryParams.appliedTaxId !== null ? 
+          summaryParams.appliedTaxId.id || summaryParams.appliedTaxId : summaryParams.appliedTaxId) : 
+        appliedTaxId;
+        
+      const usedCouponId = summaryParams.couponId !== undefined ? 
+        (typeof summaryParams.couponId === 'object' && summaryParams.couponId !== null ? 
+          summaryParams.couponId.id || summaryParams.couponId : summaryParams.couponId) : 
+        couponId;
 
-      if (packagesError) throw packagesError;
-
-      // Calculate total duration
-      let totalDuration = 0;
-      selectedServices.forEach(serviceId => {
-        const service = services?.find(s => s.id === serviceId);
-        totalDuration += service?.duration || 0;
+      console.log("Appointment data for saving:", {
+        total: totalPrice,
+        taxAmount: calculatedTaxAmount,
+        couponDiscount: calculatedCouponDiscount,
+        taxId: usedTaxId,
+        couponId: usedCouponId
       });
 
-      selectedPackages.forEach(packageId => {
-        const pkg = packages?.find(p => p.id === packageId);
-        totalDuration += pkg?.duration || 0;
-      });
+      // Create or update appointment with properly typed status
+      const appointmentStatus: AppointmentStatus = 
+        currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
 
-      endDateTime.setMinutes(startDateTime.getMinutes() + totalDuration);
-
-      // Update/Insert appointment record
-      let appointmentData = {
-        customer_id: selectedCustomer?.id,
-        start_time: startDateTime,
-        end_time: endDateTime,
+      const appointmentData = {
+        customer_id: selectedCustomer.id,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
         status: appointmentStatus,
-        total_price: params?.total || finalTotal,
-        discount_type: discountType,
+        total_price: totalPrice,
+        discount_type: discountType as 'none' | 'percentage' | 'fixed',
         discount_value: discountValue,
         payment_method: paymentMethod,
-        notes,
-        location: selectedLocation,
-        tax_amount: params?.taxAmount || 0,
-        coupon_id: params?.couponId || null
+        notes: notes,
+        location: locationId,
+        tax_amount: calculatedTaxAmount,
+        coupon_id: usedCouponId
       };
-      
-      // Add membership fields if present
-      if (params?.membershipId) {
-        appointmentData = {
-          ...appointmentData,
-          membership_id: params.membershipId,
-          membership_name: params.membershipName,
-          membership_discount: params.membershipDiscount
-        };
-      }
 
-      let appointmentId = existingAppointmentId;
-      
-      if (!existingAppointmentId) {
-        // Insert new appointment
-        const { data: appointmentData, error: appointmentError } = await supabase
-          .from('appointments')
-          .insert([{
-            ...appointmentData,
-            transaction_type: 'sale'
-          }])
-          .select('id')
-          .single();
+      let createdAppointmentId;
 
-        if (appointmentError) throw appointmentError;
-        appointmentId = appointmentData.id;
-      } else {
+      if (appointmentId) {
         // Update existing appointment
-        const { error: appointmentError } = await supabase
+        const { error } = await supabase
           .from('appointments')
-          .update({
-            ...appointmentData,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingAppointmentId);
+          .update(appointmentData)
+          .eq('id', appointmentId);
 
-        if (appointmentError) throw appointmentError;
-      }
+        if (error) throw error;
+        createdAppointmentId = appointmentId;
 
-      // Insert/Update bookings
-      const allItems = [...selectedServices, ...selectedPackages];
-
-      // First, delete existing bookings for existing appointments
-      if (existingAppointmentId) {
+        // Delete existing bookings
         const { error: deleteError } = await supabase
           .from('bookings')
           .delete()
-          .eq('appointment_id', existingAppointmentId);
+          .eq('appointment_id', appointmentId);
 
         if (deleteError) throw deleteError;
+      } else {
+        // Create new appointment
+        const { data, error } = await supabase
+          .from('appointments')
+          .insert(appointmentData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        createdAppointmentId = data.id;
       }
 
-      // Then, insert new bookings
-      for (const itemId of allItems) {
-        const isService = selectedServices.includes(itemId);
+      // Create bookings for each service with properly typed status
+      for (const serviceId of selectedServices) {
+        const service = services.find(s => s.id === serviceId);
+        if (!service) continue;
 
-        let bookingData = {
-          appointment_id: appointmentId,
-          start_time: new Date(`${selectedDate}T${selectedTimeSlots[itemId]}:00`).toISOString(),
-          employee_id: selectedStylists[itemId],
-          price_paid: 0,
-          status: appointmentStatus,
+        const serviceStartTime = new Date(startTime);
+        const bookingStatus: AppointmentStatus = 
+          currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
+
+        const bookingData = {
+          appointment_id: createdAppointmentId,
+          service_id: serviceId,
+          employee_id: selectedStylists[serviceId] === 'any' ? null : selectedStylists[serviceId],
+          status: bookingStatus,
+          start_time: serviceStartTime.toISOString(),
+          end_time: addMinutes(serviceStartTime, service.duration).toISOString(),
+          price_paid: service.selling_price,
+          original_price: service.original_price || service.selling_price,
         };
 
-        if (isService) {
-          const service = services?.find(s => s.id === itemId);
-          bookingData = {
-            ...bookingData,
-            service_id: itemId,
-            price_paid: service?.selling_price || 0,
-          };
-        } else {
-          const pkg = packages?.find(p => p.id === itemId);
-          bookingData = {
-            ...bookingData,
-            package_id: itemId,
-            price_paid: pkg?.price || 0,
-          };
-        }
-
-        const { error: bookingError } = await supabase
+        const { error } = await supabase
           .from('bookings')
-          .insert([bookingData]);
+          .insert(bookingData);
 
-        if (bookingError) throw bookingError;
+        if (error) throw error;
       }
 
-      // Clear local storage
-      localStorage.removeItem('selectedServices');
-      localStorage.removeItem('selectedPackages');
-      localStorage.removeItem('selectedCustomer');
-      localStorage.removeItem('selectedStylists');
-      localStorage.removeItem('selectedTimeSlots');
-      localStorage.removeItem('selectedDate');
-      localStorage.removeItem('discountType');
-      localStorage.removeItem('discountValue');
-      localStorage.removeItem('paymentMethod');
-      localStorage.removeItem('notes');
-      localStorage.removeItem('appointmentId');
-      localStorage.removeItem('selectedLocation');
-      localStorage.removeItem('appointmentStatus');
-      localStorage.removeItem('subtotal');
-      localStorage.removeItem('finalTotal');
-      localStorage.removeItem('taxAmount');
-      localStorage.removeItem('receiptNumber');
-      localStorage.removeItem('customizedServices');
+      // Create bookings for each package
+      for (const packageId of selectedPackages) {
+        const pkg = packages.find(p => p.id === packageId);
+        if (!pkg) continue;
 
-      return appointmentId;
+        // For each service in the package
+        const packageServiceIds = pkg.package_services?.map((ps: any) => ps.service.id) || [];
+        
+        for (const packageServiceId of packageServiceIds) {
+          const packageService = services.find(s => s.id === packageServiceId);
+          if (!packageService) continue;
+
+          const packageServiceStartTime = new Date(startTime);
+          // TODO: Calculate proper start time based on previous services
+
+          const bookingData = {
+            appointment_id: createdAppointmentId,
+            service_id: packageServiceId,
+            package_id: packageId,
+            employee_id: selectedStylists[packageServiceId] === 'any' ? null : selectedStylists[packageServiceId],
+            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
+            start_time: packageServiceStartTime.toISOString(),
+            end_time: addMinutes(packageServiceStartTime, packageService.duration).toISOString(),
+            price_paid: 0, // Package services typically don't have individual prices
+            original_price: packageService.selling_price,
+          };
+
+          const { error } = await supabase
+            .from('bookings')
+            .insert(bookingData);
+
+          if (error) throw error;
+        }
+
+        // Add any customized services for this package
+        const customServiceIds = customizedServices[packageId] || [];
+        for (const customServiceId of customServiceIds) {
+          const customService = services.find(s => s.id === customServiceId);
+          if (!customService) continue;
+
+          const customServiceStartTime = new Date(startTime);
+          // TODO: Calculate proper start time based on previous services
+
+          const bookingData = {
+            appointment_id: createdAppointmentId,
+            service_id: customServiceId,
+            package_id: packageId,
+            employee_id: selectedStylists[customServiceId] === 'any' ? null : selectedStylists[customServiceId],
+            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
+            start_time: customServiceStartTime.toISOString(),
+            end_time: addMinutes(customServiceStartTime, customService.duration).toISOString(),
+            price_paid: customService.selling_price,
+            original_price: customService.selling_price,
+          };
+
+          const { error } = await supabase
+            .from('bookings')
+            .insert(bookingData);
+
+          if (error) throw error;
+        }
+      }
+
+      // Update the appointment with the number of bookings
+      const { count, error: countError } = await supabase
+        .from('bookings')
+        .select('id', { count: 'exact' })
+        .eq('appointment_id', createdAppointmentId);
+
+      if (countError) throw countError;
+
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({ number_of_bookings: count })
+        .eq('id', createdAppointmentId);
+
+      if (updateError) throw updateError;
+
+      toast.success(appointmentId ? "Appointment updated" : "Appointment created");
+      return createdAppointmentId;
     } catch (error: any) {
-      console.error("Error saving appointment:", error);
-      toast.error(error.message || "Failed to save appointment");
-      return null;
+      console.error('Error saving appointment:', error);
+      toast.error(error.message || 'Failed to save appointment');
+      return undefined;
     } finally {
       setIsLoading(false);
     }
   };
 
-  return {
-    isLoading,
-    saveAppointment,
-  };
+  return { handleSaveAppointment, isLoading };
 }

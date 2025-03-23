@@ -37,14 +37,10 @@ export function useAppointmentDetails(appointmentId?: string | null) {
         const appointmentData = {
           ...data,
           location_id: data.location || null, // Map location to location_id for compatibility
-          discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none",
-          membership_discount: data.membership_discount || 0,
-          membership_id: data.membership_id || null,
-          membership_name: data.membership_name || null
-        };
+          discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none"
+        } as Appointment;
         
-        // Cast to Appointment type after ensuring all required fields are present
-        setAppointment(appointmentData as unknown as Appointment);
+        setAppointment(appointmentData);
       }
     } catch (error) {
       console.error("Error fetching appointment:", error);
