@@ -1,59 +1,79 @@
 
-import React, { useState, useEffect } from "react";
-import { format } from "date-fns";
+import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { formatPrice } from "@/lib/utils";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardContent, 
-  CardFooter 
-} from "@/components/ui/card";
-import { Customer, Service, Package, StylistSelection } from "../types";
-import { getTotalPrice, getTotalDuration, getFinalPrice, getMembershipDiscount } from "../utils/bookingUtils";
-import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
-import { Trash2, Tag } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+  MoreVertical, 
+  IndianRupee, 
+  Percent, 
+  Clock,
+  User,
+  Plus,
+  ArrowLeft,
+  Trash2
+} from "lucide-react";
 import { toast } from "sonner";
+import type { Service, Package, Customer } from "../types";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { format } from 'date-fns';
+import { 
+  getTotalPrice, 
+  getTotalDuration, 
+  getFinalPrice, 
+  getServicePriceInPackage,
+  calculatePackagePrice 
+} from "../utils/bookingUtils";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useTaxRates } from "@/hooks/use-tax-rates";
+import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 
 interface CheckoutSectionProps {
+  appointmentId?: string;
   selectedCustomer: Customer | null;
   selectedServices: string[];
   selectedPackages: string[];
   services: Service[];
   packages: Package[];
-  discountType: "none" | "percentage" | "fixed";
+  discountType: 'none' | 'percentage' | 'fixed';
   discountValue: number;
-  paymentMethod: string;
+  paymentMethod: 'cash' | 'online';
   notes: string;
-  onDiscountTypeChange: (type: "none" | "percentage" | "fixed") => void;
+  onDiscountTypeChange: (type: 'none' | 'percentage' | 'fixed') => void;
   onDiscountValueChange: (value: number) => void;
-  onPaymentMethodChange: (method: string) => void;
+  onPaymentMethodChange: (method: 'cash' | 'online') => void;
   onNotesChange: (notes: string) => void;
-  onSaveAppointment: () => Promise<string | undefined>;
   onPaymentComplete: (appointmentId?: string) => void;
-  selectedStylists: StylistSelection;
+  selectedStylists: Record<string, string>;
   selectedTimeSlots: Record<string, string>;
+  onSaveAppointment: (params?: any) => Promise<string | null>;
   onRemoveService: (serviceId: string) => void;
   onRemovePackage: (packageId: string) => void;
   onBackToServices: () => void;
-  customizedServices: Record<string, string[]>;
   isExistingAppointment?: boolean;
-  appointmentId?: string;
+  customizedServices?: Record<string, string[]>;
   locationId?: string;
 }
 
-export function CheckoutSection({
+export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
+  appointmentId,
   selectedCustomer,
   selectedServices,
   selectedPackages,
@@ -67,376 +87,492 @@ export function CheckoutSection({
   onDiscountValueChange,
   onPaymentMethodChange,
   onNotesChange,
-  onSaveAppointment,
   onPaymentComplete,
   selectedStylists,
   selectedTimeSlots,
+  onSaveAppointment,
   onRemoveService,
   onRemovePackage,
   onBackToServices,
-  customizedServices,
   isExistingAppointment,
-  appointmentId,
+  customizedServices = {},
   locationId
-}: CheckoutSectionProps) {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [subtotal, setSubtotal] = useState(0);
-  const [taxAmount, setTaxAmount] = useState(0);
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [taxRate, setTaxRate] = useState(0);
-  const [taxRates, setTaxRates] = useState<any[]>([]);
-  const [selectedTaxId, setSelectedTaxId] = useState<string | null>(null);
-  const [membershipDiscount, setMembershipDiscount] = useState<number>(0);
-  const [appliedMembershipId, setAppliedMembershipId] = useState<string | null>(null);
-  const [appliedMembershipName, setAppliedMembershipName] = useState<string | null>(null);
+}) => {
+  const { data: employees } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('employment_type', 'stylist');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { taxRates, fetchTaxRates, isLoading: taxRatesLoading } = useTaxRates();
+  const { fetchLocationTaxSettings } = useLocationTaxSettings();
+  const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
+  const [appliedTaxRate, setAppliedTaxRate] = useState<number>(0);
+  const [appliedTaxName, setAppliedTaxName] = useState<string>("");
+  const { data: paymentMethods = [], isLoading: paymentMethodsLoading } = useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('is_enabled', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
   
-  const { customerMemberships, isLoading: isMembershipsLoading, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
+  const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
+  const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState<number>(0);
+  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+
+  const subtotal = useMemo(() => 
+    getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
+    [selectedServices, selectedPackages, services, packages, customizedServices]
+  );
 
   useEffect(() => {
-    if (selectedCustomer?.id) {
-      fetchCustomerMemberships(selectedCustomer.id);
-    } else {
-      setMembershipDiscount(0);
-      setAppliedMembershipId(null);
-      setAppliedMembershipName(null);
-    }
-  }, [selectedCustomer, fetchCustomerMemberships]);
-
-  // Fetch tax rates when component mounts
-  useEffect(() => {
-    const fetchTaxRates = async () => {
-      try {
-        const { data, error } = await fetch(
-          'tax_rates',
-          locationId ? { location_id: locationId } : undefined
-        );
-        if (error) throw error;
-        setTaxRates(data || []);
+    const loadTaxData = async () => {
+      await fetchTaxRates();
+      
+      if (locationId) {
+        const settings = await fetchLocationTaxSettings(locationId);
         
-        // Find default tax rate if exists
-        const defaultTax = data?.find((tax: any) => tax.is_default);
-        if (defaultTax) {
-          setSelectedTaxId(defaultTax.id);
-          setTaxRate(defaultTax.percentage);
+        if (settings && settings.service_tax_id) {
+          setAppliedTaxId(settings.service_tax_id);
         }
-      } catch (error) {
-        console.error("Error fetching tax rates:", error);
       }
     };
     
-    const fetch = async (table: string, equalityFilter?: Record<string, any>) => {
-      let query = supabase.from(table).select('*');
-      
-      if (equalityFilter) {
-        const key = Object.keys(equalityFilter)[0];
-        query = query.eq(key, equalityFilter[key]);
-      }
-      
-      return await query;
-    };
-
-    fetchTaxRates();
+    loadTaxData();
   }, [locationId]);
 
-  // Calculate subtotal and apply membership discounts
   useEffect(() => {
-    const baseSubtotal = getTotalPrice(
-      selectedServices,
-      selectedPackages,
-      services,
-      packages,
-      customizedServices
-    );
-    
-    setSubtotal(baseSubtotal);
-    
-    // Check if customer has applicable memberships
-    let bestMembershipDiscount = 0;
-    let bestMembershipId = null;
-    let bestMembershipName = null;
-    
-    // For services
-    selectedServices.forEach(serviceId => {
-      const servicePrice = services.find(s => s.id === serviceId)?.selling_price || 0;
-      const discount = getApplicableMembershipDiscount(serviceId, null, servicePrice);
-      
-      if (discount && discount.calculatedDiscount > bestMembershipDiscount) {
-        bestMembershipDiscount = discount.calculatedDiscount;
-        bestMembershipId = discount.membershipId;
-        bestMembershipName = discount.membershipName;
+    if (appliedTaxId && taxRates.length > 0) {
+      const tax = taxRates.find(t => t.id === appliedTaxId);
+      if (tax) {
+        setAppliedTaxRate(tax.percentage);
+        setAppliedTaxName(tax.name);
       }
-    });
-    
-    // For packages
-    selectedPackages.forEach(packageId => {
-      const packagePrice = packages.find(p => p.id === packageId)?.price || 0;
-      const discount = getApplicableMembershipDiscount(null, packageId, packagePrice);
-      
-      if (discount && discount.calculatedDiscount > bestMembershipDiscount) {
-        bestMembershipDiscount = discount.calculatedDiscount;
-        bestMembershipId = discount.membershipId;
-        bestMembershipName = discount.membershipName;
+    } else {
+      setAppliedTaxRate(0);
+      setAppliedTaxName("");
+    }
+  }, [appliedTaxId, taxRates]);
+
+  useEffect(() => {
+    const fetchCoupons = async () => {
+      setIsLoadingCoupons(true);
+      try {
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("*")
+          .eq("is_active", true)
+          .order("code");
+
+        if (error) throw error;
+        setAvailableCoupons(data || []);
+      } catch (error) {
+        console.error("Error fetching coupons:", error);
+      } finally {
+        setIsLoadingCoupons(false);
       }
+    };
+
+    fetchCoupons();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCouponId && availableCoupons.length > 0) {
+      const coupon = availableCoupons.find(c => c.id === selectedCouponId);
+      if (coupon) {
+        setSelectedCoupon(coupon);
+        
+        const discountAmount = coupon.discount_type === 'percentage' 
+          ? subtotal * (coupon.discount_value / 100)
+          : Math.min(coupon.discount_value, subtotal);
+        
+        setCouponDiscount(discountAmount);
+      }
+    } else {
+      setSelectedCoupon(null);
+      setCouponDiscount(0);
+    }
+  }, [selectedCouponId, availableCoupons, subtotal]);
+
+  const handleTaxChange = (taxId: string) => {
+    if (taxId === "none") {
+      setAppliedTaxId(null);
+      return;
+    }
+    setAppliedTaxId(taxId);
+  };
+
+  const handleCouponChange = (couponId: string) => {
+    if (couponId === "none") {
+      setSelectedCouponId(null);
+      return;
+    }
+    setSelectedCouponId(couponId);
+  };
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`;
+    }
+    return `${minutes}m`;
+  };
+
+  const formatTimeSlot = (timeString: string) => {
+    try {
+      const baseDate = new Date();
+      const [hours, minutes] = timeString.split(':').map(Number);
+      baseDate.setHours(hours, minutes);
+      return format(baseDate, 'hh:mm a');
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return timeString;
+    }
+  };
+
+  const getStylistName = (stylistId: string) => {
+    if (!employees || !stylistId) return null;
+    const stylist = employees.find(emp => emp.id === stylistId);
+    return stylist ? stylist.name : null;
+  };
+
+  const totalDuration = useMemo(() => 
+    getTotalDuration(selectedServices, selectedPackages, services, packages, customizedServices),
+    [selectedServices, selectedPackages, services, packages, customizedServices]
+  );
+
+  const taxAmount = useMemo(() => {
+    const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
+    const afterAllDiscounts = couponDiscount > 0 
+      ? Math.max(0, regularDiscountedPrice - couponDiscount) 
+      : regularDiscountedPrice;
+    
+    return appliedTaxId ? afterAllDiscounts * (appliedTaxRate / 100) : 0;
+  }, [subtotal, appliedTaxId, appliedTaxRate, discountType, discountValue, couponDiscount]);
+
+  const discountedSubtotal = useMemo(() => {
+    const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
+    
+    return couponDiscount > 0 ? Math.max(0, regularDiscountedPrice - couponDiscount) : regularDiscountedPrice;
+  }, [subtotal, discountType, discountValue, couponDiscount]);
+
+  const total = useMemo(() => 
+    discountedSubtotal + taxAmount,
+    [discountedSubtotal, taxAmount]
+  );
+  
+  const discountAmount = useMemo(() => 
+    subtotal - discountedSubtotal + couponDiscount,
+    [subtotal, discountedSubtotal, couponDiscount]
+  );
+
+  const selectedItems = useMemo(() => {
+    const individualServices = selectedServices.map((id) => {
+      const service = services.find((s) => s.id === id);
+      return service ? {
+        id,
+        name: service.name,
+        price: service.selling_price,
+        duration: service.duration,
+        type: "service" as const,
+        packageId: null as string | null,
+        stylist: selectedStylists[id],
+        stylistName: getStylistName(selectedStylists[id]),
+        time: selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ''],
+        formattedDuration: formatDuration(service.duration),
+      } : null;
+    }).filter(Boolean);
+
+    const packageItems = selectedPackages.flatMap((packageId) => {
+      const pkg = packages.find((p) => p.id === packageId);
+      if (!pkg) return [];
+      
+      const packageTotalPrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
+      
+      const packageItem = {
+        id: packageId,
+        name: pkg.name,
+        price: packageTotalPrice,
+        duration: getTotalDuration([], [packageId], services, packages, customizedServices),
+        type: "package" as const,
+        packageId: null as string | null,
+        stylist: selectedStylists[packageId],
+        stylistName: getStylistName(selectedStylists[packageId]),
+        time: selectedTimeSlots[packageId] || selectedTimeSlots[appointmentId || ''],
+        formattedDuration: formatDuration(getTotalDuration([], [packageId], services, packages, customizedServices)),
+        services: [] as Array<{
+          id: string;
+          name: string;
+          price: number;
+          duration: number;
+          stylist: string | null;
+          stylistName: string | null;
+          isCustomized: boolean;
+        }>
+      };
+      
+      if (pkg.package_services) {
+        packageItem.services = pkg.package_services.map(ps => {
+          const adjustedPrice = ps.package_selling_price !== undefined && ps.package_selling_price !== null
+            ? ps.package_selling_price 
+            : ps.service.selling_price;
+            
+          return {
+            id: ps.service.id,
+            name: ps.service.name,
+            price: adjustedPrice,
+            duration: ps.service.duration,
+            stylist: selectedStylists[ps.service.id] || selectedStylists[packageId] || null,
+            stylistName: getStylistName(selectedStylists[ps.service.id] || selectedStylists[packageId] || ''),
+            isCustomized: false
+          };
+        });
+      }
+      
+      if (customizedServices[packageId] && customizedServices[packageId].length > 0) {
+        const additionalServices = customizedServices[packageId]
+          .filter(serviceId => {
+            return !pkg.package_services.some(ps => ps.service.id === serviceId);
+          })
+          .map(serviceId => {
+            const service = services.find(s => s.id === serviceId);
+            if (!service) return null;
+            
+            return {
+              id: service.id,
+              name: service.name,
+              price: service.selling_price,
+              duration: service.duration,
+              stylist: selectedStylists[service.id] || selectedStylists[packageId] || null,
+              stylistName: getStylistName(selectedStylists[service.id] || selectedStylists[packageId] || ''),
+              isCustomized: true
+            };
+          })
+          .filter(Boolean);
+        
+        packageItem.services.push(...additionalServices);
+      }
+      
+      return [packageItem];
     });
-    
-    // Set membership discount info
-    setMembershipDiscount(bestMembershipDiscount);
-    setAppliedMembershipId(bestMembershipId);
-    setAppliedMembershipName(bestMembershipName);
-    
-    // Calculate total after discounts (manual + membership)
-    const afterManualDiscount = getFinalPrice(baseSubtotal, discountType, discountValue);
-    const finalSubtotal = Math.max(0, afterManualDiscount - bestMembershipDiscount);
-    
-    // Calculate tax amount
-    const calculatedTaxAmount = (finalSubtotal * taxRate) / 100;
-    setTaxAmount(calculatedTaxAmount);
-    
-    // Calculate final price
-    setTotalPrice(finalSubtotal + calculatedTaxAmount);
+
+    return [...individualServices, ...packageItems] as Array<any>;
   }, [
     selectedServices, 
     selectedPackages, 
     services, 
     packages, 
-    customizedServices, 
-    discountType, 
-    discountValue, 
-    taxRate, 
-    getApplicableMembershipDiscount,
-    customerMemberships
+    selectedStylists, 
+    selectedTimeSlots, 
+    appointmentId, 
+    customizedServices,
+    employees
   ]);
 
-  const handleTaxRateChange = (taxId: string) => {
-    if (taxId === "none") {
-      setSelectedTaxId(null);
-      setTaxRate(0);
-    } else {
-      setSelectedTaxId(taxId);
-      const selectedTax = taxRates.find(tax => tax.id === taxId);
-      if (selectedTax) {
-        setTaxRate(selectedTax.percentage);
-      }
-    }
-  };
-
-  const handleCheckout = async () => {
-    if (!selectedCustomer) {
-      toast.error("Please select a customer");
-      return;
-    }
-
-    if (selectedServices.length === 0 && selectedPackages.length === 0) {
-      toast.error("Please select at least one service or package");
-      return;
-    }
-
-    setIsProcessing(true);
+  const handlePayment = async () => {
     try {
-      // Save appointment data with membership info
-      const appointmentId = await onSaveAppointment();
-      
-      // If we successfully saved the appointment, complete the payment
-      if (appointmentId) {
-        onPaymentComplete(appointmentId);
+      if (!selectedCustomer) {
+        toast.error("Please select a customer");
+        return;
       }
-    } catch (error) {
-      console.error("Error during checkout:", error);
-      toast.error("There was an error processing your payment");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+      
+      console.log("Payment data:", {
+        taxId: appliedTaxId,
+        taxAmount,
+        couponId: selectedCouponId,
+        couponDiscount,
+        total
+      });
+      
+      // Pass the summary data with values already calculated
+      const saveAppointmentParams = {
+        appointmentId: appointmentId, // Include the appointmentId in the params
+        appliedTaxId: appliedTaxId,
+        taxAmount: taxAmount,
+        couponId: selectedCouponId,
+        couponDiscount: couponDiscount,
+        total: total
+      };
+      
+      const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
+      if (!savedAppointmentId) {
+        toast.error("Failed to complete payment");
+        return;
+      }
 
-  const duration = getTotalDuration(
-    selectedServices,
-    selectedPackages,
-    services,
-    packages,
-    customizedServices
-  );
-
-  // Helper for calculating service or package price with membership
-  const getItemPrice = (id: string, type: 'service' | 'package') => {
-    if (type === 'service') {
-      const service = services.find(s => s.id === id);
-      return service?.selling_price || 0;
-    } else {
-      const pkg = packages.find(p => p.id === id);
-      return pkg?.price || 0;
+      toast.success("Payment completed successfully");
+      onPaymentComplete(savedAppointmentId);
+    } catch (error: any) {
+      console.error("Error completing payment:", error);
+      toast.error(error.message || "Failed to complete payment");
     }
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-6 border-b">
-        <h3 className="text-lg font-semibold">Checkout</h3>
-      </div>
+    <div className="h-full w-full bg-gray-50 p-6">
+      <Card className="h-full">
+        <CardContent className="p-6 h-full flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">Checkout Summary</h2>
+            <Button
+              variant="outline"
+              onClick={onBackToServices}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Service
+            </Button>
+          </div>
 
-      <div className="flex-1 overflow-auto p-6">
-        <div className="mb-8">
-          <h4 className="text-sm font-medium mb-3">Services & Packages</h4>
-          <div className="space-y-2">
-            {selectedServices.map((serviceId) => {
-              const service = services.find((s) => s.id === serviceId);
-              if (!service) return null;
-              return (
-                <Card key={serviceId} className="bg-gray-50">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h5 className="font-medium">{service.name}</h5>
-                        <p className="text-sm text-muted-foreground">
-                          Duration: {service.duration} min
-                        </p>
-                        {selectedTimeSlots[serviceId] && (
-                          <p className="text-sm text-muted-foreground">
-                            Time: {selectedTimeSlots[serviceId]}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <div className="font-medium">
-                            {formatPrice(service.selling_price)}
+          <div className="flex-1 space-y-6 overflow-hidden flex flex-col">
+            {selectedItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full space-y-4">
+                <p className="text-muted-foreground text-center">
+                  No services or packages selected
+                </p>
+                <Button
+                  variant="default"
+                  onClick={onBackToServices}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Go to Services
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+                {selectedItems.map((item) => (
+                  item && (
+                    <div
+                      key={`${item.type}-${item.id}`}
+                      className="flex flex-col py-4 border-b border-gray-100"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="space-y-1">
+                          <p className="text-lg font-semibold tracking-tight">{item.name}</p>
+                          <div className="flex flex-wrap text-sm text-muted-foreground gap-2">
+                            <div className="flex items-center">
+                              <Clock className="mr-1 h-4 w-4" />
+                              {item.time && (
+                                <span>{item.time} • {item.formattedDuration}</span>
+                              )}
+                              {!item.time && (
+                                <span>{item.formattedDuration}</span>
+                              )}
+                            </div>
+                            {item.stylistName && (
+                              <div className="flex items-center">
+                                <User className="mr-1 h-4 w-4" />
+                                {item.stylistName}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onRemoveService(serviceId)}
-                          className="h-8 w-8"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-
-            {selectedPackages.map((packageId) => {
-              const pkg = packages.find((p) => p.id === packageId);
-              if (!pkg) return null;
-              return (
-                <Card key={packageId} className="bg-gray-50">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h5 className="font-medium">{pkg.name}</h5>
-                        <p className="text-sm text-muted-foreground">
-                          Duration:{" "}
-                          {pkg.duration ||
-                            pkg.package_services?.reduce(
-                              (total, ps) => total + ps.service.duration,
-                              0
-                            ) ||
-                            0}{" "}
-                          min
-                        </p>
-                        {selectedTimeSlots[packageId] && (
-                          <p className="text-sm text-muted-foreground">
-                            Time: {selectedTimeSlots[packageId]}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <div className="font-medium">{formatPrice(pkg.price)}</div>
+                        <div className="flex items-center gap-4">
+                          {item.type === "package" && (
+                            <p className="font-semibold text-lg">
+                              <IndianRupee className="inline h-4 w-4" />
+                              {item.price}
+                            </p>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              if (item.type === 'service') {
+                                onRemoveService(item.id);
+                              } else {
+                                onRemovePackage(item.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onRemovePackage(packageId)}
-                          className="h-8 w-8"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
 
-        <div className="mb-8">
-          <h4 className="text-sm font-medium mb-3">Payment Details</h4>
-          <Card className="bg-gray-50">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex justify-between items-center">
+                      {item.type === "package" && item.services && item.services.length > 0 && (
+                        <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
+                          {item.services.map(service => (
+                            <div key={service.id} className="flex items-center justify-between py-1">
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">
+                                  {service.name}
+                                  {service.isCustomized && (
+                                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                      Added
+                                    </span>
+                                  )}
+                                </p>
+                                <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
+                                  <span>{formatDuration(service.duration)}</span>
+                                  {service.stylistName && (
+                                    <div className="flex items-center">
+                                      <User className="mr-1 h-3 w-3" />
+                                      {service.stylistName}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm">
+                                <IndianRupee className="inline h-3 w-3" />
+                                {service.price}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {item.type === "service" && (
+                        <div className="flex justify-end">
+                          <p className="font-semibold text-lg">
+                            <IndianRupee className="inline h-4 w-4" />
+                            {item.price}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                ))}
+              </div>
+            )}
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatPrice(subtotal)}</span>
+                <span>₹{subtotal}</span>
               </div>
               
-              {/* Manual Discount */}
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Discount</span>
-                  <Select value={discountType} onValueChange={(v) => onDiscountTypeChange(v as "none" | "percentage" | "fixed")}>
-                    <SelectTrigger className="w-32 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="percentage">Percentage</SelectItem>
-                      <SelectItem value="fixed">Fixed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {discountType !== "none" && (
-                    <input
-                      type="number"
-                      value={discountValue}
-                      onChange={(e) => onDiscountValueChange(Number(e.target.value))}
-                      className="w-20 h-8 border rounded-md px-2"
-                      min={0}
-                      max={discountType === "percentage" ? 100 : undefined}
-                    />
-                  )}
-                </div>
-                {discountType !== "none" && discountValue > 0 && (
-                  <span className="text-green-600">
-                    -{formatPrice(
-                      discountType === "percentage"
-                        ? (subtotal * discountValue) / 100
-                        : Math.min(discountValue, subtotal)
-                    )}
-                  </span>
-                )}
-              </div>
-              
-              {/* Membership Discount */}
-              {membershipDiscount > 0 && appliedMembershipName && (
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Membership Discount</span>
-                    <Badge variant="outline" className="ml-2">
-                      <Tag className="h-3 w-3 mr-1" />
-                      {appliedMembershipName}
-                    </Badge>
-                  </div>
-                  <span className="text-green-600">
-                    -{formatPrice(membershipDiscount)}
-                  </span>
-                </div>
-              )}
-              
-              {/* Tax Rate */}
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">Tax</span>
-                  <Select
-                    value={selectedTaxId || "none"}
-                    onValueChange={handleTaxRateChange}
-                  >
-                    <SelectTrigger className="w-32 h-8">
-                      <SelectValue />
+                  <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
+                    <SelectTrigger className="h-7 w-[120px]">
+                      <SelectValue placeholder="No Tax" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {taxRates.map((tax) => (
+                      <SelectItem value="none">No Tax</SelectItem>
+                      {taxRates.map(tax => (
                         <SelectItem key={tax.id} value={tax.id}>
                           {tax.name} ({tax.percentage}%)
                         </SelectItem>
@@ -444,68 +580,147 @@ export function CheckoutSection({
                     </SelectContent>
                   </Select>
                 </div>
-                {taxAmount > 0 && <span>{formatPrice(taxAmount)}</span>}
+                <span>₹{taxAmount.toFixed(2)}</span>
               </div>
               
-              <div className="pt-2 mt-2 border-t flex justify-between items-center font-medium">
-                <span>Total</span>
-                <span>{formatPrice(totalPrice)}</span>
+              <div className="flex justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Coupon</span>
+                  <Select value={selectedCouponId || "none"} onValueChange={handleCouponChange} disabled={isLoadingCoupons}>
+                    <SelectTrigger className="h-7 w-[120px]">
+                      <SelectValue placeholder="No Coupon" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Coupon</SelectItem>
+                      {availableCoupons.map(coupon => (
+                        <SelectItem key={coupon.id} value={coupon.id}>
+                          {coupon.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <span>{selectedCoupon ? `-₹${couponDiscount.toFixed(2)}` : "₹0.00"}</span>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              
+              {selectedCoupon && (
+                <div className="flex justify-between text-xs text-green-600 -mt-2 ml-16">
+                  <span>
+                    {selectedCoupon.discount_type === 'percentage' 
+                      ? `${selectedCoupon.discount_value}% off` 
+                      : `Fixed ₹${selectedCoupon.discount_value} off`}
+                  </span>
+                </div>
+              )}
 
-        <div className="mb-8">
-          <div className="mb-4">
-            <Label>Payment Method</Label>
-            <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="card">Card</SelectItem>
-                <SelectItem value="online">Online</SelectItem>
-              </SelectContent>
-            </Select>
+              {discountType !== "none" && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span className="flex items-center">
+                    <Percent className="mr-2 h-4 w-4" />
+                    Discount
+                    {discountType === "percentage" && ` (${discountValue}%)`}
+                  </span>
+                  <span>-₹{discountAmount - couponDiscount}</span>
+                </div>
+              )}
+              
+              <div className="flex justify-between text-lg font-bold pt-2">
+                <span>Total</span>
+                <span>₹{total.toFixed(2)}</span>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <Label>Notes</Label>
-            <Textarea
-              placeholder="Add any notes about this appointment..."
-              value={notes}
-              onChange={(e) => onNotesChange(e.target.value)}
-              className="resize-none"
-            />
-          </div>
-        </div>
-      </div>
+          <div className="pt-6 space-y-4 mt-auto">
+            <div>
+              <h4 className="text-sm font-medium mb-2">Payment Method</h4>
+              <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentMethodsLoading ? (
+                    <SelectItem value="loading">Loading...</SelectItem>
+                  ) : paymentMethods.length > 0 ? (
+                    paymentMethods.map(method => (
+                      <SelectItem key={method.id} value={method.name}>
+                        {method.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
 
-      <div className="p-6 border-t flex justify-between">
-        <Button variant="outline" onClick={onBackToServices}>
-          Back to Services
-        </Button>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={async () => {
-              const appointmentId = await onSaveAppointment();
-              if (appointmentId) {
-                toast.success("Appointment saved");
-              }
-            }}
-          >
-            Save
-          </Button>
-          <Button 
-            onClick={handleCheckout}
-            disabled={isProcessing}
-          >
-            {isProcessing ? "Processing..." : "Complete Payment"}
-          </Button>
-        </div>
-      </div>
+            <div className="flex gap-2">
+              <Button 
+                className="flex-1" 
+                size="lg"
+                onClick={handlePayment}
+                disabled={selectedItems.length === 0}
+              >
+                Complete Payment
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="lg">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Discount</h3>
+                    <div className="flex gap-4">
+                      <Select
+                        value={discountType}
+                        onValueChange={onDiscountTypeChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Discount type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Discount</SelectItem>
+                          <SelectItem value="percentage">Percentage</SelectItem>
+                          <SelectItem value="fixed">Fixed Amount</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {discountType !== "none" && (
+                        <Input
+                          type="number"
+                          placeholder={
+                            discountType === "percentage"
+                              ? "Enter %"
+                              : "Enter amount"
+                          }
+                          value={discountValue}
+                          onChange={(e) =>
+                            onDiscountValueChange(Number(e.target.value))
+                          }
+                          className="w-24"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Notes</h3>
+                      <Textarea
+                        placeholder="Add appointment notes..."
+                        value={notes}
+                        onChange={(e) => onNotesChange(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

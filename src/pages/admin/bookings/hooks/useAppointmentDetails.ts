@@ -38,12 +38,12 @@ export function useAppointmentDetails(appointmentId?: string | null) {
           ...data,
           location_id: data.location || null, // Map location to location_id for compatibility
           discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none",
-          // Add default values for membership fields if they don't exist in DB response
-          membership_discount: data.membership_discount ?? 0,
-          membership_id: data.membership_id ?? null,
-          membership_name: data.membership_name ?? null,
-          tax_amount: data.tax_amount ?? 0
-        } as unknown as Appointment;
+          // Safely add membership fields with default values if they don't exist
+          membership_discount: data.membership_discount || 0,
+          membership_id: data.membership_id || null,
+          membership_name: data.membership_name || null,
+          tax_amount: data.tax_amount || 0
+        } as Appointment;
         
         setAppointment(appointmentData);
       }

@@ -7,7 +7,6 @@ import { Search } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Customer } from '@/pages/admin/bookings/types';
-import { Badge } from "@/components/ui/badge";
 
 interface CustomerSearchProps {
   onSelect: (customer: Customer) => void;
@@ -16,7 +15,6 @@ interface CustomerSearchProps {
 export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
-  const [customersWithMemberships, setCustomersWithMemberships] = useState<string[]>([]);
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers'],
@@ -28,26 +26,6 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
 
       if (error) throw error;
       return data as Customer[];
-    }
-  });
-
-  // Fetch customers with active memberships
-  useQuery({
-    queryKey: ['customer-memberships'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customer_memberships')
-        .select('customer_id')
-        .eq('status', 'active');
-
-      if (error) throw error;
-      
-      if (data) {
-        const customerIds = data.map(item => item.customer_id);
-        setCustomersWithMemberships(customerIds);
-      }
-      
-      return data;
     }
   });
 
@@ -78,28 +56,25 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
         {isLoading ? (
           <p className="text-sm text-gray-500">Loading customers...</p>
         ) : (
-          filteredCustomers.slice(0, 5).map((customer) => (
+          filteredCustomers.slice(5).map((customer) => (
             <Button
               key={customer.id}
               variant="ghost"
               className="w-full justify-start text-left p-2 h-auto hover:bg-gray-50"
               onClick={() => onSelect(customer)}
             >
-              <div className="flex items-center gap-3 w-full">
+              <div className="flex items-center gap-3">
                 <Avatar className="bg-primary/10">
                   <AvatarFallback>
                     {customer.full_name?.charAt(0).toUpperCase() || '?'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
+                <div>
                   <div className="font-medium">{customer.full_name}</div>
                   <div className="text-sm text-muted-foreground">
                     {customer.email}
                   </div>
                 </div>
-                {customersWithMemberships.includes(customer.id) && (
-                  <Badge variant="secondary" className="ml-auto">Membership</Badge>
-                )}
               </div>
             </Button>
           ))
