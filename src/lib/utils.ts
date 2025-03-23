@@ -49,3 +49,8 @@ export function generateStrongPassword(length: number = 12): string {
   }
   return password;
 }
+
+export const formatDate = (date: Date | string | number): string => {
+  if (!date) return "";
+  return format(new Date(date), "MMMM d, yyyy");
+};

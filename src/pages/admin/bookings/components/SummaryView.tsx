@@ -14,7 +14,8 @@ import {
   Ban,
   Clock,
   Package,
-  MapPin
+  MapPin,
+  Percent
 } from "lucide-react";
 import { format } from 'date-fns';
 import {
@@ -35,39 +36,13 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentActions } from '../hooks/useAppointmentActions';
-import type { RefundData, TransactionDetails } from '../types';
+import { useAppointmentDetails } from '../hooks/useAppointmentDetails';
+import type { RefundData, TransactionDetails, SummaryViewProps } from '../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRefundReason } from '../utils/formatters';
 import { formatPrice } from '@/lib/utils';
-
-export interface SummaryViewProps {
-  appointmentId: string;
-  customer: {
-    id: string;
-    full_name: string;
-    email: string;
-    phone_number?: string;
-  };
-  totalPrice: number;
-  items: {
-    id: string;
-    name: string;
-    price: number;
-    type: string;
-    employee?: {
-      id: string;
-      name: string;
-    };
-    duration?: number;
-  }[];
-  paymentMethod: 'cash' | 'online';
-  onAddAnother: () => void;
-  receiptNumber: string;
-  taxAmount: number;
-  subTotal: number;
-}
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
@@ -78,7 +53,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   onAddAnother,
   receiptNumber,
   taxAmount,
-  subTotal
+  subTotal,
+  membershipName,
+  membershipDiscount
 }) => {
   const [showVoidDialog, setShowVoidDialog] = React.useState(false);
   const [showRefundDialog, setShowRefundDialog] = React.useState(false);
@@ -92,6 +69,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [employees, setEmployees] = React.useState<Array<{ id: string; name: string }>>([]);
   const [selectAll, setSelectAll] = React.useState(false);
   const { fetchAppointmentDetails, updateAppointmentStatus, processRefund } = useAppointmentActions();
+  const { appointment } = useAppointmentDetails(appointmentId);
 
   React.useEffect(() => {
     if (appointmentId) {
@@ -123,8 +101,11 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
   };
 
-  // Generate a receipt-like view for non-existent transactions (new appointments)
   const renderNewReceipt = () => {
+    if (!customer) {
+      return <div>Missing customer information</div>;
+    }
+
     return (
       <Card className="bg-white h-full border">
         <CardContent className="p-4 space-y-4">
@@ -150,7 +131,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           <div className="overflow-y-auto">
             <h4 className="font-medium mb-4">Items</h4>
             
-            {items.map((item, idx) => (
+            {items && items.map((item, idx) => (
               <div key={idx} className="py-2 flex justify-between items-start border-b">
                 <div className="flex-1">
                   <p className="font-medium text-sm line-clamp-1">
@@ -176,35 +157,58 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           </div>
 
           <div className="space-y-1 pt-2 border-t">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span>{formatPrice(subTotal)}</span>
-            </div>
+            {subTotal !== undefined && (
+              <div className="flex justify-between text-sm">
+                <span>Subtotal</span>
+                <span>{formatPrice(subTotal)}</span>
+              </div>
+            )}
             
-            {taxAmount > 0 && (
+            {taxAmount !== undefined && taxAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Tax</span>
                 <span>{formatPrice(taxAmount)}</span>
               </div>
             )}
             
-            {subTotal !== totalPrice && (
+            {membershipName && membershipDiscount && membershipDiscount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
-                <span>Discount</span>
-                <span>-{formatPrice(subTotal - totalPrice)}</span>
+                <span className="flex items-center gap-1">
+                  <Percent className="h-3 w-3" />
+                  {membershipName} Discount
+                </span>
+                <span>-{formatPrice(membershipDiscount)}</span>
+              </div>
+            )}
+            
+            {appointment && appointment.discount_type !== 'none' && appointment.discount_value > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>
+                  Discount ({appointment.discount_type === 'percentage' ? 
+                    `${appointment.discount_value}%` : 
+                    formatPrice(appointment.discount_value)
+                  })
+                </span>
+                <span>
+                  -{formatPrice(
+                    appointment.discount_type === 'percentage' 
+                      ? (appointment.original_total_price || 0) * (appointment.discount_value / 100)
+                      : appointment.discount_value
+                  )}
+                </span>
               </div>
             )}
             
             <div className="flex justify-between text-lg font-bold pt-2">
               <span>Total</span>
-              <span>{formatPrice(totalPrice)}</span>
+              <span>{formatPrice(totalPrice || 0)}</span>
             </div>
           </div>
 
           <div className="pt-4 border-t">
             <div className="flex justify-between text-xs">
               <span className="capitalize">
-                Paid with {paymentMethod === 'cash' ? 'Cash' : 'Online'}
+                Paid with {paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'card' ? 'Card' : 'Online'}
               </span>
               <div className="flex items-center">
                 {paymentMethod === 'cash' ? (
@@ -212,7 +216,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                 ) : (
                   <CreditCard className="h-4 w-4 mr-1" />
                 )}
-                {formatPrice(totalPrice)}
+                {formatPrice(totalPrice || 0)}
               </div>
             </div>
           </div>
@@ -223,17 +227,18 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             </div>
           )}
           
-          <div className="flex justify-center mt-4">
-            <Button onClick={onAddAnother} className="mx-auto">
-              Add Another Appointment
-            </Button>
-          </div>
+          {onAddAnother && (
+            <div className="flex justify-center mt-4">
+              <Button onClick={onAddAnother} className="mx-auto">
+                Add Another {items && items[0]?.type === 'membership' ? 'Membership' : 'Appointment'}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
   };
 
-  // For existing appointments, we'll still show the full summary view
   if (transactionDetails) {
     const getGroupedBookings = (transaction: any) => {
       if (!transaction) return [];
@@ -757,6 +762,5 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     );
   }
 
-  // For new appointments, show simplified receipt view
   return renderNewReceipt();
 };

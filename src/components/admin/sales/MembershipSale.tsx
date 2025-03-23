@@ -303,7 +303,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
         }`}
       >
         <SummaryView
-          appointmentId=""
           customer={{
             id: selectedCustomer.id,
             full_name: selectedCustomer.full_name || "",
@@ -317,11 +316,13 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
             price: subtotal,
             type: "membership"
           }]}
-          paymentMethod={paymentMethod === "card" ? "card" : paymentMethod}
+          paymentMethod={paymentMethod === "card" ? "card" : paymentMethod as 'cash' | 'card' | 'online'}
           onAddAnother={handleReset}
           receiptNumber={receiptNumber}
           taxAmount={taxAmount}
           subTotal={subtotal}
+          membershipName={selectedMembership.name}
+          membershipDiscount={selectedMembership.discount_value}
         />
       </div>
     );

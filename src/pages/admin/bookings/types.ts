@@ -1,4 +1,3 @@
-
 export enum SCREEN {
   SERVICE_SELECTION = "service_selection",
   CHECKOUT = "checkout",
@@ -69,7 +68,7 @@ export interface Employee {
   employment_type: "stylist" | "operations";
   created_at: string;
   updated_at: string;
-  avatar?: string; // Add avatar property for TimeSlots component
+  avatar?: string;
 }
 
 export interface Booking {
@@ -116,11 +115,14 @@ export interface Appointment {
   original_total_price?: number;
   refund_reason?: string;
   total_duration?: number;
+  tax_amount?: number;
+  membership_id?: string;
+  membership_name?: string;
+  membership_discount?: number;
   customer?: Customer;
   bookings: Booking[];
 }
 
-// Add the missing types for refund and transaction details
 export interface RefundData {
   reason: "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | 
           "health_concern" | "price_dispute" | "other" | "booking_error" | 
@@ -137,4 +139,33 @@ export interface TransactionDetails {
   created_at: string;
   originalSale: Appointment;
   refunds: Appointment[];
+}
+
+export interface SummaryViewProps {
+  appointmentId?: string;
+  customer?: {
+    id: string;
+    full_name: string;
+    email: string;
+    phone_number?: string;
+  };
+  totalPrice?: number;
+  items?: {
+    id: string;
+    name: string;
+    price: number;
+    type: string;
+    employee?: {
+      id: string;
+      name: string;
+    };
+    duration?: number;
+  }[];
+  paymentMethod?: 'cash' | 'card' | 'online';
+  onAddAnother?: () => void;
+  receiptNumber?: string;
+  taxAmount?: number;
+  subTotal?: number;
+  membershipName?: string;
+  membershipDiscount?: number;
 }
