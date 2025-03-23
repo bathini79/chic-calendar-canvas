@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
+import { Search, Award } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Customer } from '@/pages/admin/bookings/types';
+import { Badge } from "@/components/ui/badge";
 
 interface CustomerSearchProps {
   onSelect: (customer: Customer) => void;
@@ -15,6 +16,7 @@ interface CustomerSearchProps {
 export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [customersWithMemberships, setCustomersWithMemberships] = useState<Set<string>>(new Set());
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers'],
@@ -28,6 +30,26 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
       return data as Customer[];
     }
   });
+
+  // Fetch customers with active memberships
+  const { data: memberships = [] } = useQuery({
+    queryKey: ['customer_memberships'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customer_memberships')
+        .select('customer_id')
+        .eq('status', 'active');
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  useEffect(() => {
+    // Create a set of customer IDs who have active memberships
+    const membershipSet = new Set(memberships.map(membership => membership.customer_id));
+    setCustomersWithMemberships(membershipSet);
+  }, [memberships]);
 
   useEffect(() => {
     if (customers) {
@@ -56,21 +78,29 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
         {isLoading ? (
           <p className="text-sm text-gray-500">Loading customers...</p>
         ) : (
-          filteredCustomers.slice(5).map((customer) => (
+          filteredCustomers.slice(0, 5).map((customer) => (
             <Button
               key={customer.id}
               variant="ghost"
               className="w-full justify-start text-left p-2 h-auto hover:bg-gray-50"
               onClick={() => onSelect(customer)}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 w-full">
                 <Avatar className="bg-primary/10">
                   <AvatarFallback>
                     {customer.full_name?.charAt(0).toUpperCase() || '?'}
                   </AvatarFallback>
                 </Avatar>
-                <div>
-                  <div className="font-medium">{customer.full_name}</div>
+                <div className="flex-1">
+                  <div className="font-medium flex items-center gap-2">
+                    {customer.full_name}
+                    {customersWithMemberships.has(customer.id) && (
+                      <Badge variant="info" className="flex items-center gap-1 ml-1">
+                        <Award className="h-3 w-3" />
+                        <span>Member</span>
+                      </Badge>
+                    )}
+                  </div>
                   <div className="text-sm text-muted-foreground">
                     {customer.email}
                   </div>
