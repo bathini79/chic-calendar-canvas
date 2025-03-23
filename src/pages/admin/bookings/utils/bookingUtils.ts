@@ -1,3 +1,4 @@
+
 import { type Service, type Package } from "../types";
 
 export const getTotalPrice = (

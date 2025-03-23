@@ -1,3 +1,4 @@
+
 export enum SCREEN {
   SERVICE_SELECTION = "service_selection",
   CHECKOUT = "checkout",
@@ -56,7 +57,6 @@ export interface Customer {
   phone_number?: string;
   created_at: string;
   updated_at: string;
-  memberships?: CustomerMembership[];
 }
 
 export interface Employee {
@@ -69,7 +69,7 @@ export interface Employee {
   employment_type: "stylist" | "operations";
   created_at: string;
   updated_at: string;
-  avatar?: string;
+  avatar?: string; // Add avatar property for TimeSlots component
 }
 
 export interface Booking {
@@ -118,13 +118,9 @@ export interface Appointment {
   total_duration?: number;
   customer?: Customer;
   bookings: Booking[];
-  tax_amount?: number;
-  coupon_id?: string;
-  membership_id?: string;
-  membership_name?: string;
-  membership_discount?: number;
 }
 
+// Add the missing types for refund and transaction details
 export interface RefundData {
   reason: "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | 
           "health_concern" | "price_dispute" | "other" | "booking_error" | 
@@ -141,26 +137,4 @@ export interface TransactionDetails {
   created_at: string;
   originalSale: Appointment;
   refunds: Appointment[];
-}
-
-export interface CustomerMembership {
-  id: string;
-  customer_id: string;
-  membership_id: string;
-  status: string;
-  start_date: string;
-  end_date: string;
-  amount_paid: number;
-  created_at: string;
-  updated_at: string;
-  membership?: {
-    id: string;
-    name: string;
-    discount_type: 'percentage' | 'fixed';
-    discount_value: number;
-    applicable_services: string[];
-    applicable_packages: string[];
-    min_billing_amount: number | null;
-    max_discount_value: number | null;
-  };
 }
