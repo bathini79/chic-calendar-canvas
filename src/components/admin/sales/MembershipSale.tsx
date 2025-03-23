@@ -317,7 +317,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
             price: subtotal,
             type: "membership"
           }]}
-          paymentMethod={paymentMethod === "card" ? "online" : paymentMethod}
+          paymentMethod={paymentMethod === "card" ? "card" : paymentMethod}
           onAddAnother={handleReset}
           receiptNumber={receiptNumber}
           taxAmount={taxAmount}
@@ -520,4 +520,3 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     </div>
   );
 };
-
