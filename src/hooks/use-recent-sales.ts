@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { formatISO, subDays } from "date-fns";
 
 // Define the types for the data we'll be fetching
 export type RecentAppointment = {
