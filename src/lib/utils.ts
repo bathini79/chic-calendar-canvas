@@ -1,5 +1,7 @@
+
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { format as dateFormat } from "date-fns";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -52,5 +54,5 @@ export function generateStrongPassword(length: number = 12): string {
 
 export const formatDate = (date: Date | string | number): string => {
   if (!date) return "";
-  return format(new Date(date), "MMMM d, yyyy");
+  return dateFormat(new Date(date), "MMMM d, yyyy");
 };

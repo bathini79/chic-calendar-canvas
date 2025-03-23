@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -25,6 +24,7 @@ import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 import { Trash2, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CheckoutSectionProps {
   selectedCustomer: Customer | null;

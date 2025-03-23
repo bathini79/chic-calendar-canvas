@@ -1,3 +1,4 @@
+
 export enum SCREEN {
   SERVICE_SELECTION = "service_selection",
   CHECKOUT = "checkout",
@@ -105,6 +106,7 @@ export interface Appointment {
   payment_method?: string;
   notes?: string;
   location?: string;
+  location_id?: string;
   number_of_bookings?: number;
   created_at: string;
   updated_at: string;
@@ -116,8 +118,8 @@ export interface Appointment {
   refund_reason?: string;
   total_duration?: number;
   tax_amount?: number;
-  membership_id?: string;
-  membership_name?: string;
+  membership_id?: string | null;
+  membership_name?: string | null;
   membership_discount?: number;
   customer?: Customer;
   bookings: Booking[];
@@ -169,3 +171,5 @@ export interface SummaryViewProps {
   membershipName?: string;
   membershipDiscount?: number;
 }
+
+export type StylistSelection = Record<string, string>;
