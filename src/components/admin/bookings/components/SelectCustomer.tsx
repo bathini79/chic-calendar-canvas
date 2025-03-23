@@ -1,10 +1,14 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CustomerSearch } from "./CustomerSearch";
 import { Customer } from "@/pages/admin/bookings/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CreateClientDialog } from "./CreateClientDialog";
+import { Award } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SelectCustomerProps {
   selectedCustomer: Customer | null;
@@ -18,6 +22,27 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
   setShowCreateForm,
 }) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [customersWithMemberships, setCustomersWithMemberships] = useState<Set<string>>(new Set());
+
+  // Fetch customers with active memberships
+  const { data: memberships = [] } = useQuery({
+    queryKey: ['customer_memberships'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customer_memberships')
+        .select('customer_id')
+        .eq('status', 'active');
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  useEffect(() => {
+    // Create a set of customer IDs who have active memberships
+    const membershipSet = new Set(memberships.map(membership => membership.customer_id));
+    setCustomersWithMemberships(membershipSet);
+  }, [memberships]);
 
   return (
     <div className="w-full h-full overflow-hidden flex flex-col">
@@ -56,8 +81,14 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <h3 className="font-medium text-base">
+              <h3 className="font-medium text-base flex items-center gap-2">
                 {selectedCustomer.full_name}
+                {customersWithMemberships.has(selectedCustomer.id) && (
+                  <Badge variant="info" className="flex items-center gap-1 ml-1">
+                    <Award className="h-3 w-3" />
+                    <span>Member</span>
+                  </Badge>
+                )}
               </h3>
               <p className="text-sm text-muted-foreground">
                 {selectedCustomer.email}

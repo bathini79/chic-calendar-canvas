@@ -34,7 +34,7 @@ export function useAppointmentDetails(appointmentId?: string | null) {
 
       // Convert data to match Appointment type
       if (data) {
-        const appointmentData = {
+        const appointmentData: Appointment = {
           ...data,
           location_id: data.location || null, // Map location to location_id for compatibility
           discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none",
@@ -43,7 +43,7 @@ export function useAppointmentDetails(appointmentId?: string | null) {
           membership_id: data.membership_id || null,
           membership_name: data.membership_name || null,
           tax_amount: data.tax_amount || 0
-        } as Appointment;
+        };
         
         setAppointment(appointmentData);
       }
