@@ -1,11 +1,10 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useActiveServices } from '../hooks/useActiveServices';
 import { useActivePackages } from '../hooks/useActivePackages';
 import { useAppointmentState } from '../hooks/useAppointmentState';
-import { useSaveAppointment } from '../hooks/useSaveAppointment';
+import useSaveAppointment from '../hooks/useSaveAppointment';
 import { formatPhoneNumber } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getFinalPrice, calculatePackagePrice, getTotalPrice, getTotalDuration } from '../utils/bookingUtils';
@@ -36,6 +35,8 @@ interface Customer {
   full_name: string;
   email: string;
   phone_number?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
@@ -48,20 +49,23 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   locationId
 }) => {
   // Services and packages data
-  const { services } = useActiveServices();
-  const { packages } = useActivePackages();
+  const { data: services = [] } = useActiveServices();
+  const { data: packages = [] } = useActivePackages();
   
   // Customer memberships
   const { customerMemberships, fetchCustomerMemberships, isLoading: isMembershipsLoading } = useCustomerMemberships();
 
   // State for appointment management
   const { 
-    state: appointmentState, 
+    state: appointmentState,
     actions: appointmentActions,
     resetState,
     errors,
     setErrors
   } = useAppointmentState();
+
+  const { selectedCustomer, selectedServices, selectedPackages, serviceEmployees, packageEmployees, customizedServices, paymentMethod } = appointmentState;
+  const { setCustomerId, setPaymentMethod, addService, removeService, addPackage, removePackage, assignServiceEmployee, assignPackageEmployee, customizePackage } = appointmentActions;
 
   // State for controlling view
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -76,27 +80,45 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   });
 
   // Use the save appointment hook
-  const { saveAppointment, isLoading } = useSaveAppointment();
+  const { handleSaveAppointment, isLoading } = useSaveAppointment({
+    selectedDate,
+    selectedTime,
+    selectedCustomer: customer,
+    selectedServices,
+    selectedPackages,
+    services,
+    packages,
+    selectedStylists: serviceEmployees,
+    getTotalDuration: calculateTotalDuration,
+    getTotalPrice: getFinalPriceWithDiscount,
+    discountType: appliedDiscount.type,
+    discountValue: appliedDiscount.value,
+    paymentMethod: paymentMethod || 'cash',
+    notes: '',
+    customizedServices,
+    currentScreen: showSummary ? 'CHECKOUT' : 'BOOKING',
+    locationId
+  });
 
   // Calculate total price
   const calculateTotalPrice = () => {
     return getTotalPrice(
-      appointmentState.selectedServices,
-      appointmentState.selectedPackages,
+      selectedServices,
+      selectedPackages,
       services || [],
       packages || [],
-      appointmentState.customizedServices
+      customizedServices
     );
   };
 
   // Calculate total duration
   const calculateTotalDuration = () => {
     return getTotalDuration(
-      appointmentState.selectedServices,
-      appointmentState.selectedPackages,
+      selectedServices,
+      selectedPackages,
       services || [],
       packages || [],
-      appointmentState.customizedServices
+      customizedServices
     );
   };
 
@@ -109,7 +131,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   // Handle customer selection
   const handleCustomerSelect = async (selectedCustomer: Customer) => {
     setCustomer(selectedCustomer);
-    appointmentActions.setCustomerId(selectedCustomer.id);
+    setCustomerId(selectedCustomer.id);
 
     // Fetch customer's active memberships
     if (selectedCustomer?.id) {
@@ -127,7 +149,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       };
       
       // Check each service for membership discount
-      appointmentState.selectedServices.forEach(serviceId => {
+      selectedServices.forEach(serviceId => {
         const servicePrice = services?.find(s => s.id === serviceId)?.selling_price || 0;
         if (servicePrice <= 0) return;
         
@@ -138,13 +160,13 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       });
       
       // Check each package for membership discount
-      appointmentState.selectedPackages.forEach(packageId => {
+      selectedPackages.forEach(packageId => {
         const pkg = packages?.find(p => p.id === packageId);
         if (!pkg) return;
         
         const packagePrice = calculatePackagePrice(
           pkg,
-          appointmentState.customizedServices[packageId] || [],
+          customizedServices[packageId] || [],
           services || []
         );
         
@@ -223,35 +245,35 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
   // Handle adding a service to the appointment
   const handleAddService = (serviceId: string) => {
-    appointmentActions.addService(serviceId);
+    addService(serviceId);
   };
 
   // Handle adding a package to the appointment
   const handleAddPackage = (packageId: string) => {
-    appointmentActions.addPackage(packageId);
+    addPackage(packageId);
   };
 
   // Handle removing a service from the appointment
   const handleRemoveService = (serviceId: string) => {
-    appointmentActions.removeService(serviceId);
+    removeService(serviceId);
   };
 
   // Handle removing a package from the appointment
   const handleRemovePackage = (packageId: string) => {
-    appointmentActions.removePackage(packageId);
+    removePackage(packageId);
   };
 
   // Handle customized services for a package
   const handleCustomizePackage = (packageId: string, serviceIds: string[]) => {
-    appointmentActions.customizePackage(packageId, serviceIds);
+    customizePackage(packageId, serviceIds);
   };
 
   // Handle employee assignment
   const handleEmployeeChange = (serviceId: string | null, packageId: string | null, employeeId: string) => {
     if (serviceId) {
-      appointmentActions.assignServiceEmployee(serviceId, employeeId);
+      assignServiceEmployee(serviceId, employeeId);
     } else if (packageId) {
-      appointmentActions.assignPackageEmployee(packageId, employeeId);
+      assignPackageEmployee(packageId, employeeId);
     }
   };
 
@@ -263,7 +285,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       return;
     }
 
-    if (appointmentState.selectedServices.length === 0 && appointmentState.selectedPackages.length === 0) {
+    if (selectedServices.length === 0 && selectedPackages.length === 0) {
       setErrors({ ...errors, services: 'Please select at least one service or package' });
       return;
     }
@@ -272,7 +294,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     prepareItemsForSummary();
     
     // Update payment information
-    appointmentActions.setPaymentMethod(paymentMethod);
+    setPaymentMethod(paymentMethod);
     
     // Show summary view
     setShowSummary(true);
@@ -283,10 +305,10 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     const items: any[] = [];
 
     // Add services
-    appointmentState.selectedServices.forEach(serviceId => {
+    selectedServices.forEach(serviceId => {
       const service = services?.find(s => s.id === serviceId);
       if (service) {
-        const employeeId = appointmentState.serviceEmployees[serviceId];
+        const employeeId = serviceEmployees[serviceId];
         const employee = employees.find(e => e.id === employeeId);
         
         items.push({
@@ -301,12 +323,12 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     });
 
     // Add packages
-    appointmentState.selectedPackages.forEach(packageId => {
+    selectedPackages.forEach(packageId => {
       const pkg = packages?.find(p => p.id === packageId);
       if (pkg) {
-        const employeeId = appointmentState.packageEmployees[packageId];
+        const employeeId = packageEmployees[packageId];
         const employee = employees.find(e => e.id === employeeId);
-        const customized = appointmentState.customizedServices[packageId] || [];
+        const customized = customizedServices[packageId] || [];
         
         // Calculate package price with customizations
         const packagePrice = calculatePackagePrice(pkg, customized, services || []);
@@ -327,30 +349,31 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   // Handle appointment save
-  const handleSaveAppointment = async () => {
+  const handleSaveAppointmentInner = async () => {
     setIsProcessing(true);
     try {
       // Create appointment and bookings data
       const apptData = {
-        ...appointmentState,
-        date: selectedDate,
-        time: selectedTime,
+        total: getFinalPriceWithDiscount(),
         discountType: appliedDiscount.type,
         discountValue: appliedDiscount.value,
-        totalPrice: getFinalPriceWithDiscount(),
-        location: locationId
+        taxAmount: 0, // Could add tax calculation logic here
+        couponDiscount: 0 // Could add coupon discount logic here
       };
 
       // Check if this is an existing appointment or a new one
-      const result = await saveAppointment(apptData, existingAppointment?.id);
+      const appointmentId = await handleSaveAppointment(existingAppointment?.id ? 
+        { appointmentId: existingAppointment.id, ...apptData } : 
+        apptData
+      );
       
-      if (result.success) {
+      if (appointmentId) {
         toast.success(existingAppointment ? 'Appointment updated successfully' : 'Appointment created successfully');
         resetState();
         setShowSummary(false);
         onClose();
       } else {
-        toast.error(result.error || 'Failed to save appointment');
+        toast.error('Failed to save appointment');
       }
     } catch (error: any) {
       console.error('Error saving appointment:', error);
@@ -368,7 +391,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setAppliedDiscount({ type: 'none', value: 0, label: '', source: '' });
   };
 
-  // Reset state when closing
+  // Handle close
   const handleClose = () => {
     resetState();
     setCustomer(null);
@@ -385,12 +408,17 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       
       // Set customer info
       if (existingAppointment.customer) {
-        setCustomer({
+        const customerData = {
           id: existingAppointment.customer.id,
           full_name: existingAppointment.customer.full_name || '',
           email: existingAppointment.customer.email || '',
-          phone_number: existingAppointment.customer.phone_number || ''
-        });
+          phone_number: existingAppointment.customer.phone_number || '',
+          created_at: existingAppointment.customer.created_at || '',
+          updated_at: existingAppointment.customer.updated_at || ''
+        };
+        
+        setCustomer(customerData);
+        setCustomerId(customerData.id);
         
         // Also fetch customer memberships
         if (existingAppointment.customer.id) {
@@ -399,10 +427,10 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       }
       
       // Set customer ID
-      appointmentActions.setCustomerId(existingAppointment.customer_id);
+      setCustomerId(existingAppointment.customer_id);
       
       // Set payment method
-      appointmentActions.setPaymentMethod(existingAppointment.payment_method || 'cash');
+      setPaymentMethod(existingAppointment.payment_method || 'cash');
       
       // Set discount
       if (existingAppointment.discount_type && existingAppointment.discount_type !== 'none') {
@@ -416,22 +444,22 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       
       // Set services and packages
       existingAppointment.bookings?.forEach(booking => {
-        if (booking.service_id) {
-          appointmentActions.addService(booking.service_id);
+        if (booking.service_id && !booking.package_id) {
+          addService(booking.service_id);
           if (booking.employee_id) {
-            appointmentActions.assignServiceEmployee(booking.service_id, booking.employee_id);
+            assignServiceEmployee(booking.service_id, booking.employee_id);
           }
         } else if (booking.package_id) {
-          appointmentActions.addPackage(booking.package_id);
+          addPackage(booking.package_id);
           if (booking.employee_id) {
-            appointmentActions.assignPackageEmployee(booking.package_id, booking.employee_id);
+            assignPackageEmployee(booking.package_id, booking.employee_id);
           }
           
           // TODO: Handle customized services if needed
         }
       });
     }
-  }, [existingAppointment, services, packages, resetState, appointmentActions]);
+  }, [existingAppointment, services, packages, resetState, setCustomerId, setPaymentMethod, addService, assignServiceEmployee, addPackage, assignPackageEmployee, setAppliedDiscount, fetchCustomerMemberships]);
 
   if (showSummary) {
     return (
@@ -442,7 +470,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
             customer={customer!}
             totalPrice={getFinalPriceWithDiscount()}
             items={appointmentItems}
-            paymentMethod={appointmentState.paymentMethod || 'cash'}
+            paymentMethod={paymentMethod || 'cash'}
             onAddAnother={handleAddAnother}
             receiptNumber={''} 
             taxAmount={0}
@@ -454,7 +482,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
               Back
             </Button>
             <Button 
-              onClick={handleSaveAppointment} 
+              onClick={handleSaveAppointmentInner} 
               disabled={isProcessing}
             >
               {isProcessing ? 'Saving...' : existingAppointment ? 'Update Appointment' : 'Complete Appointment'}
@@ -502,7 +530,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                           <span key={membership.id} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                             {membership.membership?.name} 
                             {membership.end_date && (
-                              <> (valid until {format(new Date(membership.end_date), 'dd MMM yyyy')})</>
+                              <> (valid until {format(new Date(membership.end_date), 'dd MMM yyyy')}</>
                             )}
                           </span>
                         ))}
@@ -515,13 +543,13 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
             
             {/* Service selection */}
             <ServiceSelector
-              services={services || []}
-              packages={packages || []}
-              selectedServices={appointmentState.selectedServices}
-              selectedPackages={appointmentState.selectedPackages}
-              serviceEmployees={appointmentState.serviceEmployees}
-              packageEmployees={appointmentState.packageEmployees}
-              customizedServices={appointmentState.customizedServices}
+              services={services}
+              packages={packages}
+              selectedServices={selectedServices}
+              selectedPackages={selectedPackages}
+              serviceEmployees={serviceEmployees}
+              packageEmployees={packageEmployees}
+              customizedServices={customizedServices}
               employees={employees}
               onAddService={handleAddService}
               onAddPackage={handleAddPackage}
@@ -579,7 +607,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
               onCheckout={handleCheckout}
               isDisabled={
                 !customer || 
-                (appointmentState.selectedServices.length === 0 && appointmentState.selectedPackages.length === 0)
+                (selectedServices.length === 0 && selectedPackages.length === 0)
               }
               isLoading={isLoading}
             />
