@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, AppointmentStatus, RefundData, TransactionDetails } from '../types';
+import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
 
 // Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
@@ -48,16 +48,11 @@ export function useAppointmentActions() {
       // Cast the data to match our expected types
       const typedAppointment = {
         ...appointment,
-        location_id: appointment.location,
-        membership_discount: appointment.membership_discount || 0,
-        membership_id: appointment.membership_id || null,
-        membership_name: appointment.membership_name || null,
-        discount_type: appointment.discount_type as Appointment['discount_type'],
-        status: appointment.status as AppointmentStatus,
+        discount_type: appointment.discount_type as Appointment['discount_type']
       } as Appointment;
 
       // If this is a refund, get the original sale
-      if (appointment.transaction_type === 'refund') {
+      if (typedAppointment.transaction_type === 'refund') {
         const { data: originalSale, error: originalError } = await supabase
           .from('appointments')
           .select(`
@@ -70,7 +65,7 @@ export function useAppointmentActions() {
               employee:employees!bookings_employee_id_fkey(*)
             )
           `)
-          .eq('id', appointment.original_appointment_id)
+          .eq('id', typedAppointment.original_appointment_id)
           .single();
 
         if (originalError) throw originalError;
@@ -78,12 +73,7 @@ export function useAppointmentActions() {
         // Cast the original sale data
         const typedOriginalSale = {
           ...originalSale,
-          location_id: originalSale.location,
-          membership_discount: originalSale.membership_discount || 0,
-          membership_id: originalSale.membership_id || null,
-          membership_name: originalSale.membership_name || null,
-          discount_type: originalSale.discount_type as Appointment['discount_type'],
-          status: originalSale.status as AppointmentStatus,
+          discount_type: originalSale.discount_type as Appointment['discount_type']
         } as Appointment;
 
         // Get all refunds for this original sale
@@ -107,12 +97,7 @@ export function useAppointmentActions() {
         // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
-          location_id: refund.location,
-          membership_discount: refund.membership_discount || 0,
-          membership_id: refund.membership_id || null,
-          membership_name: refund.membership_name || null,
-          discount_type: refund.discount_type as Appointment['discount_type'],
-          status: refund.status as AppointmentStatus,
+          discount_type: refund.discount_type as Appointment['discount_type']
         })) as Appointment[];
 
         // Create TransactionDetails with all required properties
@@ -121,7 +106,7 @@ export function useAppointmentActions() {
           amount: typedOriginalSale.total_price,
           status: typedOriginalSale.status,
           payment_method: typedOriginalSale.payment_method,
-          created_at: typedOriginalSale.created_at || '',
+          created_at: typedOriginalSale.created_at,
           originalSale: typedOriginalSale,
           refunds: typedRefunds || []
         };
@@ -147,12 +132,7 @@ export function useAppointmentActions() {
         // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
-          location_id: refund.location,
-          membership_discount: refund.membership_discount || 0,
-          membership_id: refund.membership_id || null,
-          membership_name: refund.membership_name || null,
-          discount_type: refund.discount_type as Appointment['discount_type'],
-          status: refund.status as AppointmentStatus,
+          discount_type: refund.discount_type as Appointment['discount_type']
         })) as Appointment[];
 
         // Create TransactionDetails with all required properties
@@ -161,7 +141,7 @@ export function useAppointmentActions() {
           amount: typedAppointment.total_price,
           status: typedAppointment.status,
           payment_method: typedAppointment.payment_method,
-          created_at: typedAppointment.created_at || '',
+          created_at: typedAppointment.created_at,
           originalSale: typedAppointment,
           refunds: typedRefunds || []
         };
@@ -295,20 +275,17 @@ export function useAppointmentActions() {
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: AppointmentStatus,
+    status: Appointment['status'],
     bookingIds: string[]
   ) => {
     try {
       setIsLoading(true);
 
-      // Convert 'no-show' to 'noshow' for database compatibility
-      const dbStatus = status === 'noshow' ? 'noshow' : status;
-
       // First update the appointment status
       const { error: appointmentError } = await supabase
         .from('appointments')
         .update({ 
-          status: dbStatus,
+          status,
           updated_at: new Date().toISOString()
         })
         .eq('id', appointmentId);
@@ -319,7 +296,7 @@ export function useAppointmentActions() {
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({ 
-          status: dbStatus,
+          status,
           updated_at: new Date().toISOString()
         })
         .in('id', bookingIds);
@@ -354,10 +331,6 @@ export function useAppointmentActions() {
     selectedItems,
     fetchAppointmentDetails,
     updateAppointmentStatus,
-    // Returning processRefund if it exists in the original file
-    processRefund: async (appointmentId: string, bookingIds: string[], refundData: RefundData) => {
-      console.log('Processing refund', appointmentId, bookingIds, refundData);
-      return true; // Replace with actual implementation if needed
-    }
+    processRefund
   };
 }

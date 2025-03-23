@@ -138,16 +138,16 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                     {item.type === 'package' && <Package className="h-4 w-4 inline mr-1" />}
                     {item.name}
                   </p>
-                  {item.employee ? (
-                    <div className="text-xs text-muted-foreground">
-                      Service Provider: {item.employee.name}
-                    </div>
-                  ) : null}
-                  {item.duration ? (
-                    <div className="text-xs text-muted-foreground">
+                  {item.employee && (
+                    <p className="text-xs text-gray-500">
+                      Stylist: {item.employee.name}
+                    </p>
+                  )}
+                  {item.duration && (
+                    <p className="text-xs text-gray-500">
                       Duration: {item.duration} minutes
-                    </div>
-                  ) : null}
+                    </p>
+                  )}
                 </div>
                 <p className="text-right text-gray-900">
                   {formatPrice(item.price)}
@@ -569,18 +569,18 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                     </div>
                   </div>
   
-                  {isRefund && transaction?.originalSale.refund_reason && (
+                  {isRefund && transaction.refund_reason && (
                     <div className="space-y-2 pt-4 border-t">
-                      {transaction?.originalSale.refund_reason && (
+                      {transaction.refund_reason && (
                         <div>
                           <p className="font-medium text-xs">Reason:</p>
-                          <p className="text-gray-600">{formatRefundReason(transaction.originalSale.refund_reason || "other")}</p>
+                          <p className="text-gray-600">{formatRefundReason(transaction.refund_reason)}</p>
                         </div>
                       )}
-                      {transaction?.originalSale.refund_notes && (
+                      {transaction.refund_notes && (
                         <div>
                           <p className="font-medium text-sm">Notes:</p>
-                          <p className="text-gray-600">{transaction.originalSale.refund_notes}</p>
+                          <p className="text-gray-600">{transaction.refund_notes}</p>
                         </div>
                       )}
                     </div>
