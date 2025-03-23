@@ -1,14 +1,28 @@
-export type AppointmentStatus = 'pending' | 'confirmed' | 'canceled' | 'completed' | 'no-show';
+
+export type AppointmentStatus = 
+  | 'pending' 
+  | 'confirmed' 
+  | 'canceled' 
+  | 'completed' 
+  | 'no-show' 
+  | 'noshow' 
+  | 'inprogress'
+  | 'voided'
+  | 'refunded'
+  | 'partially_refunded'
+  | 'booked';
 
 export type Appointment = {
   id: string;
   customer_id: string;
   location_id: string | null;
+  location?: string | null;
   start_time: string;
   end_time: string;
   status: AppointmentStatus;
   notes: string | null;
   total_price: number;
+  original_total_price?: number;
   discount_type: 'none' | 'percentage' | 'fixed';
   discount_value: number;
   payment_method: string;
@@ -16,6 +30,11 @@ export type Appointment = {
   membership_discount: number;
   membership_id: string | null;
   membership_name: string | null;
+  created_at?: string;
+  updated_at?: string;
+  transaction_type?: string;
+  original_appointment_id?: string;
+  coupon_id?: string | null;
   customer: any;
   bookings: any[];
 };
@@ -59,13 +78,17 @@ export type Package = {
 export type Customer = {
   id: string;
   email: string;
-  phone: string;
-  first_name: string;
-  last_name: string;
+  phone?: string;
+  phone_number?: string;
+  first_name?: string;
+  last_name?: string;
   full_name?: string;
   avatar_url?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
+  admin_created?: boolean;
+  phone_verified?: boolean;
+  role?: string;
 };
 
 export type Employee = {
@@ -77,6 +100,9 @@ export type Employee = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  avatar?: string;
+  photo_url?: string;
+  status?: string;
 };
 
 export type Booking = {
@@ -87,11 +113,60 @@ export type Booking = {
   employee_id: string | null;
   start_time: string;
   end_time: string;
-  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'no-show';
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'no-show' | 'noshow' | 'refunded';
   price: number;
+  price_paid?: number;
+  original_price?: number;
   created_at: string;
   updated_at: string;
   service?: Service | null;
   package?: Package | null;
   employee?: Employee | null;
+};
+
+export enum SCREEN {
+  SERVICE_SELECTION = "service_selection",
+  CHECKOUT = "checkout",
+  SUMMARY = "summary"
+}
+
+export type RefundData = {
+  reason: string;
+  notes: string;
+  refundedBy: string;
+};
+
+export type TransactionDetails = {
+  id: string;
+  amount: number;
+  status: string;
+  payment_method: string;
+  created_at: string;
+  originalSale: Appointment;
+  refunds: Appointment[];
+};
+
+export type SummaryViewProps = {
+  appointmentId?: string;
+  customer?: {
+    id: string;
+    full_name: string;
+    email: string;
+    phone_number?: string;
+  };
+  totalPrice?: number;
+  items?: Array<{
+    id: string;
+    name: string;
+    price: number;
+    type: string;
+  }>;
+  paymentMethod?: 'cash' | 'card' | 'online';
+  onAddAnother?: () => void;
+  receiptNumber?: string;
+  taxAmount?: number;
+  subTotal?: number;
+  membershipName?: string;
+  membershipDiscount?: number;
+  children?: React.ReactNode;
 };

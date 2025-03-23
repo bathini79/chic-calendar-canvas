@@ -27,7 +27,18 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
         .eq('role', 'customer');
 
       if (error) throw error;
-      return data as Customer[];
+      // Convert the database profiles to Customer type
+      return data.map(profile => ({
+        id: profile.id,
+        email: profile.email,
+        phone_number: profile.phone_number,
+        full_name: profile.full_name,
+        created_at: profile.created_at,
+        updated_at: profile.updated_at,
+        admin_created: profile.admin_created,
+        phone_verified: profile.phone_verified,
+        role: profile.role
+      } as Customer));
     }
   });
 

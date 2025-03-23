@@ -1,43 +1,67 @@
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Package } from "../types";
 
-export function useActivePackages(locationId?: string) {
-  return useQuery<Package[]>({
-    queryKey: ['activePackages', locationId],
+export const useActivePackages = (locationId?: string) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const query = useQuery({
+    queryKey: ["packages", locationId],
     queryFn: async () => {
-      let query = supabase
-        .from('packages')
-        .select(`
-          *,
-          package_services(
-            service:services(*),
-            package_selling_price
+      setIsLoading(true);
+      try {
+        let query = supabase
+          .from("packages")
+          .select(
+            `
+            *,
+            package_services(
+              *,
+              service:services(*)
+            )
+          `
           )
-        `)
-        .eq('status', 'active');
-      
-      if (locationId) {
-        // Get packages associated with this location
-        const { data: packageLocations, error: packageLocationsError } = await supabase
-          .from('package_locations')
-          .select('package_id')
-          .eq('location_id', locationId);
-        
-        if (packageLocationsError) throw packageLocationsError;
-        
-        // If we have package locations, filter by them
-        if (packageLocations && packageLocations.length > 0) {
-          const packageIds = packageLocations.map(pl => pl.package_id);
-          query = query.in('id', packageIds);
+          .eq("status", "active");
+
+        if (locationId) {
+          const { data: packageIds, error: locationError } = await supabase
+            .from("package_locations")
+            .select("package_id")
+            .eq("location_id", locationId);
+
+          if (locationError) throw locationError;
+
+          if (packageIds && packageIds.length > 0) {
+            const ids = packageIds.map((item) => item.package_id);
+            query = query.in("id", ids);
+          }
         }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        // Map the data to the Package type
+        const typedPackages = data.map((pkg) => ({
+          ...pkg,
+          is_active: pkg.status === 'active',
+        } as Package));
+
+        return typedPackages;
+      } catch (error) {
+        console.error("Error fetching packages:", error);
+        return [];
+      } finally {
+        setIsLoading(false);
       }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      return data as Package[];
     },
   });
-}
+
+  return {
+    data: query.data || [],
+    isLoading: isLoading || query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  };
+};

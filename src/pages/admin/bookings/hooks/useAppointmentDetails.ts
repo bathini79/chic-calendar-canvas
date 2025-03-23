@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Appointment } from "../types";
+import { Appointment, AppointmentStatus } from "../types";
 
 export function useAppointmentDetails(appointmentId?: string | null) {
   const [isLoading, setIsLoading] = useState(false);
@@ -34,15 +34,25 @@ export function useAppointmentDetails(appointmentId?: string | null) {
 
       // Convert data to match Appointment type
       if (data) {
+        // Handle status conversion to match AppointmentStatus type
+        let mappedStatus: AppointmentStatus = data.status as AppointmentStatus;
+        // Convert 'noshow' to 'no-show' if needed for consistency
+        if (data.status === 'noshow') {
+          mappedStatus = 'no-show';
+        }
+
         const appointmentData: Appointment = {
           ...data,
           location_id: data.location || null, // Map location to location_id for compatibility
+          location: data.location,
           discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none",
           // Safely add membership fields with default values if they don't exist
           membership_discount: data.membership_discount ?? 0,
           membership_id: data.membership_id ?? null,
           membership_name: data.membership_name ?? null,
           tax_amount: data.tax_amount ?? 0,
+          // Set the mapped status
+          status: mappedStatus,
           // Ensure bookings status is typed correctly
           bookings: data.bookings.map((booking: any) => ({
             ...booking,

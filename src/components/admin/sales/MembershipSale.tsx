@@ -307,7 +307,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
             id: selectedCustomer.id,
             full_name: selectedCustomer.full_name || "",
             email: selectedCustomer.email || "",
-            phone_number: selectedCustomer.phone_number || ""
+            phone_number: selectedCustomer.phone_number || selectedCustomer.phone || ""
           }}
           totalPrice={totalAmount}
           items={[{
