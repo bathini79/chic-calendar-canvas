@@ -435,10 +435,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-muted-foreground">Discount</span>
-                      <Select 
-                        value={discountType}
-                        onValueChange={(v) => setDiscountType(v as 'none' | 'percentage' | 'fixed')}
-                      >
+                      <Select value={discountType} onValueChange={(v) => setDiscountType(v as 'none' | 'percentage' | 'fixed')}>
                         <SelectTrigger className="w-[110px] h-8">
                           <SelectValue placeholder="Discount" />
                         </SelectTrigger>
@@ -469,10 +466,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-muted-foreground">Tax</span>
-                      <Select 
-                        value={selectedTaxRate || "none"}
-                        onValueChange={handleTaxRateChange}
-                      >
+                      <Select value={selectedTaxRate || "none"} onValueChange={handleTaxRateChange}>
                         <SelectTrigger className="w-[180px] h-8">
                           <SelectValue placeholder="No tax" />
                         </SelectTrigger>
@@ -498,29 +492,14 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium mb-1 block">Payment Method</label>
-                    <Select 
-                      value={paymentMethod}
-                      onValueChange={(value: string) => setPaymentMethod(value)}
-                    >
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select payment method" />
                       </SelectTrigger>
                       <SelectContent>
-                        {paymentMethodsLoading ? (
-                          <SelectItem value="loading">Loading...</SelectItem>
-                        ) : paymentMethods.length > 0 ? (
-                          paymentMethods.map(method => (
-                            <SelectItem key={method.id} value={method.name}>
-                              {method.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <>
-                            <SelectItem value="cash">Cash</SelectItem>
-                            <SelectItem value="card">Card</SelectItem>
-                            <SelectItem value="online">Online</SelectItem>
-                          </>
-                        )}
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="card">Card</SelectItem>
+                        <SelectItem value="online">Online</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

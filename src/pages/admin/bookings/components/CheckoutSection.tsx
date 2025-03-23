@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,14 +38,12 @@ import {
   getTotalDuration, 
   getFinalPrice, 
   getServicePriceInPackage,
-  calculatePackagePrice,
-  getMembershipDiscount
+  calculatePackagePrice 
 } from "../utils/bookingUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
-import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -136,90 +135,11 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
   const [couponDiscount, setCouponDiscount] = useState<number>(0);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
-  
-  const { 
-    customerMemberships, 
-    fetchCustomerMemberships, 
-    isLoading: membershipsLoading 
-  } = useCustomerMemberships();
-  const [membershipDiscount, setMembershipDiscount] = useState<number>(0);
-  const [membershipId, setMembershipId] = useState<string | null>(null);
-  const [membershipName, setMembershipName] = useState<string>("");
 
   const subtotal = useMemo(() => 
     getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices),
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
-
-  useEffect(() => {
-    if (selectedCustomer?.id) {
-      fetchCustomerMemberships(selectedCustomer.id);
-    }
-  }, [selectedCustomer, fetchCustomerMemberships]);
-
-  useEffect(() => {
-    if (!customerMemberships || customerMemberships.length === 0) {
-      setMembershipDiscount(0);
-      setMembershipId(null);
-      setMembershipName("");
-      return;
-    }
-
-    let totalMembershipDiscount = 0;
-    let appliedMembershipId = null;
-    let appliedMembershipName = "";
-    const seenMemberships = new Set<string>();
-
-    selectedServices.forEach(serviceId => {
-      const service = services.find(s => s.id === serviceId);
-      if (!service) return;
-
-      const membershipDiscountInfo = getMembershipDiscount(
-        serviceId, 
-        null, 
-        service.selling_price, 
-        customerMemberships
-      );
-
-      if (membershipDiscountInfo) {
-        totalMembershipDiscount += membershipDiscountInfo.calculatedDiscount;
-        
-        if (!seenMemberships.has(membershipDiscountInfo.membershipId)) {
-          seenMemberships.add(membershipDiscountInfo.membershipId);
-          appliedMembershipId = membershipDiscountInfo.membershipId;
-          appliedMembershipName = membershipDiscountInfo.membershipName || "";
-        }
-      }
-    });
-
-    selectedPackages.forEach(packageId => {
-      const pkg = packages.find(p => p.id === packageId);
-      if (!pkg) return;
-      
-      const packagePrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
-      
-      const membershipDiscountInfo = getMembershipDiscount(
-        null, 
-        packageId, 
-        packagePrice, 
-        customerMemberships
-      );
-
-      if (membershipDiscountInfo) {
-        totalMembershipDiscount += membershipDiscountInfo.calculatedDiscount;
-        
-        if (!seenMemberships.has(membershipDiscountInfo.membershipId)) {
-          seenMemberships.add(membershipDiscountInfo.membershipId);
-          appliedMembershipId = membershipDiscountInfo.membershipId;
-          appliedMembershipName = membershipDiscountInfo.membershipName || "";
-        }
-      }
-    });
-
-    setMembershipDiscount(totalMembershipDiscount);
-    setMembershipId(appliedMembershipId);
-    setMembershipName(appliedMembershipName);
-  }, [customerMemberships, selectedServices, selectedPackages, services, packages, customizedServices]);
 
   useEffect(() => {
     const loadTaxData = async () => {
@@ -338,34 +258,29 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  const manualDiscountAmount = useMemo(() => {
-    return discountType !== "none" ? (
-      discountType === "percentage" 
-        ? subtotal * (discountValue / 100) 
-        : Math.min(discountValue, subtotal)
-    ) : 0;
-  }, [subtotal, discountType, discountValue]);
+  const taxAmount = useMemo(() => {
+    const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
+    const afterAllDiscounts = couponDiscount > 0 
+      ? Math.max(0, regularDiscountedPrice - couponDiscount) 
+      : regularDiscountedPrice;
+    
+    return appliedTaxId ? afterAllDiscounts * (appliedTaxRate / 100) : 0;
+  }, [subtotal, appliedTaxId, appliedTaxRate, discountType, discountValue, couponDiscount]);
 
   const discountedSubtotal = useMemo(() => {
-    const afterManualDiscount = Math.max(0, subtotal - manualDiscountAmount);
+    const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
     
-    const afterMembershipDiscount = Math.max(0, afterManualDiscount - membershipDiscount);
-    
-    return Math.max(0, afterMembershipDiscount - couponDiscount);
-  }, [subtotal, manualDiscountAmount, membershipDiscount, couponDiscount]);
-
-  const taxAmount = useMemo(() => {
-    return appliedTaxId ? discountedSubtotal * (appliedTaxRate / 100) : 0;
-  }, [discountedSubtotal, appliedTaxId, appliedTaxRate]);
+    return couponDiscount > 0 ? Math.max(0, regularDiscountedPrice - couponDiscount) : regularDiscountedPrice;
+  }, [subtotal, discountType, discountValue, couponDiscount]);
 
   const total = useMemo(() => 
     discountedSubtotal + taxAmount,
     [discountedSubtotal, taxAmount]
   );
   
-  const totalDiscountAmount = useMemo(() => 
-    manualDiscountAmount + membershipDiscount + couponDiscount,
-    [manualDiscountAmount, membershipDiscount, couponDiscount]
+  const discountAmount = useMemo(() => 
+    subtotal - discountedSubtotal + couponDiscount,
+    [subtotal, discountedSubtotal, couponDiscount]
   );
 
   const selectedItems = useMemo(() => {
@@ -483,21 +398,16 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         taxAmount,
         couponId: selectedCouponId,
         couponDiscount,
-        membershipId,
-        membershipDiscount,
-        membershipName,
         total
       });
       
+      // Pass the summary data with values already calculated
       const saveAppointmentParams = {
         appointmentId: appointmentId, // Include the appointmentId in the params
         appliedTaxId: appliedTaxId,
         taxAmount: taxAmount,
         couponId: selectedCouponId,
         couponDiscount: couponDiscount,
-        membershipId: membershipId,
-        membershipDiscount: membershipDiscount,
-        membershipName: membershipName,
         total: total
       };
       
@@ -703,24 +613,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </div>
               )}
 
-              {membershipDiscount > 0 && (
+              {discountType !== "none" && (
                 <div className="flex justify-between text-sm text-green-600">
                   <span className="flex items-center">
                     <Percent className="mr-2 h-4 w-4" />
-                    Membership Discount ({membershipName})
-                  </span>
-                  <span>-₹{membershipDiscount.toFixed(2)}</span>
-                </div>
-              )}
-
-              {discountType !== "none" && manualDiscountAmount > 0 && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span className="flex items-center">
-                    <Percent className="mr-2 h-4 w-4" />
-                    Manual Discount
+                    Discount
                     {discountType === "percentage" && ` (${discountValue}%)`}
                   </span>
-                  <span>-₹{manualDiscountAmount.toFixed(2)}</span>
+                  <span>-₹{discountAmount - couponDiscount}</span>
                 </div>
               )}
               

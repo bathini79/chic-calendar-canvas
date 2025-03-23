@@ -1,3 +1,4 @@
+
 export enum SCREEN {
   SERVICE_SELECTION = "service_selection",
   CHECKOUT = "checkout",
@@ -117,12 +118,9 @@ export interface Appointment {
   total_duration?: number;
   customer?: Customer;
   bookings: Booking[];
-  membership_id?: string;
-  membership_name?: string;
-  membership_discount?: number;
-  location_id?: string; // Added for compatibility
 }
 
+// Add the missing types for refund and transaction details
 export interface RefundData {
   reason: "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | 
           "health_concern" | "price_dispute" | "other" | "booking_error" | 
