@@ -1,21 +1,20 @@
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { AppointmentStatus, Appointment } from "../types";
+import { Appointment } from "../types";
 
-export function useAppointmentDetails() {
+export function useAppointmentDetails(appointmentId?: string | null) {
   const [isLoading, setIsLoading] = useState(false);
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
 
-  async function fetchAppointmentDetails(appointmentId: string) {
-    if (!appointmentId || appointmentId === "") {
-      console.log("No appointment ID provided or empty ID");
-      return null;
+  const fetchAppointment = useCallback(async () => {
+    if (!appointmentId) {
+      setAppointment(null);
+      return;
     }
     
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
       const { data, error } = await supabase
         .from("appointments")
         .select(`
@@ -31,62 +30,33 @@ export function useAppointmentDetails() {
         .eq("id", appointmentId)
         .single();
 
-      if (error) {
-        throw error;
+      if (error) throw error;
+
+      // Convert data to match Appointment type
+      if (data) {
+        const appointmentData = {
+          ...data,
+          location_id: data.location || null, // Map location to location_id for compatibility
+          discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none"
+        } as Appointment;
+        
+        setAppointment(appointmentData);
       }
-
-      // Handle potential missing fields by providing default values
-      const processedData = {
-        ...data,
-        membership_discount: data.membership_discount || 0,
-        membership_id: data.membership_id || null,
-        membership_name: data.membership_name || null,
-        tax_amount: data.tax_amount || 0
-      };
-
-      // Type assertion to Appointment - we add the fields that might be missing
-      return processedData as unknown as Appointment;
-    } catch (error: any) {
-      console.error("Error fetching appointment details:", error);
-      toast.error(error.message || "Failed to fetch appointment details");
-      return null;
+    } catch (error) {
+      console.error("Error fetching appointment:", error);
+      setAppointment(null);
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [appointmentId]);
 
-  async function updateAppointmentStatus(appointmentId: string, status: AppointmentStatus) {
-    if (!appointmentId || appointmentId === "") {
-      console.log("No appointment ID provided or empty ID");
-      return false;
-    }
-    
-    try {
-      setIsLoading(true);
-      
-      const { error } = await supabase
-        .from("appointments")
-        .update({ status })
-        .eq("id", appointmentId);
-
-      if (error) {
-        throw error;
-      }
-
-      toast.success(`Appointment ${status} successfully`);
-      return true;
-    } catch (error: any) {
-      console.error("Error updating appointment status:", error);
-      toast.error(error.message || "Failed to update appointment status");
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  useEffect(() => {
+    fetchAppointment();
+  }, [fetchAppointment]);
 
   return {
+    appointment,
     isLoading,
-    fetchAppointmentDetails,
-    updateAppointmentStatus
+    refetch: fetchAppointment,
   };
 }

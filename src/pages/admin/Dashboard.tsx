@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
+import { AppointmentManager } from "./bookings/components/AppointmentManager";
 import { format } from "date-fns";
-import { useNavigate } from "react-router-dom";
 import { TopTeamMembers } from '@/components/admin/dashboard/TopTeamMembers';
 import { TodaysAppointments } from '@/components/admin/dashboard/TodaysAppointments';
 import { TopServices } from '@/components/admin/dashboard/TopServices';
@@ -22,14 +21,15 @@ export default function AdminDashboard() {
   const [topStylistsLocationId, setTopStylistsLocationId] = useState("all");
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
   const [appointmentDate, setAppointmentDate] = useState(null);
   const [appointmentTime, setAppointmentTime] = useState("");
   const [employees, setEmployees] = useState([]);
-  const navigate = useNavigate();
 
   useEffect(() => {
     fetchLocations();
     fetchEmployees();
+    console.log("rr")
   }, []);
 
   const fetchLocations = async () => {
@@ -68,9 +68,12 @@ export default function AdminDashboard() {
     setAppointmentDate(startDate);
     setAppointmentTime(format(startDate, 'HH:mm'));
     setIsDetailsDialogOpen(false);
-    
-    // Navigate to appointment page with ID
-    navigate(`/admin/bookings/appointment/${appointment.id}`);
+    setIsAddAppointmentOpen(true);
+  };
+
+  const closeAppointmentManager = () => {
+    setIsAddAppointmentOpen(false);
+    setSelectedAppointment(null);
   };
 
   return (
@@ -123,6 +126,17 @@ export default function AdminDashboard() {
         onCheckout={handleCheckoutFromAppointment}
         onEdit={() => handleCheckoutFromAppointment(selectedAppointment)}
       />
+      {isAddAppointmentOpen && appointmentDate && (
+        <AppointmentManager
+          isOpen={true}
+          onClose={closeAppointmentManager}
+          selectedDate={appointmentDate}
+          selectedTime={appointmentTime}
+          employees={employees}
+          existingAppointment={selectedAppointment}
+          locationId={todayAppointmentsLocationId !== "all" ? todayAppointmentsLocationId : undefined}
+        />
+      )}
     </div>
   );
 }

@@ -1,49 +1,75 @@
 
-// Define all the types needed for the bookings system
-
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'refunded';
-
-export type RefundReason = 'customer_dissatisfaction' | 'service_issue' | 'scheduling_conflict' | 'price_dispute' | 'other';
-
 export enum SCREEN {
-  CUSTOMER_SELECTION = "CUSTOMER_SELECTION",
-  SERVICE_SELECTION = "SERVICE_SELECTION",
-  CHECKOUT = "CHECKOUT",
-  SUMMARY = "SUMMARY"
+  SERVICE_SELECTION = "service_selection",
+  CHECKOUT = "checkout",
+  SUMMARY = "summary",
+}
+
+export type AppointmentStatus = 
+  | "pending" 
+  | "confirmed" 
+  | "canceled" 
+  | "completed"
+  | "inprogress"
+  | "voided"
+  | "refunded"
+  | "partially_refunded"
+  | "noshow"
+  | "booked";
+
+export interface Service {
+  id: string;
+  name: string;
+  description?: string;
+  duration: number;
+  selling_price: number;
+  original_price: number;
+  category_id?: string;
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+  gender?: string;
+  image_urls?: string[];
+}
+
+export interface Package {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  duration?: number;
+  discount_type?: "none" | "fixed" | "percentage";
+  discount_value?: number;
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+  image_urls?: string[];
+  is_customizable?: boolean;
+  customizable_services?: string[];
+  categories?: any[];
+  package_services?: any[];
 }
 
 export interface Customer {
   id: string;
-  full_name: string;
-  email: string;
+  full_name?: string;
+  email?: string;
   phone_number?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Employee {
   id: string;
   name: string;
   email: string;
-  status: 'active' | 'inactive';
-  employment_type: 'stylist' | 'operations';
   phone?: string;
   photo_url?: string;
+  status: "active" | "inactive";
+  employment_type: "stylist" | "operations";
   created_at: string;
   updated_at: string;
-}
-
-export interface Service {
-  id: string;
-  name: string;
-  selling_price: number;
-  duration: number;
-  [key: string]: any;
-}
-
-export interface Package {
-  id: string;
-  name: string;
-  price: number;
-  [key: string]: any;
+  avatar?: string; // Add avatar property for TimeSlots component
 }
 
 export interface Booking {
@@ -52,66 +78,63 @@ export interface Booking {
   service_id?: string;
   package_id?: string;
   employee_id?: string;
+  created_at: string;
+  updated_at: string;
   price_paid: number;
-  status: string;
+  original_price?: number;
+  status: AppointmentStatus;
+  start_time: string;
+  end_time?: string;
+  refunded_at?: string;
+  refund_notes?: string;
+  refunded_by?: string;
+  refund_reason?: string;
   service?: Service;
   package?: Package;
   employee?: Employee;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface RefundData {
-  appointmentId: string;
-  reason: RefundReason;
-  notes?: string;
-  selectedBookings?: string[];
 }
 
 export interface Appointment {
   id: string;
   customer_id: string;
-  customer?: Customer;
   start_time: string;
   end_time: string;
-  total_price: number;
   status: AppointmentStatus;
-  payment_method: 'cash' | 'card' | 'online';
-  discount_type: 'none' | 'percentage' | 'fixed';
+  total_price: number;
+  discount_type: "none" | "fixed" | "percentage";
   discount_value: number;
+  payment_method?: string;
   notes?: string;
-  bookings: Booking[];
   location?: string;
+  number_of_bookings?: number;
   created_at: string;
   updated_at: string;
-  number_of_bookings?: number;
+  original_appointment_id?: string;
+  refund_notes?: string;
+  transaction_type?: string;
+  refunded_by?: string;
   original_total_price?: number;
+  refund_reason?: string;
   total_duration?: number;
-  tax_amount?: number;
-  coupon_id?: string;
-  membership_discount?: number;
-  membership_id?: string;
-  membership_name?: string;
+  customer?: Customer;
+  bookings: Booking[];
 }
 
-export interface CustomerMembership {
+// Add the missing types for refund and transaction details
+export interface RefundData {
+  reason: "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | 
+          "health_concern" | "price_dispute" | "other" | "booking_error" | 
+          "service_unavailable" | "customer_emergency" | "customer_no_show";
+  notes: string;
+  refundedBy: string;
+}
+
+export interface TransactionDetails {
   id: string;
-  customer_id: string;
-  membership_id: string;
-  start_date: string;
-  end_date: string;
-  status: string;
-  amount_paid: number;
+  amount: number;
+  status: AppointmentStatus;
+  payment_method?: string;
   created_at: string;
-  updated_at: string;
-  membership: {
-    id: string;
-    name: string;
-    discount_type: string;
-    discount_value: number;
-    applicable_services?: string[];
-    applicable_packages?: string[];
-    min_billing_amount?: number;
-    max_discount_value?: number;
-  };
+  originalSale: Appointment;
+  refunds: Appointment[];
 }
