@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatISO, subDays } from "date-fns";
 
 // Define the types for the data we'll be fetching
 export type RecentAppointment = {
@@ -45,51 +46,79 @@ export function useRecentSales(days = 30, limit = 10) {
     setError(null);
     
     try {
-      // Use the new Supabase function to get all recent sales
-      const { data, error: salesError } = await supabase
-        .rpc('get_recent_sales', { days_param: days, limit_param: limit });
+      const startDate = formatISO(subDays(new Date(), days));
       
-      if (salesError) throw salesError;
+      // Fetch recent appointments
+      const { data: appointmentsData, error: appointmentsError } = await supabase
+        .from("appointments")
+        .select(`
+          id,
+          customer_id,
+          total_price,
+          created_at,
+          customer:profiles(full_name, email, phone_number)
+        `)
+        .gte('created_at', startDate)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      if (appointmentsError) throw appointmentsError;
 
-      // Process the sales data
-      if (data && data.length > 0) {
-        const processedSales: RecentSale[] = data.map(sale => {
-          if (sale.sale_type === 'appointment') {
-            return {
-              id: sale.id,
-              customer_id: sale.customer_id,
-              customer: {
-                full_name: sale.customer_name || 'Unknown',
-                email: sale.customer_email,
-                phone_number: sale.customer_phone
-              },
-              total_price: sale.amount || 0,
-              created_at: sale.created_at,
-              type: 'appointment'
-            } as RecentAppointment;
-          } else {
-            // Handle membership sales
-            return {
-              id: sale.id,
-              customer_id: sale.customer_id,
-              customer: {
-                full_name: sale.customer_name || 'Unknown',
-                email: sale.customer_email,
-                phone_number: sale.customer_phone
-              },
-              total_amount: sale.amount || 0,
-              sale_date: sale.created_at,
-              membership: null, // We'll fetch membership details separately if needed
-              type: 'membership'
-            } as RecentMembershipSale;
-          }
-        });
+      // Fetch recent membership sales
+      const { data: membershipData, error: membershipError } = await supabase
+        .from("membership_sales")
+        .select(`
+          id,
+          customer_id,
+          total_amount,
+          sale_date,
+          customer:profiles(full_name, email, phone_number),
+          membership:memberships(id, name)
+        `)
+        .gte('sale_date', startDate)
+        .order('sale_date', { ascending: false })
+        .limit(limit);
+      
+      if (membershipError) throw membershipError;
 
-        setSales(processedSales);
-      } else {
-        setSales([]);
-      }
+      // Convert appointments to RecentSale format
+      const appointmentSales: RecentAppointment[] = (appointmentsData || []).map(appointment => ({
+        id: appointment.id,
+        customer_id: appointment.customer_id,
+        customer: {
+          full_name: appointment.customer?.full_name || 'Unknown',
+          email: appointment.customer?.email || null,
+          phone_number: appointment.customer?.phone_number || null
+        },
+        total_price: appointment.total_price,
+        created_at: appointment.created_at,
+        type: 'appointment'
+      }));
 
+      // Convert membership sales to RecentSale format
+      const membershipSales: RecentMembershipSale[] = (membershipData || []).map(sale => ({
+        id: sale.id,
+        customer_id: sale.customer_id,
+        customer: {
+          full_name: sale.customer?.full_name || 'Unknown',
+          email: sale.customer?.email || null,
+          phone_number: sale.customer?.phone_number || null
+        },
+        total_amount: sale.total_amount,
+        sale_date: sale.sale_date,
+        membership: sale.membership,
+        type: 'membership'
+      }));
+
+      // Combine and sort all sales by date
+      const combinedSales = [...appointmentSales, ...membershipSales].sort((a, b) => {
+        const dateA = a.type === 'appointment' ? new Date(a.created_at) : new Date(a.sale_date);
+        const dateB = b.type === 'appointment' ? new Date(b.created_at) : new Date(b.sale_date);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      // Limit the final results
+      setSales(combinedSales.slice(0, limit));
     } catch (err: any) {
       console.error("Error fetching recent sales:", err);
       setError(err.message);
