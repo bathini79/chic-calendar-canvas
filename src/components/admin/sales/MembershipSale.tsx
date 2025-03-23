@@ -212,7 +212,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
           total_amount: totalAmount,
           payment_method: paymentMethod,
           tax_rate_id: selectedTaxRate,
-          location_id: locationId,
+          location_id: locationId || null,
           status: "completed"
         })
         .select()
@@ -520,3 +520,4 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     </div>
   );
 };
+
