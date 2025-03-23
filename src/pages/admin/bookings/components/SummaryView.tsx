@@ -540,17 +540,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                         <span>-₹{transaction.discount_value.toFixed(2)}</span>
                       </div>
                     )}
-                    
-                    {transaction.membership_discount > 0 && (
-                      <div className="flex justify-between text-xs text-blue-600">
-                        <span>
-                          Membership Discount
-                          {transaction.membership_name && ` (${transaction.membership_name})`}
-                        </span>
-                        <span>-₹{transaction.membership_discount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    
                     <div className="flex justify-between text-lg font-bold pt-2">
                       <span>Total</span>
                       <span className={isRefund ? 'text-red-600' : ''}>

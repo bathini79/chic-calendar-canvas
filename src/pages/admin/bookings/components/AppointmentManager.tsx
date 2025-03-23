@@ -1,3 +1,4 @@
+
 // First line replaces the existing first lines
 // This component now takes locationId as a prop
 import React, { useState, useEffect } from "react";
@@ -392,15 +393,17 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                 </h3>
                 <SummaryView
                   appointmentId={newAppointmentId}
-                  customer={selectedCustomer || undefined}
-                  totalPrice={0}
-                  items={[]}
-                  paymentMethod="cash"
-                  onAddAnother={() => {
-                    setCurrentScreen(SCREEN.SERVICE_SELECTION);
-                    setNewAppointmentId(null);
-                  }}
                 />
+                <div className="mt-6 flex justify-end">
+                  <Button
+                    onClick={() => {
+                      setCurrentScreen(SCREEN.SERVICE_SELECTION);
+                      setNewAppointmentId(null);
+                    }}
+                  >
+                    Create New Appointment
+                  </Button>
+                </div>
               </div>
             )}
           </div>
