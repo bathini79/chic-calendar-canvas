@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FinancialDashboard } from "@/components/admin/dashboard/FinancialDashboard";
+// import { FinancialDashboard } from "@/components/admin/dashboard/FinancialDashboard";
 import { FinancialSummary } from "@/components/admin/reports/FinancialSummary";
 
 const reportCategories = [
@@ -152,7 +152,7 @@ export default function Reports() {
             </Button>
             <h2 className="text-2xl font-bold">Financial Dashboard</h2>
           </div>
-          <FinancialDashboard />
+          {/* <FinancialDashboard /> */}
         </div>
       );
     }
