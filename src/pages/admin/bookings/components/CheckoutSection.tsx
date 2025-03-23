@@ -117,6 +117,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
   const [appliedTaxRate, setAppliedTaxRate] = useState<number>(0);
   const [appliedTaxName, setAppliedTaxName] = useState<string>("");
+  
   const [membershipDiscount, setMembershipDiscount] = useState<number>(0);
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [membershipName, setMembershipName] = useState<string | null>(null);
@@ -135,7 +136,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     },
   });
 
-  const { data: customerMemberships = [], isLoading: isLoadingMemberships } = useQuery({
+  const { data: customerMemberships = [] } = useQuery({
     queryKey: ['customer-memberships', selectedCustomer?.id],
     queryFn: async () => {
       if (!selectedCustomer) return [];
@@ -145,7 +146,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         .select(`
           id,
           status,
-          membership:memberships(*)
+          membership:memberships(
+            id, 
+            name, 
+            discount_type, 
+            discount_value,
+            applicable_services, 
+            applicable_packages
+          )
         `)
         .eq('customer_id', selectedCustomer.id)
         .eq('status', 'active');
@@ -237,53 +245,75 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   }, [selectedCouponId, availableCoupons, subtotal]);
 
   useEffect(() => {
-    if (customerMemberships.length > 0) {
-      let bestDiscount = 0;
-      let bestMembershipId = null;
-      let bestMembershipName = null;
-      
+    let bestDiscount = 0;
+    let bestMembershipId = null;
+    let bestMembershipName = null;
+    
+    if (customerMemberships.length > 0 && (selectedServices.length > 0 || selectedPackages.length > 0)) {
       selectedServices.forEach(serviceId => {
-        const membershipDiscount = getMembershipDiscount(
-          serviceId,
-          null,
-          services.find(s => s.id === serviceId)?.selling_price || 0,
-          customerMemberships
-        );
+        const service = services.find(s => s.id === serviceId);
+        if (!service) return;
         
-        if (membershipDiscount && membershipDiscount.calculatedDiscount > bestDiscount) {
-          bestDiscount = membershipDiscount.calculatedDiscount;
-          bestMembershipId = membershipDiscount.membershipId;
-          bestMembershipName = membershipDiscount.membershipName;
-        }
+        customerMemberships.forEach(membership => {
+          const membershipData = membership.membership;
+          if (!membershipData) return;
+          
+          const isServiceEligible = 
+            membershipData.applicable_services?.includes(serviceId) || 
+            (membershipData.applicable_services?.length === 0);
+          
+          if (isServiceEligible) {
+            const discountAmount = membershipData.discount_type === 'percentage'
+              ? service.selling_price * (membershipData.discount_value / 100)
+              : Math.min(membershipData.discount_value, service.selling_price);
+            
+            if (discountAmount > bestDiscount) {
+              bestDiscount = discountAmount;
+              bestMembershipId = membershipData.id;
+              bestMembershipName = membershipData.name;
+            }
+          }
+        });
       });
       
       selectedPackages.forEach(packageId => {
         const pkg = packages.find(p => p.id === packageId);
-        if (pkg) {
-          const packagePrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
-          const membershipDiscount = getMembershipDiscount(
-            null,
-            packageId,
-            packagePrice,
-            customerMemberships
-          );
+        if (!pkg) return;
+        
+        const packagePrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
+        
+        customerMemberships.forEach(membership => {
+          const membershipData = membership.membership;
+          if (!membershipData) return;
           
-          if (membershipDiscount && membershipDiscount.calculatedDiscount > bestDiscount) {
-            bestDiscount = membershipDiscount.calculatedDiscount;
-            bestMembershipId = membershipDiscount.membershipId;
-            bestMembershipName = membershipDiscount.membershipName;
+          const isPackageEligible = 
+            membershipData.applicable_packages?.includes(packageId) || 
+            (membershipData.applicable_packages?.length === 0);
+          
+          if (isPackageEligible) {
+            const discountAmount = membershipData.discount_type === 'percentage'
+              ? packagePrice * (membershipData.discount_value / 100)
+              : Math.min(membershipData.discount_value, packagePrice);
+            
+            if (discountAmount > bestDiscount) {
+              bestDiscount = discountAmount;
+              bestMembershipId = membershipData.id;
+              bestMembershipName = membershipData.name;
+            }
           }
-        }
+        });
       });
-      
-      setMembershipDiscount(bestDiscount);
-      setMembershipId(bestMembershipId);
-      setMembershipName(bestMembershipName);
-    } else {
-      setMembershipDiscount(0);
-      setMembershipId(null);
-      setMembershipName(null);
     }
+    
+    setMembershipDiscount(bestDiscount);
+    setMembershipId(bestMembershipId);
+    setMembershipName(bestMembershipName);
+    
+    console.log("Membership values set:", {
+      membershipDiscount: bestDiscount,
+      membershipId: bestMembershipId,
+      membershipName: bestMembershipName
+    });
   }, [customerMemberships, selectedServices, selectedPackages, services, packages, customizedServices]);
 
   const handleTaxChange = (taxId: string) => {
@@ -483,15 +513,15 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       });
       
       const saveAppointmentParams = {
-        appointmentId: appointmentId, // Include the appointmentId in the params
-        appliedTaxId: appliedTaxId,
-        taxAmount: taxAmount,
+        appointmentId,
+        appliedTaxId,
+        taxAmount,
         couponId: selectedCouponId,
-        couponDiscount: couponDiscount,
-        membershipId: membershipId,
-        membershipName: membershipName,
-        membershipDiscount: membershipDiscount,
-        total: total
+        couponDiscount,
+        membershipId,
+        membershipName,
+        membershipDiscount,
+        total
       };
       
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
@@ -713,7 +743,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     Discount
                     {discountType === "percentage" && ` (${discountValue}%)`}
                   </span>
-                  <span>-₹{(discountAmount - couponDiscount - membershipDiscount).toFixed(2)}</span>
+                  <span>-₹{(discountType === "percentage" 
+                    ? subtotal * (discountValue / 100) 
+                    : discountValue).toFixed(2)}</span>
                 </div>
               )}
               
@@ -821,3 +853,4 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     </div>
   );
 }
+

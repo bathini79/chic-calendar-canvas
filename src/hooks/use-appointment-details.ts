@@ -54,9 +54,15 @@ export function useAppointmentDetails() {
     try {
       setIsLoading(true);
       
+      // Handle status format conversion for database consistency
+      let dbStatus = status;
+      if (status === 'no-show') {
+        dbStatus = 'noshow' as AppointmentStatus;
+      }
+      
       const { error } = await supabase
         .from("appointments")
-        .update({ status })
+        .update({ status: dbStatus })
         .eq("id", appointmentId);
 
       if (error) {
