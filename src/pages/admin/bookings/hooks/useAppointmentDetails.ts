@@ -1,20 +1,21 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Appointment } from "../types";
+import { toast } from "sonner";
+import { AppointmentStatus, Appointment } from "@/pages/admin/bookings/types";
 
-export function useAppointmentDetails(appointmentId?: string | null) {
+export function useAppointmentDetails() {
   const [isLoading, setIsLoading] = useState(false);
-  const [appointment, setAppointment] = useState<Appointment | null>(null);
 
-  const fetchAppointment = useCallback(async () => {
-    if (!appointmentId) {
-      setAppointment(null);
-      return;
+  async function fetchAppointmentDetails(appointmentId: string) {
+    if (!appointmentId || appointmentId === "") {
+      console.log("No appointment ID provided or empty ID");
+      return null;
     }
     
-    setIsLoading(true);
     try {
+      setIsLoading(true);
+      
       const { data, error } = await supabase
         .from("appointments")
         .select(`
@@ -30,36 +31,61 @@ export function useAppointmentDetails(appointmentId?: string | null) {
         .eq("id", appointmentId)
         .single();
 
-      if (error) throw error;
-
-      // Convert data to match Appointment type
-      if (data) {
-        const appointmentData = {
-          ...data,
-          location_id: data.location || null, // Map location to location_id for compatibility
-          discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none",
-          membership_discount: data.membership_discount || 0,
-          membership_id: data.membership_id || null,
-          membership_name: data.membership_name || null
-        } as Appointment;
-        
-        setAppointment(appointmentData);
+      if (error) {
+        throw error;
       }
-    } catch (error) {
-      console.error("Error fetching appointment:", error);
-      setAppointment(null);
+
+      // Handle potential missing fields by providing default values
+      const processedData = {
+        ...data,
+        membership_discount: data.membership_discount || 0,
+        membership_id: data.membership_id || null,
+        membership_name: data.membership_name || null,
+        tax_amount: data.tax_amount || 0
+      };
+
+      return processedData as Appointment;
+    } catch (error: any) {
+      console.error("Error fetching appointment details:", error);
+      toast.error(error.message || "Failed to fetch appointment details");
+      return null;
     } finally {
       setIsLoading(false);
     }
-  }, [appointmentId]);
+  }
 
-  useEffect(() => {
-    fetchAppointment();
-  }, [fetchAppointment]);
+  async function updateAppointmentStatus(appointmentId: string, status: AppointmentStatus) {
+    if (!appointmentId || appointmentId === "") {
+      console.log("No appointment ID provided or empty ID");
+      return false;
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      const { error } = await supabase
+        .from("appointments")
+        .update({ status })
+        .eq("id", appointmentId);
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success(`Appointment ${status} successfully`);
+      return true;
+    } catch (error: any) {
+      console.error("Error updating appointment status:", error);
+      toast.error(error.message || "Failed to update appointment status");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   return {
-    appointment,
     isLoading,
-    refetch: fetchAppointment,
+    fetchAppointmentDetails,
+    updateAppointmentStatus
   };
 }

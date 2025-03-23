@@ -1,417 +1,214 @@
-
-import React, { useState, useEffect } from "react";
-import { format } from "date-fns";
+import React, { useState, useCallback, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ServiceSelector } from "./ServiceSelector";
+import { SCREEN } from "../types";
+import { SelectCustomer } from "./SelectCustomer";
+import { ServiceSelection } from "./ServiceSelection";
 import { CheckoutSection } from "./CheckoutSection";
 import { SummaryView } from "./SummaryView";
-import { useAppointmentState } from "../hooks/useAppointmentState";
-import { useActiveServices } from "../hooks/useActiveServices";
-import { useActivePackages } from "../hooks/useActivePackages";
-import useSaveAppointment from "../hooks/useSaveAppointment";
+import { useSaveAppointment } from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
-import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
-import { Appointment, SCREEN, Service, Package } from "../types";
-import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
+import { useNavigate, useParams } from "react-router-dom";
+import { useAppointmentDetails } from "../hooks/useAppointmentDetails";
+import { AppointmentStatus } from "../types";
 
-interface AppointmentManagerProps {
-  onClose: () => void;
-  selectedDate: Date;
-  selectedTime: string;
-  employees: any[];
-  existingAppointment?: Appointment | null;
-  locationId?: string;
-}
+export function AppointmentManager() {
+  const [screen, setScreen] = useState<SCREEN>(SCREEN.SERVICE_SELECTION);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [discountValue, setDiscountValue] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [notes, setNotes] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedStylists, setSelectedStylists] = useState<Record<string, string>>({});
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<Record<string, string>>({});
+  const [customizedServices, setCustomizedServices] = useState<Record<string, string[]>>({});
+  const [totalPrice, setTotalPrice] = useState<number>(0);
+  const [totalDuration, setTotalDuration] = useState<number>(0);
+  const [locationId, setLocationId] = useState<string | undefined>(undefined);
+  
+  const navigate = useNavigate();
+  const { appointmentId } = useParams<{ appointmentId: string }>();
+  const isExistingAppointment = !!appointmentId;
 
-export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
-  onClose,
-  selectedDate,
-  selectedTime,
-  employees,
-  existingAppointment,
-  locationId
-}) => {
-  const [isOpen, setIsOpen] = useState(true);
-  const [currentScreen, setCurrentScreen] = useState(
-    SCREEN.SERVICE_SELECTION
-  );
-  const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
+  const { saveAppointment, isLoading: isSaving } = useSaveAppointment();
+  const { fetchAppointmentDetails, isLoading: isFetchingAppointment } = useAppointmentDetails();
 
-  const { data: services } = useActiveServices(locationId);
-  const { data: packages } = useActivePackages(locationId);
-
-  const {
-    selectedCustomer,
-    setSelectedCustomer,
-    setShowCreateForm,
-    selectedServices,
-    setSelectedServices,
-    selectedPackages,
-    setSelectedPackages,
-    selectedStylists,
-    setSelectedStylists,
-    selectedDate: stateSelectedDate,
-    setSelectedDate,
-    selectedTime: stateSelectedTime,
-    setSelectedTime,
-    paymentMethod,
-    setPaymentMethod,
-    discountType,
-    setDiscountType,
-    discountValue,
-    setDiscountValue,
-    appointmentNotes,
-    setAppointmentNotes,
-    resetState,
-    customizedServices,
-    setCustomizedServices,
-  } = useAppointmentState();
-
+  // Fetch appointment details if appointmentId is available
   useEffect(() => {
-    if (selectedDate) {
-      setSelectedDate(selectedDate);
-    }
-    
-    if (selectedTime) {
-      setSelectedTime(selectedTime);
-    }
-
-    if (existingAppointment) {
-      processExistingAppointment(existingAppointment);
-      setCurrentScreen(SCREEN.CHECKOUT);
-    }
-  }, [selectedDate, selectedTime, existingAppointment]);
-
-  const processExistingAppointment = (appointment: Appointment) => {
-    const services: string[] = [];
-    const packages: string[] = [];
-    const stylists: Record<string, string> = {};
-    const customizedServicesMap: Record<string, string[]> = {};
-
-    const packageIdsSet = new Set<string>();
-    appointment.bookings.forEach(booking => {
-      if (booking.package_id) {
-        packageIdsSet.add(booking.package_id);
-        if (booking.employee_id) {
-          stylists[booking.package_id] = booking.employee_id;
-        }
-      }
-    });
-
-    const packageIds = Array.from(packageIdsSet);
-    packageIds.forEach(pkgId => {
-      packages.push(pkgId);
-    });
-
-    appointment.bookings.forEach(booking => {
-      if (booking.service_id) {
-        if (booking.package_id) {
-          const basePackage = packageIds.includes(booking.package_id);
-          if (basePackage) {
-            const pkgDetails = appointment.bookings.find(b => 
-              b.package && b.package.id === booking.package_id
-            )?.package;
-
-            if (pkgDetails) {
-              const isBaseService = pkgDetails?.package_services?.some(
-                ps => ps.service.id === booking.service_id
-              );
-
-              if (!isBaseService) {
-                if (!customizedServicesMap[booking.package_id]) {
-                  customizedServicesMap[booking.package_id] = [];
-                }
-                customizedServicesMap[booking.package_id].push(booking.service_id);
-              }
-            }
-          }
-
-          if (booking.employee_id) {
-            stylists[booking.service_id] = booking.employee_id;
-          }
+    if (appointmentId) {
+      const fetchDetails = async () => {
+        const details = await fetchAppointmentDetails(appointmentId);
+        if (details) {
+          setSelectedCustomer(details.customer);
+          setLocationId(details.location);
+          setDiscountType(details.discount_type);
+          setDiscountValue(details.discount_value);
+          setPaymentMethod(details.payment_method || 'cash');
+          setNotes(details.notes || '');
+          
+          // Extract service and package IDs from bookings
+          const serviceIds = details.bookings
+            .filter(booking => booking.service_id)
+            .map(booking => booking.service_id);
+          setSelectedServices(serviceIds);
+          
+          const packageIds = details.bookings
+            .filter(booking => booking.package_id)
+            .map(booking => booking.package_id);
+          setSelectedPackages(packageIds);
+          
+          // Extract stylist and time slot information
+          const stylistSlots = {};
+          details.bookings.forEach(booking => {
+            stylistSlots[booking.service_id || booking.package_id] = booking.employee_id;
+          });
+          setSelectedStylists(stylistSlots);
+          
+          setScreen(SCREEN.CHECKOUT);
         } else {
-          services.push(booking.service_id);
-          if (booking.employee_id) {
-            stylists[booking.service_id] = booking.employee_id;
-          }
+          toast.error("Failed to load appointment details");
         }
-      }
-    });
+      };
+      
+      fetchDetails();
+    }
+  }, [appointmentId, fetchAppointmentDetails]);
 
-    setNewAppointmentId(appointment.id);
-    setSelectedServices(services);
-    setSelectedPackages(packages);
-    setSelectedStylists(stylists);
-    setCustomizedServices(customizedServicesMap);
-    setPaymentMethod(appointment.payment_method as 'cash' | 'online' || 'cash');
-    setDiscountType(appointment.discount_type as 'none' | 'percentage' | 'fixed' || 'none');
-    setDiscountValue(appointment.discount_value || 0);
-    setAppointmentNotes(appointment.notes || '');
-    setSelectedCustomer(appointment.customer || null);
-    
-    const startDate = new Date(appointment.start_time);
-    setSelectedDate(startDate);
-    setSelectedTime(format(startDate, 'HH:mm'));
-  };
-
-  const calculateTotalDuration = (
-    services: any[],
-    packages: any[]
-  ): number => {
-    return getTotalDuration(
-      selectedServices,
-      selectedPackages,
-      services,
-      packages,
-      customizedServices
-    );
-  };
-
-  const calculateTotalPrice = (
-    services: any[],
-    packages: any[],
-    discountType: string,
-    discountValue: number
-  ): number => {
-    return getTotalPrice(
-      selectedServices,
-      selectedPackages,
-      services,
-      packages,
-      customizedServices
-    );
-  };
-
-  const { handleSaveAppointment } = useSaveAppointment({
-    selectedDate: stateSelectedDate,
-    selectedTime: stateSelectedTime,
-    selectedCustomer,
-    selectedServices,
-    selectedPackages,
-    services,
-    packages,
-    selectedStylists,
-    getTotalDuration: calculateTotalDuration,
-    getTotalPrice: calculateTotalPrice,
-    discountType,
-    discountValue,
-    paymentMethod,
-    notes: appointmentNotes,
-    customizedServices,
-    currentScreen,
-    locationId
-  });
-
-  const handleProceedToCheckout = async () => {
+  const handleNext = useCallback(() => {
     if (!selectedCustomer) {
       toast.error("Please select a customer");
       return;
     }
-    if (selectedServices.length === 0 && selectedPackages.length === 0) {
-      toast.error("Please select at least one service or package");
-      return;
-    }
-    setCurrentScreen(SCREEN.CHECKOUT);
-  };
+    setScreen(SCREEN.SERVICE_SELECTION);
+  }, [selectedCustomer]);
 
-  const handleServiceSelect = (serviceId: string) => {
-    setSelectedServices((prev) =>
-      prev.includes(serviceId)
-        ? prev.filter((id) => id !== serviceId)
-        : [...prev, serviceId]
-    );
-  };
-  
-  const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
-    const pkg = packages?.find((p) => p.id === packageId);
-    if (!pkg) return;
-    setCustomizedServices((prev) => {
-      const currentServices = prev[packageId] || [];
-      const newServices = currentServices.includes(serviceId)
-        ? currentServices.filter((id) => id !== serviceId)
-        : [...currentServices, serviceId];
-      return {
-        ...prev,
-        [packageId]: newServices,
-      };
-    });
-  };
-  
-  const handlePackageSelect = (packageId: string) => {
-    setSelectedPackages((prev) =>
-      prev.includes(packageId)
-        ? prev.filter((id) => id !== packageId)
-        : [...prev, packageId]
+  const handleSaveAppointment = async (params: any = {}) => {
+    if (!selectedCustomer) {
+      toast.error("Please select a customer");
+      return null;
+    }
+
+    // Prepare service and package items for saving
+    const serviceItems = [];
+    const packageItems = [];
+
+    return await saveAppointment(
+      selectedCustomer,
+      serviceItems,
+      packageItems,
+      notes,
+      discountType,
+      discountValue,
+      paymentMethod,
+      totalDuration,
+      params
     );
   };
 
-  const handleStylistSelect = (itemId: string, stylistId: string) => {
-    setSelectedStylists((prev) => ({
-      ...prev,
-      [itemId]: stylistId,
-    }));
+  const handlePaymentComplete = (appointmentId: string) => {
+    setScreen(SCREEN.SUMMARY);
   };
 
-  const handleRemoveService = (serviceId: string) => {
-    setSelectedServices(prev => prev.filter(id => id !== serviceId));
-    const updatedStylists = { ...selectedStylists };
-    delete updatedStylists[serviceId];
-    setSelectedStylists(updatedStylists);
-  };
-
-  const handleRemovePackage = (packageId: string) => {
-    setSelectedPackages(prev => prev.filter(id => id !== packageId));
-    const updatedStylists = { ...selectedStylists };
-    delete updatedStylists[packageId];
-    setSelectedStylists(updatedStylists);
-  };
-
-  const handleBackToServices = () => {
-    setCurrentScreen(SCREEN.SERVICE_SELECTION);
-  };
-
-  const handlePaymentComplete = (appointmentId?: string) => {  
-    setNewAppointmentId(appointmentId || null);
-    setCurrentScreen(SCREEN.SUMMARY);
-    resetState();
-  };
-
-  const onHandleSaveAppointment = async() => {
-    const appointmentId = await handleSaveAppointment();
-    if(appointmentId){
-      onClose();
-      resetState();
-    }
-  };
-
-  const handleClose = () => {
-    setIsOpen(false);
-    onClose();
+  const handleAddAnother = () => {
+    navigate('/admin/bookings');
   };
 
   return (
-    <div
-      className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
-        isOpen ? "translate-x-0" : "translate-x-full"
-      }`}
-    >
-      <div className="flex flex-col h-full">
-        <div className="p-6 border-b flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">
-              {existingAppointment ? "Edit Appointment" : "New Appointment"}
-            </h2>
-            <button
-              onClick={handleClose}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-          </div>
-          {stateSelectedDate && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {format(stateSelectedDate, "MMMM d, yyyy")} at {stateSelectedTime}
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-1 min-h-0">
-          <div className="w-[30%] border-r">
+    <div className="container h-full">
+      <Card className="h-full">
+        <CardContent className="h-full">
+          {screen === SCREEN.SERVICE_SELECTION && !isExistingAppointment && (
             <SelectCustomer
               selectedCustomer={selectedCustomer}
               setSelectedCustomer={setSelectedCustomer}
               setShowCreateForm={setShowCreateForm}
             />
-          </div>
-
-          <div className="w-[70%] flex flex-col h-full">
-            {currentScreen === SCREEN.SERVICE_SELECTION && (
-              <div className="flex flex-col h-full">
-                <div className="p-6 flex-shrink-0">
-                  <h3 className="text-lg font-semibold">Select Services</h3>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-6">
-                  <ServiceSelector
-                    onServiceSelect={handleServiceSelect}
-                    onPackageSelect={handlePackageSelect}
-                    onStylistSelect={handleStylistSelect}
-                    selectedServices={selectedServices}
-                    selectedPackages={selectedPackages}
-                    selectedStylists={selectedStylists}
-                    stylists={employees}
-                    onCustomPackage={handleCustomServiceToggle}
-                    customizedServices={customizedServices}
-                    locationId={locationId}
-                  />
-                </div>
-
-                <div className="p-6 border-t mt-auto flex justify-end gap-4">
-                  <Button variant="outline" onClick={onHandleSaveAppointment}>
-                    Save Appointment
-                  </Button>
-                  <Button
-                    className="bg-black text-white"
-                    onClick={handleProceedToCheckout}
-                  >
-                    Checkout
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {currentScreen === SCREEN.CHECKOUT && (
-              <CheckoutSection
-                appointmentId={newAppointmentId || ""}
-                selectedCustomer={selectedCustomer}
-                selectedServices={selectedServices}
-                selectedPackages={selectedPackages}
-                services={services || []}
-                packages={packages || []}
-                discountType={discountType}
-                discountValue={discountValue}
-                paymentMethod={paymentMethod}
-                notes={appointmentNotes}
-                onDiscountTypeChange={setDiscountType}
-                onDiscountValueChange={setDiscountValue}
-                onPaymentMethodChange={setPaymentMethod}
-                onNotesChange={setAppointmentNotes}
-                onPaymentComplete={handlePaymentComplete}
-                selectedStylists={selectedStylists}
-                selectedTimeSlots={{ [newAppointmentId || '']: stateSelectedTime }}
-                onSaveAppointment={handleSaveAppointment}
-                onRemoveService={handleRemoveService}
-                onRemovePackage={handleRemovePackage}
-                onBackToServices={handleBackToServices}
-                customizedServices={customizedServices}
-                isExistingAppointment={!!existingAppointment}
-                locationId={locationId}
-              />
-            )}
-
-            {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
-              <div className="p-6">
-                <h3 className="text-xl font-semibold mb-6">
-                  Appointment Summary
-                </h3>
-                <SummaryView
-                  appointmentId={newAppointmentId}
-                />
-                <div className="mt-6 flex justify-end">
-                  <Button
-                    onClick={() => {
-                      setCurrentScreen(SCREEN.SERVICE_SELECTION);
-                      setNewAppointmentId(null);
-                    }}
-                  >
-                    Create New Appointment
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+          )}
+          {screen === SCREEN.SERVICE_SELECTION && !isExistingAppointment && (
+            <Button onClick={handleNext}>Next</Button>
+          )}
+          {screen === SCREEN.SERVICE_SELECTION && isExistingAppointment && (
+            <p>Loading Appointment Details...</p>
+          )}
+          {screen === SCREEN.SERVICE_SELECTION && isFetchingAppointment && (
+            <p>Loading Appointment Details...</p>
+          )}
+          {screen === SCREEN.SERVICE_SELECTION && !isFetchingAppointment && isExistingAppointment && (
+            <SelectCustomer
+              selectedCustomer={selectedCustomer}
+              setSelectedCustomer={setSelectedCustomer}
+              setShowCreateForm={setShowCreateForm}
+            />
+          )}
+          {screen === SCREEN.SERVICE_SELECTION && !isFetchingAppointment && isExistingAppointment && (
+            <ServiceSelection
+              selectedServices={selectedServices}
+              selectedPackages={selectedPackages}
+              selectedStylists={selectedStylists}
+              selectedTimeSlots={selectedTimeSlots}
+              customizedServices={customizedServices}
+              setCustomizedServices={setCustomizedServices}
+              onSaveAppointment={handleSaveAppointment}
+              setScreen={setScreen}
+              appointmentId={appointmentId}
+              selectedCustomer={selectedCustomer}
+              locationId={locationId}
+            />
+          )}
+          {screen === SCREEN.CHECKOUT && (
+            <CheckoutSection
+              appointmentId={appointmentId}
+              selectedCustomer={selectedCustomer}
+              selectedServices={selectedServices}
+              selectedPackages={selectedPackages}
+              discountType={discountType}
+              discountValue={discountValue}
+              paymentMethod={paymentMethod}
+              notes={notes}
+              onDiscountTypeChange={setDiscountType}
+              onDiscountValueChange={setDiscountValue}
+              onPaymentMethodChange={setPaymentMethod}
+              onNotesChange={setNotes}
+              onPaymentComplete={handlePaymentComplete}
+              selectedStylists={selectedStylists}
+              selectedTimeSlots={selectedTimeSlots}
+              onSaveAppointment={handleSaveAppointment}
+              onRemoveService={(serviceId) =>
+                setSelectedServices(
+                  selectedServices.filter((id) => id !== serviceId)
+                )
+              }
+              onRemovePackage={(packageId) =>
+                setSelectedPackages(
+                  selectedPackages.filter((id) => id !== packageId)
+                )
+              }
+              onBackToServices={() => setScreen(SCREEN.SERVICE_SELECTION)}
+              isExistingAppointment={isExistingAppointment}
+              customizedServices={customizedServices}
+              locationId={locationId}
+            />
+          )}
+          {screen === SCREEN.SUMMARY && appointmentId && (
+            <SummaryView 
+              appointmentId={appointmentId}
+              customer={{
+                id: selectedCustomer?.id || "",
+                full_name: selectedCustomer?.full_name || "",
+                email: selectedCustomer?.email || "",
+                phone_number: selectedCustomer?.phone_number
+              }}
+              totalPrice={totalPrice || 0}
+              items={[]}
+              paymentMethod={paymentMethod as 'cash' | 'card' | 'online'}
+              onAddAnother={handleAddAnother}
+            />
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-};
+}

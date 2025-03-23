@@ -56,6 +56,7 @@ export interface Customer {
   phone_number?: string;
   created_at: string;
   updated_at: string;
+  memberships?: CustomerMembership[];
 }
 
 export interface Employee {
@@ -68,7 +69,7 @@ export interface Employee {
   employment_type: "stylist" | "operations";
   created_at: string;
   updated_at: string;
-  avatar?: string; // Add avatar property for TimeSlots component
+  avatar?: string;
 }
 
 export interface Booking {
@@ -96,20 +97,16 @@ export interface Booking {
 export interface Appointment {
   id: string;
   customer_id: string;
-  customer?: Customer;
   start_time: string;
   end_time: string;
   status: AppointmentStatus;
-  notes?: string;
-  bookings: Booking[];
   total_price: number;
-  discount_type: "none" | "percentage" | "fixed";
+  discount_type: "none" | "fixed" | "percentage";
   discount_value: number;
   payment_method?: string;
-  location_id?: string | null;
-  membership_discount?: number; // Added for membership discount
-  membership_id?: string;       // Added for membership reference
-  membership_name?: string;     // Added for membership name
+  notes?: string;
+  location?: string;
+  number_of_bookings?: number;
   created_at: string;
   updated_at: string;
   original_appointment_id?: string;
@@ -119,6 +116,13 @@ export interface Appointment {
   original_total_price?: number;
   refund_reason?: string;
   total_duration?: number;
+  customer?: Customer;
+  bookings: Booking[];
+  tax_amount?: number;
+  coupon_id?: string;
+  membership_id?: string;
+  membership_name?: string;
+  membership_discount?: number;
 }
 
 export interface RefundData {
@@ -137,4 +141,26 @@ export interface TransactionDetails {
   created_at: string;
   originalSale: Appointment;
   refunds: Appointment[];
+}
+
+export interface CustomerMembership {
+  id: string;
+  customer_id: string;
+  membership_id: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  amount_paid: number;
+  created_at: string;
+  updated_at: string;
+  membership?: {
+    id: string;
+    name: string;
+    discount_type: 'percentage' | 'fixed';
+    discount_value: number;
+    applicable_services: string[];
+    applicable_packages: string[];
+    min_billing_amount: number | null;
+    max_discount_value: number | null;
+  };
 }

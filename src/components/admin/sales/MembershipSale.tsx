@@ -38,14 +38,16 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online' | 'card'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [isProcessing, setIsProcessing] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState<string>("");
   const [activeTab, setActiveTab] = useState("memberships");
   const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
   const [discountValue, setDiscountValue] = useState<number>(0);
-  
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
+
   const { taxRates, fetchTaxRates } = useTaxRates();
   const [selectedTaxRate, setSelectedTaxRate] = useState<string | null>(null);
   const [taxRateValue, setTaxRateValue] = useState(0);
@@ -56,6 +58,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
   useEffect(() => {
     fetchMemberships();
     fetchTaxRates();
+    fetchPaymentMethods();
   }, [locationId]);
   
   useEffect(() => {
@@ -121,6 +124,24 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
       console.error("Error fetching memberships:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchPaymentMethods = async () => {
+    setIsLoadingPaymentMethods(true);
+    try {
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('is_enabled', true)
+        .order('name');
+      
+      if (error) throw error;
+      setPaymentMethods(data || []);
+    } catch (error: any) {
+      console.error("Error fetching payment methods:", error);
+    } finally {
+      setIsLoadingPaymentMethods(false);
     }
   };
 
@@ -290,10 +311,6 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
     setDiscountValue(0);
   };
   
-  const handlePaymentMethodChange = (value: string) => {
-    setPaymentMethod(value as 'cash' | 'online' | 'card');
-  };
-
   const filteredMemberships = memberships.filter(membership => 
     membership.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (membership.description && membership.description.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -321,7 +338,7 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
             price: subtotal,
             type: "membership"
           }]}
-          paymentMethod={paymentMethod}
+          paymentMethod={paymentMethod === "card" ? "card" : paymentMethod}
           onAddAnother={handleReset}
           receiptNumber={receiptNumber}
           taxAmount={taxAmount}
@@ -496,6 +513,44 @@ export const MembershipSale: React.FC<MembershipSaleProps> = ({
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium mb-1 block">Payment Method</label>
-                    <Select value={paymentMethod} onValueChange={handlePaymentMethodChange}>
-                     
-
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Coupon</SelectItem>
+                        {isLoadingPaymentMethods ? (
+                          <SelectItem value="loading">Loading...</SelectItem>
+                        ) : paymentMethods.length > 0 ? (
+                          paymentMethods.map(method => (
+                            <SelectItem key={method.id} value={method.name}>
+                              {method.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="card">Card</SelectItem>
+                            <SelectItem value="online">Online</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <Button 
+                    className="w-full" 
+                    onClick={handleComplete}
+                    disabled={!selectedCustomer || !selectedMembership || isProcessing}
+                  >
+                    {isProcessing ? "Processing..." : "Pay Now"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

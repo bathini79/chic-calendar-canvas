@@ -1,244 +1,345 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/utils";
+import { StatusBadge } from "./StatusBadge";
 import { 
-  CheckCircle2, 
+  Ban, 
+  Banknote, 
+  Calendar, 
+  Check, 
+  Clock, 
   CreditCard, 
-  Banknote,
-  MoreVertical,
-  PencilLine,
-  FileText,
-  Mail,
-  Printer,
-  Download,
-  Ban,
-  Clock,
-  Package,
-  MapPin
+  File, 
+  FileCheck, 
+  FileMinus, 
+  FileWarning, 
+  MessagesSquare, 
+  Tag, 
+  User, 
+  UserRound,
+  Undo
 } from "lucide-react";
-import { format } from 'date-fns';
-import { useAppointmentDetails } from '../hooks/useAppointmentDetails';
-import { formatPrice } from '@/lib/utils';
+import { AppointmentStatus, Customer, RefundData } from "../types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { formatPrice } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
-export interface SummaryViewProps {
-  appointmentId: string;
-  customer?: {
+interface SelectedItem {
+  id: string;
+  name: string;
+  price: number;
+  type: 'service' | 'package' | 'membership';
+}
+
+interface SummaryViewProps {
+  appointmentId?: string;
+  customer: {
     id: string;
     full_name: string;
     email: string;
     phone_number?: string;
   };
-  totalPrice?: number;
-  items?: {
-    id: string;
-    name: string;
-    price: number;
-    type: string;
-    employee?: {
-      id: string;
-      name: string;
-    };
-    duration?: number;
-  }[];
-  paymentMethod?: 'cash' | 'online' | 'card';
-  onAddAnother?: () => void;
+  totalPrice: number;
+  items: SelectedItem[];
+  paymentMethod: 'cash' | 'card' | 'online';
+  onAddAnother: () => void;
   receiptNumber?: string;
   taxAmount?: number;
   subTotal?: number;
+  couponDiscount?: number;
+  membershipDiscount?: number;
+  membershipName?: string;
 }
 
-export const SummaryView: React.FC<SummaryViewProps> = ({
-  appointmentId,
-  customer,
-  totalPrice,
-  items,
-  paymentMethod = 'cash',
+export function SummaryView({ 
+  appointmentId, 
+  customer, 
+  totalPrice, 
+  items, 
+  paymentMethod, 
   onAddAnother,
   receiptNumber,
   taxAmount = 0,
-  subTotal = 0
-}) => {
-  const { appointment, isLoading } = useAppointmentDetails(appointmentId || null);
-  const [summaryData, setSummaryData] = useState<{
-    customer: { id: string; full_name: string; email: string; phone_number?: string } | null;
-    items: any[];
-    totalPrice: number;
-    paymentMethod: 'cash' | 'online' | 'card';
-    taxAmount: number;
-    subTotal: number;
-    membershipName?: string;
-    membershipDiscount?: number;
-  }>({
-    customer: null,
-    items: [],
-    totalPrice: 0,
-    paymentMethod: 'cash',
-    taxAmount: 0,
-    subTotal: 0
+  subTotal = 0,
+  couponDiscount = 0,
+  membershipDiscount = 0,
+  membershipName = ""
+}: SummaryViewProps) {
+  const [showActionDialog, setShowActionDialog] = useState(false);
+  const [showRefundDialog, setShowRefundDialog] = useState(false);
+  const [actionType, setActionType] = useState<'cancel' | 'complete' | 'noshow' | 'refund'>('complete');
+  const [refundReason, setRefundReason] = useState<string>('customer_dissatisfaction');
+  const [refundNotes, setRefundNotes] = useState('');
+  const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
+  const [appointmentDetails, setAppointmentDetails] = useState<any | null>(null);
+  const [isPartialRefund, setIsPartialRefund] = useState(false);
+  const regularDiscount = subTotal - totalPrice - couponDiscount - membershipDiscount + taxAmount;
+
+  const { data: transactionDetails, isLoading: isTransactionLoading } = useQuery({
+    queryKey: ['appointment-transaction', appointmentId],
+    queryFn: async () => {
+      if (!appointmentId) return null;
+      
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customer:profiles(*),
+          bookings(
+            *,
+            service:services(*),
+            package:packages(*),
+            employee:employees(*)
+          )
+        `)
+        .eq('id', appointmentId)
+        .single();
+        
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!appointmentId
   });
 
-  useEffect(() => {
-    if (appointmentId && appointment) {
-      // Use appointment data
-      const items = appointment.bookings.map(booking => ({
-        id: booking.id,
-        name: booking.service?.name || booking.package?.name || 'Unknown',
-        price: booking.price_paid,
-        type: booking.service_id ? 'service' : 'package',
-        employee: booking.employee,
-        duration: booking.service?.duration || booking.package?.duration
-      }));
-
-      setSummaryData({
-        customer: appointment.customer || null,
-        items,
-        totalPrice: appointment.total_price,
-        paymentMethod: (appointment.payment_method as 'cash' | 'online' | 'card') || 'cash',
-        taxAmount: appointment.tax_amount || 0,
-        subTotal: items.reduce((sum, item) => sum + item.price, 0),
-        membershipName: appointment.membership_name,
-        membershipDiscount: appointment.membership_discount
-      });
-    } else if (customer && items && totalPrice !== undefined) {
-      // Use provided props
-      setSummaryData({
-        customer,
-        items,
-        totalPrice,
-        paymentMethod: paymentMethod || 'cash',
-        taxAmount: taxAmount || 0,
-        subTotal: subTotal || 0
-      });
-    }
-  }, [appointment, appointmentId, customer, items, totalPrice, paymentMethod, taxAmount, subTotal]);
-
-  // Generate a receipt-like view
-  const renderReceipt = () => {
-    if (isLoading || (!summaryData.customer && !appointment)) {
-      return <div>Loading...</div>;
-    }
-
-    const { customer, items, totalPrice, paymentMethod, taxAmount, subTotal, membershipName, membershipDiscount } = summaryData;
-
-    if (!customer) return <div>No customer information</div>;
-
-    return (
-      <Card className="bg-white h-full border">
-        <CardContent className="p-4 space-y-4">
-          <div className="flex items-center justify-between border-b pb-2">
-            <div className="flex-1">
-              <div className="inline-flex items-center px-2.5 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Completed Sale
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="text-base font-semibold">
-              {customer.full_name || 'No name provided'}
-            </h4>
-            <p className="text-gray-600">{customer.email || 'No email provided'}</p>
-            {customer.phone_number && (
-              <p className="text-gray-600">{customer.phone_number}</p>
-            )}
-          </div>
-
-          <div className="overflow-y-auto">
-            <h4 className="font-medium mb-4">Items</h4>
-            
-            {items && items.map((item, idx) => (
-              <div key={idx} className="py-2 flex justify-between items-start border-b">
-                <div className="flex-1">
-                  <p className="font-medium text-sm line-clamp-1">
-                    {item.type === 'package' && <Package className="h-4 w-4 inline mr-1" />}
-                    {item.name}
-                  </p>
-                  {item.employee && (
-                    <p className="text-xs text-gray-500">
-                      Stylist: {item.employee.name}
-                    </p>
-                  )}
-                  {item.duration && (
-                    <p className="text-xs text-gray-500">
-                      Duration: {item.duration} minutes
-                    </p>
-                  )}
-                </div>
-                <p className="text-right text-gray-900">
-                  {formatPrice(item.price)}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="space-y-1 pt-2 border-t">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span>{formatPrice(subTotal)}</span>
-            </div>
-            
-            {taxAmount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span>Tax</span>
-                <span>{formatPrice(taxAmount)}</span>
-              </div>
-            )}
-            
-            {membershipName && membershipDiscount && membershipDiscount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>Membership Discount ({membershipName})</span>
-                <span>-{formatPrice(membershipDiscount)}</span>
-              </div>
-            )}
-            
-            {subTotal !== totalPrice && !membershipDiscount && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>Discount</span>
-                <span>-{formatPrice(subTotal - totalPrice + (taxAmount || 0))}</span>
-              </div>
-            )}
-            
-            <div className="flex justify-between text-lg font-bold pt-2">
-              <span>Total</span>
-              <span>{formatPrice(totalPrice)}</span>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <div className="flex justify-between text-xs">
-              <span className="capitalize">
-                Paid with {paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'card' ? 'Card' : 'Online'}
-              </span>
-              <div className="flex items-center">
-                {paymentMethod === 'cash' ? (
-                  <Banknote className="h-4 w-4 mr-1" />
-                ) : (
-                  <CreditCard className="h-4 w-4 mr-1" />
-                )}
-                {formatPrice(totalPrice)}
-              </div>
-            </div>
-          </div>
-          
-          {receiptNumber && (
-            <div className="pt-2 text-center text-xs text-gray-500">
-              Receipt #: {receiptNumber}
-            </div>
-          )}
-          
-          {onAddAnother && (
-            <div className="flex justify-center mt-4">
-              <Button onClick={onAddAnother} className="mx-auto">
-                Add Another
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
+  // Use either fetched transaction details or provided props
+  const displayDetails = transactionDetails || {
+    customer,
+    total_price: totalPrice,
+    status: 'confirmed',
+    payment_method: paymentMethod,
+    tax_amount: taxAmount,
   };
 
-  return renderReceipt();
-};
+  // Handle appointment actions
+  const handleAction = (type: 'cancel' | 'complete' | 'noshow' | 'refund') => {
+    setActionType(type);
+    if (type === 'refund') {
+      setShowRefundDialog(true);
+    } else {
+      setShowActionDialog(true);
+    }
+  };
+
+  const calculateTotal = () => {
+    if (transactionDetails) {
+      let total = transactionDetails.total_price || 0;
+      return total;
+    }
+    return totalPrice;
+  };
+
+  return (
+    <div className="p-6 h-full overflow-auto">
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-2xl">Transaction Summary</CardTitle>
+            {receiptNumber && (
+              <p className="text-sm text-muted-foreground mt-1">Receipt: {receiptNumber}</p>
+            )}
+          </div>
+          {appointmentId && transactionDetails && (
+            <StatusBadge status={transactionDetails.status} />
+          )}
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Customer Information */}
+          <div className="space-y-2">
+            <h3 className="text-lg font-medium flex items-center gap-2">
+              <UserRound className="h-5 w-5" /> Customer Information
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Name</p>
+                <p className="font-medium">{displayDetails.customer?.full_name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-medium">{displayDetails.customer?.email}</p>
+              </div>
+              {displayDetails.customer?.phone_number && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Phone</p>
+                  <p className="font-medium">{displayDetails.customer?.phone_number}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Transaction Details */}
+          <div className="space-y-2">
+            <h3 className="text-lg font-medium flex items-center gap-2">
+              <FileCheck className="h-5 w-5" /> Transaction Details
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Date</p>
+                <p className="font-medium">
+                  {transactionDetails ? 
+                    formatDate(new Date(transactionDetails.created_at)) : 
+                    formatDate(new Date())}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Payment Method</p>
+                <p className="font-medium capitalize">
+                  {displayDetails.payment_method || paymentMethod}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Amount</p>
+                <p className="font-medium">
+                  {formatPrice(calculateTotal())}
+                </p>
+              </div>
+              {appointmentId && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Transaction ID</p>
+                  <p className="font-medium text-xs">{appointmentId}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Items Purchased */}
+          <div className="space-y-3">
+            <h3 className="text-lg font-medium flex items-center gap-2">
+              <File className="h-5 w-5" /> Items
+            </h3>
+            <div className="border rounded-md">
+              <div className="p-3 bg-muted/50 border-b grid grid-cols-12 text-sm font-medium">
+                <div className="col-span-6">Item</div>
+                <div className="col-span-3">Type</div>
+                <div className="col-span-3 text-right">Price</div>
+              </div>
+              <div className="divide-y">
+                {transactionDetails && transactionDetails.bookings ? (
+                  transactionDetails.bookings.map((booking: any) => (
+                    <div key={booking.id} className="p-3 grid grid-cols-12 items-center">
+                      <div className="col-span-6 font-medium">
+                        {booking.service?.name || booking.package?.name}
+                      </div>
+                      <div className="col-span-3 text-sm">
+                        {booking.service ? 'Service' : 'Package'}
+                      </div>
+                      <div className="col-span-3 text-right">
+                        {formatPrice(booking.price_paid)}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  items.map((item) => (
+                    <div key={item.id} className="p-3 grid grid-cols-12 items-center">
+                      <div className="col-span-6 font-medium">{item.name}</div>
+                      <div className="col-span-3 text-sm capitalize">{item.type}</div>
+                      <div className="col-span-3 text-right">{formatPrice(item.price)}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Price Breakdown */}
+          <div className="space-y-2 border-t pt-4">
+            <h3 className="text-lg font-medium flex items-center gap-2">
+              <CreditCard className="h-5 w-5" /> Price Breakdown
+            </h3>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{formatPrice(subTotal > 0 ? subTotal : (calculateTotal() + regularDiscount))}</span>
+              </div>
+              
+              {(transactionDetails?.tax_amount || taxAmount > 0) && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tax</span>
+                  <span>{formatPrice(transactionDetails?.tax_amount || taxAmount)}</span>
+                </div>
+              )}
+              
+              {(transactionDetails?.discount_type !== 'none' || regularDiscount > 0) && (
+                <div className="flex justify-between text-green-600">
+                  <span className="flex items-center">
+                    <Percent className="mr-2 h-4 w-4" />
+                    Discount
+                    {transactionDetails?.discount_type === 'percentage' && 
+                      ` (${transactionDetails.discount_value}%)`}
+                  </span>
+                  <span>-{formatPrice(regularDiscount > 0 ? regularDiscount : 
+                    (transactionDetails?.original_total_price || 0) - 
+                    (transactionDetails?.total_price || 0))}</span>
+                </div>
+              )}
+              
+              {(couponDiscount > 0 || transactionDetails?.coupon_id) && (
+                <div className="flex justify-between text-green-600">
+                  <span>Coupon Discount</span>
+                  <span>-{formatPrice(couponDiscount)}</span>
+                </div>
+              )}
+              
+              {(membershipDiscount > 0 || transactionDetails?.membership_discount) && (
+                <div className="flex justify-between text-green-600">
+                  <span className="flex items-center">
+                    <Tag className="mr-2 h-4 w-4" />
+                    Membership Discount
+                    {(membershipName || transactionDetails?.membership_name) && 
+                      ` (${membershipName || transactionDetails?.membership_name})`}
+                  </span>
+                  <span>-{formatPrice(membershipDiscount || transactionDetails?.membership_discount || 0)}</span>
+                </div>
+              )}
+              
+              <Separator className="my-2" />
+              
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total</span>
+                <span>{formatPrice(calculateTotal())}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-between">
+        {onAddAnother && (
+          <Button onClick={onAddAnother} variant="outline">
+            Add Another Transaction
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
