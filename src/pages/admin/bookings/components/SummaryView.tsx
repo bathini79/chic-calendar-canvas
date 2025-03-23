@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import {
   Clock, 
   CalendarIcon, 
   CreditCard,
-  Cash,
+  Banknote,  // Changed from 'Cash' to 'Banknote' which is available in lucide-react
   Phone,
   Mail,
   User,
@@ -95,7 +96,7 @@ export function SummaryView({
       case "card":
         return <CreditCard className="h-4 w-4 text-gray-500" />;
       case "cash":
-        return <Cash className="h-4 w-4 text-gray-500" />;
+        return <Banknote className="h-4 w-4 text-gray-500" />; // Changed from Cash to Banknote
       default:
         return <CreditCard className="h-4 w-4 text-gray-500" />;
     }
@@ -106,9 +107,19 @@ export function SummaryView({
       return 0;
     }
     
-    const baseAmount = displayData.original_total_price || 
-                      (subTotal !== undefined ? subTotal : 
-                      displayData.items.reduce((sum, item) => sum + item.price, 0));
+    // Calculate the base amount
+    let baseAmount = 0;
+    if (displayData.original_total_price) {
+      baseAmount = displayData.original_total_price;
+    } else if (subTotal !== undefined) {
+      baseAmount = subTotal;
+    } else if (displayData.items && Array.isArray(displayData.items)) {
+      // Ensure we're only summing numbers
+      baseAmount = displayData.items.reduce((sum, item) => {
+        const itemPrice = typeof item.price === 'number' ? item.price : 0;
+        return sum + itemPrice;
+      }, 0);
+    }
     
     if (displayData.discount_type === "percentage") {
       return (baseAmount * displayData.discount_value) / 100;
@@ -165,7 +176,7 @@ export function SummaryView({
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Services</h3>
             <div className="space-y-4">
-              {displayData.items.map((item) => (
+              {displayData.items && displayData.items.map((item) => (
                 <div key={item.id} className="border-b pb-4 last:border-0 last:pb-0">
                   <div className="flex justify-between items-start">
                     <div>
@@ -200,7 +211,12 @@ export function SummaryView({
                   {formatPrice(
                     displayData.original_total_price || 
                     (subTotal !== undefined ? subTotal : 
-                    displayData.items.reduce((sum, item) => sum + item.price, 0))
+                    (displayData.items && Array.isArray(displayData.items)) ? 
+                      displayData.items.reduce((sum, item) => {
+                        const itemPrice = typeof item.price === 'number' ? item.price : 0;
+                        return sum + itemPrice;
+                      }, 0) : 0
+                    )
                   )}
                 </span>
               </div>
