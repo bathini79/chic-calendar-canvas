@@ -42,7 +42,12 @@ export function useAppointmentDetails(appointmentId?: string | null) {
           membership_discount: data.membership_discount || 0,
           membership_id: data.membership_id || null,
           membership_name: data.membership_name || null,
-          tax_amount: data.tax_amount || 0
+          tax_amount: data.tax_amount || 0,
+          // Ensure bookings status is typed correctly
+          bookings: data.bookings.map((booking: any) => ({
+            ...booking,
+            status: booking.status || 'pending'
+          }))
         };
         
         setAppointment(appointmentData);
