@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -706,7 +705,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   <span>-₹{membershipDiscount.toFixed(2)}</span>
                 </div>
               )}
-
+              
               {discountType !== "none" && (
                 <div className="flex justify-between text-sm text-green-600">
                   <span className="flex items-center">
