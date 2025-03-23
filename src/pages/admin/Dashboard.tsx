@@ -51,7 +51,6 @@ import { useRecentSales } from "@/hooks/use-recent-sales";
 
 const LazyStatsPanel = React.lazy(() => import('./bookings/components/StatsPanel').then(module => ({ default: module.StatsPanel })));
 
-// Location selector component for reuse
 const LocationSelector = ({ locations, value, onChange, className = "" }) => (
   <Select value={value} onValueChange={onChange}>
     <SelectTrigger className={`w-[180px] ${className}`}>
@@ -120,7 +119,6 @@ export default function AdminDashboard() {
     totalItems: 0
   });
 
-  // Location state variables
   const [locations, setLocations] = useState([]);
   const [recentSalesLocationId, setRecentSalesLocationId] = useState("all");
   const [todayAppointmentsLocationId, setTodayAppointmentsLocationId] = useState("all");
@@ -133,7 +131,6 @@ export default function AdminDashboard() {
   const { data: todayAppointmentsData = [], isLoading: isTodayAppointmentsLoading, refetch: refetchTodayAppointments } = 
     useAppointmentsByDate(today, todayAppointmentsLocationId !== "all" ? todayAppointmentsLocationId : undefined);
 
-  // Get days parameter for the useRecentSales hook based on timeRange
   const getRecentSalesDays = useMemo(() => {
     switch (timeRange) {
       case "today": return 1;
@@ -144,15 +141,13 @@ export default function AdminDashboard() {
     }
   }, [timeRange]);
 
-  // Use the recentSales hook
   const { 
     sales: recentSales, 
     isLoading: isRecentSalesLoading 
-  } = useRecentSales(getRecentSalesDays, 50); // Fetch more sales to ensure we have enough data for stats
+  } = useRecentSales(getRecentSalesDays, 50);
 
   useEffect(() => {
     if (!isRecentSalesLoading && recentSales.length > 0) {
-      // Process sales data for revenue chart
       const groupedData = {};
       let total = 0;
       let completedTotal = 0;
@@ -179,7 +174,6 @@ export default function AdminDashboard() {
           };
         }
         
-        // Calculate sales amount
         const amount = sale.type === 'appointment' ? sale.total_price : sale.total_amount;
         
         groupedData[date].sales += amount || 0;
@@ -187,14 +181,10 @@ export default function AdminDashboard() {
         total += amount || 0;
         count += 1;
         
-        // For appointments, count completed ones separately
         if (sale.type === 'appointment') {
-          // Note: We don't have status in the recent sales, so we're counting all as completed
-          // This could be enhanced with additional status info if needed
           completedTotal += amount || 0;
           completedCount += 1;
         } else {
-          // For memberships, count all as completed (since we're only fetching completed ones)
           completedTotal += amount || 0;
           completedCount += 1;
         }
@@ -272,7 +262,6 @@ export default function AdminDashboard() {
   const fetchLowStockItems = useCallback(async () => {
     try {
       if (inventoryLocationId === "all") {
-        // For all locations, query from inventory_items
         const { data, error } = await supabase
           .from("inventory_items")
           .select("id, quantity, minimum_quantity");
@@ -291,7 +280,6 @@ export default function AdminDashboard() {
           totalItems
         });
       } else {
-        // For specific location, query from inventory_location_items
         const { data, error } = await supabase
           .from("inventory_location_items")
           .select("id, quantity, minimum_quantity")
@@ -325,7 +313,6 @@ export default function AdminDashboard() {
     setIsLoading(true);
     try {
       await Promise.all([
-        // We don't need fetchRevenueData() as we're using the useRecentSales hook now
         fetchUpcomingAppointments(),
         fetchAppointmentsActivity(),
         fetchTopServices(),
@@ -402,7 +389,6 @@ export default function AdminDashboard() {
         groupedData[date].appointments += 1;
         total += appointment.total_price || 0;
         
-        // Count completed appointments separately
         if (appointment.status === 'completed') {
           completedTotal += appointment.total_price || 0;
           completedCount += 1;
@@ -565,14 +551,12 @@ export default function AdminDashboard() {
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
-      // Always get services first
       const { data: servicesData, error: servicesError } = await supabase
         .from("services")
         .select("id, name");
       
       if (servicesError) throw servicesError;
       
-      // Create query for this month's bookings
       let thisMonthQuery = supabase
         .from("bookings")
         .select(`
@@ -584,7 +568,6 @@ export default function AdminDashboard() {
         .lte("created_at", lastDayThisMonth.toISOString())
         .not("service_id", "is", null);
       
-      // Create query for last month's bookings
       let lastMonthQuery = supabase
         .from("bookings")
         .select(`
@@ -596,9 +579,7 @@ export default function AdminDashboard() {
         .lte("created_at", lastDayLastMonth.toISOString())
         .not("service_id", "is", null);
       
-      // If location is selected, get appointment IDs for that location
       if (topServicesLocationId !== "all") {
-        // Get appointments for the selected location (this month)
         const { data: thisMonthAppointments, error: thisMonthAppError } = await supabase
           .from("appointments")
           .select("id")
@@ -608,7 +589,6 @@ export default function AdminDashboard() {
         
         if (thisMonthAppError) throw thisMonthAppError;
         
-        // Get appointments for the selected location (last month)
         const { data: lastMonthAppointments, error: lastMonthAppError } = await supabase
           .from("appointments")
           .select("id")
@@ -618,27 +598,22 @@ export default function AdminDashboard() {
         
         if (lastMonthAppError) throw lastMonthAppError;
         
-        // Get appointment IDs
         const thisMonthAppIds = thisMonthAppointments.map(app => app.id);
         const lastMonthAppIds = lastMonthAppointments.map(app => app.id);
         
-        // Filter bookings by these appointment IDs
         if (thisMonthAppIds.length > 0) {
           thisMonthQuery = thisMonthQuery.in("appointment_id", thisMonthAppIds);
         } else {
-          // If no appointments match, return empty array for this month
           thisMonthQuery = thisMonthQuery.eq("appointment_id", "no-results");
         }
         
         if (lastMonthAppIds.length > 0) {
           lastMonthQuery = lastMonthQuery.in("appointment_id", lastMonthAppIds);
         } else {
-          // If no appointments match, return empty array for last month
           lastMonthQuery = lastMonthQuery.eq("appointment_id", "no-results");
         }
       }
       
-      // Execute both queries in parallel
       const [thisMonthResult, lastMonthResult] = await Promise.all([
         thisMonthQuery,
         lastMonthQuery
@@ -651,13 +626,11 @@ export default function AdminDashboard() {
       
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
       
-      // Create a map of service_id to service name for easier lookup
       const serviceMap = {};
       servicesData.forEach(service => {
         serviceMap[service.id] = service.name;
       });
       
-      // Calculate counts for current month
       const thisMonthCounts = {};
       thisMonthData.forEach(booking => {
         if (booking.service_id && serviceMap[booking.service_id]) {
@@ -666,7 +639,6 @@ export default function AdminDashboard() {
         }
       });
       
-      // Calculate counts for last month
       const lastMonthCounts = {};
       lastMonthData.forEach(booking => {
         if (booking.service_id && serviceMap[booking.service_id]) {
@@ -675,14 +647,12 @@ export default function AdminDashboard() {
         }
       });
       
-      // Create the final array with both months' data
       const servicesArray = Object.keys(thisMonthCounts).map(serviceName => ({
         name: serviceName,
         thisMonth: thisMonthCounts[serviceName],
         lastMonth: lastMonthCounts[serviceName] || 0
       }));
       
-      // Sort by this month's bookings and take top 5
       servicesArray.sort((a, b) => b.thisMonth - a.thisMonth);
       setTopServices(servicesArray.slice(0, 5));
       
@@ -701,7 +671,6 @@ export default function AdminDashboard() {
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
       
-      // Always get employees first
       const { data: employeesData, error: employeesError } = await supabase
         .from("employees")
         .select("id, name")
@@ -709,7 +678,6 @@ export default function AdminDashboard() {
       
       if (employeesError) throw employeesError;
       
-      // Create query for this month's bookings
       let thisMonthQuery = supabase
         .from("bookings")
         .select(`
@@ -722,7 +690,6 @@ export default function AdminDashboard() {
         .lte("created_at", lastDayThisMonth.toISOString())
         .not("employee_id", "is", null);
       
-      // Create query for last month's bookings
       let lastMonthQuery = supabase
         .from("bookings")
         .select(`
@@ -735,9 +702,7 @@ export default function AdminDashboard() {
         .lte("created_at", lastDayLastMonth.toISOString())
         .not("employee_id", "is", null);
       
-      // If location is selected, filter by appointments at that location
       if (topStylistsLocationId !== "all") {
-        // Get appointments for the selected location (this month)
         const { data: thisMonthAppointments, error: thisMonthAppError } = await supabase
           .from("appointments")
           .select("id")
@@ -747,7 +712,6 @@ export default function AdminDashboard() {
         
         if (thisMonthAppError) throw thisMonthAppError;
         
-        // Get appointments for the selected location (last month)
         const { data: lastMonthAppointments, error: lastMonthAppError } = await supabase
           .from("appointments")
           .select("id")
@@ -757,27 +721,22 @@ export default function AdminDashboard() {
         
         if (lastMonthAppError) throw lastMonthAppError;
         
-        // Get appointment IDs
         const thisMonthAppIds = thisMonthAppointments.map(app => app.id);
         const lastMonthAppIds = lastMonthAppointments.map(app => app.id);
         
-        // Filter bookings by these appointment IDs
         if (thisMonthAppIds.length > 0) {
           thisMonthQuery = thisMonthQuery.in("appointment_id", thisMonthAppIds);
         } else {
-          // If no appointments match, return empty array for this month
           thisMonthQuery = thisMonthQuery.eq("appointment_id", "no-results");
         }
         
         if (lastMonthAppIds.length > 0) {
           lastMonthQuery = lastMonthQuery.in("appointment_id", lastMonthAppIds);
         } else {
-          // If no appointments match, return empty array for last month
           lastMonthQuery = lastMonthQuery.eq("appointment_id", "no-results");
         }
       }
       
-      // Execute both queries in parallel
       const [thisMonthResult, lastMonthResult] = await Promise.all([
         thisMonthQuery,
         lastMonthQuery
@@ -790,13 +749,11 @@ export default function AdminDashboard() {
       
       if (thisMonthError || lastMonthError) throw thisMonthError || lastMonthError;
       
-      // Create a map of employee_id to employee name for easier lookup
       const employeeMap = {};
       employeesData.forEach(employee => {
         employeeMap[employee.id] = employee.name;
       });
       
-      // Calculate revenue for current month
       const thisMonthRevenue = {};
       thisMonthData.forEach(booking => {
         if (booking.employee_id && employeeMap[booking.employee_id]) {
@@ -805,7 +762,6 @@ export default function AdminDashboard() {
         }
       });
       
-      // Calculate revenue for last month
       const lastMonthRevenue = {};
       lastMonthData.forEach(booking => {
         if (booking.employee_id && employeeMap[booking.employee_id]) {
@@ -814,14 +770,12 @@ export default function AdminDashboard() {
         }
       });
       
-      // Create the final array with both months' data
       const stylistsArray = Object.keys(thisMonthRevenue).map(stylistName => ({
         name: stylistName,
         thisMonth: thisMonthRevenue[stylistName],
         lastMonth: lastMonthRevenue[stylistName] || 0
       }));
       
-      // Sort by this month's revenue and take top 5
       stylistsArray.sort((a, b) => b.thisMonth - a.thisMonth);
       setTopStylists(stylistsArray.slice(0, 5));
       
@@ -833,21 +787,17 @@ export default function AdminDashboard() {
 
   const fetchBusinessMetrics = useCallback(async () => {
     try {
-      // Calculate revenue
       const revenue = totalRevenue;
       
-      // Calculate occupancy rate
       const startDate = getStartDateForTimeRange(timeRange);
       const yesterday = subDays(today, 1);
       
-      // Get available employees (stylists)
       let empQuery = supabase
         .from("employees")
         .select("*")
         .eq("employment_type", "stylist");
       
       if (recentSalesLocationId !== "all") {
-        // Filter employees by location if a specific location is selected
         empQuery = supabase
           .from("employee_locations")
           .select(`
@@ -860,7 +810,6 @@ export default function AdminDashboard() {
       
       if (empError) throw empError;
       
-      // Get appointments for current period
       let currentAppQuery = supabase
         .from("appointments")
         .select("*")
@@ -875,7 +824,6 @@ export default function AdminDashboard() {
       
       if (currentAppError) throw currentAppError;
       
-      // Get appointments for comparison period (yesterday, last week, or last month)
       let comparisonStartDate, comparisonEndDate;
       
       if (timeRange === "today") {
@@ -906,6 +854,116 @@ export default function AdminDashboard() {
       
       if (compAppError) throw compAppError;
       
-      // Calculate occupancy rates
       const employeeCount = recentSalesLocationId !== "all" 
-        ? (employees?.length ||
+        ? (employees?.length || 0)
+        : (employees?.length || 0);
+        
+      const occupancyRate = employeeCount > 0 ? (currentAppointments.length / employeeCount) * 100 : 0;
+      const revenueChange = (revenue - totalRevenue) / totalRevenue * 100;
+      const occupancyChange = (occupancyRate - businessMetrics.occupancyRate) / businessMetrics.occupancyRate * 100;
+      const returningCustomerChange = (currentAppointments.filter(app => app.status === 'completed').length - businessMetrics.returningCustomerRate) / businessMetrics.returningCustomerRate * 100;
+      
+      setBusinessMetrics({
+        revenue: formatPrice(revenue),
+        occupancyRate: occupancyRate.toFixed(2),
+        returningCustomerRate: businessMetrics.returningCustomerRate,
+        tips: businessMetrics.tips,
+        revenueChange: revenueChange.toFixed(2),
+        occupancyChange: occupancyChange.toFixed(2),
+        returningCustomerChange: returningCustomerChange.toFixed(2),
+        tipsChange: businessMetrics.tipsChange
+      });
+    } catch (error) {
+      console.error("Error fetching business metrics:", error);
+    }
+  }, [timeRange, recentSalesLocationId, totalRevenue, today]);
+
+  const fetchQuickActionsData = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("quick_actions")
+        .select("*");
+      
+      if (error) throw error;
+      
+      setQuickActions(data[0]);
+    } catch (error) {
+      console.error("Error fetching quick actions data:", error);
+    }
+  }, []);
+
+  const handleDetailsClick = (appointmentId) => {
+    setSelectedAppointment(appointmentId);
+    setIsDetailsDialogOpen(true);
+  };
+
+  const handleAddAppointment = () => {
+    setIsAddAppointmentOpen(true);
+  };
+
+  const getStartDateForTimeRange = (range) => {
+    switch (range) {
+      case "today":
+        return startOfDay(today);
+      case "week":
+        return subDays(new Date(), 7);
+      case "month":
+        return subDays(new Date(), 30);
+      case "year":
+        return subDays(new Date(), 365);
+      default:
+        return startOfDay(today);
+    }
+  };
+
+  const renderAppointmentStatus = (status) => {
+    switch (status) {
+      case 'confirmed':
+        return <CheckCircle className="mr-2 h-4 w-4" />;
+      case 'canceled':
+        return <XCircle className="mr-2 h-4 w-4" />;
+      case 'booked':
+        return <Clock className="mr-2 h-4 w-4" />;
+      default:
+        return <User className="mr-2 h-4 w-4" />;
+    }
+  };
+
+  const renderTopServices = () => {
+    return (
+      <div>
+        {topServices.map(service => (
+          <div key={service.name} className="flex items-center mb-2">
+            <div className="mr-2">{service.name}</div>
+            <div className="flex items-center">
+              <div className="mr-2">{service.thisMonth}</div>
+              <div className="mr-2">{service.lastMonth}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderTopStylists = () => {
+    return (
+      <div>
+        {topStylists.map(stylist => (
+          <div key={stylist.name} className="flex items-center mb-2">
+            <div className="mr-2">{stylist.name}</div>
+            <div className="flex items-center">
+              <div className="mr-2">{stylist.thisMonth}</div>
+              <div className="mr-2">{stylist.lastMonth}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      {/* Render components and logic */}
+    </div>
+  );
+}
