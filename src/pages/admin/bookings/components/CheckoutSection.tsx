@@ -140,7 +140,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [membershipDetails, setMembershipDetails] = useState<{ id: string, name: string } | null>(null);
   const { customerMemberships, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
 
-  // Fetch customer's memberships
   useEffect(() => {
     const loadMemberships = async () => {
       if (selectedCustomer?.id) {
@@ -151,7 +150,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     loadMemberships();
   }, [selectedCustomer, fetchCustomerMemberships]);
 
-  // Calculate membership discount when services or memberships change
   useEffect(() => {
     if (customerMemberships.length === 0 || !selectedCustomer) {
       setAppliedMembershipDiscount(0);
@@ -162,7 +160,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     let bestDiscount = 0;
     let bestDiscountDetails: { id: string, name: string } | null = null;
 
-    // Check each selected service for membership discount
     selectedServices.forEach(serviceId => {
       const service = services.find(s => s.id === serviceId);
       if (!service) return;
@@ -179,7 +176,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       }
     });
 
-    // Check each selected package for membership discount
     selectedPackages.forEach(packageId => {
       const pkg = packages.find(p => p.id === packageId);
       if (!pkg) return;
@@ -355,10 +351,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [discountedSubtotal, taxAmount]
   );
   
-  const discountAmount = useMemo(() => 
-    subtotal - discountedSubtotal + couponDiscount,
-    [subtotal, discountedSubtotal, couponDiscount]
-  );
+  const discountAmount = useMemo(() => {
+    return subtotal - discountedSubtotal + couponDiscount;
+  }, [subtotal, discountedSubtotal, couponDiscount]);
 
   const selectedItems = useMemo(() => {
     const individualServices = selectedServices.map((id) => {
@@ -480,7 +475,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         total
       });
       
-      // Pass the summary data with values already calculated
       const saveAppointmentParams = {
         appointmentId: appointmentId,
         appliedTaxId: appliedTaxId,
@@ -506,7 +500,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
-  // Update the summary section to include membership discount
   return (
     <div className="h-full w-full bg-gray-50 p-6">
       <Card className="h-full">
@@ -701,6 +694,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     <Percent className="mr-2 h-4 w-4" />
                     Discount
                     {discountType === "percentage" && ` (${discountValue}%)`}
+                    {discountType === "fixed" && ` (₹${discountValue})`}
                   </span>
                   <span>-₹{discountType !== "none" ? (subtotal - getFinalPrice(subtotal, discountType, discountValue)).toFixed(2) : "0.00"}</span>
                 </div>

@@ -1,4 +1,3 @@
-
 export enum SCREEN {
   SERVICE_SELECTION = "service_selection",
   CHECKOUT = "checkout",
@@ -69,7 +68,7 @@ export interface Employee {
   employment_type: "stylist" | "operations";
   created_at: string;
   updated_at: string;
-  avatar?: string; // Add avatar property for TimeSlots component
+  avatar?: string;
 }
 
 export interface Booking {
@@ -118,9 +117,12 @@ export interface Appointment {
   total_duration?: number;
   customer?: Customer;
   bookings: Booking[];
+  location_id?: string;
+  membership_discount?: number;
+  membership_id?: string;
+  membership_name?: string;
 }
 
-// Add the missing types for refund and transaction details
 export interface RefundData {
   reason: "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | 
           "health_concern" | "price_dispute" | "other" | "booking_error" | 
