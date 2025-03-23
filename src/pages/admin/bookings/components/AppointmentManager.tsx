@@ -1,4 +1,3 @@
-
 // First line replaces the existing first lines
 // This component now takes locationId as a prop
 import React, { useState, useEffect } from "react";
