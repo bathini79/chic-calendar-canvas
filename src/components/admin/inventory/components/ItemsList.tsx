@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ItemDialog } from "../ItemDialog";
 import { Category, Supplier } from "./types";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 
 export function ItemsList() {
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -16,6 +18,7 @@ export function ItemsList() {
   const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [showItemDialog, setShowItemDialog] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch inventory items with location-specific data
@@ -190,8 +193,13 @@ export function ItemsList() {
     setEditingItem(item);
   };
 
+  const handleAddItem = () => {
+    setShowItemDialog(true);
+  };
+
   const handleCloseDialog = () => {
     setEditingItem(null);
+    setShowItemDialog(false);
   };
 
   if (itemsLoading || categoriesLoading || suppliersLoading || locationsLoading) {
@@ -230,7 +238,14 @@ export function ItemsList() {
         onDeleteItem={handleDeleteItem}
       />
 
-      {editingItem && (
+      <div className="flex justify-end mt-6">
+        <Button onClick={handleAddItem}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Item
+        </Button>
+      </div>
+
+      {(editingItem || showItemDialog) && (
         <ItemDialog item={editingItem} onClose={handleCloseDialog} open={true} />
       )}
     </div>
