@@ -187,6 +187,9 @@ const Auth = () => {
         // Handle special case for new users requiring name
         if (response.data.error === "new_user_requires_name") {
           setNeedsFullName(true);
+          setVerificationError("Please enter your full name to complete registration");
+          setEdgeFunctionError("New user registration requires a full name");
+          toast.info("New user detected. Please enter your full name to complete registration.");
           setIsLoading(false);
           return;
         }
@@ -294,6 +297,14 @@ const Auth = () => {
               <span>{verificationError}</span>
             </div>
           )}
+          {edgeFunctionError && (
+            <div className="bg-yellow-50 text-yellow-800 p-2 rounded-md text-sm flex items-start mt-2">
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>
+                <strong>Server Error:</strong> {edgeFunctionError}
+              </span>
+            </div>
+          )}
           <div className="flex space-x-2">
             <Button
               type="button"
@@ -303,6 +314,7 @@ const Auth = () => {
                 setNeedsFullName(false);
                 setOtpSent(false);
                 setVerificationError(null);
+                setEdgeFunctionError(null);
               }}
               disabled={isLoading}
             >
@@ -397,6 +409,7 @@ const Auth = () => {
               setOtpSent(false);
               setOtp("");
               setVerificationError(null);
+              setEdgeFunctionError(null);
             }}
             disabled={isLoading}
           >

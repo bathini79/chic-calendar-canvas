@@ -51,8 +51,11 @@ const InputOTPSlot = React.forwardRef<
       )}
       {...props}
     >
-      {char && <span className="text-center font-medium text-xl">{char}</span>}
-      {!char && <span className="text-muted-foreground text-2xl font-light">·</span>}
+      {char ? (
+        <span className="text-center font-medium text-xl">{char}</span>
+      ) : (
+        <span className="text-muted-foreground text-2xl font-light">·</span>
+      )}
       {hasFakeCaret && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />

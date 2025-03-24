@@ -69,9 +69,10 @@ serve(async (req) => {
     let newUser = false
     
     if (userError || !existingUser) {
+      console.log('New user detected')
       // Creating a new user requires a full name
       if (!fullName) {
-        console.log('New user detected, requiring name')
+        console.log('New user registration requires full name')
         // If no full name provided for a new user, return a specific error
         return new Response(
           JSON.stringify({ 
