@@ -23,18 +23,20 @@ serve(async (req) => {
     
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
       throw new Error('Supabase credentials not configured')
     }
     
-    const supabaseAdmin = createClient(supabaseUrl, supabaseAnonKey, {
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     })
+    
+    console.log("Verifying OTP for phone number:", phoneNumber)
     
     // Verify OTP from database
     const { data, error } = await supabaseAdmin
@@ -107,23 +109,25 @@ serve(async (req) => {
       console.log('Creating new user with name:', fullName, 'and phone:', phoneNumber)
       
       try {
-        // Create a new user
-        const { data: user, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+        // First create the auth user
+        console.log("Starting user creation with phone:", phoneNumber)
+        const { data: newAuthUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
           phone: phoneNumber,
           phone_confirm: true,
+          email_confirm: true,
           user_metadata: { 
-            phone_verified: true,
-            full_name: fullName
+            full_name: fullName,
+            phone_verified: true
           }
         })
         
-        if (signUpError) {
-          console.error('Error creating user:', signUpError)
+        if (createUserError) {
+          console.error('Error creating auth user:', createUserError)
           return new Response(
             JSON.stringify({ 
               error: "user_creation_failed",
               message: "Failed to create user account",
-              details: signUpError.message
+              details: createUserError.message
             }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -132,14 +136,16 @@ serve(async (req) => {
           )
         }
         
-        if (!user || !user.user) {
+        if (!newAuthUser || !newAuthUser.user) {
           throw new Error('User creation returned no user data')
         }
         
-        userId = user.user.id
+        userId = newAuthUser.user.id
         newUser = true
         
-        // Create profile for new user
+        console.log('User created successfully with ID:', userId)
+        
+        // Manually create profile since the trigger might not work in all cases
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
@@ -152,17 +158,11 @@ serve(async (req) => {
           
         if (profileError) {
           console.error('Error creating profile:', profileError)
-          return new Response(
-            JSON.stringify({ 
-              error: "profile_creation_failed",
-              message: "Failed to create user profile",
-              details: profileError.message
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200 // Using 200 to avoid non-2xx handling issues
-            }
-          )
+          // We don't fail here since the auth user was already created,
+          // the profile might be created by a trigger
+          console.log('Profile creation failed, but continuing with auth...')
+        } else {
+          console.log('Profile created successfully')
         }
       } catch (createError) {
         console.error('Exception during user creation:', createError)
@@ -180,21 +180,26 @@ serve(async (req) => {
       }
     } else {
       userId = existingUser.id
+      console.log('Existing user found with ID:', userId)
     }
     
     // Sign in the user and get session
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.signInWithPhone({
-      phone: phoneNumber,
-      createUser: false
+    console.log('Attempting to sign in user with phone:', phoneNumber)
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: `${userId}@phone.auth`, // Create a fake email for phone auth
+      options: {
+        redirectTo: 'http://localhost:3000/',
+      }
     })
     
-    if (sessionError) {
-      console.error('Error signing in:', sessionError)
+    if (sessionError || !sessionData) {
+      console.error('Error generating auth link:', sessionError)
       return new Response(
         JSON.stringify({ 
           error: "signin_failed",
           message: "Failed to sign in user",
-          details: sessionError.message
+          details: sessionError?.message || "No session data returned"
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -204,16 +209,27 @@ serve(async (req) => {
     }
     
     // Delete used OTP
-    await supabaseAdmin
+    const { error: deleteError } = await supabaseAdmin
       .from('phone_auth_codes')
       .delete()
       .eq('phone_number', phoneNumber)
+      
+    if (deleteError) {
+      console.warn('Error deleting used OTP:', deleteError)
+      // Not failing on this error, just logging
+    } else {
+      console.log('Used OTP deleted successfully')
+    }
     
     return new Response(
       JSON.stringify({ 
         message: newUser ? 'Registration successful' : 'Login successful',
         isNewUser: newUser,
-        user: { id: userId, phone_number: phoneNumber }
+        user: { id: userId, phone_number: phoneNumber },
+        properties: {
+          hashed_token: sessionData.properties.hashed_token,
+          action_link: sessionData.properties.action_link
+        }
       }),
       { 
         headers: { 
