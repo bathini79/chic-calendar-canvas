@@ -104,51 +104,73 @@ serve(async (req) => {
         )
       }
 
-      console.log('Creating new user with name:', fullName)
-      // Create a new user
-      const { data: user, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
-        phone: phoneNumber,
-        phone_confirm: true,
-        user_metadata: { 
-          phone_verified: true,
-          full_name: fullName
-        }
-      })
+      console.log('Creating new user with name:', fullName, 'and phone:', phoneNumber)
       
-      if (signUpError) {
-        console.error('Error creating user:', signUpError)
-        return new Response(
-          JSON.stringify({ 
-            error: signUpError.message || "user_creation_failed",
-            message: "Failed to create user account"
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 // Using 200 to avoid non-2xx handling issues
+      try {
+        // Create a new user
+        const { data: user, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+          phone: phoneNumber,
+          phone_confirm: true,
+          user_metadata: { 
+            phone_verified: true,
+            full_name: fullName
           }
-        )
-      }
-      
-      userId = user.user.id
-      newUser = true
-      
-      // Create profile for new user
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .insert({
-          id: userId,
-          phone_number: phoneNumber,
-          phone_verified: true,
-          full_name: fullName,
-          role: 'customer'
         })
         
-      if (profileError) {
-        console.error('Error creating profile:', profileError)
+        if (signUpError) {
+          console.error('Error creating user:', signUpError)
+          return new Response(
+            JSON.stringify({ 
+              error: "user_creation_failed",
+              message: "Failed to create user account",
+              details: signUpError.message
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200 // Using 200 to avoid non-2xx handling issues
+            }
+          )
+        }
+        
+        if (!user || !user.user) {
+          throw new Error('User creation returned no user data')
+        }
+        
+        userId = user.user.id
+        newUser = true
+        
+        // Create profile for new user
+        const { error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .insert({
+            id: userId,
+            phone_number: phoneNumber,
+            phone_verified: true,
+            full_name: fullName,
+            role: 'customer'
+          })
+          
+        if (profileError) {
+          console.error('Error creating profile:', profileError)
+          return new Response(
+            JSON.stringify({ 
+              error: "profile_creation_failed",
+              message: "Failed to create user profile",
+              details: profileError.message
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200 // Using 200 to avoid non-2xx handling issues
+            }
+          )
+        }
+      } catch (createError) {
+        console.error('Exception during user creation:', createError)
         return new Response(
           JSON.stringify({ 
-            error: profileError.message || "profile_creation_failed",
-            message: "Failed to create user profile"
+            error: "user_creation_exception",
+            message: "Failed to create user account due to an exception",
+            details: createError.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -170,8 +192,9 @@ serve(async (req) => {
       console.error('Error signing in:', sessionError)
       return new Response(
         JSON.stringify({ 
-          error: sessionError.message || "signin_failed",
-          message: "Failed to sign in user"
+          error: "signin_failed",
+          message: "Failed to sign in user",
+          details: sessionError.message
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -200,11 +223,15 @@ serve(async (req) => {
         status: 200 
       }
     )
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error verifying OTP:', error)
     
     return new Response(
-      JSON.stringify({ error: error.message || "Unknown error occurred" }),
+      JSON.stringify({ 
+        error: "unknown_error", 
+        message: error.message || "Unknown error occurred",
+        details: error.stack
+      }),
       { 
         headers: { 
           ...corsHeaders, 
