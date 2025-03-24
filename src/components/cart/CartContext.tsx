@@ -79,26 +79,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
       
       let newItem: CartItem = {
         id: itemId,
-        name: "",
-        price: 0,
-        type: serviceId ? 'service' : 'package'
+        name: extraData?.name || "",
+        price: extraData?.price || 0,
+        type: serviceId ? 'service' : 'package',
+        duration: extraData?.duration || 0
       };
 
       if (serviceId) {
-        // Fetch service data if needed
+        // Add service data
         newItem = {
           ...newItem,
           service_id: serviceId,
-          // Add service data if available
-          ...(extraData && { ...extraData })
+          service: extraData?.service || {},
+          selling_price: extraData?.service?.selling_price || extraData?.selling_price || 0,
+          // Include duration if provided
+          duration: extraData?.service?.duration || extraData?.duration || 0
         };
       } else if (packageId) {
-        // Fetch package data if needed
+        // Add package data
         newItem = {
           ...newItem,
           package_id: packageId,
-          // Add package data if available
-          ...(extraData && { ...extraData })
+          package: extraData?.package || {},
+          selling_price: extraData?.package?.price || extraData?.price || 0,
+          duration: extraData?.package?.duration || extraData?.duration || 0,
+          customized_services: extraData?.customized_services || []
         };
       }
 
@@ -122,26 +127,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getTotalPrice = () => {
     return items.reduce((total, item) => {
-      const itemPrice = 
-        item.selling_price || 
-        (item.service && item.service.selling_price) || 
-        (item.package && item.package.price) || 
-        item.price || 
-        0;
+      // First check if there is a direct selling_price on the item
+      if (item.selling_price && typeof item.selling_price === 'number') {
+        return total + item.selling_price;
+      }
       
-      return total + itemPrice;
+      // Then check the nested service or package objects
+      if (item.service && item.service.selling_price) {
+        return total + item.service.selling_price;
+      }
+      
+      if (item.package && item.package.price) {
+        return total + item.package.price;
+      }
+      
+      // Finally, use the price field, or default to 0
+      return total + (item.price || 0);
     }, 0);
   };
 
   const getTotalDuration = () => {
     return items.reduce((total, item) => {
-      const itemDuration = 
-        item.duration || 
-        (item.service && item.service.duration) || 
-        (item.package && item.package.duration) || 
-        0;
+      // First check direct duration property
+      if (item.duration && typeof item.duration === 'number') {
+        return total + item.duration;
+      }
       
-      return total + itemDuration;
+      // Then check nested service or package objects
+      if (item.service && item.service.duration) {
+        return total + item.service.duration;
+      }
+      
+      if (item.package && item.package.duration) {
+        return total + item.package.duration;
+      }
+      
+      return total;
     }, 0);
   };
 

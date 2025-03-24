@@ -87,7 +87,51 @@ export default function Services() {
   });
 
   const handleBookNow = async (serviceId?: string, packageId?: string) => {
-    await addToCart(serviceId, packageId);
+    if (serviceId) {
+      const service = services?.find(s => s.id === serviceId);
+      if (service) {
+        await addToCart(serviceId, undefined, { 
+          service,
+          name: service.name,
+          duration: service.duration,
+          selling_price: service.selling_price,
+          price: service.selling_price
+        });
+      }
+    } else if (packageId) {
+      const pkg = packages?.find(p => p.id === packageId);
+      if (pkg) {
+        await addToCart(undefined, packageId, { 
+          package: pkg,
+          name: pkg.name,
+          duration: pkg.duration,
+          price: pkg.price
+        });
+      }
+    }
+  };
+
+  const handleAddCustomPackage = async () => {
+    if (!selectedPackage) return;
+    
+    // Get base included services
+    const baseServiceIds = selectedPackage.package_services.map((ps: any) => ps.service.id);
+    
+    // Find additional services (not in the base package)
+    const customizedServiceIds = selectedServices.filter(
+      id => !baseServiceIds.includes(id)
+    );
+    
+    await addToCart(undefined, selectedPackage.id, {
+      package: selectedPackage,
+      name: selectedPackage.name,
+      price: totalPrice,
+      duration: totalDuration,
+      customized_services: customizedServiceIds
+    });
+    
+    // Close the dialog after adding to cart
+    setCustomizeDialogOpen(false);
   };
 
   const handleRemove = async (serviceId?: string, packageId?: string) => {
@@ -235,6 +279,7 @@ export default function Services() {
         totalPrice={totalPrice}
         totalDuration={totalDuration}
         onServiceToggle={handleServiceToggle}
+        onConfirm={handleAddCustomPackage}
       />
 
       <MobileCartBar />

@@ -26,6 +26,7 @@ export function CartSummary() {
     selectedDate, 
     selectedTimeSlots,
     getTotalPrice,
+    getTotalDuration,
     selectedLocation,
     appliedTaxId,
     setAppliedTaxId,
@@ -42,6 +43,10 @@ export function CartSummary() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSchedulingPage = location.pathname === '/schedule';
+  const isServicesPage = location.pathname === '/services';
+  
+  // Hide price details on services and schedule pages
+  const shouldShowPriceDetails = !isServicesPage && !isSchedulingPage;
 
   const subtotal = getTotalPrice();
   const afterCouponSubtotal = subtotal - couponDiscount;
@@ -136,12 +141,16 @@ export function CartSummary() {
   };
 
   const selectedCoupon = getSelectedCoupon();
+  const totalDuration = getTotalDuration();
 
   return (
     <Card className="flex flex-col h-full">
       <div className="p-4 border-b">
         <h2 className="font-semibold text-lg">Your Cart ({items.length} items)</h2>
         <p className="text-2xl font-bold mt-2">{formatPrice(totalPrice)}</p>
+        {totalDuration > 0 && (
+          <p className="text-sm text-muted-foreground">Total duration: {totalDuration} min</p>
+        )}
       </div>
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
@@ -151,8 +160,13 @@ export function CartSummary() {
             </p>
           ) : (
             sortedItems.map((item) => {
-              const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
-              const itemPrice = item.selling_price || item.service?.selling_price || item.package?.price || 0;
+              const itemDuration = item.duration || 
+                (item.service?.duration || 0) || 
+                (item.package?.duration || 0);
+                
+              const itemPrice = item.selling_price || 
+                (item.service?.selling_price || 0) || 
+                (item.package?.price || 0);
               
               return (
                 <div
@@ -162,7 +176,7 @@ export function CartSummary() {
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-medium">
-                        {item.service?.name || item.package?.name}
+                        {item.service?.name || item.package?.name || "Unknown Item"}
                       </h3>
                       <p className="text-sm text-muted-foreground">
                         Duration: {itemDuration} min
@@ -202,72 +216,76 @@ export function CartSummary() {
       
       <div className="p-4 border-t">
         <div className="space-y-2 mb-4">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span>{formatPrice(subtotal)}</span>
-          </div>
-          
-          {/* Coupon selection */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-sm items-center">
-              <span className="text-muted-foreground">Coupon</span>
-              <Select value={appliedCouponId || "none"} onValueChange={handleCouponChange} disabled={couponsLoading}>
-                <SelectTrigger className="h-8 w-[150px]">
-                  <SelectValue placeholder="No Coupon" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Coupon</SelectItem>
-                  {coupons.map(coupon => (
-                    <SelectItem key={coupon.id} value={coupon.id}>
-                      {coupon.code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {selectedCoupon && (
-              <div className="flex flex-col gap-1">
-                <Badge variant="outline" className="w-fit">
-                  <span className="text-xs font-medium">
-                    {selectedCoupon.discount_type === 'percentage' 
-                      ? `${selectedCoupon.discount_value}% off` 
-                      : `${formatPrice(selectedCoupon.discount_value)} off`}
-                  </span>
-                </Badge>
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>Discount</span>
-                  <span>-{formatPrice(couponDiscount)}</span>
-                </div>
+          {shouldShowPriceDetails && (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
               </div>
-            )}
-          </div>
-          
-          {/* Tax selection */}
-          <div className="flex justify-between text-sm items-center">
-            <span className="text-muted-foreground">Tax</span>
-            <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
-              <SelectTrigger className="h-8 w-[150px]">
-                <SelectValue placeholder="No Tax" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No Tax</SelectItem>
-                {taxRates.map(tax => (
-                  <SelectItem key={tax.id} value={tax.id}>
-                    {tax.name} ({tax.percentage}%)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {appliedTaxId && taxAmount > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                Tax Amount
-              </span>
-              <span>{formatPrice(taxAmount)}</span>
-            </div>
+              
+              {/* Coupon selection */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm items-center">
+                  <span className="text-muted-foreground">Coupon</span>
+                  <Select value={appliedCouponId || "none"} onValueChange={handleCouponChange} disabled={couponsLoading}>
+                    <SelectTrigger className="h-8 w-[150px]">
+                      <SelectValue placeholder="No Coupon" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Coupon</SelectItem>
+                      {coupons.map(coupon => (
+                        <SelectItem key={coupon.id} value={coupon.id}>
+                          {coupon.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {selectedCoupon && (
+                  <div className="flex flex-col gap-1">
+                    <Badge variant="outline" className="w-fit">
+                      <span className="text-xs font-medium">
+                        {selectedCoupon.discount_type === 'percentage' 
+                          ? `${selectedCoupon.discount_value}% off` 
+                          : `${formatPrice(selectedCoupon.discount_value)} off`}
+                      </span>
+                    </Badge>
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Discount</span>
+                      <span>-{formatPrice(couponDiscount)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Tax selection */}
+              <div className="flex justify-between text-sm items-center">
+                <span className="text-muted-foreground">Tax</span>
+                <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
+                  <SelectTrigger className="h-8 w-[150px]">
+                    <SelectValue placeholder="No Tax" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Tax</SelectItem>
+                    {taxRates.map(tax => (
+                      <SelectItem key={tax.id} value={tax.id}>
+                        {tax.name} ({tax.percentage}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {appliedTaxId && taxAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Tax Amount
+                  </span>
+                  <span>{formatPrice(taxAmount)}</span>
+                </div>
+              )}
+            </>
           )}
           
           <div className="flex justify-between text-base font-medium pt-1">
