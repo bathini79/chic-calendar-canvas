@@ -1,6 +1,6 @@
 
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/react-query";
@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -33,6 +33,9 @@ const Auth = () => {
   const [needsFullName, setNeedsFullName] = useState(false);
   const [activeTab, setActiveTab] = useState<"email" | "phone">("email");
   const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [canResendOtp, setCanResendOtp] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(30);
+  const [edgeFunctionError, setEdgeFunctionError] = useState<string | null>(null);
 
   // Check if user is already logged in
   const { data: session } = useQuery({
@@ -60,6 +63,25 @@ const Auth = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate, session]);
+
+  // Handle OTP resend countdown
+  useEffect(() => {
+    let timer: number | undefined;
+    
+    if (otpSent && resendCountdown > 0) {
+      timer = window.setTimeout(() => {
+        setResendCountdown(prev => prev - 1);
+      }, 1000);
+    }
+    
+    if (resendCountdown === 0) {
+      setCanResendOtp(true);
+    }
+    
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [otpSent, resendCountdown]);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,11 +116,15 @@ const Auth = () => {
   const sendWhatsAppOTP = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
       toast.error("Please enter a valid phone number");
+      setVerificationError("Please enter a valid phone number");
       return;
     }
 
     setIsLoading(true);
     setVerificationError(null);
+    setEdgeFunctionError(null);
+    setCanResendOtp(false);
+    setResendCountdown(30);
     
     try {
       const response = await supabase.functions.invoke('send-whatsapp-otp', {
@@ -108,13 +134,19 @@ const Auth = () => {
       if (response.error) {
         throw new Error(response.error.message || "Failed to send OTP");
       }
+      
+      if (response.data && response.data.error) {
+        throw new Error(response.data.error || "Failed to send OTP");
+      }
 
       setOtpSent(true);
       setNeedsFullName(false); // Reset in case it was previously set
       toast.success("OTP sent to your WhatsApp. Please check your messages.");
     } catch (error: any) {
-      toast.error(error.message || "Failed to send OTP");
-      setVerificationError(error.message || "Failed to send OTP");
+      const errorMessage = error.message || "Failed to send OTP";
+      toast.error(errorMessage);
+      setVerificationError(errorMessage);
+      setEdgeFunctionError(errorMessage);
       console.error("OTP send error:", error);
     } finally {
       setIsLoading(false);
@@ -136,6 +168,7 @@ const Auth = () => {
 
     setIsLoading(true);
     setVerificationError(null);
+    setEdgeFunctionError(null);
     
     try {
       const response = await supabase.functions.invoke('verify-whatsapp-otp', {
@@ -147,13 +180,17 @@ const Auth = () => {
       });
 
       if (response.error) {
-        if (response.data && response.data.error === "new_user_requires_name") {
-          // This is a new user, we need to collect their name
+        throw new Error(response.error.message || "Failed to verify OTP");
+      }
+      
+      if (response.data && response.data.error) {
+        // Handle special case for new users requiring name
+        if (response.data.error === "new_user_requires_name") {
           setNeedsFullName(true);
           setIsLoading(false);
           return;
         }
-        throw new Error(response.error.message || "Failed to verify OTP");
+        throw new Error(response.data.error || "Failed to verify OTP");
       }
 
       toast.success(response.data.isNewUser ? 
@@ -164,12 +201,21 @@ const Auth = () => {
       await queryClient.invalidateQueries({ queryKey: ["session"] });
       navigate("/");
     } catch (error: any) {
-      toast.error(error.message || "Failed to verify OTP");
-      setVerificationError(error.message || "Failed to verify OTP");
+      const errorMessage = error.message || "Failed to verify OTP";
+      toast.error(errorMessage);
+      setVerificationError(errorMessage);
+      setEdgeFunctionError(errorMessage);
       console.error("OTP verification error:", error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResendOTP = () => {
+    setOtp("");
+    setCanResendOtp(false);
+    setResendCountdown(30);
+    sendWhatsAppOTP();
   };
 
   const renderPhoneContent = () => {
@@ -193,8 +239,16 @@ const Auth = () => {
           </div>
           {verificationError && (
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
-              <AlertCircle className="h-4 w-4 mr-2 mt-0.5" />
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>{verificationError}</span>
+            </div>
+          )}
+          {edgeFunctionError && (
+            <div className="bg-yellow-50 text-yellow-800 p-2 rounded-md text-sm flex items-start mt-2">
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>
+                <strong>Server Error:</strong> {edgeFunctionError}
+              </span>
             </div>
           )}
           <Button
@@ -203,7 +257,14 @@ const Auth = () => {
             onClick={sendWhatsAppOTP}
             disabled={isLoading}
           >
-            {isLoading ? "Sending..." : "Send OTP via WhatsApp"}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              "Send OTP via WhatsApp"
+            )}
           </Button>
         </>
       );
@@ -229,7 +290,7 @@ const Auth = () => {
           </div>
           {verificationError && (
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
-              <AlertCircle className="h-4 w-4 mr-2 mt-0.5" />
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>{verificationError}</span>
             </div>
           )}
@@ -253,7 +314,14 @@ const Auth = () => {
               onClick={verifyWhatsAppOTP}
               disabled={isLoading || !fullName.trim()}
             >
-              {isLoading ? "Completing..." : "Complete Registration"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Completing...
+                </>
+              ) : (
+                "Complete Registration"
+              )}
             </Button>
           </div>
         </>
@@ -278,7 +346,7 @@ const Auth = () => {
                       key={index}
                       {...slot}
                       index={index}
-                      className="w-10 h-12 text-center"
+                      className="w-12 h-14 text-center"
                     />
                   ))}
                 </InputOTPGroup>
@@ -290,10 +358,35 @@ const Auth = () => {
           </p>
           {verificationError && (
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
-              <AlertCircle className="h-4 w-4 mr-2 mt-0.5" />
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>{verificationError}</span>
             </div>
           )}
+          {edgeFunctionError && (
+            <div className="bg-yellow-50 text-yellow-800 p-2 rounded-md text-sm flex items-start mt-2">
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>
+                <strong>Server Error:</strong> {edgeFunctionError}
+              </span>
+            </div>
+          )}
+          <div className="text-center mt-2">
+            {canResendOtp ? (
+              <Button
+                type="button"
+                variant="link"
+                className="text-primary"
+                onClick={handleResendOTP}
+                disabled={isLoading}
+              >
+                Resend OTP
+              </Button>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Resend OTP in {resendCountdown} seconds
+              </p>
+            )}
+          </div>
         </div>
         <div className="flex space-x-2">
           <Button
@@ -315,7 +408,14 @@ const Auth = () => {
             onClick={verifyWhatsAppOTP}
             disabled={isLoading || otp.length !== 6}
           >
-            {isLoading ? "Verifying..." : "Verify OTP"}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              "Verify OTP"
+            )}
           </Button>
         </div>
       </>
@@ -366,11 +466,16 @@ const Auth = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading
-                    ? "Loading..."
-                    : isSignUp
-                    ? "Create Account"
-                    : "Sign In"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : isSignUp ? (
+                    "Create Account"
+                  ) : (
+                    "Sign In"
+                  )}
                 </Button>
                 <Button
                   type="button"

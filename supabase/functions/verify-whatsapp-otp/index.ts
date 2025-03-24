@@ -45,6 +45,7 @@ serve(async (req) => {
       .single()
       
     if (error || !data) {
+      console.error('OTP verification error:', error)
       throw new Error('Invalid verification code')
     }
     
@@ -53,6 +54,7 @@ serve(async (req) => {
     const currentTime = new Date()
     
     if (currentTime > expiresAt) {
+      console.error('OTP expired')
       throw new Error('Verification code has expired')
     }
     
@@ -69,6 +71,7 @@ serve(async (req) => {
     if (userError || !existingUser) {
       // Creating a new user requires a full name
       if (!fullName) {
+        console.log('New user detected, requiring name')
         // If no full name provided for a new user, return a specific error
         return new Response(
           JSON.stringify({ 
@@ -82,6 +85,7 @@ serve(async (req) => {
         )
       }
 
+      console.log('Creating new user with name:', fullName)
       // Create a new user
       const { data: user, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
         phone: phoneNumber,
@@ -92,7 +96,11 @@ serve(async (req) => {
         }
       })
       
-      if (signUpError) throw signUpError
+      if (signUpError) {
+        console.error('Error creating user:', signUpError)
+        throw signUpError
+      }
+      
       userId = user.user.id
       newUser = true
       
@@ -107,7 +115,10 @@ serve(async (req) => {
           role: 'customer'
         })
         
-      if (profileError) throw profileError
+      if (profileError) {
+        console.error('Error creating profile:', profileError)
+        throw profileError
+      }
     } else {
       userId = existingUser.id
     }
@@ -118,7 +129,10 @@ serve(async (req) => {
       createUser: false
     })
     
-    if (sessionError) throw sessionError
+    if (sessionError) {
+      console.error('Error signing in:', sessionError)
+      throw sessionError
+    }
     
     // Delete used OTP
     await supabaseAdmin
@@ -140,11 +154,11 @@ serve(async (req) => {
         status: 200 
       }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error verifying OTP:', error)
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || "Unknown error occurred" }),
       { 
         headers: { 
           ...corsHeaders, 

@@ -46,7 +46,7 @@ async function sendWhatsAppOTP(phoneNumber: string, otp: string) {
     
     if (!response.ok) {
       console.error('Error from Twilio:', responseData)
-      throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || 'Unknown error'}`)
+      throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || JSON.stringify(responseData)}`)
     }
     
     console.log('Twilio message sent successfully:', responseData.sid)
@@ -118,14 +118,17 @@ serve(async (req) => {
           
         if (error) {
           console.error('Error storing OTP in database:', error)
-          throw error
+          throw new Error(`Failed to store OTP: ${error.message}`)
         }
         
         console.log(`OTP stored in database for phone: ${phoneNumber}`)
-      } catch (error) {
+      } catch (error: any) {
         console.error('Database operation failed:', error)
         throw new Error(`Failed to store OTP: ${error.message}`)
       }
+    } else {
+      console.error('Supabase client could not be initialized')
+      throw new Error('Database connection error')
     }
     
     // Send OTP via WhatsApp
@@ -141,11 +144,11 @@ serve(async (req) => {
         status: 200 
       }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending OTP:', error)
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || "Unknown error occurred" }),
       { 
         headers: { 
           ...corsHeaders, 
