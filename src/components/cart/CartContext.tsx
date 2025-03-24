@@ -79,36 +79,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
       
       let newItem: CartItem = {
         id: itemId,
-        name: extraData?.name || "",
-        price: extraData?.price || extraData?.selling_price || 0,
-        duration: extraData?.duration || 0,
+        name: "",
+        price: 0,
         type: serviceId ? 'service' : 'package'
       };
 
       if (serviceId) {
-        // Add service data
+        // Fetch service data if needed
         newItem = {
           ...newItem,
           service_id: serviceId,
-          service: extraData,
-          // Use provided price or selling_price
-          price: extraData?.selling_price || extraData?.price || 0,
-          name: extraData?.name || "",
-          duration: extraData?.duration || 0,
+          // Add service data if available
           ...(extraData && { ...extraData })
         };
       } else if (packageId) {
-        // Add package data
+        // Fetch package data if needed
         newItem = {
           ...newItem,
           package_id: packageId,
-          package: extraData,
-          // Use provided price
-          price: extraData?.price || 0,
-          name: extraData?.name || "",
-          duration: extraData?.duration || 0,
-          // Handle customized services
-          customized_services: extraData?.customized_services || [],
+          // Add package data if available
           ...(extraData && { ...extraData })
         };
       }
@@ -133,24 +122,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getTotalPrice = () => {
     return items.reduce((total, item) => {
-      // Calculate price based on available fields
-      let itemPrice = 0;
-      
-      if (item.selling_price !== undefined) {
-        itemPrice = item.selling_price;
-      } else if (item.service?.selling_price !== undefined) {
-        itemPrice = item.service.selling_price;
-      } else if (item.package?.price !== undefined) {
-        itemPrice = item.package.price;
-      } else {
-        itemPrice = item.price || 0;
-      }
-      
-      // Handle customized package additional services
-      if (item.type === 'package' && item.customized_services && item.customized_services.length > 0) {
-        // Additional price calculation for customized services would go here
-        // This would require access to the service details, which might need to be stored with the item
-      }
+      const itemPrice = 
+        item.selling_price || 
+        (item.service && item.service.selling_price) || 
+        (item.package && item.package.price) || 
+        item.price || 
+        0;
       
       return total + itemPrice;
     }, 0);
@@ -158,15 +135,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getTotalDuration = () => {
     return items.reduce((total, item) => {
-      let itemDuration = 0;
-      
-      if (item.duration !== undefined) {
-        itemDuration = item.duration;
-      } else if (item.service?.duration !== undefined) {
-        itemDuration = item.service.duration;
-      } else if (item.package?.duration !== undefined) {
-        itemDuration = item.package.duration;
-      }
+      const itemDuration = 
+        item.duration || 
+        (item.service && item.service.duration) || 
+        (item.package && item.package.duration) || 
+        0;
       
       return total + itemDuration;
     }, 0);

@@ -87,30 +87,7 @@ export default function Services() {
   });
 
   const handleBookNow = async (serviceId?: string, packageId?: string) => {
-    // Find the service or package to add
-    let itemData = null;
-    
-    if (serviceId) {
-      itemData = services?.find(service => service.id === serviceId);
-    } else if (packageId) {
-      itemData = packages?.find(pkg => pkg.id === packageId);
-      
-      // Calculate total duration for the package
-      if (itemData) {
-        const packageDuration = itemData.package_services.reduce(
-          (total: number, ps: any) => total + (ps.service?.duration || 0), 
-          0
-        );
-        itemData.duration = packageDuration;
-      }
-    }
-    
-    if (!itemData) {
-      toast.error("Service or package not found");
-      return;
-    }
-    
-    await addToCart(serviceId, packageId, itemData);
+    await addToCart(serviceId, packageId);
   };
 
   const handleRemove = async (serviceId?: string, packageId?: string) => {
@@ -140,7 +117,7 @@ export default function Services() {
     let price = pkg.price;
     let duration = 0;
     
-    // Calculate duration using package_services
+    // Calculate duration and price using package_selling_price when available
     pkg.package_services.forEach((ps: any) => {
       duration += ps.service.duration;
     });
@@ -182,22 +159,6 @@ export default function Services() {
     
     setTotalPrice(price);
     setTotalDuration(duration);
-  };
-  
-  const handleAddCustomPackage = async () => {
-    if (!selectedPackage) return;
-    
-    // Create a customized package with the selected services
-    const customizedPackage = {
-      ...selectedPackage,
-      price: totalPrice,
-      duration: totalDuration,
-      customized_services: selectedServices
-    };
-    
-    await addToCart(undefined, selectedPackage.id, customizedPackage);
-    setCustomizeDialogOpen(false);
-    toast.success("Customized package added to cart");
   };
 
   const filteredServices = services?.filter((service) => {
@@ -274,7 +235,6 @@ export default function Services() {
         totalPrice={totalPrice}
         totalDuration={totalDuration}
         onServiceToggle={handleServiceToggle}
-        onConfirm={handleAddCustomPackage}
       />
 
       <MobileCartBar />
