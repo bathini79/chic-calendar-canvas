@@ -43,7 +43,7 @@ export function ServiceInventoryRequirements({
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch inventory items
-  const { data: inventoryItems } = useQuery({
+  const { data: inventoryItems, refetch: refetchInventory } = useQuery({
     queryKey: ["inventory_items_active"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -153,6 +153,7 @@ export function ServiceInventoryRequirements({
       if (error) throw error;
       
       refetch();
+      refetchInventory(); // Refresh inventory items after updating requirements
       if (onSave) onSave();
     } catch (error) {
       console.error("Error saving requirements:", error);

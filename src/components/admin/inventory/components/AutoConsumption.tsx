@@ -124,7 +124,7 @@ export function AutoConsumption() {
   });
 
   // Fetch inventory items
-  const { data: inventoryItems, isLoading: itemsLoading } = useQuery({
+  const { data: inventoryItems, isLoading: itemsLoading, refetch: refetchInventory } = useQuery({
     queryKey: ["inventory_items"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -299,6 +299,7 @@ export function AutoConsumption() {
       setSelectedPackage("");
       setItemInputs([{ itemId: "", quantity: 1 }]);
       refetchRequirements();
+      refetchInventory(); // Refresh inventory items after updating requirements
 
     } catch (error: any) {
       toast.error(error.message);
