@@ -1,59 +1,66 @@
 
-import React, { useState } from "react";
-import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
 import { useCart } from "@/components/cart/CartContext";
+import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
+import { UnifiedCalendar } from "@/components/scheduling/UnifiedCalendar";
 import { CartSummary } from "@/components/cart/CartSummary";
+import { MobileCartBar } from "@/components/cart/MobileCartBar";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function UnifiedScheduling() {
   const { 
-    selectedLocation,
-    items,
-    addToCart,
-    removeFromCart
+    items, 
+    selectedDate, 
+    setSelectedDate, 
+    selectedTimeSlots, 
+    setSelectedTimeSlots, 
+    selectedStylists, 
+    setSelectedStylists 
   } = useCart();
-  
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
-  const [cartItemId, setCartItemId] = useState<string | null>(null);
-  const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
-  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const navigate = useNavigate();
 
-  const refreshCart = async () => {
-    // This would typically fetch the updated cart
-    // For now it's just a placeholder
+  useEffect(() => {
+    if (items.length === 0) {
+      navigate('/services');
+    }
+  }, [items, navigate]);
+
+  const handleStylistSelect = (serviceId: string, stylistId: string) => {
+    setSelectedStylists((prev) => ({
+      ...prev,
+      [serviceId]: stylistId,
+    }));
+  };
+
+  const handleTimeSlotSelect = (itemId: string, timeSlot: string) => {
+    setSelectedTimeSlots((prev) => ({
+      ...prev,
+      [itemId]: timeSlot,
+    }));
   };
 
   return (
-    <div className="container py-8">
-      <h1 className="text-3xl font-bold mb-6">Schedule Your Appointment</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-        <div className="md:col-span-8">
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Select Service Provider</h2>
-              <ServiceSelector 
-                selectedServices={selectedServices}
-                selectedPackages={selectedPackages}
-                onServicesChange={setSelectedServices}
-                onPackagesChange={setSelectedPackages}
-                locationId={selectedLocation}
-                refreshCart={refreshCart}
-                cartItemId={cartItemId}
-                setCartItemId={setCartItemId}
-                selectedPackage={selectedPackage}
-                setSelectedPackage={setSelectedPackage}
-                isCustomizeOpen={isCustomizeOpen}
-                setIsCustomizeOpen={setIsCustomizeOpen}
-              />
-            </div>
-          </div>
+    <div className="container max-w-7xl mx-auto py-6 px-4">
+      <div className="grid lg:grid-cols-[1fr_400px] gap-6">
+        <div className="space-y-6 min-w-0">
+          <ServiceSelector 
+            items={items}
+            selectedStylists={selectedStylists}
+            onStylistSelect={handleStylistSelect}
+          />
+          <UnifiedCalendar
+            selectedDate={selectedDate}
+            onDateSelect={setSelectedDate}
+            selectedTimeSlots={selectedTimeSlots}
+            onTimeSlotSelect={handleTimeSlotSelect}
+            selectedStylists={selectedStylists}
+          />
         </div>
-        
-        <div className="md:col-span-4">
+        <div className="hidden lg:block h-[calc(100vh-8rem)] sticky top-24">
           <CartSummary />
         </div>
       </div>
+      <MobileCartBar />
     </div>
   );
 }

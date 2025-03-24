@@ -1,303 +1,236 @@
 
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { formatPrice } from '@/lib/utils';
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
-interface ServiceSelectorProps {
-  selectedServices: string[];
-  selectedPackages: string[];
-  onServicesChange: (services: string[]) => void;
-  onPackagesChange: (packages: string[]) => void;
-  refreshCart?: () => Promise<void>;
-  cartItemId?: string | null;
-  setCartItemId?: (id: string | null) => void;
-  selectedPackage?: any | null;
-  setSelectedPackage?: (pkg: any | null) => void;
-  isCustomizeOpen?: boolean;
-  setIsCustomizeOpen?: (open: boolean) => void;
-  locationId?: string;
+interface Service {
+  id: string;
+  name: string;
+  duration: number;
+  selling_price: number;
 }
 
-export function ServiceSelector({
-  selectedServices,
-  selectedPackages,
-  onServicesChange,
-  onPackagesChange,
-  refreshCart,
-  cartItemId,
-  setCartItemId,
-  selectedPackage,
-  setSelectedPackage,
-  isCustomizeOpen,
-  setIsCustomizeOpen,
-  locationId
-}: ServiceSelectorProps) {
-  const [services, setServices] = useState<any[]>([]);
-  const [packages, setPackages] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+interface PackageService {
+  service: Service;
+  package_selling_price?: number;
+}
 
-  useEffect(() => {
-    fetchServices();
-    fetchPackages();
-  }, []);
+interface Package {
+  id: string;
+  name: string;
+  package_services: PackageService[];
+  duration: number;
+  price: number;
+}
 
-  const fetchServices = async () => {
-    try {
+interface CartItem {
+  id: string;
+  service_id?: string;
+  package_id?: string;
+  service?: Service;
+  package?: Package;
+  customized_services?: string[];
+  selling_price: number;
+}
+
+interface Employee {
+  id: string;
+  name: string;
+}
+
+interface ServiceSelectorProps {
+  items: CartItem[];
+  selectedStylists: Record<string, string>;
+  onStylistSelect: (serviceId: string, stylistId: string) => void;
+}
+
+export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
+  // Query for additional services that might be customized in packages
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('services')
-        .select('*')
-        .eq('status', 'active')
-        .order('name', { ascending: true });
-
+        .select('*');
+      
       if (error) throw error;
-      setServices(data || []);
-    } catch (error) {
-      console.error('Error fetching services:', error);
-      toast.error('Failed to load services');
-      setServices([]);
-    }
-  };
+      return data;
+    },
+    enabled: items.some(item => item.customized_services?.length > 0)
+  });
 
-  const fetchPackages = async () => {
-    try {
+  const { data: employees } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
       const { data, error } = await supabase
-        .from('packages')
-        .select('*, package_services!inner(*, service:services(*))')
-        .eq('status', 'active')
-        .order('name', { ascending: true });
-
+        .from('employees')
+        .select('*')
+        .eq('employment_type', 'stylist')
+        .eq('status', 'active');
+      
       if (error) throw error;
-      setPackages(data || []);
-    } catch (error) {
-      console.error('Error fetching packages:', error);
-      toast.error('Failed to load packages');
-      setPackages([]);
-    }
-  };
+      return data;
+    },
+  });
 
-  const handleServiceToggle = async (serviceId: string) => {
-    const isSelected = selectedServices.includes(serviceId);
-    let updatedServices;
-
-    if (isSelected) {
-      updatedServices = selectedServices.filter(id => id !== serviceId);
-    } else {
-      updatedServices = [...selectedServices, serviceId];
-    }
-
-    onServicesChange(updatedServices);
-    
-    if (refreshCart) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please login to continue");
-        return;
+  // Group items by package and standalone services
+  const groupedItems = items.reduce((acc: any, item) => {
+    if (item.package_id && item.package) {
+      const packageServices: PackageService[] = [];
+      
+      // Add regular package services
+      if (item.package.package_services) {
+        packageServices.push(...item.package.package_services);
       }
-
-      const user = session.user;
-      if (user) {
-        try {
-          if (isSelected) {
-            // Remove service from cart
-            const { error } = await supabase
-              .from('cart_items')
-              .delete()
-              .eq('customer_id', user.id)
-              .eq('service_id', serviceId);
-
-            if (error) throw error;
-            toast.success('Service removed from cart');
-          } else {
-            // Add service to cart
+      
+      // Add customized services
+      if (item.customized_services?.length && services) {
+        const customizedServiceObjects = item.customized_services
+          .map(serviceId => {
             const service = services.find(s => s.id === serviceId);
-            if (!service) throw new Error('Service not found');
-
-            const { error } = await supabase
-              .from('cart_items')
-              .insert({
-                customer_id: user.id,
-                service_id: serviceId,
-                package_id: null,
-                selling_price: service.selling_price,
-                duration: service.duration || 0,
-              });
-
-            if (error) throw error;
-            toast.success(`${service.name} added to cart`);
-          }
-
-          await refreshCart();
-        } catch (error) {
-          console.error('Error updating cart:', error);
-          toast.error('Failed to update cart');
-        }
-      }
-    }
-  };
-
-  const handlePackageToggle = (packageId: string) => {
-    const isSelected = selectedPackages.includes(packageId);
-    let updatedPackages;
-
-    if (isSelected) {
-      updatedPackages = selectedPackages.filter(id => id !== packageId);
-    } else {
-      updatedPackages = [...selectedPackages, packageId];
-    }
-
-    onPackagesChange(updatedPackages);
-  };
-
-  // Fix the type issues in the existing ServiceSelector component
-  const handleAddPackageToCart = async (packageItem: any) => {
-    if (!refreshCart || !setCartItemId || !setIsCustomizeOpen || !setSelectedPackage) {
-      handlePackageToggle(packageItem.id);
-      return;
-    }
-    
-    try {
-      // Get the user session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please login to continue");
-        return;
+            return service ? { service } : null;
+          })
+          .filter(Boolean) as PackageService[];
+        
+        packageServices.push(...customizedServiceObjects);
       }
 
-      const user = session.user;
-      
-      // Get the selected package's services
-      const packageServices = packageItem.package_services.map((ps: any) => ps.service);
-      
-      // Create a cart item for the package
-      const { data: cartItem, error } = await supabase
-        .from('cart_items')
-        .insert({
-          customer_id: user.id,
-          package_id: packageItem.id,
-          service_id: null,
-          selling_price: packageItem.price,
-          duration: packageItem.duration || 0,
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      // Redirect to customization if package is customizable
-      if (packageItem.is_customizable) {
-        setSelectedPackage(packageItem);
-        setCartItemId(cartItem.id);
-        setIsCustomizeOpen(true);
-      } else {
-        toast.success(`${packageItem.name} added to cart`);
-        await refreshCart();
-      }
-    } catch (error) {
-      console.error('Error adding package to cart:', error);
-      toast.error('Failed to add package to cart');
+      acc.packages[item.package_id] = {
+        package: item.package,
+        cartItemId: item.id,
+        services: packageServices
+      };
+    } else if (item.service) {
+      acc.services.push({
+        cartItemId: item.id,
+        service: item.service
+      });
     }
+    return acc;
+  }, { 
+    packages: {} as Record<string, {
+      package: Package;
+      cartItemId: string;
+      services: PackageService[];
+    }>, 
+    services: [] as Array<{
+      cartItemId: string;
+      service: Service;
+    }> 
+  });
+
+  // Get the price for a service, prioritizing package_selling_price if available
+  const getServicePrice = (service: Service, packageService?: PackageService): number => {
+    if (packageService && packageService.package_selling_price !== undefined && packageService.package_selling_price !== null) {
+      return packageService.package_selling_price;
+    }
+    return service.selling_price;
   };
-
-  const filteredServices = services.filter(service =>
-    service.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredPackages = packages.filter(pkg =>
-    pkg.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
-    <div className="space-y-4">
-      <Input
-        type="text"
-        placeholder="Search services or packages..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
-
-      <div>
-        <h2 className="text-lg font-semibold mb-2">Services</h2>
-        <ScrollArea className="h-[300px] w-full">
-          <div className="space-y-2">
-            {filteredServices.map(service => (
-              <div key={service.id} className="flex items-center justify-between">
-                <Label htmlFor={`service-${service.id}`} className="cursor-pointer">
-                  {service.name}
-                </Label>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="secondary">{formatPrice(service.selling_price)}</Badge>
-                  <Checkbox
-                    id={`service-${service.id}`}
-                    checked={selectedServices.includes(service.id)}
-                    onCheckedChange={() => handleServiceToggle(service.id)}
-                  />
-                </div>
-              </div>
-            ))}
+    <Card className="w-full">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg">Select Stylists</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Render Package Services */}
+        {Object.entries(groupedItems.packages).map(([packageId, packageData]) => (
+          <div key={packageId} className="space-y-4">
+            <div className="font-semibold text-lg">
+              {packageData.package.name}
+            </div>
+            <div className="space-y-3 pl-4">
+              {packageData.services.map((ps: PackageService) => {
+                // Determine if this is a package service with package_selling_price
+                const isPackageService = packageData.package.package_services.some(
+                  basePs => basePs.service.id === ps.service.id
+                );
+                
+                // Get the corresponding base package service if exists
+                const basePackageService = isPackageService 
+                  ? packageData.package.package_services.find(basePs => basePs.service.id === ps.service.id)
+                  : undefined;
+                
+                // Calculate the display price
+                const displayPrice = getServicePrice(ps.service, basePackageService);
+                
+                return (
+                  <div 
+                    key={`${packageData.cartItemId}-${ps.service.id}`}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{ps.service.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {ps.service.duration} minutes • ₹{displayPrice}
+                      </p>
+                    </div>
+                    <Select 
+                      value={selectedStylists[ps.service.id] || ''} 
+                      onValueChange={(value) => onStylistSelect(ps.service.id, value)}
+                    >
+                      <SelectTrigger className="w-full sm:w-[200px]">
+                        <SelectValue placeholder="Select stylist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any Available Stylist</SelectItem>
+                        {employees?.map((employee) => (
+                          <SelectItem key={employee.id} value={employee.id}>
+                            {employee.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
+            </div>
+            <Separator className="my-4" />
           </div>
-        </ScrollArea>
-      </div>
+        ))}
 
-      <div>
-        <h2 className="text-lg font-semibold mb-2">Packages</h2>
-        <ScrollArea className="h-[300px] w-full">
-          <div className="space-y-2">
-            {filteredPackages.map(packageItem => (
-              <div key={packageItem.id} className="flex items-center justify-between">
-                <Label htmlFor={`package-${packageItem.id}`} className="cursor-pointer">
-                  {packageItem.name}
-                </Label>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="secondary">{formatPrice(packageItem.price)}</Badge>
-                  {refreshCart ? (
-                    <Button size="sm" onClick={() => handleAddPackageToCart(packageItem)}>
-                      Add to Cart
-                    </Button>
-                  ) : (
-                    <Checkbox
-                      id={`package-${packageItem.id}`}
-                      checked={selectedPackages.includes(packageItem.id)}
-                      onCheckedChange={() => handlePackageToggle(packageItem.id)}
-                    />
-                  )}
+        {/* Render Individual Services */}
+        {groupedItems.services.length > 0 && (
+          <div className="space-y-4">
+            <div className="font-semibold text-lg">
+              Individual Services
+            </div>
+            <div className="space-y-3">
+              {groupedItems.services.map(({ cartItemId, service }) => (
+                <div 
+                  key={cartItemId}
+                  className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{service.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {service.duration} minutes • ₹{service.selling_price}
+                    </p>
+                  </div>
+                  <Select 
+                    value={selectedStylists[service.id] || ''} 
+                    onValueChange={(value) => onStylistSelect(service.id, value)}
+                  >
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                      <SelectValue placeholder="Select stylist" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any Available Stylist</SelectItem>
+                      {employees?.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </ScrollArea>
-      </div>
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
