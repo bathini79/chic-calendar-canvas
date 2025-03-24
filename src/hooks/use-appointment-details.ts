@@ -1,71 +1,58 @@
-import { useState, useEffect } from "react";
+
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Appointment } from "@/types/appointment";
+import { AppointmentStatus } from "@/types/appointment";
 
-export function useAppointmentDetails(appointmentId: string | null) {
-  const [appointment, setAppointment] = useState<Appointment | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchAppointmentDetails = async (id: string) => {
-    try {
-      // Fetch the basic appointment data
-      const { data: appointmentData, error: appointmentError } = await supabase
+export const useAppointmentDetails = (appointmentId: string | undefined) => {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['appointment', appointmentId],
+    queryFn: async () => {
+      if (!appointmentId) throw new Error('No appointment ID provided');
+      
+      const { data, error } = await supabase
         .from('appointments')
         .select(`
           *,
-          bookings:bookings(
+          bookings (
             *,
             service:services(*),
             package:packages(*),
             employee:employees(*)
           )
         `)
-        .eq('id', id)
+        .eq('id', appointmentId)
         .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!appointmentId
+  });
 
-      if (appointmentError) throw appointmentError;
-      if (!appointmentData) throw new Error('Appointment not found');
+  const isNoShow = data?.status === 'noshow'; // Fixed to match the correct enum value
+  const isPending = data?.status === 'pending';
+  const isCanceled = data?.status === 'canceled';
+  const isConfirmed = data?.status === 'confirmed';
+  const isCompleted = data?.status === 'completed';
+  const isRefunded = data?.status === 'refunded' || data?.status === 'partially_refunded';
+  const canCancel = isPending || isConfirmed;
+  const canNoShow = isConfirmed;
+  const canComplete = isConfirmed;
+  const canRefund = isCompleted || isConfirmed;
 
-      // Convert the appointment status to correct format if necessary
-      if (appointmentData.status === 'no-show') {
-        appointmentData.status = 'noshow';
-      }
-
-      // Create a proper Appointment object with all required fields
-      return {
-        ...appointmentData,
-        membership_discount: 0, // Default value
-        membership_id: null,    // Default value
-        membership_name: null,  // Default value
-        location_id: appointmentData.location || null, // Use location as location_id
-      } as Appointment;
-    } catch (error) {
-      console.error('Error fetching appointment details:', error);
-      throw error;
-    }
+  return {
+    data,
+    isLoading,
+    error,
+    isNoShow,
+    isPending,
+    isCanceled,
+    isConfirmed,
+    isCompleted,
+    isRefunded,
+    canCancel,
+    canNoShow,
+    canComplete,
+    canRefund
   };
-
-  useEffect(() => {
-    if (!appointmentId) {
-      setAppointment(null);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    fetchAppointmentDetails(appointmentId)
-      .then((data) => {
-        setAppointment(data);
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err : new Error(String(err)));
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, [appointmentId]);
-
-  return { appointment, isLoading, error };
-}
+};

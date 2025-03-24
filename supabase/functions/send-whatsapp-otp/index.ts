@@ -70,13 +70,19 @@ serve(async (req) => {
       : null
       
     if (supabaseClient) {
-      // Store OTP with expiration (10 minutes)
+      // First, delete any existing OTP for this phone number
+      await supabaseClient
+        .from('phone_auth_codes')
+        .delete()
+        .eq('phone_number', phoneNumber);
+      
+      // Then store the new OTP with expiration (10 minutes)
       const expiresAt = new Date()
       expiresAt.setMinutes(expiresAt.getMinutes() + 10)
       
       const { error } = await supabaseClient
         .from('phone_auth_codes')
-        .upsert({
+        .insert({
           phone_number: phoneNumber,
           code: otp,
           expires_at: expiresAt.toISOString(),
