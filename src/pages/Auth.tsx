@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { AlertCircle } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ const Auth = () => {
   const [fullName, setFullName] = useState("");
   const [needsFullName, setNeedsFullName] = useState(false);
   const [activeTab, setActiveTab] = useState<"email" | "phone">("email");
+  const [verificationError, setVerificationError] = useState<string | null>(null);
 
   // Check if user is already logged in
   const { data: session } = useQuery({
@@ -96,6 +98,8 @@ const Auth = () => {
     }
 
     setIsLoading(true);
+    setVerificationError(null);
+    
     try {
       const response = await supabase.functions.invoke('send-whatsapp-otp', {
         body: { phoneNumber },
@@ -110,6 +114,7 @@ const Auth = () => {
       toast.success("OTP sent to your WhatsApp. Please check your messages.");
     } catch (error: any) {
       toast.error(error.message || "Failed to send OTP");
+      setVerificationError(error.message || "Failed to send OTP");
       console.error("OTP send error:", error);
     } finally {
       setIsLoading(false);
@@ -119,15 +124,19 @@ const Auth = () => {
   const verifyWhatsAppOTP = async () => {
     if (!otp || otp.length !== 6) {
       toast.error("Please enter a valid 6-digit OTP");
+      setVerificationError("Please enter a valid 6-digit OTP");
       return;
     }
 
     if (needsFullName && !fullName.trim()) {
       toast.error("Full name is required for new registrations");
+      setVerificationError("Full name is required for new registrations");
       return;
     }
 
     setIsLoading(true);
+    setVerificationError(null);
+    
     try {
       const response = await supabase.functions.invoke('verify-whatsapp-otp', {
         body: { 
@@ -156,6 +165,7 @@ const Auth = () => {
       navigate("/");
     } catch (error: any) {
       toast.error(error.message || "Failed to verify OTP");
+      setVerificationError(error.message || "Failed to verify OTP");
       console.error("OTP verification error:", error);
     } finally {
       setIsLoading(false);
@@ -181,6 +191,12 @@ const Auth = () => {
               Enter your phone number with country code (e.g., +1 for US)
             </p>
           </div>
+          {verificationError && (
+            <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5" />
+              <span>{verificationError}</span>
+            </div>
+          )}
           <Button
             type="button"
             className="w-full"
@@ -211,6 +227,12 @@ const Auth = () => {
               Please enter your full name to complete registration
             </p>
           </div>
+          {verificationError && (
+            <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5" />
+              <span>{verificationError}</span>
+            </div>
+          )}
           <div className="flex space-x-2">
             <Button
               type="button"
@@ -219,6 +241,7 @@ const Auth = () => {
               onClick={() => {
                 setNeedsFullName(false);
                 setOtpSent(false);
+                setVerificationError(null);
               }}
               disabled={isLoading}
             >
@@ -265,13 +288,23 @@ const Auth = () => {
           <p className="text-xs text-muted-foreground text-center">
             Check your WhatsApp for the 6-digit verification code
           </p>
+          {verificationError && (
+            <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5" />
+              <span>{verificationError}</span>
+            </div>
+          )}
         </div>
         <div className="flex space-x-2">
           <Button
             type="button"
             variant="outline"
             className="w-1/2"
-            onClick={() => setOtpSent(false)}
+            onClick={() => {
+              setOtpSent(false);
+              setOtp("");
+              setVerificationError(null);
+            }}
             disabled={isLoading}
           >
             Back

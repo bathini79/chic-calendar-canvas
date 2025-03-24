@@ -34,24 +34,24 @@ const InputOTPSlot = React.forwardRef<
   React.ComponentPropsWithoutRef<"div"> & { index: number }
 >(({ index, className, ...props }, ref) => {
   const inputOTPContext = React.useContext(OTPInputContext)
-  const { slots = [] } = inputOTPContext || {}
+  const slots = inputOTPContext?.slots || []
   
   // Make sure slots exist and the index is valid
-  const char = slots && slots.length > index && slots[index] ? slots[index].char || '' : ''
-  const hasFakeCaret = slots && slots.length > index && slots[index] ? !!slots[index].hasFakeCaret : false
-  const isActive = slots && slots.length > index && slots[index] ? !!slots[index].isActive : false
+  const char = slots[index]?.char || ''
+  const hasFakeCaret = !!slots[index]?.hasFakeCaret
+  const isActive = !!slots[index]?.isActive
   
   return (
     <div
       ref={ref}
       className={cn(
-        "relative flex h-10 w-10 items-center justify-center border-y border-r border-input text-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md cursor-pointer",
+        "relative flex h-10 w-10 items-center justify-center border-y border-r border-input bg-white text-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md cursor-pointer",
         isActive && "z-10 ring-2 ring-ring ring-offset-background",
         className
       )}
       {...props}
     >
-      {char}
+      {char && <span className="text-center font-medium text-lg">{char}</span>}
       {hasFakeCaret && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />
