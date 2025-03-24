@@ -83,7 +83,8 @@ export function CustomizeDialog({
       await addToCart(undefined, selectedPackage?.id, {
         customized_services: additionalServices,
         selling_price: calculatedPrice,
-        duration: calculatedDuration
+        duration: calculatedDuration,
+        package: selectedPackage // Include the full package data
       });
       
       toast.success(existingPackageInCart ? "Package updated in cart" : "Added to cart");
@@ -123,8 +124,8 @@ export function CustomizeDialog({
             <ServicesList
               selectedPackage={selectedPackage}
               selectedServices={selectedServices}
-              allServices={localServices}
               onServiceToggle={onServiceToggle}
+              allServices={localServices}
             />
           </div>
         </ScrollArea>

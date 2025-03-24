@@ -122,26 +122,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getTotalPrice = () => {
     return items.reduce((total, item) => {
-      const itemPrice = 
-        item.selling_price || 
-        (item.service && item.service.selling_price) || 
-        (item.package && item.package.price) || 
-        item.price || 
-        0;
+      // For services, use selling_price from service or item level
+      if (item.service) {
+        return total + (item.selling_price || item.service.selling_price || 0);
+      }
       
-      return total + itemPrice;
+      // For packages, use selling_price from item or price from package
+      if (item.package) {
+        return total + (item.selling_price || item.package.price || 0);
+      }
+      
+      // Fallback to item.price if neither service nor package
+      return total + (item.price || 0);
     }, 0);
   };
 
   const getTotalDuration = () => {
     return items.reduce((total, item) => {
-      const itemDuration = 
-        item.duration || 
-        (item.service && item.service.duration) || 
-        (item.package && item.package.duration) || 
-        0;
+      // For services, use duration from service or item level
+      if (item.service) {
+        return total + (item.duration || item.service.duration || 0);
+      }
       
-      return total + itemDuration;
+      // For packages, use duration from item or package
+      if (item.package) {
+        return total + (item.duration || item.package.duration || 0);
+      }
+      
+      // Fallback to item.duration if available
+      return total + (item.duration || 0);
     }, 0);
   };
 
