@@ -1,13 +1,25 @@
 
-// This is a placeholder file to fix the build error
-// The actual implementation would go here
+import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
 
-export const calculatePackagePrice = () => {
-  // Implementation will be added later
-  return 0;
-};
+// Re-export the utility functions from bookingUtils.ts
+export { calculatePackagePrice, calculatePackageDuration };
 
-export const getPackageServices = () => {
-  // Implementation will be added later
-  return [];
+// Get customized package services
+export const getPackageServices = (packageId: string, packages: any[], customizedServices: string[]) => {
+  const pkg = packages.find(p => p.id === packageId);
+  if (!pkg) return [];
+  
+  // Get all included services
+  const packageServices = pkg.package_services || [];
+  
+  // Add any customized services if this package is customizable
+  const customServices = pkg.is_customizable && customizedServices ? 
+    customizedServices.filter(serviceId => 
+      !packageServices.some((ps: any) => ps.service.id === serviceId)
+    ) : [];
+  
+  return {
+    baseServices: packageServices.map((ps: any) => ps.service),
+    customServices
+  };
 };

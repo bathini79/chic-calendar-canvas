@@ -85,18 +85,36 @@ export function CartProvider({ children }: { children: ReactNode }) {
       };
 
       if (serviceId) {
-        // Fetch service data if needed
+        // For services
+        const serviceName = extraData?.service?.name || extraData?.name || "";
+        const servicePrice = extraData?.service?.selling_price || extraData?.selling_price || extraData?.price || 0;
+        const serviceDuration = extraData?.service?.duration || extraData?.duration || 0;
+        
         newItem = {
           ...newItem,
+          name: serviceName,
+          price: servicePrice,
+          duration: serviceDuration,
           service_id: serviceId,
+          service: extraData?.service || null,
+          selling_price: servicePrice,
           // Add service data if available
           ...(extraData && { ...extraData })
         };
       } else if (packageId) {
-        // Fetch package data if needed
+        // For packages
+        const packageName = extraData?.package?.name || extraData?.name || "";
+        const packagePrice = extraData?.selling_price || extraData?.price || extraData?.package?.price || 0;
+        const packageDuration = extraData?.duration || extraData?.package?.duration || 0;
+        
         newItem = {
           ...newItem,
+          name: packageName,
+          price: packagePrice,
+          duration: packageDuration,
           package_id: packageId,
+          package: extraData?.package || null,
+          selling_price: packagePrice,
           // Add package data if available
           ...(extraData && { ...extraData })
         };
@@ -122,35 +140,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getTotalPrice = () => {
     return items.reduce((total, item) => {
-      // For services, use selling_price from service or item level
-      if (item.service) {
-        return total + (item.selling_price || item.service.selling_price || 0);
-      }
+      // Use the most specific price available
+      const itemPrice = item.selling_price !== undefined
+        ? item.selling_price
+        : item.price !== undefined
+          ? item.price
+          : item.service?.selling_price || item.package?.price || 0;
       
-      // For packages, use selling_price from item or price from package
-      if (item.package) {
-        return total + (item.selling_price || item.package.price || 0);
-      }
-      
-      // Fallback to item.price if neither service nor package
-      return total + (item.price || 0);
+      return total + itemPrice;
     }, 0);
   };
 
   const getTotalDuration = () => {
     return items.reduce((total, item) => {
-      // For services, use duration from service or item level
-      if (item.service) {
-        return total + (item.duration || item.service.duration || 0);
-      }
+      // Use the most specific duration available
+      const itemDuration = item.duration !== undefined
+        ? item.duration
+        : item.service?.duration || item.package?.duration || 0;
       
-      // For packages, use duration from item or package
-      if (item.package) {
-        return total + (item.duration || item.package.duration || 0);
-      }
-      
-      // Fallback to item.duration if available
-      return total + (item.duration || 0);
+      return total + itemDuration;
     }, 0);
   };
 

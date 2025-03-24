@@ -10,6 +10,7 @@ import { MobileCartBar } from "@/components/cart/MobileCartBar";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { ServiceCard } from "@/components/customer/services/ServiceCard";
 import { PackageCard } from "@/components/customer/services/PackageCard";
+import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
 
 export default function Services() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -87,7 +88,34 @@ export default function Services() {
   });
 
   const handleBookNow = async (serviceId?: string, packageId?: string) => {
-    await addToCart(serviceId, packageId);
+    try {
+      if (serviceId) {
+        const service = services?.find(s => s.id === serviceId);
+        if (service) {
+          await addToCart(serviceId, undefined, {
+            name: service.name,
+            price: service.selling_price,
+            duration: service.duration,
+            selling_price: service.selling_price,
+            service: service
+          });
+        }
+      } else if (packageId) {
+        const pkg = packages?.find(p => p.id === packageId);
+        if (pkg) {
+          await addToCart(undefined, packageId, {
+            name: pkg.name,
+            price: pkg.price,
+            duration: calculatePackageDuration(pkg, [], services || []),
+            selling_price: pkg.price,
+            package: pkg
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      toast.error("Failed to add item to cart");
+    }
   };
 
   const handleRemove = async (serviceId?: string, packageId?: string) => {

@@ -84,7 +84,9 @@ export function CustomizeDialog({
         customized_services: additionalServices,
         selling_price: calculatedPrice,
         duration: calculatedDuration,
-        package: selectedPackage // Include the full package data
+        package: selectedPackage, // Include the full package data
+        name: selectedPackage?.name,
+        price: calculatedPrice
       });
       
       toast.success(existingPackageInCart ? "Package updated in cart" : "Added to cart");

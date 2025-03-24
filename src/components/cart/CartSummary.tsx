@@ -26,6 +26,7 @@ export function CartSummary() {
     selectedDate, 
     selectedTimeSlots,
     getTotalPrice,
+    getTotalDuration,
     selectedLocation,
     appliedTaxId,
     setAppliedTaxId,
@@ -48,6 +49,7 @@ export function CartSummary() {
   const shouldShowTaxAndCoupon = !isServicesPage && !isSchedulingPage;
 
   const subtotal = getTotalPrice();
+  const totalDuration = getTotalDuration();
   const afterCouponSubtotal = subtotal - couponDiscount;
   const totalPrice = afterCouponSubtotal + taxAmount;
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
@@ -145,7 +147,10 @@ export function CartSummary() {
     <Card className="flex flex-col h-full">
       <div className="p-4 border-b">
         <h2 className="font-semibold text-lg">Your Cart ({items.length} items)</h2>
-        <p className="text-2xl font-bold mt-2">{formatPrice(totalPrice)}</p>
+        <p className="text-2xl font-bold mt-2">{formatPrice(shouldShowTaxAndCoupon ? totalPrice : subtotal)}</p>
+        {totalDuration > 0 && (
+          <p className="text-sm text-muted-foreground">Total duration: {totalDuration} min</p>
+        )}
       </div>
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
@@ -155,8 +160,8 @@ export function CartSummary() {
             </p>
           ) : (
             sortedItems.map((item) => {
-              const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
-              const itemPrice = item.selling_price || item.service?.selling_price || item.package?.price || 0;
+              const itemDuration = item.duration || item.service?.duration || item.package?.duration || 0;
+              const itemPrice = item.selling_price || item.service?.selling_price || item.package?.price || item.price || 0;
               
               return (
                 <div
@@ -166,7 +171,7 @@ export function CartSummary() {
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-medium">
-                        {item.service?.name || item.package?.name}
+                        {item.name || item.service?.name || item.package?.name}
                       </h3>
                       <p className="text-sm text-muted-foreground">
                         Duration: {itemDuration} min
@@ -280,7 +285,7 @@ export function CartSummary() {
           
           <div className="flex justify-between text-base font-medium pt-1">
             <span>Total</span>
-            <span>{formatPrice(totalPrice)}</span>
+            <span>{formatPrice(shouldShowTaxAndCoupon ? totalPrice : subtotal)}</span>
           </div>
         </div>
         
