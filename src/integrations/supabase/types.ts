@@ -1460,6 +1460,30 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_auth_codes: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          phone_number: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          phone_number: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone_number?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           admin_created: boolean | null

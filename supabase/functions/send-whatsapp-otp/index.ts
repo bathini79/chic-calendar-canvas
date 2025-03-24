@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
 const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
@@ -113,29 +114,3 @@ serve(async (req) => {
     )
   }
 })
-
-function createClient(supabaseUrl: string, supabaseKey: string, options: any) {
-  return {
-    from: (table: string) => ({
-      upsert: (data: any) => {
-        return fetch(`${supabaseUrl}/rest/v1/${table}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(data)
-        }).then(response => {
-          if (!response.ok) {
-            return { error: { message: `HTTP error! status: ${response.status}` } }
-          }
-          return { error: null }
-        }).catch(error => {
-          return { error }
-        })
-      }
-    })
-  }
-}
