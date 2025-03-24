@@ -1,26 +1,22 @@
 
-import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ServicesList } from "./ServicesList";
-import { formatPrice } from "@/lib/utils";
+import { useCart } from "@/components/cart/CartContext";
+import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
 
-export interface CustomizeDialogProps {
+interface CustomizeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedPackage: any;
   selectedServices: string[];
   allServices: any[];
-  totalPrice: number;
-  totalDuration: number;
   onServiceToggle: (serviceId: string, checked: boolean) => void;
-  onConfirm: () => void;
+  totalPrice?: number;
+  totalDuration?: number;
 }
 
 export function CustomizeDialog({
@@ -29,88 +25,129 @@ export function CustomizeDialog({
   selectedPackage,
   selectedServices,
   allServices,
-  totalPrice,
-  totalDuration,
   onServiceToggle,
-  onConfirm
+  totalPrice: externalTotalPrice,
+  totalDuration: externalTotalDuration
 }: CustomizeDialogProps) {
-  if (!selectedPackage) return null;
+  const { addToCart, removeFromCart, items } = useCart();
+  const [localServices, setLocalServices] = useState<any[]>([]);
+  
+  // Find if this package is already in cart
+  const existingPackageInCart = items.find(item => 
+    item.package_id === selectedPackage?.id
+  );
 
-  const baseServiceIds = selectedPackage.package_services.map((ps: any) => ps.service.id);
-  const hasCustomServices = selectedServices.some(id => !baseServiceIds.includes(id));
+  useEffect(() => {
+    if (allServices) {
+      setLocalServices(allServices);
+    }
+  }, [allServices]);
+  
+  // When dialog opens, initialize selected services from cart if package exists
+  useEffect(() => {
+    if (open && selectedPackage && existingPackageInCart) {
+      // Reset all selections first
+      selectedServices.forEach(id => onServiceToggle(id, false));
+      
+      // Add back the included services
+      selectedPackage.package_services.forEach((ps: any) => {
+        onServiceToggle(ps.service.id, true);
+      });
+
+      // Add any additional services that were previously selected
+      if (existingPackageInCart.customized_services) {
+        existingPackageInCart.customized_services.forEach((serviceId: string) => {
+          onServiceToggle(serviceId, true);
+        });
+      }
+    }
+  }, [open, selectedPackage, existingPackageInCart]);
+
+  const handleBookNow = async () => {
+    try {
+      if (existingPackageInCart) {
+        // First remove the existing package from cart
+        await removeFromCart(existingPackageInCart.id);
+      }
+      
+      // Get additional services (exclude services already included in package)
+      const additionalServices = selectedServices.filter(
+        serviceId => !selectedPackage.package_services.some((ps: any) => ps.service.id === serviceId)
+      );
+
+      // Calculate the final package price and duration
+      const calculatedPrice = calculatePackagePrice(selectedPackage, additionalServices, localServices);
+      const calculatedDuration = calculatePackageDuration(selectedPackage, additionalServices, localServices);
+
+      // Add the package with updated customizations
+      await addToCart(undefined, selectedPackage?.id, {
+        customized_services: additionalServices,
+        selling_price: calculatedPrice,
+        duration: calculatedDuration
+      });
+      
+      toast.success(existingPackageInCart ? "Package updated in cart" : "Added to cart");
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error handling package:', error);
+      toast.error("Failed to update cart");
+    }
+  };
+
+  // Calculate total price and duration using the utility functions or use externally provided values
+  const additionalServices = selectedServices.filter(
+    serviceId => !selectedPackage?.package_services.some((ps: any) => ps.service.id === serviceId)
+  );
+  
+  const calculatedTotalPrice = externalTotalPrice !== undefined 
+    ? externalTotalPrice 
+    : calculatePackagePrice(selectedPackage, additionalServices, localServices);
+  
+  const calculatedTotalDuration = externalTotalDuration !== undefined
+    ? externalTotalDuration
+    : calculatePackageDuration(selectedPackage, additionalServices, localServices);
+
+  if (!selectedPackage) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Customize {selectedPackage.name}</DialogTitle>
+      <DialogContent 
+        className="max-w-2xl h-[90vh] flex flex-col p-0"
+      >
+        <DialogHeader className="p-6 pb-0">
+          <DialogTitle>Customize {selectedPackage?.name}</DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto py-4">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium mb-2">Included Services</h3>
-              <div className="space-y-2">
-                {selectedPackage.package_services.map((ps: any) => (
-                  <div
-                    key={ps.service.id}
-                    className="flex justify-between p-2 border rounded-md"
-                  >
-                    <div>
-                      <p className="font-medium">{ps.service.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Duration: {ps.service.duration} min
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">
-                        {formatPrice(ps.package_selling_price || ps.service.selling_price)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+
+        <ScrollArea className="flex-1">
+          <div className="p-6">
+            <ServicesList
+              selectedPackage={selectedPackage}
+              selectedServices={selectedServices}
+              allServices={localServices}
+              onServiceToggle={onServiceToggle}
+            />
+          </div>
+        </ScrollArea>
+
+        <div className="border-t bg-background p-4 mt-auto">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                {selectedServices.length} services selected • {calculatedTotalDuration} min
+              </div>
+              <div className="text-2xl font-bold">
+                ₹{calculatedTotalPrice}
               </div>
             </div>
-
-            <div>
-              <h3 className="text-lg font-medium mb-2">Add More Services</h3>
-              <ServicesList
-                services={allServices}
-                selectedServices={selectedServices}
-                onServiceToggle={onServiceToggle}
-                packageServices={selectedPackage.package_services}
-              />
-            </div>
+            <Button 
+              className="w-full" 
+              size="lg"
+              onClick={handleBookNow}
+            >
+              Book Now
+            </Button>
           </div>
         </div>
-
-        <div className="bg-muted/20 p-4 rounded-md mt-4">
-          <div className="flex justify-between mb-2">
-            <span>Original Price</span>
-            <span>{formatPrice(selectedPackage.price)}</span>
-          </div>
-          {hasCustomServices && (
-            <div className="flex justify-between mb-2 text-green-600">
-              <span>Added Services</span>
-              <span>+{formatPrice(totalPrice - selectedPackage.price)}</span>
-            </div>
-          )}
-          <div className="flex justify-between text-lg font-bold">
-            <span>Total</span>
-            <span>{formatPrice(totalPrice)}</span>
-          </div>
-          <div className="text-sm text-muted-foreground text-right">
-            Total Duration: {totalDuration} min
-          </div>
-        </div>
-
-        <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={onConfirm}>
-            Add to Cart
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
