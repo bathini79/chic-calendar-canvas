@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, Calendar, ChevronDown, Download, Filter, Star } from 'lucide-react';
+import { ArrowLeft, Calendar, ChevronDown, Download, Filter, Star, Loader } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -29,7 +29,7 @@ export function FinancialSummary({ onBack }: FinancialSummaryProps) {
   const [period, setPeriod] = useState('month');
   const [monthRange, setMonthRange] = useState('6');
   
-  // Generate last 6 months (or selected range)
+  // Generate last X months (based on selected range)
   const generateMonths = () => {
     const months = [];
     const today = new Date();
@@ -48,30 +48,42 @@ export function FinancialSummary({ onBack }: FinancialSummaryProps) {
   
   const months = generateMonths();
   
-  // Fetch financial data
-  const { data: financialData, isLoading } = useQuery({
+  // Optimized data fetching with error handling
+  const { data: financialData, isLoading, error } = useQuery({
     queryKey: ['financial-summary', monthRange],
     queryFn: async () => {
-      // Get start date (X months ago)
-      const startDate = format(subMonths(new Date(), parseInt(monthRange)), 'yyyy-MM-dd');
-      
-      // Fetch appointments for financial calculations
-      const { data, error } = await supabase
-        .from('appointments')
-        .select('*, bookings(*)')
-        .gte('created_at', startDate)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      // Process data
-      const processedData = processFinancialData(data || [], months);
-      return processedData;
-    }
+      try {
+        // Get start date (X months ago)
+        const startDate = format(subMonths(new Date(), parseInt(monthRange)), 'yyyy-MM-dd');
+        
+        console.log('Fetching financial data from:', startDate);
+        
+        // Fetch appointments for financial calculations
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('*, bookings(*)')
+          .gte('created_at', startDate)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        console.log(`Retrieved ${data?.length || 0} appointments`);
+        
+        // Process data
+        const processedData = processFinancialData(data || [], months);
+        return processedData;
+      } catch (err) {
+        console.error('Error fetching financial data:', err);
+        throw err;
+      }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
   
   // Process financial data by month
   const processFinancialData = (appointments: any[], months: any[]) => {
+    console.log('Processing financial data...');
+    
     // Initialize result structure
     const result = {
       totals: {
@@ -115,7 +127,8 @@ export function FinancialSummary({ onBack }: FinancialSummaryProps) {
     
     // Process appointments
     appointments.forEach(appointment => {
-      const monthKey = format(new Date(appointment.created_at), 'MMM yyyy');
+      const appointmentDate = new Date(appointment.created_at);
+      const monthKey = format(appointmentDate, 'MMM yyyy');
       
       // Skip if month not in our range
       if (!result.monthly[monthKey]) return;
@@ -155,12 +168,52 @@ export function FinancialSummary({ onBack }: FinancialSummaryProps) {
       result.totals.tips += tips;
     });
     
+    console.log('Financial data processing complete');
     return result;
   };
   
   const formatCurrency = (amount: number) => {
     return `₹${amount.toFixed(2)}`;
   };
+
+  // Handle error display
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            {onBack && (
+              <Button variant="ghost" onClick={onBack} className="h-8 w-8 p-0">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="sr-only">Back</span>
+              </Button>
+            )}
+            <div>
+              <h2 className="text-2xl font-bold">Finance summary</h2>
+              <p className="text-sm text-muted-foreground">
+                High-level summary of sales, payments and liabilities
+              </p>
+            </div>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+              <div className="text-red-500 mb-4">
+                Error loading financial data
+              </div>
+              <p className="text-muted-foreground mb-4">
+                {(error as Error).message || 'An unexpected error occurred'}
+              </p>
+              <Button onClick={() => window.location.reload()}>
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6">
@@ -235,128 +288,125 @@ export function FinancialSummary({ onBack }: FinancialSummaryProps) {
           </div>
           
           <div className="overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[200px]">Sales</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  {months.map(month => (
-                    <TableHead key={month.month} className="text-right">{month.month}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center p-8">
+                <Loader className="h-8 w-8 animate-spin text-primary mb-4" />
+                <p className="text-muted-foreground">Loading financial data...</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={months.length + 2} className="text-center py-8">
-                      Loading financial data...
-                    </TableCell>
+                    <TableHead className="w-[200px]">Sales</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    {months.map(month => (
+                      <TableHead key={month.month} className="text-right">{month.month}</TableHead>
+                    ))}
                   </TableRow>
-                ) : (
-                  <>
-                    <TableRow>
-                      <TableCell>Gross sales</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(financialData?.totals.grossSales || 0)}
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Gross sales</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(financialData?.totals.grossSales || 0)}
+                    </TableCell>
+                    {months.map(month => (
+                      <TableCell key={month.month} className="text-right">
+                        {formatCurrency(financialData?.monthly[month.month]?.grossSales || 0)}
                       </TableCell>
-                      {months.map(month => (
-                        <TableCell key={month.month} className="text-right">
-                          {formatCurrency(financialData?.monthly[month.month]?.grossSales || 0)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-indigo-600 pl-8">Discounts</TableCell>
-                      <TableCell className="text-right text-indigo-600">
-                        {formatCurrency(-(financialData?.totals.discounts || 0))}
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-indigo-600 pl-8">Discounts</TableCell>
+                    <TableCell className="text-right text-indigo-600">
+                      {formatCurrency(-(financialData?.totals.discounts || 0))}
+                    </TableCell>
+                    {months.map(month => (
+                      <TableCell key={month.month} className="text-right text-indigo-600">
+                        {formatCurrency(-(financialData?.monthly[month.month]?.discounts || 0))}
                       </TableCell>
-                      {months.map(month => (
-                        <TableCell key={month.month} className="text-right text-indigo-600">
-                          {formatCurrency(-(financialData?.monthly[month.month]?.discounts || 0))}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-indigo-600 pl-8">Refunds / Returns</TableCell>
-                      <TableCell className="text-right text-indigo-600">
-                        {formatCurrency(-(financialData?.totals.refunds || 0))}
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-indigo-600 pl-8">Refunds / Returns</TableCell>
+                    <TableCell className="text-right text-indigo-600">
+                      {formatCurrency(-(financialData?.totals.refunds || 0))}
+                    </TableCell>
+                    {months.map(month => (
+                      <TableCell key={month.month} className="text-right text-indigo-600">
+                        {formatCurrency(-(financialData?.monthly[month.month]?.refunds || 0))}
                       </TableCell>
-                      {months.map(month => (
-                        <TableCell key={month.month} className="text-right text-indigo-600">
-                          {formatCurrency(-(financialData?.monthly[month.month]?.refunds || 0))}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Net sales</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(financialData?.totals.netSales || 0)}
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Net sales</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(financialData?.totals.netSales || 0)}
+                    </TableCell>
+                    {months.map(month => (
+                      <TableCell key={month.month} className="text-right font-medium">
+                        {formatCurrency(financialData?.monthly[month.month]?.netSales || 0)}
                       </TableCell>
-                      {months.map(month => (
-                        <TableCell key={month.month} className="text-right font-medium">
-                          {formatCurrency(financialData?.monthly[month.month]?.netSales || 0)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-indigo-600 pl-8">Taxes</TableCell>
-                      <TableCell className="text-right text-indigo-600">
-                        {formatCurrency(financialData?.totals.taxes || 0)}
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-indigo-600 pl-8">Taxes</TableCell>
+                    <TableCell className="text-right text-indigo-600">
+                      {formatCurrency(financialData?.totals.taxes || 0)}
+                    </TableCell>
+                    {months.map(month => (
+                      <TableCell key={month.month} className="text-right text-indigo-600">
+                        {formatCurrency(financialData?.monthly[month.month]?.taxes || 0)}
                       </TableCell>
-                      {months.map(month => (
-                        <TableCell key={month.month} className="text-right text-indigo-600">
-                          {formatCurrency(financialData?.monthly[month.month]?.taxes || 0)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Total sales</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(financialData?.totals.totalSales || 0)}
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Total sales</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(financialData?.totals.totalSales || 0)}
+                    </TableCell>
+                    {months.map(month => (
+                      <TableCell key={month.month} className="text-right font-medium">
+                        {formatCurrency(financialData?.monthly[month.month]?.totalSales || 0)}
                       </TableCell>
-                      {months.map(month => (
-                        <TableCell key={month.month} className="text-right font-medium">
-                          {formatCurrency(financialData?.monthly[month.month]?.totalSales || 0)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-indigo-600 pl-8">Gift card sales</TableCell>
-                      <TableCell className="text-right text-indigo-600">
-                        {formatCurrency(financialData?.totals.giftCardSales || 0)}
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-indigo-600 pl-8">Gift card sales</TableCell>
+                    <TableCell className="text-right text-indigo-600">
+                      {formatCurrency(financialData?.totals.giftCardSales || 0)}
+                    </TableCell>
+                    {months.map(month => (
+                      <TableCell key={month.month} className="text-right text-indigo-600">
+                        {formatCurrency(financialData?.monthly[month.month]?.giftCardSales || 0)}
                       </TableCell>
-                      {months.map(month => (
-                        <TableCell key={month.month} className="text-right text-indigo-600">
-                          {formatCurrency(financialData?.monthly[month.month]?.giftCardSales || 0)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-indigo-600 pl-8">Service charges</TableCell>
-                      <TableCell className="text-right text-indigo-600">
-                        {formatCurrency(financialData?.totals.serviceCharges || 0)}
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-indigo-600 pl-8">Service charges</TableCell>
+                    <TableCell className="text-right text-indigo-600">
+                      {formatCurrency(financialData?.totals.serviceCharges || 0)}
+                    </TableCell>
+                    {months.map(month => (
+                      <TableCell key={month.month} className="text-right text-indigo-600">
+                        {formatCurrency(financialData?.monthly[month.month]?.serviceCharges || 0)}
                       </TableCell>
-                      {months.map(month => (
-                        <TableCell key={month.month} className="text-right text-indigo-600">
-                          {formatCurrency(financialData?.monthly[month.month]?.serviceCharges || 0)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-indigo-600 pl-8">Tips</TableCell>
-                      <TableCell className="text-right text-indigo-600">
-                        {formatCurrency(financialData?.totals.tips || 0)}
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-indigo-600 pl-8">Tips</TableCell>
+                    <TableCell className="text-right text-indigo-600">
+                      {formatCurrency(financialData?.totals.tips || 0)}
+                    </TableCell>
+                    {months.map(month => (
+                      <TableCell key={month.month} className="text-right text-indigo-600">
+                        {formatCurrency(financialData?.monthly[month.month]?.tips || 0)}
                       </TableCell>
-                      {months.map(month => (
-                        <TableCell key={month.month} className="text-right text-indigo-600">
-                          {formatCurrency(financialData?.monthly[month.month]?.tips || 0)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </>
-                )}
-              </TableBody>
-            </Table>
+                    ))}
+                  </TableRow>
+                </TableBody>
+              </Table>
+            )}
           </div>
           
           <div className="mt-6 flex justify-end">
