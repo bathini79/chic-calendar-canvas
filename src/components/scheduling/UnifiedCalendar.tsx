@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, addDays, startOfToday, isSameDay, addMinutes, parseISO } from "date-fns";
@@ -123,24 +124,25 @@ export function UnifiedCalendar({
         id => id && id !== 'any'
       );
 
-      const useLocationHours = !hasSpecificStylists || true;
-
-      if (useLocationHours && locationHours) {
-        const [startHour] = locationHours.start_time.split(':').map(Number);
-        const [endHour] = locationHours.end_time.split(':').map(Number);
+      if (locationHours && !locationHours.is_closed) {
+        const [startHour, startMinute] = locationHours.start_time.split(':').map(Number);
+        const [endHour, endMinute] = locationHours.end_time.split(':').map(Number);
         
-        for (let hour = startHour; hour < endHour; hour++) {
-          for (let minute = 0; minute < 60; minute += 30) {
-            const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-            const slotStart = new Date(selectedDate);
-            slotStart.setHours(hour, minute, 0, 0);
-            
-            const slotEnd = addMinutes(slotStart, totalDuration);
-            
-            const closingTime = new Date(selectedDate);
-            closingTime.setHours(endHour, 0, 0, 0);
-            if (slotEnd > closingTime) continue;
+        let currentHour = startHour;
+        let currentMinute = startMinute;
 
+        while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+          const timeString = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+          const slotStart = new Date(selectedDate);
+          slotStart.setHours(currentHour, currentMinute, 0, 0);
+          
+          const slotEnd = addMinutes(slotStart, totalDuration);
+          
+          const closingTime = new Date(selectedDate);
+          closingTime.setHours(endHour, endMinute, 0, 0);
+          
+          // Only add the slot if it ends before closing time
+          if (slotEnd <= closingTime) {
             const hasConflict = existingBookings?.some(booking => {
               const bookingStart = new Date(booking.start_time);
               const bookingEnd = new Date(booking.end_time);
@@ -159,6 +161,13 @@ export function UnifiedCalendar({
               isAvailable: !hasConflict,
               isSelected,
             });
+          }
+          
+          // Increment by 30 minutes
+          currentMinute += 30;
+          if (currentMinute >= 60) {
+            currentHour += 1;
+            currentMinute = 0;
           }
         }
       }
@@ -283,7 +292,9 @@ export function UnifiedCalendar({
               </div>
               <h3 className="text-lg font-semibold mb-2">No available slots</h3>
               <p className="text-muted-foreground mb-4">
-                Please select a different date
+                {locationData?.location_hours?.some((h: any) => h.day_of_week === selectedDate.getDay() && !h.is_closed)
+                  ? "Please select a different date or time"
+                  : "Location is closed on this day"}
               </p>
             </div>
           )

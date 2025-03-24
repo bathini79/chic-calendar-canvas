@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -11,20 +10,60 @@ import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { ServiceCard } from "@/components/customer/services/ServiceCard";
 import { PackageCard } from "@/components/customer/services/PackageCard";
 import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
+import { useSearchParams } from "react-router-dom";
+import { LocationSelector } from "@/components/admin/dashboard/LocationSelector";
 
 export default function Services() {
+  const [searchParams] = useSearchParams();
+  const locationParam = searchParams.get('location');
+  
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const { addToCart, removeFromCart, items } = useCart();
+  const { addToCart, removeFromCart, items, setSelectedLocation } = useCart();
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [totalPrice, setTotalPrice] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
+  const [locationId, setLocationId] = useState<string>("all");
   
-  const { data: services, isLoading: servicesLoading } = useQuery({
-    queryKey: ["services"],
+  const { data: locations } = useQuery({
+    queryKey: ["locations"],
     queryFn: async () => {
       const { data, error } = await supabase
+        .from("locations")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+      
+      if (error) {
+        toast.error("Error loading locations");
+        throw error;
+      }
+      return data || [];
+    },
+  });
+
+  useEffect(() => {
+    if (locations && locations.length > 0) {
+      if (locationParam && locations.some(loc => loc.id === locationParam)) {
+        setLocationId(locationParam);
+        setSelectedLocation(locationParam);
+      } else {
+        setLocationId(locations[0].id);
+        setSelectedLocation(locations[0].id);
+      }
+    }
+  }, [locations, locationParam, setSelectedLocation]);
+
+  const handleLocationChange = (value: string) => {
+    setLocationId(value);
+    setSelectedLocation(value);
+  };
+  
+  const { data: services, isLoading: servicesLoading } = useQuery({
+    queryKey: ["services", locationId],
+    queryFn: async () => {
+      let query = supabase
         .from("services")
         .select(`
           *,
@@ -33,9 +72,16 @@ export default function Services() {
               id,
               name
             )
-          )
+          ),
+          service_locations!inner (location_id)
         `)
         .eq("status", "active");
+      
+      if (locationId !== "all") {
+        query = query.eq("service_locations.location_id", locationId);
+      }
+      
+      const { data, error } = await query;
       
       if (error) {
         toast.error("Error loading services");
@@ -43,12 +89,13 @@ export default function Services() {
       }
       return data;
     },
+    enabled: !!locationId
   });
 
   const { data: packages, isLoading: packagesLoading } = useQuery({
-    queryKey: ["packages"],
+    queryKey: ["packages", locationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("packages")
         .select(`
           *,
@@ -60,15 +107,24 @@ export default function Services() {
               duration
             ),
             package_selling_price
-          )
+          ),
+          package_locations!inner (location_id)
         `)
         .eq("status", "active");
+      
+      if (locationId !== "all") {
+        query = query.eq("package_locations.location_id", locationId);
+      }
+      
+      const { data, error } = await query;
+      
       if (error) {
         toast.error("Error loading packages");
         throw error;
       }
       return data;
     },
+    enabled: !!locationId
   });
 
   const { data: categories } = useQuery({
@@ -141,11 +197,9 @@ export default function Services() {
     setSelectedServices(includedServiceIds);
     setCustomizeDialogOpen(true);
     
-    // Calculate initial totals
     let price = pkg.price;
     let duration = 0;
     
-    // Calculate duration and price using package_selling_price when available
     pkg.package_services.forEach((ps: any) => {
       duration += ps.service.duration;
     });
@@ -165,16 +219,13 @@ export default function Services() {
     }
     setSelectedServices(newSelectedServices);
 
-    // Recalculate totals
     let price = selectedPackage.price;
     let duration = 0;
     
-    // First, add all base package services duration
     selectedPackage.package_services.forEach((ps: any) => {
       duration += ps.service.duration;
     });
     
-    // Then add any additional custom services
     newSelectedServices.forEach(id => {
       const service = services?.find(s => s.id === id);
       const isInBasePackage = selectedPackage.package_services.some((ps: any) => ps.service.id === id);
@@ -208,13 +259,20 @@ export default function Services() {
   return (
     <div className="container mx-auto py-8">
       <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-8">
-        <div >
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div>
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mb-6">
             <div className="w-full sm:w-[400px]">
               <CategoryFilter
                 categories={categories || []}
                 selectedCategory={selectedCategory}
                 onCategorySelect={setSelectedCategory}
+              />
+            </div>
+            <div className="w-full sm:w-auto">
+              <LocationSelector
+                locations={locations || []}
+                value={locationId}
+                onChange={handleLocationChange}
               />
             </div>
           </div>

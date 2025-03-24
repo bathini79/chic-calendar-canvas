@@ -1,46 +1,82 @@
-import { describe, it, expect } from 'vitest';
-import { calculatePackagePrice } from '../utils/packageUtils';
 
-describe('Package Utilities', () => {
-  const mockServices = [
-    { id: '1', selling_price: 100 },
-    { id: '2', selling_price: 200 },
-  ];
+import { describe, expect, it } from "vitest";
+import { getPackageServices } from "../utils/packageUtils";
 
-  describe('calculatePackagePrice', () => {
-    it('should calculate total price without discount', () => {
-      const selectedServices = ['1', '2'];
-      const result = calculatePackagePrice();
-      // Modify assertions based on the actual implementation
-      expect(result).toBeDefined();
+describe("packageUtils", () => {
+  describe("getPackageServices", () => {
+    it("should return empty arrays when the package is not found", () => {
+      const result = getPackageServices("non-existent", [], []);
+      expect(result).toEqual([]);
     });
 
-    it('should apply percentage discount correctly', () => {
-      const selectedServices = ['1', '2'];
-      const result = calculatePackagePrice();
-      // Modify assertions based on the actual implementation
-      expect(result).toBeDefined();
+    it("should return base services for a package", () => {
+      const packages = [
+        {
+          id: "pkg1",
+          name: "Package 1",
+          package_services: [
+            { service: { id: "svc1", name: "Service 1" } },
+            { service: { id: "svc2", name: "Service 2" } }
+          ],
+          is_customizable: false
+        }
+      ];
+      
+      const result = getPackageServices("pkg1", packages, []);
+      expect(result.baseServices).toHaveLength(2);
+      expect(result.customServices).toHaveLength(0);
     });
 
-    it('should apply fixed discount correctly', () => {
-      const selectedServices = ['1', '2'];
-      const result = calculatePackagePrice();
-      // Modify assertions based on the actual implementation
-      expect(result).toBeDefined();
+    it("should include customized services when package is customizable", () => {
+      const packages = [
+        {
+          id: "pkg1",
+          name: "Package 1",
+          package_services: [
+            { service: { id: "svc1", name: "Service 1" } }
+          ],
+          is_customizable: true
+        }
+      ];
+      
+      const result = getPackageServices("pkg1", packages, ["svc2", "svc3"]);
+      expect(result.baseServices).toHaveLength(1);
+      expect(result.customServices).toHaveLength(2);
     });
 
-    it('should not allow negative prices', () => {
-      const selectedServices = ['1'];
-      const result = calculatePackagePrice();
-      // Modify assertions based on the actual implementation
-      expect(result).toBeDefined();
+    it("should not include base services in custom services list", () => {
+      const packages = [
+        {
+          id: "pkg1",
+          name: "Package 1",
+          package_services: [
+            { service: { id: "svc1", name: "Service 1" } }
+          ],
+          is_customizable: true
+        }
+      ];
+      
+      const result = getPackageServices("pkg1", packages, ["svc1", "svc2"]);
+      expect(result.baseServices).toHaveLength(1);
+      expect(result.customServices).toHaveLength(1);
+      expect(result.customServices[0]).toBe("svc2");
     });
 
-    it('should handle empty service selection', () => {
-      const selectedServices: string[] = [];
-      const result = calculatePackagePrice();
-      // Modify assertions based on the actual implementation
-      expect(result).toBeDefined();
+    it("should not include custom services when package is not customizable", () => {
+      const packages = [
+        {
+          id: "pkg1",
+          name: "Package 1",
+          package_services: [
+            { service: { id: "svc1", name: "Service 1" } }
+          ],
+          is_customizable: false
+        }
+      ];
+      
+      const result = getPackageServices("pkg1", packages, ["svc2", "svc3"]);
+      expect(result.baseServices).toHaveLength(1);
+      expect(result.customServices).toHaveLength(0);
     });
   });
 });
