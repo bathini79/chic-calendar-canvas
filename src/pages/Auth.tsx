@@ -122,6 +122,11 @@ const Auth = () => {
       return;
     }
 
+    if (needsFullName && !fullName.trim()) {
+      toast.error("Full name is required for new registrations");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await supabase.functions.invoke('verify-whatsapp-otp', {
@@ -132,14 +137,13 @@ const Auth = () => {
         },
       });
 
-      if (response.error === "new_user_requires_name") {
-        // This is a new user, we need to collect their name
-        setNeedsFullName(true);
-        setIsLoading(false);
-        return;
-      }
-
       if (response.error) {
+        if (response.data && response.data.error === "new_user_requires_name") {
+          // This is a new user, we need to collect their name
+          setNeedsFullName(true);
+          setIsLoading(false);
+          return;
+        }
         throw new Error(response.error.message || "Failed to verify OTP");
       }
 
@@ -194,7 +198,7 @@ const Auth = () => {
         <>
           <div className="space-y-2">
             <label htmlFor="fullName" className="text-sm font-medium">
-              Full Name
+              Full Name <span className="text-red-500">*</span>
             </label>
             <Input
               id="fullName"
@@ -224,7 +228,7 @@ const Auth = () => {
               type="button"
               className="w-1/2"
               onClick={verifyWhatsAppOTP}
-              disabled={isLoading || !fullName}
+              disabled={isLoading || !fullName.trim()}
             >
               {isLoading ? "Completing..." : "Complete Registration"}
             </Button>

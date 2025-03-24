@@ -46,7 +46,7 @@ async function sendWhatsAppOTP(phoneNumber: string, otp: string) {
     
     if (!response.ok) {
       console.error('Error from Twilio:', responseData)
-      throw new Error(`Twilio API error: ${responseData.message || 'Unknown error'}`)
+      throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || 'Unknown error'}`)
     }
     
     console.log('Twilio message sent successfully:', responseData.sid)
@@ -96,31 +96,36 @@ serve(async (req) => {
       : null
       
     if (supabaseClient) {
-      // First, delete any existing OTP for this phone number
-      await supabaseClient
-        .from('phone_auth_codes')
-        .delete()
-        .eq('phone_number', phoneNumber);
-      
-      // Then store the new OTP with expiration (10 minutes)
-      const expiresAt = new Date()
-      expiresAt.setMinutes(expiresAt.getMinutes() + 10)
-      
-      const { error } = await supabaseClient
-        .from('phone_auth_codes')
-        .insert({
-          phone_number: phoneNumber,
-          code: otp,
-          expires_at: expiresAt.toISOString(),
-          created_at: new Date().toISOString()
-        })
+      try {
+        // First, delete any existing OTP for this phone number
+        await supabaseClient
+          .from('phone_auth_codes')
+          .delete()
+          .eq('phone_number', phoneNumber);
         
-      if (error) {
-        console.error('Error storing OTP in database:', error)
-        throw error
+        // Then store the new OTP with expiration (10 minutes)
+        const expiresAt = new Date()
+        expiresAt.setMinutes(expiresAt.getMinutes() + 10)
+        
+        const { error } = await supabaseClient
+          .from('phone_auth_codes')
+          .insert({
+            phone_number: phoneNumber,
+            code: otp,
+            expires_at: expiresAt.toISOString(),
+            created_at: new Date().toISOString()
+          })
+          
+        if (error) {
+          console.error('Error storing OTP in database:', error)
+          throw error
+        }
+        
+        console.log(`OTP stored in database for phone: ${phoneNumber}`)
+      } catch (error) {
+        console.error('Database operation failed:', error)
+        throw new Error(`Failed to store OTP: ${error.message}`)
       }
-      
-      console.log(`OTP stored in database for phone: ${phoneNumber}`)
     }
     
     // Send OTP via WhatsApp
