@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { InventoryTable } from "./list/InventoryTable";
@@ -7,8 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ItemDialog } from "../ItemDialog";
 import { Category, Supplier } from "./types";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 
 export function ItemsList() {
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -237,13 +234,6 @@ export function ItemsList() {
         onEditItem={handleEditItem}
         onDeleteItem={handleDeleteItem}
       />
-
-      <div className="flex justify-end mt-6">
-        <Button onClick={handleAddItem}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
-      </div>
 
       {(editingItem || showItemDialog) && (
         <ItemDialog item={editingItem} onClose={handleCloseDialog} open={true} />

@@ -10,15 +10,21 @@ import { ItemsList } from "@/components/admin/inventory/components/ItemsList";
 import { PurchaseOrdersList } from "@/components/admin/inventory/components/PurchaseOrdersList";
 import { HeaderActions } from "@/components/admin/inventory/components/HeaderActions";
 import { AutoConsumption } from "@/components/admin/inventory/components/AutoConsumption";
+import { ItemDialog } from "@/components/admin/inventory/ItemDialog";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [showItemDialog, setShowItemDialog] = useState(false);
+
+  const handleAddItem = () => {
+    setShowItemDialog(true);
+  };
 
   return (
     <div className="container mx-auto p-6">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-6">
-          <HeaderActions onAdd={() => {}} />
+          <HeaderActions onAdd={handleAddItem} />
           <InventoryStats />
         </div>
 
@@ -64,6 +70,10 @@ export default function Inventory() {
           </Tabs>
         </div>
       </div>
+      
+      {showItemDialog && (
+        <ItemDialog open={true} onClose={() => setShowItemDialog(false)} />
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { ItemForm } from "./components/ItemForm";
 import { useItemForm } from "./hooks/use-item-form";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ItemDialogProps {
   item?: any;
@@ -19,14 +20,18 @@ export function ItemDialog({ item, onClose, open = false }: ItemDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose?.()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{item ? 'Edit Item' : 'Add New Item'}</DialogTitle>
         </DialogHeader>
-        <ItemForm 
-          defaultValues={defaultValues}
-          onSubmit={handleSubmit}
-        />
+        <ScrollArea className="flex-1 overflow-auto">
+          <div className="p-1">
+            <ItemForm 
+              defaultValues={defaultValues}
+              onSubmit={handleSubmit}
+            />
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
