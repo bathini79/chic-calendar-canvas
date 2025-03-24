@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumber, code } = await req.json()
+    const { phoneNumber, code, fullName } = await req.json()
     
     if (!phoneNumber || !code) {
       throw new Error('Phone number and verification code are required')
@@ -62,19 +62,39 @@ serve(async (req) => {
       .select('id')
       .eq('phone_number', phoneNumber)
       .single()
-      
+    
     let userId = null
+    let newUser = false
     
     if (userError || !existingUser) {
-      // Create a new user if not exists
+      // Creating a new user requires a full name
+      if (!fullName) {
+        // If no full name provided for a new user, return a specific error
+        return new Response(
+          JSON.stringify({ 
+            error: "new_user_requires_name",
+            message: "New user registration requires a full name"
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          }
+        )
+      }
+
+      // Create a new user
       const { data: user, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
         phone: phoneNumber,
         phone_confirm: true,
-        user_metadata: { phone_verified: true }
+        user_metadata: { 
+          phone_verified: true,
+          full_name: fullName
+        }
       })
       
       if (signUpError) throw signUpError
       userId = user.user.id
+      newUser = true
       
       // Create profile for new user
       const { error: profileError } = await supabaseAdmin
@@ -82,7 +102,9 @@ serve(async (req) => {
         .insert({
           id: userId,
           phone_number: phoneNumber,
-          phone_verified: true
+          phone_verified: true,
+          full_name: fullName,
+          role: 'customer'
         })
         
       if (profileError) throw profileError
@@ -91,10 +113,9 @@ serve(async (req) => {
     }
     
     // Sign in the user and get session
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.signInWithPhone({
       phone: phoneNumber,
-      phone_confirm: true,
-      user_metadata: { phone_verified: true }
+      createUser: false
     })
     
     if (sessionError) throw sessionError
@@ -107,7 +128,8 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        message: 'Phone verified successfully',
+        message: newUser ? 'Registration successful' : 'Login successful',
+        isNewUser: newUser,
         user: { id: userId, phone_number: phoneNumber }
       }),
       { 

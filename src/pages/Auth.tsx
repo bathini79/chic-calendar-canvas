@@ -28,6 +28,8 @@ const Auth = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [needsFullName, setNeedsFullName] = useState(false);
   const [activeTab, setActiveTab] = useState<"email" | "phone">("email");
 
   // Check if user is already logged in
@@ -104,6 +106,7 @@ const Auth = () => {
       }
 
       setOtpSent(true);
+      setNeedsFullName(false); // Reset in case it was previously set
       toast.success("OTP sent to your WhatsApp. Please check your messages.");
     } catch (error: any) {
       toast.error(error.message || "Failed to send OTP");
@@ -122,14 +125,27 @@ const Auth = () => {
     setIsLoading(true);
     try {
       const response = await supabase.functions.invoke('verify-whatsapp-otp', {
-        body: { phoneNumber, code: otp },
+        body: { 
+          phoneNumber, 
+          code: otp,
+          fullName: needsFullName ? fullName : undefined
+        },
       });
+
+      if (response.error === "new_user_requires_name") {
+        // This is a new user, we need to collect their name
+        setNeedsFullName(true);
+        setIsLoading(false);
+        return;
+      }
 
       if (response.error) {
         throw new Error(response.error.message || "Failed to verify OTP");
       }
 
-      toast.success("Phone verified successfully! Logging in...");
+      toast.success(response.data.isNewUser ? 
+        "Registration successful! Logging in..." : 
+        "Login successful!");
       
       // Force refresh the session
       await queryClient.invalidateQueries({ queryKey: ["session"] });
@@ -140,6 +156,133 @@ const Auth = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const renderPhoneContent = () => {
+    if (!otpSent) {
+      return (
+        <>
+          <div className="space-y-2">
+            <label htmlFor="phone" className="text-sm font-medium">
+              Phone Number
+            </label>
+            <PhoneInput
+              id="phone"
+              placeholder="+1 (555) 000-0000"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter your phone number with country code (e.g., +1 for US)
+            </p>
+          </div>
+          <Button
+            type="button"
+            className="w-full"
+            onClick={sendWhatsAppOTP}
+            disabled={isLoading}
+          >
+            {isLoading ? "Sending..." : "Send OTP via WhatsApp"}
+          </Button>
+        </>
+      );
+    }
+
+    if (needsFullName) {
+      return (
+        <>
+          <div className="space-y-2">
+            <label htmlFor="fullName" className="text-sm font-medium">
+              Full Name
+            </label>
+            <Input
+              id="fullName"
+              placeholder="John Doe"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Please enter your full name to complete registration
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-1/2"
+              onClick={() => {
+                setNeedsFullName(false);
+                setOtpSent(false);
+              }}
+              disabled={isLoading}
+            >
+              Back
+            </Button>
+            <Button
+              type="button"
+              className="w-1/2"
+              onClick={verifyWhatsAppOTP}
+              disabled={isLoading || !fullName}
+            >
+              {isLoading ? "Completing..." : "Complete Registration"}
+            </Button>
+          </div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div className="space-y-2">
+          <label htmlFor="otp" className="text-sm font-medium">
+            Enter OTP
+          </label>
+          <div className="flex justify-center">
+            <InputOTP
+              maxLength={6}
+              value={otp}
+              onChange={setOtp}
+              render={({ slots }) => (
+                <InputOTPGroup>
+                  {slots.map((slot, index) => (
+                    <InputOTPSlot
+                      key={index}
+                      {...slot}
+                      index={index}
+                      className="w-10 h-12 text-center"
+                    />
+                  ))}
+                </InputOTPGroup>
+              )}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Check your WhatsApp for the 6-digit verification code
+          </p>
+        </div>
+        <div className="flex space-x-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-1/2"
+            onClick={() => setOtpSent(false)}
+            disabled={isLoading}
+          >
+            Back
+          </Button>
+          <Button
+            type="button"
+            className="w-1/2"
+            onClick={verifyWhatsAppOTP}
+            disabled={isLoading || otp.length !== 6}
+          >
+            {isLoading ? "Verifying..." : "Verify OTP"}
+          </Button>
+        </div>
+      </>
+    );
   };
 
   return (
@@ -209,83 +352,7 @@ const Auth = () => {
           <TabsContent value="phone">
             <CardContent>
               <div className="space-y-4">
-                {!otpSent ? (
-                  <>
-                    <div className="space-y-2">
-                      <label htmlFor="phone" className="text-sm font-medium">
-                        Phone Number
-                      </label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        placeholder="+1 (555) 000-0000"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        required
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Enter your phone number with country code (e.g., +1 for US)
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      className="w-full"
-                      onClick={sendWhatsAppOTP}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Sending..." : "Send OTP via WhatsApp"}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      <label htmlFor="otp" className="text-sm font-medium">
-                        Enter OTP
-                      </label>
-                      <div className="flex justify-center">
-                        <InputOTP
-                          maxLength={6}
-                          value={otp}
-                          onChange={setOtp}
-                          render={({ slots }) => (
-                            <InputOTPGroup>
-                              {slots.map((slot, index) => (
-                                <InputOTPSlot
-                                  key={index}
-                                  {...slot}
-                                  index={index}
-                                  className="w-10 h-12 text-center"
-                                />
-                              ))}
-                            </InputOTPGroup>
-                          )}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground text-center">
-                        Check your WhatsApp for the 6-digit verification code
-                      </p>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-1/2"
-                        onClick={() => setOtpSent(false)}
-                        disabled={isLoading}
-                      >
-                        Back
-                      </Button>
-                      <Button
-                        type="button"
-                        className="w-1/2"
-                        onClick={verifyWhatsAppOTP}
-                        disabled={isLoading || otp.length !== 6}
-                      >
-                        {isLoading ? "Verifying..." : "Verify OTP"}
-                      </Button>
-                    </div>
-                  </>
-                )}
+                {renderPhoneContent()}
               </div>
             </CardContent>
           </TabsContent>
