@@ -10,6 +10,7 @@ export function MobileCartBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSchedulingPage = location.pathname === '/schedule';
+  const isServicesPage = location.pathname === '/services';
 
   const totalPrice = getTotalPrice();
 
