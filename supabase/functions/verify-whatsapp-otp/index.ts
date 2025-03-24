@@ -46,7 +46,16 @@ serve(async (req) => {
       
     if (error || !data) {
       console.error('OTP verification error:', error)
-      throw new Error('Invalid verification code')
+      return new Response(
+        JSON.stringify({ 
+          error: 'invalid_code',
+          message: 'Invalid verification code'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 // Using 200 even for errors to avoid non-2xx handling issues
+        }
+      )
     }
     
     // Check if OTP has expired
@@ -55,7 +64,16 @@ serve(async (req) => {
     
     if (currentTime > expiresAt) {
       console.error('OTP expired')
-      throw new Error('Verification code has expired')
+      return new Response(
+        JSON.stringify({ 
+          error: 'code_expired',
+          message: 'Verification code has expired'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 // Using 200 even for errors to avoid non-2xx handling issues
+        }
+      )
     }
     
     // Check if user exists
@@ -73,7 +91,7 @@ serve(async (req) => {
       // Creating a new user requires a full name
       if (!fullName) {
         console.log('New user registration requires full name')
-        // If no full name provided for a new user, return a specific error
+        // Return specific error for missing name but with 200 status code
         return new Response(
           JSON.stringify({ 
             error: "new_user_requires_name",
@@ -81,7 +99,7 @@ serve(async (req) => {
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
+            status: 200 // Using 200 to avoid non-2xx handling issues
           }
         )
       }
@@ -99,7 +117,16 @@ serve(async (req) => {
       
       if (signUpError) {
         console.error('Error creating user:', signUpError)
-        throw signUpError
+        return new Response(
+          JSON.stringify({ 
+            error: signUpError.message || "user_creation_failed",
+            message: "Failed to create user account"
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 // Using 200 to avoid non-2xx handling issues
+          }
+        )
       }
       
       userId = user.user.id
@@ -118,7 +145,16 @@ serve(async (req) => {
         
       if (profileError) {
         console.error('Error creating profile:', profileError)
-        throw profileError
+        return new Response(
+          JSON.stringify({ 
+            error: profileError.message || "profile_creation_failed",
+            message: "Failed to create user profile"
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 // Using 200 to avoid non-2xx handling issues
+          }
+        )
       }
     } else {
       userId = existingUser.id
@@ -132,7 +168,16 @@ serve(async (req) => {
     
     if (sessionError) {
       console.error('Error signing in:', sessionError)
-      throw sessionError
+      return new Response(
+        JSON.stringify({ 
+          error: sessionError.message || "signin_failed",
+          message: "Failed to sign in user"
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 // Using 200 to avoid non-2xx handling issues
+        }
+      )
     }
     
     // Delete used OTP
@@ -165,7 +210,7 @@ serve(async (req) => {
           ...corsHeaders, 
           'Content-Type': 'application/json' 
         },
-        status: 400 
+        status: 200 // Using 200 to avoid non-2xx handling issues
       }
     )
   }

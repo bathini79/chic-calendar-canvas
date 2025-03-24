@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,7 +36,6 @@ const Auth = () => {
   const [resendCountdown, setResendCountdown] = useState(30);
   const [edgeFunctionError, setEdgeFunctionError] = useState<string | null>(null);
 
-  // Check if user is already logged in
   const { data: session } = useQuery({
     queryKey: ["session"],
     queryFn: async () => {
@@ -47,16 +45,13 @@ const Auth = () => {
   });
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
-        // Invalidate and refetch session data
         await queryClient.invalidateQueries({ queryKey: ["session"] });
         navigate("/");
       }
     });
 
-    // Redirect if already logged in
     if (session) {
       navigate("/");
     }
@@ -64,7 +59,6 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate, session]);
 
-  // Handle OTP resend countdown
   useEffect(() => {
     let timer: number | undefined;
     
@@ -140,7 +134,7 @@ const Auth = () => {
       }
 
       setOtpSent(true);
-      setNeedsFullName(false); // Reset in case it was previously set
+      setNeedsFullName(false);
       toast.success("OTP sent to your WhatsApp. Please check your messages.");
     } catch (error: any) {
       const errorMessage = error.message || "Failed to send OTP";
@@ -179,12 +173,7 @@ const Auth = () => {
         },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || "Failed to verify OTP");
-      }
-      
       if (response.data && response.data.error) {
-        // Handle special case for new users requiring name
         if (response.data.error === "new_user_requires_name") {
           setNeedsFullName(true);
           setVerificationError("Please enter your full name to complete registration");
@@ -193,22 +182,25 @@ const Auth = () => {
           setIsLoading(false);
           return;
         }
-        throw new Error(response.data.error || "Failed to verify OTP");
+        setVerificationError(response.data.message || "Verification failed");
+        setEdgeFunctionError(response.data.error);
+        toast.error(response.data.message || "Verification failed");
+        setIsLoading(false);
+        return;
       }
 
       toast.success(response.data.isNewUser ? 
         "Registration successful! Logging in..." : 
         "Login successful!");
       
-      // Force refresh the session
       await queryClient.invalidateQueries({ queryKey: ["session"] });
       navigate("/");
     } catch (error: any) {
-      const errorMessage = error.message || "Failed to verify OTP";
+      console.error("OTP verification error:", error);
+      const errorMessage = "Connection error. Please try again.";
       toast.error(errorMessage);
       setVerificationError(errorMessage);
-      setEdgeFunctionError(errorMessage);
-      console.error("OTP verification error:", error);
+      setEdgeFunctionError("Network or server error occurred");
     } finally {
       setIsLoading(false);
     }
