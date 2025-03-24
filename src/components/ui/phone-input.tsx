@@ -1,9 +1,9 @@
 
 import * as React from "react"
-import { Input, InputProps } from "@/components/ui/input"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
-const PhoneInput = React.forwardRef<HTMLInputElement, InputProps>(
+const PhoneInput = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, ...props }, ref) => {
     return (
       <Input

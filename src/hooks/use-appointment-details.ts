@@ -1,88 +1,71 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { AppointmentStatus } from "@/pages/admin/bookings/types";
+import { Appointment } from "@/types/appointment";
 
-export function useAppointmentDetails() {
+export function useAppointmentDetails(appointmentId: string | null) {
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  async function fetchAppointmentDetails(appointmentId: string) {
-    if (!appointmentId || appointmentId === "") {
-      console.log("No appointment ID provided or empty ID");
-      return null;
-    }
-    
+  const fetchAppointmentDetails = async (id: string) => {
     try {
-      setIsLoading(true);
-      
-      const { data, error } = await supabase
-        .from("appointments")
+      // Fetch the basic appointment data
+      const { data: appointmentData, error: appointmentError } = await supabase
+        .from('appointments')
         .select(`
           *,
-          customer:profiles(*),
-          bookings(
+          bookings:bookings(
             *,
             service:services(*),
             package:packages(*),
             employee:employees(*)
           )
         `)
-        .eq("id", appointmentId)
+        .eq('id', id)
         .single();
 
-      if (error) {
-        throw error;
+      if (appointmentError) throw appointmentError;
+      if (!appointmentData) throw new Error('Appointment not found');
+
+      // Convert the appointment status to correct format if necessary
+      if (appointmentData.status === 'no-show') {
+        appointmentData.status = 'noshow';
       }
 
-      return data;
-    } catch (error: any) {
-      console.error("Error fetching appointment details:", error);
-      toast.error(error.message || "Failed to fetch appointment details");
-      return null;
-    } finally {
-      setIsLoading(false);
+      // Create a proper Appointment object with all required fields
+      return {
+        ...appointmentData,
+        membership_discount: 0, // Default value
+        membership_id: null,    // Default value
+        membership_name: null,  // Default value
+        location_id: appointmentData.location || null, // Use location as location_id
+      } as Appointment;
+    } catch (error) {
+      console.error('Error fetching appointment details:', error);
+      throw error;
     }
-  }
-
-  async function updateAppointmentStatus(appointmentId: string, status: AppointmentStatus) {
-    if (!appointmentId || appointmentId === "") {
-      console.log("No appointment ID provided or empty ID");
-      return false;
-    }
-    
-    try {
-      setIsLoading(true);
-      
-      // Handle status format conversion for database consistency
-      let dbStatus = status;
-      if (status === 'no-show') {
-        dbStatus = 'noshow' as AppointmentStatus;
-      }
-      
-      const { error } = await supabase
-        .from("appointments")
-        .update({ status: dbStatus })
-        .eq("id", appointmentId);
-
-      if (error) {
-        throw error;
-      }
-
-      toast.success(`Appointment ${status} successfully`);
-      return true;
-    } catch (error: any) {
-      console.error("Error updating appointment status:", error);
-      toast.error(error.message || "Failed to update appointment status");
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  return {
-    isLoading,
-    fetchAppointmentDetails,
-    updateAppointmentStatus
   };
+
+  useEffect(() => {
+    if (!appointmentId) {
+      setAppointment(null);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    fetchAppointmentDetails(appointmentId)
+      .then((data) => {
+        setAppointment(data);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [appointmentId]);
+
+  return { appointment, isLoading, error };
 }
