@@ -18,25 +18,43 @@ function generateOTP() {
 }
 
 async function sendWhatsAppOTP(phoneNumber: string, otp: string) {
+  // Make sure the phone number is in E.164 format
+  const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`
+  
+  console.log(`Attempting to send OTP to: ${formattedPhone} using Twilio WhatsApp`)
+  
   const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
   
   const formData = new URLSearchParams()
   formData.append('From', `whatsapp:${TWILIO_PHONE_NUMBER}`)
-  formData.append('To', `whatsapp:${phoneNumber}`)
+  formData.append('To', `whatsapp:${formattedPhone}`)
   formData.append('Body', `Your verification code is: ${otp}`)
 
   const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)
   
-  const response = await fetch(twilioUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${auth}`
-    },
-    body: formData
-  })
-
-  return response.json()
+  try {
+    const response = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${auth}`
+      },
+      body: formData
+    })
+    
+    const responseData = await response.json()
+    
+    if (!response.ok) {
+      console.error('Error from Twilio:', responseData)
+      throw new Error(`Twilio API error: ${responseData.message || 'Unknown error'}`)
+    }
+    
+    console.log('Twilio message sent successfully:', responseData.sid)
+    return responseData
+  } catch (error) {
+    console.error('Failed to send WhatsApp message:', error)
+    throw error
+  }
 }
 
 serve(async (req) => {
@@ -47,6 +65,11 @@ serve(async (req) => {
 
   try {
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+      console.error('Twilio credentials missing:', {
+        ACCOUNT_SID_EXISTS: !!TWILIO_ACCOUNT_SID,
+        AUTH_TOKEN_EXISTS: !!TWILIO_AUTH_TOKEN,
+        PHONE_NUMBER_EXISTS: !!TWILIO_PHONE_NUMBER
+      })
       throw new Error('Twilio credentials not configured')
     }
     
@@ -56,9 +79,12 @@ serve(async (req) => {
     if (!phoneNumber) {
       throw new Error('Phone number is required')
     }
+
+    console.log(`Processing OTP request for phone: ${phoneNumber}`)
     
     // Generate OTP
     const otp = generateOTP()
+    console.log(`Generated OTP: ${otp} for phone: ${phoneNumber}`)
     
     // Store OTP in database for verification
     const supabaseClient = Deno.env.get('SUPABASE_URL') && Deno.env.get('SUPABASE_ANON_KEY')
@@ -89,7 +115,12 @@ serve(async (req) => {
           created_at: new Date().toISOString()
         })
         
-      if (error) throw error
+      if (error) {
+        console.error('Error storing OTP in database:', error)
+        throw error
+      }
+      
+      console.log(`OTP stored in database for phone: ${phoneNumber}`)
     }
     
     // Send OTP via WhatsApp
