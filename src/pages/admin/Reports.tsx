@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 // import { FinancialDashboard } from "@/components/admin/dashboard/FinancialDashboard";
 import { FinancialSummary } from "@/components/admin/reports/FinancialSummary";
 import { CustomerList } from "@/components/admin/reports/CustomerList";
+import { CustomerRetentionDashboard } from "@/components/admin/reports/CustomerRetentionDashboard";
 
 const reportCategories = [
   {
@@ -149,6 +150,14 @@ export default function Reports() {
       );
     }
     
+    if (expandedReport === "retention-rate") {
+      return (
+        <div className="space-y-4">
+          <CustomerRetentionDashboard onBack={() => setExpandedReport(null)} />
+        </div>
+      );
+    }
+    
     if (expandedReport === "summary") {
       return (
         <div className="space-y-4">
@@ -253,7 +262,7 @@ export default function Reports() {
                     
                     <Card 
                       className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => handleReportClick("client-list")}
+                      onClick={() => handleReportClick("retention-rate")}
                     >
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
@@ -263,8 +272,8 @@ export default function Reports() {
                           </div>
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <CardTitle className="text-xl">Client List</CardTitle>
-                        <CardDescription>Comprehensive list of all active clients</CardDescription>
+                        <CardTitle className="text-xl">Retention Rate</CardTitle>
+                        <CardDescription>Customer return and loyalty metrics</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="h-40 flex items-center justify-center bg-muted/30 rounded-md">
