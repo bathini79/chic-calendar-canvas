@@ -1487,36 +1487,66 @@ export type Database = {
       profiles: {
         Row: {
           admin_created: boolean | null
+          anniversary_date: string | null
+          birth_date: string | null
+          cashback_balance: number | null
           created_at: string
           email: string | null
+          facebook_url: string | null
           full_name: string | null
+          gender: string | null
           id: string
+          instagram_url: string | null
+          lead_source: string | null
           phone_number: string | null
           phone_verified: boolean | null
           role: Database["public"]["Enums"]["user_role"] | null
+          twitter_url: string | null
           updated_at: string
+          wallet_balance: number | null
+          whatsapp_number: string | null
         }
         Insert: {
           admin_created?: boolean | null
+          anniversary_date?: string | null
+          birth_date?: string | null
+          cashback_balance?: number | null
           created_at?: string
           email?: string | null
+          facebook_url?: string | null
           full_name?: string | null
+          gender?: string | null
           id: string
+          instagram_url?: string | null
+          lead_source?: string | null
           phone_number?: string | null
           phone_verified?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          twitter_url?: string | null
           updated_at?: string
+          wallet_balance?: number | null
+          whatsapp_number?: string | null
         }
         Update: {
           admin_created?: boolean | null
+          anniversary_date?: string | null
+          birth_date?: string | null
+          cashback_balance?: number | null
           created_at?: string
           email?: string | null
+          facebook_url?: string | null
           full_name?: string | null
+          gender?: string | null
           id?: string
+          instagram_url?: string | null
+          lead_source?: string | null
           phone_number?: string | null
           phone_verified?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          twitter_url?: string | null
           updated_at?: string
+          wallet_balance?: number | null
+          whatsapp_number?: string | null
         }
         Relationships: []
       }

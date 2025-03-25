@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, Calendar, ChevronDown, Download, Filter, Loader, Search, Star, SortAsc, SortDesc } from 'lucide-react';
+import { ArrowLeft, Calendar, ChevronDown, Download, Filter, Loader, Search, Star, SortAsc, SortDesc, User } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays } from 'date-fns';
+import { CustomerDetails } from './CustomerDetails';
 
 interface CustomerListProps {
   onBack?: () => void;
@@ -22,6 +23,7 @@ export function CustomerList({ onBack }: CustomerListProps) {
   const [timeRange, setTimeRange] = useState('90');
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   
   // Fetch customer data
   const { data: customers, isLoading, error } = useQuery({
@@ -104,6 +106,16 @@ export function CustomerList({ onBack }: CustomerListProps) {
     customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     customer.phone_number?.includes(searchQuery)
   ) || [];
+
+  // If a customer is selected, show their details
+  if (selectedCustomerId) {
+    return (
+      <CustomerDetails 
+        customerId={selectedCustomerId} 
+        onBack={() => setSelectedCustomerId(null)} 
+      />
+    );
+  }
 
   // Handle error display
   if (error) {
@@ -272,14 +284,19 @@ export function CustomerList({ onBack }: CustomerListProps) {
                           Last appt. {renderSortIcon('last_appt')}
                         </div>
                       </TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredCustomers.map((customer) => (
-                      <TableRow key={customer.id} className="hover:bg-muted/50 cursor-pointer">
+                      <TableRow key={customer.id} className="hover:bg-muted/50">
                         <TableCell className="font-medium">{customer.full_name || 'N/A'}</TableCell>
-                        <TableCell>—</TableCell>
-                        <TableCell>—</TableCell>
+                        <TableCell>{customer.gender || '—'}</TableCell>
+                        <TableCell>
+                          {customer.birth_date ? 
+                            Math.floor((new Date().getTime() - new Date(customer.birth_date).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) 
+                            : '—'}
+                        </TableCell>
                         <TableCell>{customer.phone_number || '—'}</TableCell>
                         <TableCell>{customer.email || '—'}</TableCell>
                         <TableCell>
@@ -299,6 +316,16 @@ export function CustomerList({ onBack }: CustomerListProps) {
                             ? format(new Date(customer.last_appt), 'dd MMM yyyy')
                             : '—'
                           }
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => setSelectedCustomerId(customer.id)}
+                          >
+                            <User className="h-4 w-4" />
+                            <span className="sr-only">View details</span>
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
