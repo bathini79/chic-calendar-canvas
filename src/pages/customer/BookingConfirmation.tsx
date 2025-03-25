@@ -77,7 +77,7 @@ export default function BookingConfirmation() {
         setTaxAmount(0);
         return;
       }
-      
+      if(!tax){
       const taxData = await fetchTaxDetails(appliedTaxId);
       if (taxData) {
         setTax(taxData);
@@ -86,7 +86,7 @@ export default function BookingConfirmation() {
         const afterCoupon = subtotal - couponDiscount;
         const newTaxAmount = afterCoupon * (taxData.percentage / 100);
         setTaxAmount(newTaxAmount);
-      }
+      }}
     };
     
     loadTaxDetails();
