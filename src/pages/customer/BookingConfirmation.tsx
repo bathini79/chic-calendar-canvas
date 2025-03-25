@@ -1,3 +1,4 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -212,8 +213,7 @@ export default function BookingConfirmation() {
           number_of_bookings: items.length,
           total_price: totalPrice,
           total_duration: totalDuration,
-          tax_id: appliedTaxId,
-          tax_amount: taxAmount,
+          tax_amount: taxAmount,  // Using tax_amount, not tax_id
           coupon_id: appliedCouponId,
           location: selectedLocation
         })

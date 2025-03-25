@@ -162,6 +162,7 @@ export default function useSaveAppointment({
         location: locationId,
         tax_amount: calculatedTaxAmount,
         coupon_id: usedCouponId
+        // Removed tax_id as it doesn't exist in the schema
       };
 
       let createdAppointmentId;
