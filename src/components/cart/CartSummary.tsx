@@ -73,6 +73,7 @@ export function CartSummary() {
 
   // Load coupons
   useEffect(() => {
+    console.log("Fetching coupons in CartSummary");
     fetchCoupons();
   }, []);
 
@@ -91,13 +92,20 @@ export function CartSummary() {
   // Calculate coupon discount
   useEffect(() => {
     if (appliedCouponId && coupons.length > 0) {
+      console.log("Applied coupon ID:", appliedCouponId);
+      console.log("Available coupons:", coupons);
+      
       const coupon = coupons.find(c => c.id === appliedCouponId);
       if (coupon) {
+        console.log("Found coupon:", coupon);
         const discount = coupon.discount_type === 'percentage' 
           ? subtotal * (coupon.discount_value / 100)
           : Math.min(coupon.discount_value, subtotal); // Don't discount more than the subtotal
         
         setCouponDiscount(discount);
+      } else {
+        console.log("Coupon not found in coupons list");
+        setCouponDiscount(0);
       }
     } else {
       setCouponDiscount(0);
@@ -130,6 +138,7 @@ export function CartSummary() {
   };
 
   const handleCouponChange = (couponId: string) => {
+    console.log("Coupon changed to:", couponId);
     if (couponId === "none") {
       setAppliedCouponId(null);
     } else {

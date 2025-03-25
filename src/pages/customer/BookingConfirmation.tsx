@@ -1,3 +1,4 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -99,13 +100,22 @@ export default function BookingConfirmation() {
         return;
       }
       
+      console.log("Fetching coupon details for ID:", appliedCouponId);
       const { data, error } = await supabase
         .from('coupons')
         .select('*')
         .eq('id', appliedCouponId)
         .single();
       
-      if (!error && data) {
+      if (error) {
+        console.error("Error fetching coupon:", error);
+        setCoupon(null);
+        setCouponDiscount(0);
+        return;
+      }
+      
+      if (data) {
+        console.log("Coupon data loaded:", data);
         setCoupon(data);
         const subtotal = getTotalPrice();
         const newDiscount = data.discount_type === 'percentage' 
@@ -226,7 +236,6 @@ export default function BookingConfirmation() {
       }
 
       const appointmentId = appointmentData[0].id;
-      let currentStartTime = startDateTime;
       
       const bookingPromises = [];
 
@@ -474,7 +483,7 @@ export default function BookingConfirmation() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>₹{subtotal}</span>
+                  <span>₹{subtotal.toFixed(2)}</span>
                 </div>
                 
                 {coupon && couponDiscount > 0 && (
