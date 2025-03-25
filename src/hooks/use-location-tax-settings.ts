@@ -20,14 +20,13 @@ export function useLocationTaxSettings() {
         .from("location_tax_settings")
         .select("*")
         .eq("location_id", locationId)
-        .maybeSingle();
+        .single();
 
-      if (error) {
-        console.error(`Error fetching location tax settings:`, error);
-        return null;
+      if (error && error.code !== 'PGRST116') {
+        throw error;
       }
       
-      return data;
+      return data || null;
     } catch (error: any) {
       console.error(`Error fetching location tax settings:`, error);
       return null;

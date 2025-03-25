@@ -1,319 +1,329 @@
-
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useCart } from "@/components/cart/CartContext";
+import { CustomizeDialog } from "@/components/customer/packages/CustomizeDialog";
+import { CartSummary } from "@/components/cart/CartSummary";
+import { MobileCartBar } from "@/components/cart/MobileCartBar";
+import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { ServiceCard } from "@/components/customer/services/ServiceCard";
 import { PackageCard } from "@/components/customer/services/PackageCard";
-import { supabase } from "@/integrations/supabase/client";
-import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
-import { useCart } from "@/components/cart/CartContext";
-import { MobileCartBar } from "@/components/cart/MobileCartBar";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Search } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { useIsMobile } from "@/hooks/use-mobile";
-
-interface Service {
-  id: string;
-  name: string;
-  description: string;
-  duration: number;
-  original_price: number;
-  selling_price: number;
-  image_urls: string[];
-  category_id: string;
-  services_categories: Array<{ category: { id: string; name: string } }>;
-}
-
-interface Package {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  duration: number;
-  image_urls: string[];
-  is_active: boolean;
-  categories: string[];
-  package_services: Array<{
-    service: Service;
-    package_selling_price: number;
-  }>;
-  package_locations: Array<{ location_id: string }>;
-}
+import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
+import { useSearchParams } from "react-router-dom";
+import { LocationSelector } from "@/components/admin/dashboard/LocationSelector";
 
 export default function Services() {
-  const [services, setServices] = useState<Service[]>([]);
-  const [packages, setPackages] = useState<Package[]>([]);
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([]);
-  const { addToCart, selectedLocation, setSelectedLocation } = useCart();
-  const [isLoading, setIsLoading] = useState(true);
-  const isMobile = useIsMobile();
+  const [searchParams] = useSearchParams();
+  const locationParam = searchParams.get('location');
+  
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { addToCart, removeFromCart, items, setSelectedLocation } = useCart();
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [totalPrice, setTotalPrice] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
+  const [locationId, setLocationId] = useState<string>("all");
+  
+  const { data: locations } = useQuery({
+    queryKey: ["locations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("locations")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+      
+      if (error) {
+        toast.error("Error loading locations");
+        throw error;
+      }
+      return data || [];
+    },
+  });
 
   useEffect(() => {
-    fetchCategories();
-    fetchLocations();
-  }, []);
-
-  useEffect(() => {
-    if (selectedLocation) {
-      fetchServices();
-      fetchPackages();
+    if (locations && locations.length > 0) {
+      if (locationParam && locations.some(loc => loc.id === locationParam)) {
+        setLocationId(locationParam);
+        setSelectedLocation(locationParam);
+      } else {
+        setLocationId(locations[0].id);
+        setSelectedLocation(locations[0].id);
+      }
     }
-  }, [selectedLocation, selectedCategoryId]);
+  }, [locations, locationParam, setSelectedLocation]);
 
-  async function fetchServices() {
-    setIsLoading(true);
-    try {
+  const handleLocationChange = (value: string) => {
+    setLocationId(value);
+    setSelectedLocation(value);
+  };
+  
+  const { data: services, isLoading: servicesLoading } = useQuery({
+    queryKey: ["services", locationId],
+    queryFn: async () => {
       let query = supabase
         .from("services")
         .select(`
           *,
-          services_categories(
-            category:categories(id, name)
-          )
+          services_categories!inner (
+            categories (
+              id,
+              name
+            )
+          ),
+          service_locations!inner (location_id)
         `)
         .eq("status", "active");
-
-      if (selectedCategoryId !== "all") {
-        query = query.contains("categories", [selectedCategoryId]);
+      
+      if (locationId !== "all") {
+        query = query.eq("service_locations.location_id", locationId);
       }
-
+      
       const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Filter services to only show those that have a service_locations entry
-      // with the selected location, or show all if no location is selected
-      if (selectedLocation) {
-        const { data: serviceLocations } = await supabase
-          .from("service_locations")
-          .select("service_id")
-          .eq("location_id", selectedLocation);
-
-        if (serviceLocations) {
-          const serviceIds = serviceLocations.map(sl => sl.service_id);
-          setServices(data.filter(service => serviceIds.includes(service.id)));
-        } else {
-          setServices(data);
-        }
-      } else {
-        setServices(data);
+      
+      if (error) {
+        toast.error("Error loading services");
+        throw error;
       }
-    } catch (error) {
-      console.error("Error fetching services:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+      return data;
+    },
+    enabled: !!locationId
+  });
 
-  async function fetchPackages() {
-    try {
+  const { data: packages, isLoading: packagesLoading } = useQuery({
+    queryKey: ["packages", locationId],
+    queryFn: async () => {
       let query = supabase
         .from("packages")
         .select(`
           *,
-          package_services(
-            service:services(*),
+          package_services (
+            service:services (
+              id,
+              name,
+              selling_price,
+              duration
+            ),
             package_selling_price
           ),
-          package_locations(location_id)
+          package_locations!inner (location_id)
         `)
         .eq("status", "active");
-
-      if (selectedCategoryId !== "all") {
-        query = query.contains("categories", [selectedCategoryId]);
+      
+      if (locationId !== "all") {
+        query = query.eq("package_locations.location_id", locationId);
       }
-
+      
       const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Filter packages to only show those that have a package_locations entry
-      // with the selected location, or show all if no location is selected
-      if (selectedLocation) {
-        setPackages(
-          data.filter(pkg => 
-            pkg.package_locations.some(loc => loc.location_id === selectedLocation)
-          )
-        );
-      } else {
-        setPackages(data);
+      
+      if (error) {
+        toast.error("Error loading packages");
+        throw error;
       }
-    } catch (error) {
-      console.error("Error fetching packages:", error);
-    }
-  }
+      return data;
+    },
+    enabled: !!locationId
+  });
 
-  async function fetchCategories() {
-    try {
+  const { data: categories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
         .select("*")
         .order("name");
-
-      if (error) throw error;
-      setCategories(data);
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    }
-  }
-
-  async function fetchLocations() {
-    try {
-      const { data, error } = await supabase
-        .from("locations")
-        .select("*")
-        .eq("status", "active")
-        .order("name");
-
-      if (error) throw error;
-      setLocations(data);
       
-      // If location is already selected in cart but there's no data yet, fetch it now
-      if (selectedLocation && !isLoading && services.length === 0) {
-        fetchServices();
-        fetchPackages();
+      if (error) {
+        toast.error("Error loading categories");
+        throw error;
+      }
+      return data;
+    },
+  });
+
+  const handleBookNow = async (serviceId?: string, packageId?: string) => {
+    try {
+      if (serviceId) {
+        const service = services?.find(s => s.id === serviceId);
+        if (service) {
+          await addToCart(serviceId, undefined, {
+            name: service.name,
+            price: service.selling_price,
+            duration: service.duration,
+            selling_price: service.selling_price,
+            service: service
+          });
+        }
+      } else if (packageId) {
+        const pkg = packages?.find(p => p.id === packageId);
+        if (pkg) {
+          await addToCart(undefined, packageId, {
+            name: pkg.name,
+            price: pkg.price,
+            duration: calculatePackageDuration(pkg, [], services || []),
+            selling_price: pkg.price,
+            package: pkg
+          });
+        }
       }
     } catch (error) {
-      console.error("Error fetching locations:", error);
+      console.error("Error adding to cart:", error);
+      toast.error("Failed to add item to cart");
     }
-  }
+  };
 
-  function handleAddServiceToCart(service: Service) {
-    addToCart(service.id, undefined, {
-      service,
-      selling_price: service.selling_price,
-      duration: service.duration
+  const handleRemove = async (serviceId?: string, packageId?: string) => {
+    const itemToRemove = items.find(item => 
+      (serviceId && item.service_id === serviceId) || 
+      (packageId && item.package_id === packageId)
+    );
+    if (itemToRemove) {
+      await removeFromCart(itemToRemove.id);
+    }
+  };
+
+  const isItemInCart = (serviceId?: string, packageId?: string) => {
+    return items.some(item => 
+      (serviceId && item.service_id === serviceId) || 
+      (packageId && item.package_id === packageId)
+    );
+  };
+
+  const handleCustomize = (pkg: any) => {
+    setSelectedPackage(pkg);
+    const includedServiceIds = pkg.package_services.map((ps: any) => ps.service.id);
+    setSelectedServices(includedServiceIds);
+    setCustomizeDialogOpen(true);
+    
+    let price = pkg.price;
+    let duration = 0;
+    
+    pkg.package_services.forEach((ps: any) => {
+      duration += ps.service.duration;
     });
-  }
+    
+    setTotalPrice(price);
+    setTotalDuration(duration);
+  };
 
-  function handleAddPackageToCart(pkg: Package) {
-    addToCart(undefined, pkg.id, {
-      package: pkg,
-      selling_price: pkg.price,
-      duration: pkg.duration
+  const handleServiceToggle = (serviceId: string, checked: boolean) => {
+    let newSelectedServices;
+    if (checked) {
+      newSelectedServices = [...selectedServices, serviceId];
+    } else {
+      const includedServiceIds = selectedPackage.package_services.map((ps: any) => ps.service.id);
+      if (includedServiceIds.includes(serviceId)) return;
+      newSelectedServices = selectedServices.filter(id => id !== serviceId);
+    }
+    setSelectedServices(newSelectedServices);
+
+    let price = selectedPackage.price;
+    let duration = 0;
+    
+    selectedPackage.package_services.forEach((ps: any) => {
+      duration += ps.service.duration;
     });
+    
+    newSelectedServices.forEach(id => {
+      const service = services?.find(s => s.id === id);
+      const isInBasePackage = selectedPackage.package_services.some((ps: any) => ps.service.id === id);
+      
+      if (service && !isInBasePackage) {
+        price += service.selling_price;
+        duration += service.duration;
+      }
+    });
+    
+    setTotalPrice(price);
+    setTotalDuration(duration);
+  };
+
+  const filteredServices = services?.filter((service) => {
+    const matchesCategory = !selectedCategory || 
+      service.services_categories.some(
+        (sc: any) => sc.categories.id === selectedCategory
+      );
+    return matchesCategory;
+  });
+
+  if (servicesLoading || packagesLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-pulse text-lg">Loading...</div>
+      </div>
+    );
   }
-
-  const filteredServices = services.filter(service =>
-    service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (service.description && service.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  const filteredPackages = packages.filter(pkg =>
-    pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (pkg.description && pkg.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
 
   return (
-    <div className="container py-6">
-      <h1 className="text-2xl font-bold mb-6">Our Services</h1>
+    <div className="container mx-auto py-8">
+      <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-8">
+        <div>
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mb-6">
+            <div className="w-full sm:w-[400px]">
+              <CategoryFilter
+                categories={categories || []}
+                selectedCategory={selectedCategory}
+                onCategorySelect={setSelectedCategory}
+              />
+            </div>
+            <div className="w-full sm:w-auto">
+              <LocationSelector
+                locations={locations || []}
+                value={locationId}
+                onChange={handleLocationChange}
+              />
+            </div>
+          </div>
 
-      <div className="flex flex-col md:flex-row mb-6 gap-4">
-        <div className="w-full md:w-1/2 space-y-2">
-          <Label htmlFor="location-select">Select Location</Label>
-          <Select
-            value={selectedLocation || ""}
-            onValueChange={(value) => setSelectedLocation(value)}
-          >
-            <SelectTrigger id="location-select">
-              <SelectValue placeholder="Select a location" />
-            </SelectTrigger>
-            <SelectContent>
-              {locations.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {packages?.map((pkg) => (
+              <PackageCard
+                key={pkg.id}
+                pkg={pkg}
+                isInCart={isItemInCart(undefined, pkg.id)}
+                onBookNow={(packageId) => handleBookNow(undefined, packageId)}
+                onRemove={(packageId) => handleRemove(undefined, packageId)}
+                onCustomize={handleCustomize}
+              />
+            ))}
+
+            {filteredServices?.map((service) => (
+              <ServiceCard
+                key={service.id}
+                service={service}
+                isInCart={isItemInCart(service.id)}
+                onBookNow={(serviceId) => handleBookNow(serviceId)}
+                onRemove={(serviceId) => handleRemove(serviceId)}
+              />
+            ))}
+          </div>
+
+          {(!filteredServices || filteredServices.length === 0) && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No services found matching your criteria.</p>
+            </div>
+          )}
         </div>
 
-        <div className="w-full md:w-1/2">
-          <Label htmlFor="search" className="mb-2 block">
-            Search Services
-          </Label>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="search"
-              placeholder="Search by name or description..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+        <div className="hidden lg:block sticky top-24 h-[calc(100vh-6rem)]">
+          <CartSummary />
         </div>
       </div>
 
-      <CategoryFilter
-        categories={categories}
-        selectedCategoryId={selectedCategoryId}
-        onSelectCategory={setSelectedCategoryId}
+      <CustomizeDialog
+        open={customizeDialogOpen}
+        onOpenChange={setCustomizeDialogOpen}
+        selectedPackage={selectedPackage}
+        selectedServices={selectedServices}
+        allServices={services}
+        totalPrice={totalPrice}
+        totalDuration={totalDuration}
+        onServiceToggle={handleServiceToggle}
       />
 
-      {!selectedLocation ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <h3 className="text-lg font-medium mb-2">Please select a location</h3>
-          <p className="text-muted-foreground">
-            Select a salon location to view available services and packages
-          </p>
-        </div>
-      ) : isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-pulse">Loading services...</div>
-        </div>
-      ) : (
-        <>
-          {filteredServices.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Services</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredServices.map((service) => (
-                  <ServiceCard
-                    key={service.id}
-                    service={service}
-                    onAddToCart={() => handleAddServiceToCart(service)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {filteredServices.length > 0 && filteredPackages.length > 0 && (
-            <Separator className="my-8" />
-          )}
-
-          {filteredPackages.length > 0 && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Packages</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredPackages.map((pkg) => (
-                  <PackageCard
-                    key={pkg.id}
-                    package={pkg}
-                    onAddToCart={() => handleAddPackageToCart(pkg)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {filteredServices.length === 0 && filteredPackages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <h3 className="text-lg font-medium mb-2">No services found</h3>
-              <p className="text-muted-foreground">
-                Try selecting a different category or adjusting your search
-              </p>
-            </div>
-          )}
-        </>
-      )}
-
-      {isMobile && <MobileCartBar />}
+      <MobileCartBar />
     </div>
   );
 }
