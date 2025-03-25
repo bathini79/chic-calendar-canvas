@@ -1,14 +1,18 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { format, addMinutes, parseISO } from "date-fns";
-import { ArrowRight, Calendar, Clock, Package, Store, Tag } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Package, Store, Tag, MapPin } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function BookingConfirmation() {
   const {
@@ -20,7 +24,10 @@ export default function BookingConfirmation() {
     getTotalDuration,
     removeFromCart,
     appliedTaxId,
-    appliedCouponId
+    setAppliedTaxId,
+    appliedCouponId,
+    setAppliedCouponId,
+    selectedLocation
   } = useCart();
   const navigate = useNavigate();
   const [notes, setNotes] = useState("");
@@ -29,9 +36,33 @@ export default function BookingConfirmation() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [tax, setTax] = useState<any>(null);
   const [coupon, setCoupon] = useState<any>(null);
+  const [locationName, setLocationName] = useState<string>("");
+  const [couponCode, setCouponCode] = useState<string>("");
+  const [isCouponLoading, setIsCouponLoading] = useState(false);
+  const { fetchLocationTaxSettings } = useLocationTaxSettings();
 
   useEffect(() => {
     const fetchTaxAndCouponDetails = async () => {
+      // Fetch tax based on location
+      if (selectedLocation) {
+        // Get location tax settings
+        const locationTaxSettings = await fetchLocationTaxSettings(selectedLocation);
+        if (locationTaxSettings && locationTaxSettings.service_tax_id) {
+          setAppliedTaxId(locationTaxSettings.service_tax_id);
+        }
+        
+        // Get location name
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('name')
+          .eq('id', selectedLocation)
+          .single();
+          
+        if (locationData) {
+          setLocationName(locationData.name);
+        }
+      }
+
       if (appliedTaxId) {
         const { data, error } = await supabase
           .from('tax_rates')
@@ -75,7 +106,7 @@ export default function BookingConfirmation() {
     };
 
     fetchTaxAndCouponDetails();
-  }, [appliedTaxId, appliedCouponId, getTotalPrice]);
+  }, [appliedTaxId, appliedCouponId, getTotalPrice, selectedLocation]);
 
   if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
     navigate("/schedule");
@@ -115,6 +146,64 @@ export default function BookingConfirmation() {
   const discountedSubtotal = subtotal - couponDiscount;
   const totalPrice = discountedSubtotal + taxAmount;
 
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    
+    setIsCouponLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", couponCode.trim())
+        .eq("is_active", true)
+        .single();
+      
+      if (error) {
+        toast.error("Invalid coupon code");
+        return;
+      }
+      
+      setAppliedCouponId(data.id);
+      setCoupon(data);
+      toast.success("Coupon applied successfully!");
+      
+      // Calculate discount
+      const newDiscount = data.discount_type === 'percentage'
+        ? subtotal * (data.discount_value / 100)
+        : Math.min(data.discount_value, subtotal);
+      
+      setCouponDiscount(newDiscount);
+      
+      // Recalculate tax
+      if (tax) {
+        const afterCoupon = subtotal - newDiscount;
+        const newTaxAmount = afterCoupon * (tax.percentage / 100);
+        setTaxAmount(newTaxAmount);
+      }
+      
+    } catch (error) {
+      console.error("Error applying coupon:", error);
+      toast.error("Failed to apply coupon");
+    } finally {
+      setIsCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCouponId(null);
+    setCoupon(null);
+    setCouponCode("");
+    setCouponDiscount(0);
+    
+    // Recalculate tax without coupon discount
+    if (tax) {
+      const newTaxAmount = subtotal * (tax.percentage / 100);
+      setTaxAmount(newTaxAmount);
+    }
+    
+    toast.success("Coupon removed");
+  };
+
   const handleBookingConfirmation = async () => {
     setIsLoading(true);
     try {
@@ -150,7 +239,8 @@ export default function BookingConfirmation() {
         taxAmount,
         totalPrice,
         couponId: appliedCouponId,
-        taxId: appliedTaxId
+        taxId: appliedTaxId,
+        location: selectedLocation
       });
 
       const { data: appointmentData, error: appointmentError } = await supabase
@@ -166,7 +256,8 @@ export default function BookingConfirmation() {
           total_duration: totalDuration,
           tax_id: appliedTaxId,
           tax_amount: taxAmount,
-          coupon_id: appliedCouponId
+          coupon_id: appliedCouponId,
+          location: selectedLocation
         })
         .select();
 
@@ -347,6 +438,21 @@ export default function BookingConfirmation() {
                 <span className="ml-1 text-sm">({durationDisplay})</span>
               </span>
             </div>
+            {locationName && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <MapPin className="h-4 w-4" />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="underline decoration-dotted">{locationName}</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-secondary">
+                      <p>Your selected salon venue</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -419,19 +525,45 @@ export default function BookingConfirmation() {
                   <span>₹{subtotal}</span>
                 </div>
                 
+                {!coupon && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Coupon code"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleApplyCoupon}
+                      disabled={isCouponLoading || !couponCode.trim()}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                )}
+                
                 {coupon && couponDiscount > 0 && (
                   <div className="space-y-1">
-                    <div className="flex items-center gap-1">
-                      <Tag className="h-3 w-3 text-green-600" />
-                      <Badge variant="outline" className="text-xs font-medium text-green-600">
-                        {coupon.code} - {coupon.discount_type === 'percentage' 
-                          ? `${coupon.discount_value}% off` 
-                          : `₹${coupon.discount_value} off`}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span>Discount</span>
-                      <span>-₹{couponDiscount.toFixed(2)}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <Tag className="h-3 w-3 text-green-600" />
+                        <Badge variant="outline" className="text-xs font-medium text-green-600">
+                          {coupon.code} - {coupon.discount_type === 'percentage' 
+                            ? `${coupon.discount_value}% off` 
+                            : `₹${coupon.discount_value} off`}
+                        </Badge>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-5 p-0 text-xs text-red-500 hover:text-red-700"
+                          onClick={handleRemoveCoupon}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                      <span className="text-sm text-green-600">-₹{couponDiscount.toFixed(2)}</span>
                     </div>
                   </div>
                 )}
