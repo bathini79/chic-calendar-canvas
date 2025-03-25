@@ -1,4 +1,3 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -55,65 +54,76 @@ export default function BookingConfirmation() {
   }, [selectedLocation]);
 
   useEffect(() => {
-    const fetchTaxAndCouponDetails = async () => {
-      if (selectedLocation) {
-        // Fetch location tax settings
+    const fetchTaxSettings = async () => {
+      if (!selectedLocation) return;
+      
+      if (!appliedTaxId) {
         const settings = await fetchLocationTaxSettings(selectedLocation);
         
-        if (settings && settings.service_tax_id && !appliedTaxId) {
+        if (settings && settings.service_tax_id) {
           setAppliedTaxId(settings.service_tax_id);
-          
-          // Fetch tax details
-          const taxData = await fetchTaxDetails(settings.service_tax_id);
-          if (taxData) {
-            setTax(taxData);
-            
-            const subtotal = getTotalPrice();
-            const afterCoupon = subtotal - couponDiscount;
-            const newTaxAmount = afterCoupon * (taxData.percentage / 100);
-            setTaxAmount(newTaxAmount);
-          }
-        } else if (appliedTaxId) {
-          // If tax is already applied, fetch its details
-          const taxData = await fetchTaxDetails(appliedTaxId);
-          if (taxData) {
-            setTax(taxData);
-            
-            const subtotal = getTotalPrice();
-            const afterCoupon = subtotal - couponDiscount;
-            const newTaxAmount = afterCoupon * (taxData.percentage / 100);
-            setTaxAmount(newTaxAmount);
-          }
-        }
-      }
-
-      if (appliedCouponId) {
-        const { data, error } = await supabase
-          .from('coupons')
-          .select('*')
-          .eq('id', appliedCouponId)
-          .single();
-        
-        if (!error && data) {
-          setCoupon(data);
-          const subtotal = getTotalPrice();
-          const newDiscount = data.discount_type === 'percentage' 
-            ? subtotal * (data.discount_value / 100)
-            : Math.min(data.discount_value, subtotal);
-          
-          setCouponDiscount(newDiscount);
-          
-          if (tax) {
-            const afterCoupon = subtotal - newDiscount;
-            const newTaxAmount = afterCoupon * (tax.percentage / 100);
-            setTaxAmount(newTaxAmount);
-          }
         }
       }
     };
 
-    fetchTaxAndCouponDetails();
-  }, [appliedTaxId, appliedCouponId, getTotalPrice, fetchLocationTaxSettings, fetchTaxDetails, selectedLocation, tax]);
+    fetchTaxSettings();
+  }, [selectedLocation, appliedTaxId, setAppliedTaxId, fetchLocationTaxSettings]);
+
+  useEffect(() => {
+    const loadTaxDetails = async () => {
+      if (!appliedTaxId) {
+        setTax(null);
+        setTaxAmount(0);
+        return;
+      }
+      
+      const taxData = await fetchTaxDetails(appliedTaxId);
+      if (taxData) {
+        setTax(taxData);
+        
+        const subtotal = getTotalPrice();
+        const afterCoupon = subtotal - couponDiscount;
+        const newTaxAmount = afterCoupon * (taxData.percentage / 100);
+        setTaxAmount(newTaxAmount);
+      }
+    };
+    
+    loadTaxDetails();
+  }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails]);
+
+  useEffect(() => {
+    const loadCouponDetails = async () => {
+      if (!appliedCouponId) {
+        setCoupon(null);
+        setCouponDiscount(0);
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('id', appliedCouponId)
+        .single();
+      
+      if (!error && data) {
+        setCoupon(data);
+        const subtotal = getTotalPrice();
+        const newDiscount = data.discount_type === 'percentage' 
+          ? subtotal * (data.discount_value / 100)
+          : Math.min(data.discount_value, subtotal);
+        
+        setCouponDiscount(newDiscount);
+        
+        if (tax) {
+          const afterCoupon = subtotal - newDiscount;
+          const newTaxAmount = afterCoupon * (tax.percentage / 100);
+          setTaxAmount(newTaxAmount);
+        }
+      }
+    };
+    
+    loadCouponDetails();
+  }, [appliedCouponId, getTotalPrice, tax]);
 
   if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
     navigate("/schedule");
