@@ -56,9 +56,21 @@ export function useLocationTaxSettings() {
     }
   }
 
-  // New function to reset location-specific settings
-  async function resetLocationSettings() {
-    return null;
+  // Function to reset location-specific settings
+  async function resetLocationSettings(locationId: string) {
+    try {
+      setIsLoading(true);
+      
+      // Fetch new settings for the changed location
+      const settings = await fetchLocationTaxSettings(locationId);
+      
+      return settings;
+    } catch (error) {
+      console.error("Error resetting location settings:", error);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return { fetchLocationTaxSettings, fetchTaxDetails, resetLocationSettings, isLoading };

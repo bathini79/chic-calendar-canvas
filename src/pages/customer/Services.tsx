@@ -12,6 +12,7 @@ import { PackageCard } from "@/components/customer/services/PackageCard";
 import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { LocationSelector } from "@/components/admin/dashboard/LocationSelector";
+import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 
 export default function Services() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,7 +27,8 @@ export default function Services() {
     setSelectedLocation, 
     selectedLocation, 
     setAppliedTaxId, 
-    setAppliedCouponId 
+    setAppliedCouponId,
+    clearCart
   } = useCart();
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
@@ -34,6 +36,8 @@ export default function Services() {
   const [totalPrice, setTotalPrice] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
   const [locationId, setLocationId] = useState<string>(selectedLocation || "all");
+  
+  const { resetLocationSettings } = useLocationTaxSettings();
   
   const { data: locations } = useQuery({
     queryKey: ["locations"],
@@ -76,24 +80,37 @@ export default function Services() {
     }
   }, [locations, locationParam, selectedLocation, setSelectedLocation, setSearchParams]);
 
-  const handleLocationChange = (value: string) => {
+  const handleLocationChange = async (value: string) => {
     if (value !== locationId) {
+      clearCart();
+      
       setLocationId(value);
       setSelectedLocation(value);
       
       setAppliedTaxId(null);
       setAppliedCouponId(null);
       
+      setSelectedCategory(null);
+      
       setSearchParams(prev => {
         prev.set('location', value);
         return prev;
       });
       
-      setSelectedCategory(null);
+      await resetLocationSettings(value);
+      
+      await servicesRefetch();
+      await packagesRefetch();
+      
+      toast.success(`Location switched to ${locations?.find(loc => loc.id === value)?.name || 'new location'}`);
     }
   };
   
-  const { data: services, isLoading: servicesLoading } = useQuery({
+  const { 
+    data: services, 
+    isLoading: servicesLoading,
+    refetch: servicesRefetch 
+  } = useQuery({
     queryKey: ["services", locationId],
     queryFn: async () => {
       let query = supabase
@@ -125,7 +142,11 @@ export default function Services() {
     enabled: !!locationId
   });
 
-  const { data: packages, isLoading: packagesLoading } = useQuery({
+  const { 
+    data: packages, 
+    isLoading: packagesLoading,
+    refetch: packagesRefetch 
+  } = useQuery({
     queryKey: ["packages", locationId],
     queryFn: async () => {
       let query = supabase
