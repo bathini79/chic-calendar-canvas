@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Card, 
@@ -24,6 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 // import { FinancialDashboard } from "@/components/admin/dashboard/FinancialDashboard";
 import { FinancialSummary } from "@/components/admin/reports/FinancialSummary";
+import { CustomerList } from "@/components/admin/reports/CustomerList";
 
 const reportCategories = [
   {
@@ -73,6 +75,7 @@ const reportCategories = [
     name: "Customer Retention",
     icon: <Heart className="h-5 w-5" />,
     reports: [
+      { id: "client-list", name: "Client List", description: "Comprehensive list of all active clients" },
       { id: "retention-rate", name: "Retention Rate", description: "Customer return and loyalty metrics" },
       { id: "churn", name: "Churn Analysis", description: "Analysis of customers who don't return" },
       { id: "loyalty", name: "Loyalty Program Performance", description: "Effectiveness of loyalty initiatives" }
@@ -134,6 +137,14 @@ export default function Reports() {
       return (
         <div className="space-y-4">
           <FinancialSummary onBack={() => setExpandedReport(null)} />
+        </div>
+      );
+    }
+    
+    if (expandedReport === "client-list") {
+      return (
+        <div className="space-y-4">
+          <CustomerList onBack={() => setExpandedReport(null)} />
         </div>
       );
     }
@@ -215,7 +226,7 @@ export default function Reports() {
               
               <TabsContent value="all" className="mt-6">
                 {activeCategory === "all" && searchQuery === "" && !expandedReport && (
-                  <div className="mb-6">
+                  <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Card 
                       className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
                       onClick={() => handleReportClick("finance-summary")}
@@ -230,6 +241,30 @@ export default function Reports() {
                         </div>
                         <CardTitle className="text-xl">Finance Summary</CardTitle>
                         <CardDescription>High-level summary of sales, payments and liabilities</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-40 flex items-center justify-center bg-muted/30 rounded-md">
+                          <p className="text-muted-foreground text-center">
+                            Preview data will appear here
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card 
+                      className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => handleReportClick("client-list")}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Heart className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Customer Retention</p>
+                          </div>
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <CardTitle className="text-xl">Client List</CardTitle>
+                        <CardDescription>Comprehensive list of all active clients</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="h-40 flex items-center justify-center bg-muted/30 rounded-md">
