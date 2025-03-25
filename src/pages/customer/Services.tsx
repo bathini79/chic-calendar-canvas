@@ -19,7 +19,15 @@ export default function Services() {
   const locationParam = searchParams.get('location');
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const { addToCart, removeFromCart, items, setSelectedLocation, selectedLocation } = useCart();
+  const { 
+    addToCart, 
+    removeFromCart, 
+    items, 
+    setSelectedLocation, 
+    selectedLocation, 
+    setAppliedTaxId, 
+    setAppliedCouponId 
+  } = useCart();
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -69,12 +77,20 @@ export default function Services() {
   }, [locations, locationParam, selectedLocation, setSelectedLocation, setSearchParams]);
 
   const handleLocationChange = (value: string) => {
-    setLocationId(value);
-    setSelectedLocation(value);
-    setSearchParams(prev => {
-      prev.set('location', value);
-      return prev;
-    });
+    if (value !== locationId) {
+      setLocationId(value);
+      setSelectedLocation(value);
+      
+      setAppliedTaxId(null);
+      setAppliedCouponId(null);
+      
+      setSearchParams(prev => {
+        prev.set('location', value);
+        return prev;
+      });
+      
+      setSelectedCategory(null);
+    }
   };
   
   const { data: services, isLoading: servicesLoading } = useQuery({

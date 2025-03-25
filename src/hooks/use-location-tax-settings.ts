@@ -56,5 +56,10 @@ export function useLocationTaxSettings() {
     }
   }
 
-  return { fetchLocationTaxSettings, fetchTaxDetails, isLoading };
+  // New function to reset location-specific settings
+  async function resetLocationSettings() {
+    return null;
+  }
+
+  return { fetchLocationTaxSettings, fetchTaxDetails, resetLocationSettings, isLoading };
 }
