@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays } from 'date-fns';
 import { CustomerDetails } from './CustomerDetails';
+import { CustomerSummary } from './CustomerSummary';
 
 interface CustomerListProps {
   onBack?: () => void;
@@ -185,6 +186,9 @@ export function CustomerList({ onBack }: CustomerListProps) {
           </Button>
         </div>
       </div>
+
+      {/* Add Customer Summary Component */}
+      <CustomerSummary />
 
       <Card>
         <CardContent className="pt-6">

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -506,8 +505,7 @@ export function CustomerDetails({ customerId, onBack }: CustomerDetailsProps) {
                         </TableCell>
                         <TableCell>
                           <Badge variant={
-                            appointment.status === 'completed' ? 'default' :
-                            appointment.status === 'cancelled' ? 'destructive' :
+                            appointment.status === 'canceled' ? 'destructive' :
                             'secondary'
                           }>
                             {appointment.status || 'pending'}
