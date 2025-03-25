@@ -30,6 +30,7 @@ export type Database = {
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"] | null
           tax_amount: number | null
+          tax_id: string | null
           total_duration: number | null
           total_price: number
           transaction_type: string | null
@@ -55,6 +56,7 @@ export type Database = {
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           tax_amount?: number | null
+          tax_id?: string | null
           total_duration?: number | null
           total_price: number
           transaction_type?: string | null
@@ -80,6 +82,7 @@ export type Database = {
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           tax_amount?: number | null
+          tax_id?: string | null
           total_duration?: number | null
           total_price?: number
           transaction_type?: string | null
@@ -112,6 +115,13 @@ export type Database = {
             columns: ["refunded_by"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_tax_id_fkey"
+            columns: ["tax_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rates"
             referencedColumns: ["id"]
           },
         ]

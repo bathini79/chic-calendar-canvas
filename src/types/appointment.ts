@@ -24,6 +24,7 @@ export interface Appointment {
   discount_type?: string;
   discount_value?: number;
   tax_amount?: number;
+  tax_id?: string | null;
   created_at?: string;
   updated_at?: string;
   coupon_id?: string | null;
@@ -44,4 +45,5 @@ export interface Appointment {
   
   // Joined data
   bookings?: any[];
+  tax?: any;
 }

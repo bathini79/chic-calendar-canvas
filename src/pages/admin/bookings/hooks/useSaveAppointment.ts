@@ -140,8 +140,8 @@ export default function useSaveAppointment({
       console.log("Appointment data for saving:", {
         total: totalPrice,
         taxAmount: calculatedTaxAmount,
-        couponDiscount: calculatedCouponDiscount,
         taxId: usedTaxId,
+        couponDiscount: calculatedCouponDiscount,
         couponId: usedCouponId
       });
 
@@ -161,8 +161,8 @@ export default function useSaveAppointment({
         notes: notes,
         location: locationId,
         tax_amount: calculatedTaxAmount,
+        tax_id: usedTaxId,
         coupon_id: usedCouponId
-        // Removed tax_id as it doesn't exist in the schema
       };
 
       let createdAppointmentId;

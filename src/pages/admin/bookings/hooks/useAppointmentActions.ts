@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -38,7 +37,8 @@ export function useAppointmentActions() {
             service:services(*),
             package:packages(*),
             employee:employees!bookings_employee_id_fkey(*)
-          )
+          ),
+          tax:tax_rates(*)
         `)
         .eq('id', appointmentId)
         .single();
@@ -107,6 +107,7 @@ export function useAppointmentActions() {
           status: typedOriginalSale.status,
           payment_method: typedOriginalSale.payment_method,
           created_at: typedOriginalSale.created_at,
+          tax: appointment.tax,
           originalSale: typedOriginalSale,
           refunds: typedRefunds || []
         };
@@ -142,6 +143,7 @@ export function useAppointmentActions() {
           status: typedAppointment.status,
           payment_method: typedAppointment.payment_method,
           created_at: typedAppointment.created_at,
+          tax: appointment.tax,
           originalSale: typedAppointment,
           refunds: typedRefunds || []
         };
