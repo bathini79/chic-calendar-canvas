@@ -35,5 +35,26 @@ export function useLocationTaxSettings() {
     }
   }
 
-  return { fetchLocationTaxSettings, isLoading };
+  async function fetchTaxDetails(taxId: string) {
+    try {
+      if (!taxId) return null;
+      
+      const { data, error } = await supabase
+        .from("tax_rates")
+        .select("*")
+        .eq("id", taxId)
+        .single();
+        
+      if (error) {
+        throw error;
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error(`Error fetching tax details:`, error);
+      return null;
+    }
+  }
+
+  return { fetchLocationTaxSettings, fetchTaxDetails, isLoading };
 }

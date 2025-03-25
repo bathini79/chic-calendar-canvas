@@ -10,21 +10,22 @@ import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { ServiceCard } from "@/components/customer/services/ServiceCard";
 import { PackageCard } from "@/components/customer/services/PackageCard";
 import { calculatePackagePrice, calculatePackageDuration } from "@/pages/admin/bookings/utils/bookingUtils";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { LocationSelector } from "@/components/admin/dashboard/LocationSelector";
 
 export default function Services() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const locationParam = searchParams.get('location');
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const { addToCart, removeFromCart, items, setSelectedLocation } = useCart();
+  const { addToCart, removeFromCart, items, setSelectedLocation, selectedLocation } = useCart();
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [totalPrice, setTotalPrice] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
-  const [locationId, setLocationId] = useState<string>("all");
+  const [locationId, setLocationId] = useState<string>(selectedLocation || "all");
   
   const { data: locations } = useQuery({
     queryKey: ["locations"],
@@ -48,16 +49,32 @@ export default function Services() {
       if (locationParam && locations.some(loc => loc.id === locationParam)) {
         setLocationId(locationParam);
         setSelectedLocation(locationParam);
-      } else {
+      } 
+      else if (selectedLocation && locations.some(loc => loc.id === selectedLocation)) {
+        setLocationId(selectedLocation);
+        setSearchParams(prev => {
+          prev.set('location', selectedLocation);
+          return prev;
+        });
+      } 
+      else {
         setLocationId(locations[0].id);
         setSelectedLocation(locations[0].id);
+        setSearchParams(prev => {
+          prev.set('location', locations[0].id);
+          return prev;
+        });
       }
     }
-  }, [locations, locationParam, setSelectedLocation]);
+  }, [locations, locationParam, selectedLocation, setSelectedLocation, setSearchParams]);
 
   const handleLocationChange = (value: string) => {
     setLocationId(value);
     setSelectedLocation(value);
+    setSearchParams(prev => {
+      prev.set('location', value);
+      return prev;
+    });
   };
   
   const { data: services, isLoading: servicesLoading } = useQuery({

@@ -1,14 +1,16 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { format, addMinutes, parseISO } from "date-fns";
-import { ArrowRight, Calendar, Clock, Package, Store, Tag } from "lucide-react";
+import { ArrowRight, Calendar, Clock, MapPin, Package, Store, Tag } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 
 export default function BookingConfirmation() {
   const {
@@ -20,7 +22,9 @@ export default function BookingConfirmation() {
     getTotalDuration,
     removeFromCart,
     appliedTaxId,
-    appliedCouponId
+    setAppliedTaxId,
+    appliedCouponId,
+    selectedLocation
   } = useCart();
   const navigate = useNavigate();
   const [notes, setNotes] = useState("");
@@ -29,23 +33,57 @@ export default function BookingConfirmation() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [tax, setTax] = useState<any>(null);
   const [coupon, setCoupon] = useState<any>(null);
+  const [locationDetails, setLocationDetails] = useState<any>(null);
+  const { fetchLocationTaxSettings, fetchTaxDetails } = useLocationTaxSettings();
 
   useEffect(() => {
-    const fetchTaxAndCouponDetails = async () => {
-      if (appliedTaxId) {
+    const fetchLocationDetails = async () => {
+      if (selectedLocation) {
         const { data, error } = await supabase
-          .from('tax_rates')
+          .from('locations')
           .select('*')
-          .eq('id', appliedTaxId)
+          .eq('id', selectedLocation)
           .single();
         
         if (!error && data) {
-          setTax(data);
+          setLocationDetails(data);
+        }
+      }
+    };
+
+    fetchLocationDetails();
+  }, [selectedLocation]);
+
+  useEffect(() => {
+    const fetchTaxAndCouponDetails = async () => {
+      if (selectedLocation) {
+        // Fetch location tax settings
+        const settings = await fetchLocationTaxSettings(selectedLocation);
+        
+        if (settings && settings.service_tax_id && !appliedTaxId) {
+          setAppliedTaxId(settings.service_tax_id);
           
-          const subtotal = getTotalPrice();
-          const afterCoupon = subtotal - couponDiscount;
-          const newTaxAmount = afterCoupon * (data.percentage / 100);
-          setTaxAmount(newTaxAmount);
+          // Fetch tax details
+          const taxData = await fetchTaxDetails(settings.service_tax_id);
+          if (taxData) {
+            setTax(taxData);
+            
+            const subtotal = getTotalPrice();
+            const afterCoupon = subtotal - couponDiscount;
+            const newTaxAmount = afterCoupon * (taxData.percentage / 100);
+            setTaxAmount(newTaxAmount);
+          }
+        } else if (appliedTaxId) {
+          // If tax is already applied, fetch its details
+          const taxData = await fetchTaxDetails(appliedTaxId);
+          if (taxData) {
+            setTax(taxData);
+            
+            const subtotal = getTotalPrice();
+            const afterCoupon = subtotal - couponDiscount;
+            const newTaxAmount = afterCoupon * (taxData.percentage / 100);
+            setTaxAmount(newTaxAmount);
+          }
         }
       }
 
@@ -75,7 +113,7 @@ export default function BookingConfirmation() {
     };
 
     fetchTaxAndCouponDetails();
-  }, [appliedTaxId, appliedCouponId, getTotalPrice]);
+  }, [appliedTaxId, appliedCouponId, getTotalPrice, fetchLocationTaxSettings, fetchTaxDetails, selectedLocation, tax]);
 
   if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
     navigate("/schedule");
@@ -166,7 +204,8 @@ export default function BookingConfirmation() {
           total_duration: totalDuration,
           tax_id: appliedTaxId,
           tax_amount: taxAmount,
-          coupon_id: appliedCouponId
+          coupon_id: appliedCouponId,
+          location: selectedLocation
         })
         .select();
 
@@ -347,6 +386,15 @@ export default function BookingConfirmation() {
                 <span className="ml-1 text-sm">({durationDisplay})</span>
               </span>
             </div>
+            {locationDetails && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <MapPin className="h-4 w-4" />
+                <span>{locationDetails.name}</span>
+                {locationDetails.address && (
+                  <span className="text-xs">• {locationDetails.address}</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
