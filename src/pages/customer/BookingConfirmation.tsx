@@ -1,3 +1,4 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -257,6 +258,22 @@ export default function BookingConfirmation() {
   const discountedSubtotal = subtotal - couponDiscount;
   const totalPrice = discountedSubtotal + taxAmount;
 
+  // Calculate discount ratio for each item based on its price proportion
+  const calculateItemDiscountedPrice = (itemOriginalPrice: number) => {
+    if (couponDiscount <= 0 || subtotal <= 0) {
+      return itemOriginalPrice; // No discount applied
+    }
+    
+    // Calculate what proportion of the total price this item represents
+    const priceRatio = itemOriginalPrice / subtotal;
+    
+    // Calculate the discount amount for this item
+    const itemDiscountAmount = couponDiscount * priceRatio;
+    
+    // Return the discounted price (original - discount)
+    return Math.max(0, itemOriginalPrice - itemDiscountAmount);
+  };
+
   const handleCouponSelect = async (couponId: string) => {
     try {
       if (couponId === appliedCouponId) {
@@ -378,13 +395,19 @@ export default function BookingConfirmation() {
           const itemDuration = item.service?.duration || 0;
           const itemEndTime = addMinutes(currentStartTime, itemDuration);
 
+          // Calculate the discounted price for this service
+          const originalPrice = item.selling_price || item.service?.selling_price || 0;
+          const discountedPrice = calculateItemDiscountedPrice(originalPrice);
+
+          console.log(`Service: ${item.service?.name}, Original: ${originalPrice}, Discounted: ${discountedPrice}`);
+
           const bookingPromise = supabase.from("bookings").insert({
             appointment_id: appointmentId,
             service_id: item.service_id,
             employee_id: stylistId,
             status: "booked",
-            price_paid: item.selling_price || item.service?.selling_price || 0,
-            original_price: item.service?.original_price || 0,
+            price_paid: discountedPrice,
+            original_price: item.service?.original_price || originalPrice,
             start_time: currentStartTime.toISOString(),
             end_time: itemEndTime.toISOString(),
           });
@@ -395,6 +418,15 @@ export default function BookingConfirmation() {
             item.package?.package_services &&
             item.package.package_services.length > 0
           ) {
+            // Get total package price to calculate discount distribution
+            const packageTotalPrice = item.selling_price || item.package?.price || 0;
+            // Calculate the discounted package price
+            const discountedPackagePrice = calculateItemDiscountedPrice(packageTotalPrice);
+            // Calculate discount ratio for all services in this package
+            const packageDiscountRatio = packageTotalPrice > 0 
+              ? discountedPackagePrice / packageTotalPrice 
+              : 1;
+
             for (const packageService of item.package.package_services) {
               const stylistId =
                 selectedStylists[packageService?.service?.id] &&
@@ -407,11 +439,17 @@ export default function BookingConfirmation() {
                 serviceDuration
               );
 
+              // Get original price for this service in the package
               const servicePriceInPackage =
                 packageService.package_selling_price !== undefined &&
                 packageService.package_selling_price !== null
                   ? packageService.package_selling_price
                   : packageService.service.selling_price;
+                  
+              // Apply the package discount ratio to this service price
+              const adjustedServicePrice = servicePriceInPackage * packageDiscountRatio;
+
+              console.log(`Package Service: ${packageService.service.name}, Original: ${servicePriceInPackage}, Adjusted: ${adjustedServicePrice}`);
 
               const bookingPromise = supabase.from("bookings").insert({
                 appointment_id: appointmentId,
@@ -419,7 +457,8 @@ export default function BookingConfirmation() {
                 package_id: item.package_id,
                 employee_id: stylistId,
                 status: "booked",
-                price_paid: servicePriceInPackage,
+                price_paid: adjustedServicePrice,
+                original_price: servicePriceInPackage,
                 start_time: currentStartTime.toISOString(),
                 end_time: serviceEndTime.toISOString(),
               });
@@ -459,13 +498,20 @@ export default function BookingConfirmation() {
                         ? selectedStylists[serviceId]
                         : null;
 
+                    // Apply the coupon discount to the custom service too
+                    const originalCustomPrice = customService.selling_price || 0;
+                    const discountedCustomPrice = calculateItemDiscountedPrice(originalCustomPrice);
+
+                    console.log(`Custom Service: ${customService.name}, Original: ${originalCustomPrice}, Discounted: ${discountedCustomPrice}`);
+
                     const bookingPromise = supabase.from("bookings").insert({
                       appointment_id: appointmentId,
                       service_id: serviceId,
                       package_id: item.package_id,
                       employee_id: stylistId,
                       status: "confirmed",
-                      price_paid: customService.selling_price || 0,
+                      price_paid: discountedCustomPrice,
+                      original_price: originalCustomPrice,
                       start_time: currentStartTime.toISOString(),
                       end_time: serviceEndTime.toISOString(),
                     });
@@ -567,6 +613,13 @@ export default function BookingConfirmation() {
                   ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`
                   : `${minutes}m`;
 
+              // Calculate the discounted price for display
+              const originalPrice = item.selling_price || 
+                item.service?.selling_price || 
+                item.package?.price || 0;
+              const discountedPrice = calculateItemDiscountedPrice(originalPrice);
+              const hasDiscount = discountedPrice < originalPrice;
+
               return (
                 <div
                   key={item.id}
@@ -599,10 +652,16 @@ export default function BookingConfirmation() {
                     </div>
                   </div>
                   <div className="font-medium">
-                    ₹
-                    {item.selling_price ||
-                      item.service?.selling_price ||
-                      item.package?.price}
+                    {hasDiscount ? (
+                      <div className="text-right">
+                        <span className="text-muted-foreground line-through text-xs mr-1">
+                          ₹{originalPrice.toFixed(0)}
+                        </span>
+                        <span className="text-green-600">₹{discountedPrice.toFixed(0)}</span>
+                      </div>
+                    ) : (
+                      <span>₹{originalPrice.toFixed(0)}</span>
+                    )}
                   </div>
                 </div>
               );
