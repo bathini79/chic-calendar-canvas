@@ -1,4 +1,3 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -51,9 +50,9 @@ export default function BookingConfirmation() {
   const [isLoading, setIsLoading] = useState(false);
   const [taxAmount, setTaxAmount] = useState(0);
   const [couponDiscount, setCouponDiscount] = useState(0);
-  const [tax, setTax] = useState<any>(null);
-  const [coupon, setCoupon] = useState<any>(null);
-  const [locationDetails, setLocationDetails] = useState<any>(null);
+  const [tax, setTax] = useState(null);
+  const [coupon, setCoupon] = useState(null);
+  const [locationDetails, setLocationDetails] = useState(null);
   const { fetchLocationTaxSettings, fetchTaxDetails } = useLocationTaxSettings();
   const { coupons, isLoading: couponsLoading, validateCouponCode, getCouponById } = useCoupons();
   const [couponSearchValue, setCouponSearchValue] = useState("");
