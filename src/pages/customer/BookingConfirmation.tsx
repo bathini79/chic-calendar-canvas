@@ -192,8 +192,25 @@ export default function BookingConfirmation() {
   }, [appliedCouponId, getTotalPrice, tax, getCouponById]);
 
   const handleCouponSelect = (couponId: string) => {
-    setAppliedCouponId(couponId);
-    setCouponSearchOpen(false);
+    try {
+      console.log("Selecting coupon with ID:", couponId);
+      if (!couponId || couponId === appliedCouponId) {
+        return;
+      }
+      
+      // Validate that the coupon exists in our list
+      const selectedCoupon = coupons.find(c => c.id === couponId);
+      if (!selectedCoupon) {
+        console.error("Selected coupon not found in coupons list");
+        return;
+      }
+      
+      setAppliedCouponId(couponId);
+      setCouponSearchOpen(false);
+    } catch (error) {
+      console.error("Error in handleCouponSelect:", error);
+      toast.error("Failed to apply coupon");
+    }
   };
 
   const handleRemoveCoupon = () => {
@@ -202,12 +219,10 @@ export default function BookingConfirmation() {
     setCouponDiscount(0);
   };
 
-  const filteredCoupons = couponSearchQuery
-    ? coupons.filter(
-        (coupon) =>
-          coupon.code.toLowerCase().includes(couponSearchQuery.toLowerCase()) ||
-          (coupon.description && 
-            coupon.description.toLowerCase().includes(couponSearchQuery.toLowerCase()))
+  const filteredCoupons = couponSearchQuery 
+    ? coupons.filter(coupon => 
+        coupon.code.toLowerCase().includes(couponSearchQuery.toLowerCase()) || 
+        (coupon.description && coupon.description.toLowerCase().includes(couponSearchQuery.toLowerCase()))
       )
     : coupons;
 
@@ -595,7 +610,10 @@ export default function BookingConfirmation() {
                               <CommandItem
                                 key={coupon.id}
                                 value={coupon.code}
-                                onSelect={() => handleCouponSelect(coupon.id)}
+                                onSelect={() => {
+                                  console.log(`CommandItem onSelect for coupon ${coupon.code}`);
+                                  handleCouponSelect(coupon.id);
+                                }}
                                 className="flex flex-col items-start"
                               >
                                 <div className="font-medium">{coupon.code}</div>

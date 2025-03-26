@@ -50,8 +50,11 @@ export function useCoupons() {
 
   const getCouponById = useCallback(
     async (id: string) => {
+      if (!id) return null;
+      
       try {
         console.log("Looking for coupon with ID:", id, "in cache:", coupons);
+        // First check in the cached coupons list
         if (coupons.length > 0) {
           const cachedCoupon = coupons.find((coupon) => coupon.id === id);
           if (cachedCoupon) {
@@ -84,12 +87,26 @@ export function useCoupons() {
 
   const validateCouponCode = useCallback(
     async (code: string) => {
+      if (!code) return null;
+      
       try {
         console.log("Validating coupon code:", code);
+        // First check in the cached coupons list
+        if (coupons.length > 0) {
+          const cachedCoupon = coupons.find(
+            (coupon) => coupon.code.toLowerCase() === code.toLowerCase() && coupon.is_active
+          );
+          if (cachedCoupon) {
+            console.log("Found cached coupon by code:", cachedCoupon);
+            return cachedCoupon;
+          }
+        }
+        
+        // If not in cache, check in the database
         const { data, error } = await supabase
           .from("coupons")
           .select("*")
-          .eq("code", code)
+          .ilike("code", code)
           .eq("is_active", true)
           .single();
 
@@ -105,7 +122,7 @@ export function useCoupons() {
         return null;
       }
     },
-    []
+    [coupons]
   );
 
   return {
