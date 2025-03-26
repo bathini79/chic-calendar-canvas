@@ -62,7 +62,8 @@ export default function BookingConfirmation() {
   // Log for debugging
   useEffect(() => {
     console.log("BookingConfirmation - appliedCouponId:", appliedCouponId);
-  }, [appliedCouponId]);
+    console.log("BookingConfirmation - items:", items);
+  }, [appliedCouponId, items]);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -116,7 +117,8 @@ export default function BookingConfirmation() {
         if (taxData) {
           setTax(taxData);
 
-          const subtotal = getTotalPrice();
+          // Make sure to use a safe calculation in case items are not loaded yet
+          const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
           const afterCoupon = subtotal - couponDiscount;
           const newTaxAmount = afterCoupon * (taxData.percentage / 100);
           setTaxAmount(newTaxAmount);
@@ -127,7 +129,7 @@ export default function BookingConfirmation() {
     };
 
     loadTaxDetails();
-  }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails]);
+  }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails, items]);
 
   // Fetch and load coupon details
   useEffect(() => {
@@ -176,12 +178,21 @@ export default function BookingConfirmation() {
 
     const processCouponData = (data: any) => {
       setCoupon(data);
+      
+      // Ensure items are available before calculating discount
+      if (!items || items.length === 0) {
+        console.log("Items array is empty, setting discount to 0");
+        setCouponDiscount(0);
+        return;
+      }
+      
       const subtotal = getTotalPrice();
       const newDiscount =
         data.discount_type === "percentage"
           ? subtotal * (data.discount_value / 100)
           : Math.min(data.discount_value, subtotal);
 
+      console.log("Calculated coupon discount:", newDiscount, "from subtotal:", subtotal);
       setCouponDiscount(newDiscount);
 
       if (tax) {
@@ -192,14 +203,27 @@ export default function BookingConfirmation() {
     };
 
     loadCouponDetails();
-  }, [appliedCouponId, getTotalPrice, tax, getCouponById]);
+  }, [appliedCouponId, getTotalPrice, tax, getCouponById, items]);
 
   // Redirect if no date or timeslots
   useEffect(() => {
-    if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
+    if (!selectedDate || !items || items.length === 0 || Object.keys(selectedTimeSlots).length === 0) {
       navigate("/schedule");
     }
-  }, [selectedDate, selectedTimeSlots, navigate]);
+  }, [selectedDate, selectedTimeSlots, items, navigate]);
+
+  // Guard against undefined items
+  if (!items || items.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-bold mb-2">No items in your cart</h2>
+          <p className="text-muted-foreground mb-4">Please add services to continue</p>
+          <Button onClick={() => navigate("/services")}>Browse Services</Button>
+        </div>
+      </div>
+    );
+  }
 
   const sortedItems = [...items].sort((a, b) => {
     const aTime = selectedTimeSlots[a.id] || "00:00";
@@ -478,6 +502,8 @@ export default function BookingConfirmation() {
   };
 
   const clearCart = async () => {
+    if (!items) return;
+    
     for (const item of items) {
       await removeFromCart(item.id);
     }
