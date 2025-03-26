@@ -12,8 +12,8 @@ import {
   Package,
   Store,
   Tag,
+  Search,
   X,
-  Search
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -21,11 +21,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
-import { useCoupons, Coupon } from "@/hooks/use-coupons";
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
+import { useCoupons } from "@/hooks/use-coupons";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -51,19 +51,13 @@ export default function BookingConfirmation() {
   const [taxAmount, setTaxAmount] = useState(0);
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [tax, setTax] = useState<any>(null);
-  const [coupon, setCoupon] = useState<Coupon | null>(null);
+  const [coupon, setCoupon] = useState<any>(null);
   const [locationDetails, setLocationDetails] = useState<any>(null);
-  const [couponPopoverOpen, setCouponPopoverOpen] = useState(false);
   const { fetchLocationTaxSettings, fetchTaxDetails } =
     useLocationTaxSettings();
-  const { 
-    filteredCoupons, 
-    searchQuery, 
-    setSearchQuery, 
-    validateCouponCode, 
-    getCouponById,
-    calculateCouponDiscount
-  } = useCoupons();
+  const { coupons, validateCouponCode, getCouponById, isLoading: isLoadingCoupons } = useCoupons();
+  const [couponSearchOpen, setCouponSearchOpen] = useState(false);
+  const [couponSearchQuery, setCouponSearchQuery] = useState("");
 
   // Log for debugging
   useEffect(() => {
@@ -116,15 +110,16 @@ export default function BookingConfirmation() {
         setTaxAmount(0);
         return;
       }
-      
-      const taxData = await fetchTaxDetails(appliedTaxId);
-      if (taxData) {
-        setTax(taxData);
+      if (!tax) {
+        const taxData = await fetchTaxDetails(appliedTaxId);
+        if (taxData) {
+          setTax(taxData);
 
-        const subtotal = getTotalPrice();
-        const afterCoupon = subtotal - couponDiscount;
-        const newTaxAmount = afterCoupon * (taxData.percentage / 100);
-        setTaxAmount(newTaxAmount);
+          const subtotal = getTotalPrice();
+          const afterCoupon = subtotal - couponDiscount;
+          const newTaxAmount = afterCoupon * (taxData.percentage / 100);
+          setTaxAmount(newTaxAmount);
+        }
       }
     };
 
@@ -143,7 +138,7 @@ export default function BookingConfirmation() {
 
       console.log("Fetching coupon details for ID:", appliedCouponId);
       try {
-        // Try to get from getCouponById
+        // Try to get from getCouponById first
         const couponData = await getCouponById(appliedCouponId);
         if (couponData) {
           console.log("Coupon found via getCouponById:", couponData);
@@ -156,7 +151,7 @@ export default function BookingConfirmation() {
           .from("coupons")
           .select("*")
           .eq("id", appliedCouponId)
-          .maybeSingle();
+          .single();
 
         if (error) {
           console.error("Error fetching coupon:", error);
@@ -168,11 +163,6 @@ export default function BookingConfirmation() {
         if (data) {
           console.log("Coupon data loaded from direct query:", data);
           processCouponData(data);
-        } else {
-          console.log("No coupon found with ID:", appliedCouponId);
-          setAppliedCouponId(null);
-          setCoupon(null);
-          setCouponDiscount(0);
         }
       } catch (error) {
         console.error("Error in loadCouponDetails:", error);
@@ -181,10 +171,14 @@ export default function BookingConfirmation() {
       }
     };
 
-    const processCouponData = (data: Coupon) => {
+    const processCouponData = (data: any) => {
       setCoupon(data);
       const subtotal = getTotalPrice();
-      const newDiscount = calculateCouponDiscount(data, subtotal);
+      const newDiscount =
+        data.discount_type === "percentage"
+          ? subtotal * (data.discount_value / 100)
+          : Math.min(data.discount_value, subtotal);
+
       setCouponDiscount(newDiscount);
 
       if (tax) {
@@ -195,7 +189,27 @@ export default function BookingConfirmation() {
     };
 
     loadCouponDetails();
-  }, [appliedCouponId, getTotalPrice, tax, getCouponById, calculateCouponDiscount, setAppliedCouponId]);
+  }, [appliedCouponId, getTotalPrice, tax, getCouponById]);
+
+  const handleCouponSelect = (couponId: string) => {
+    setAppliedCouponId(couponId);
+    setCouponSearchOpen(false);
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCouponId(null);
+    setCoupon(null);
+    setCouponDiscount(0);
+  };
+
+  const filteredCoupons = couponSearchQuery
+    ? coupons.filter(
+        (coupon) =>
+          coupon.code.toLowerCase().includes(couponSearchQuery.toLowerCase()) ||
+          (coupon.description && 
+            coupon.description.toLowerCase().includes(couponSearchQuery.toLowerCase()))
+      )
+    : coupons;
 
   if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
     navigate("/schedule");
@@ -234,32 +248,6 @@ export default function BookingConfirmation() {
   const subtotal = getTotalPrice();
   const discountedSubtotal = subtotal - couponDiscount;
   const totalPrice = discountedSubtotal + taxAmount;
-
-  const handleApplyCoupon = async (couponId: string) => {
-    try {
-      const selectedCoupon = filteredCoupons.find(c => c.id === couponId);
-      if (!selectedCoupon) {
-        console.error("Coupon not found:", couponId);
-        toast.error("Coupon not found");
-        return;
-      }
-      
-      console.log("Applying coupon:", selectedCoupon);
-      setAppliedCouponId(couponId);
-      setCouponPopoverOpen(false);
-      toast.success(`Coupon ${selectedCoupon.code} applied`);
-    } catch (error) {
-      console.error("Error applying coupon:", error);
-      toast.error("Failed to apply coupon");
-    }
-  };
-
-  const handleRemoveCoupon = () => {
-    setAppliedCouponId(null);
-    setCoupon(null);
-    setCouponDiscount(0);
-    toast.success("Coupon removed");
-  };
 
   const handleBookingConfirmation = async () => {
     setIsLoading(true);
@@ -577,84 +565,83 @@ export default function BookingConfirmation() {
                   <span>₹{subtotal.toFixed(2)}</span>
                 </div>
 
-                {/* Coupon Section */}
+                {/* Coupon Selection */}
                 <div className="flex justify-between items-center text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Coupon</span>
-                    {!coupon ? (
-                      <Popover open={couponPopoverOpen} onOpenChange={setCouponPopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-7 px-2 text-xs"
-                          >
-                            Apply Coupon
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0" align="start">
-                          <Command>
-                            <CommandInput 
-                              placeholder="Search coupons..." 
-                              value={searchQuery}
-                              onValueChange={setSearchQuery}
-                              className="h-9"
-                              leftIcon={<Search className="h-4 w-4" />}
-                            />
-                            <CommandEmpty>No coupons found</CommandEmpty>
-                            <CommandGroup className="max-h-[200px] overflow-auto">
-                              {filteredCoupons.map(coupon => (
-                                <CommandItem 
-                                  key={coupon.id}
-                                  onSelect={() => handleApplyCoupon(coupon.id)}
-                                  className="flex justify-between items-center"
-                                >
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{coupon.code}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {coupon.discount_type === 'percentage' 
-                                        ? `${coupon.discount_value}% off` 
-                                        : `₹${coupon.discount_value} off`}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {coupon.description || ''}
-                                  </span>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    ) : (
-                      <Badge 
-                        variant="outline" 
-                        className="flex items-center gap-1 text-green-600 border-green-600"
-                      >
-                        {coupon.code}
+                  <span className="text-muted-foreground">Coupon</span>
+                  {!coupon ? (
+                    <Popover open={couponSearchOpen} onOpenChange={setCouponSearchOpen}>
+                      <PopoverTrigger asChild>
                         <Button 
                           variant="ghost" 
-                          size="icon" 
-                          className="h-4 w-4 p-0 text-green-600 hover:text-red-500"
+                          size="sm" 
+                          className="flex items-center gap-1 h-8 px-2 text-blue-600 hover:text-blue-800"
+                        >
+                          <span>Apply Coupon</span>
+                          <Search className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-0 w-60" align="end">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search coupons..." 
+                            value={couponSearchQuery}
+                            onValueChange={setCouponSearchQuery}
+                          />
+                          <CommandEmpty>
+                            {isLoadingCoupons ? "Loading..." : "No coupons found"}
+                          </CommandEmpty>
+                          <CommandGroup className="max-h-52 overflow-auto">
+                            {filteredCoupons.map(coupon => (
+                              <CommandItem
+                                key={coupon.id}
+                                value={coupon.code}
+                                onSelect={() => handleCouponSelect(coupon.id)}
+                                className="flex flex-col items-start"
+                              >
+                                <div className="font-medium">{coupon.code}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {coupon.discount_type === 'percentage' 
+                                    ? `${coupon.discount_value}% off` 
+                                    : `₹${coupon.discount_value} off`}
+                                </div>
+                                {coupon.description && (
+                                  <div className="text-xs text-muted-foreground truncate w-full">
+                                    {coupon.description}
+                                  </div>
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant="secondary" 
+                        className="text-xs flex items-center gap-2"
+                      >
+                        <span>{coupon.code}</span>
+                        <button 
                           onClick={handleRemoveCoupon}
+                          className="hover:text-destructive"
                         >
                           <X className="h-3 w-3" />
-                        </Button>
+                        </button>
                       </Badge>
-                    )}
-                  </div>
-                  <span>
-                    {couponDiscount > 0 ? `-₹${couponDiscount.toFixed(2)}` : "₹0.00"}
-                  </span>
+                    </div>
+                  )}
                 </div>
 
                 {coupon && couponDiscount > 0 && (
-                  <div className="flex justify-end text-xs text-green-600 -mt-1">
-                    <span>
-                      {coupon.discount_type === 'percentage' 
-                        ? `${coupon.discount_value}% off` 
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span className="flex items-center">
+                      <Tag className="mr-1 h-3 w-3" />
+                      {coupon.discount_type === "percentage"
+                        ? `${coupon.discount_value}% off`
                         : `₹${coupon.discount_value} off`}
                     </span>
+                    <span>-₹{couponDiscount.toFixed(2)}</span>
                   </div>
                 )}
 
