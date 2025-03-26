@@ -9,7 +9,7 @@ import { formatPrice } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { useTaxRates } from "@/hooks/use-tax-rates";
-import { useCoupons } from "@/hooks/use-coupons";
+import { useCoupons, Coupon } from "@/hooks/use-coupons";
 import { 
   Select, 
   SelectContent, 
@@ -38,7 +38,7 @@ export function CartSummary() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
   const { taxRates, fetchTaxRates } = useTaxRates();
-  const { coupons, fetchCoupons, isLoading: couponsLoading } = useCoupons();
+  const { coupons, fetchCoupons, isLoading: couponsLoading, getCouponById } = useCoupons();
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,6 +53,15 @@ export function CartSummary() {
   const afterCouponSubtotal = subtotal - couponDiscount;
   const totalPrice = afterCouponSubtotal + taxAmount;
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
+  
+  // Debug logging for coupon state
+  useEffect(() => {
+    console.log("CartSummary - Current coupon state:", {
+      appliedCouponId,
+      couponsLoaded: coupons.length,
+      couponDiscount
+    });
+  }, [appliedCouponId, coupons.length, couponDiscount]);
   
   // Load tax data
   useEffect(() => {
@@ -69,13 +78,13 @@ export function CartSummary() {
     };
     
     loadTaxData();
-  }, [selectedLocation]);
+  }, [selectedLocation, appliedTaxId]);
 
   // Load coupons
   useEffect(() => {
     console.log("Fetching coupons in CartSummary");
     fetchCoupons();
-  }, []);
+  }, [fetchCoupons]);
 
   // Calculate tax amount whenever appliedTaxId or subtotal changes
   useEffect(() => {
@@ -91,26 +100,51 @@ export function CartSummary() {
   
   // Calculate coupon discount
   useEffect(() => {
-    if (appliedCouponId && coupons.length > 0) {
-      console.log("Applied coupon ID:", appliedCouponId);
-      console.log("Available coupons:", coupons);
+    const applyCoupon = async () => {
+      if (!appliedCouponId) {
+        console.log("No coupon applied, setting discount to 0");
+        setCouponDiscount(0);
+        return;
+      }
       
-      const coupon = coupons.find(c => c.id === appliedCouponId);
-      if (coupon) {
-        console.log("Found coupon:", coupon);
-        const discount = coupon.discount_type === 'percentage' 
-          ? subtotal * (coupon.discount_value / 100)
-          : Math.min(coupon.discount_value, subtotal); // Don't discount more than the subtotal
-        
-        setCouponDiscount(discount);
-      } else {
-        console.log("Coupon not found in coupons list");
+      console.log("Applied coupon ID:", appliedCouponId);
+      
+      // First try from cache
+      const cachedCoupon = coupons.find(c => c.id === appliedCouponId);
+      if (cachedCoupon) {
+        console.log("Found coupon in cache:", cachedCoupon);
+        calculateDiscount(cachedCoupon);
+        return;
+      }
+      
+      // If not in cache, try direct lookup
+      try {
+        console.log("Coupon not in cache, fetching from database");
+        const coupon = await getCouponById(appliedCouponId);
+        if (coupon) {
+          console.log("Fetched coupon from database:", coupon);
+          calculateDiscount(coupon);
+        } else {
+          console.log("Coupon not found in database");
+          setCouponDiscount(0);
+        }
+      } catch (error) {
+        console.error("Error fetching coupon:", error);
         setCouponDiscount(0);
       }
-    } else {
-      setCouponDiscount(0);
-    }
-  }, [appliedCouponId, subtotal, coupons]);
+    };
+    
+    const calculateDiscount = (coupon: Coupon) => {
+      const discount = coupon.discount_type === 'percentage' 
+        ? subtotal * (coupon.discount_value / 100)
+        : Math.min(coupon.discount_value, subtotal); // Don't discount more than the subtotal
+      
+      console.log("Calculated coupon discount:", discount);
+      setCouponDiscount(discount);
+    };
+    
+    applyCoupon();
+  }, [appliedCouponId, subtotal, coupons, getCouponById]);
   
   // Sort items by their scheduled start time
   const sortedItems = [...items].sort((a, b) => {

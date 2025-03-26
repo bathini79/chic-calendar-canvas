@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
+import { useCoupons } from "@/hooks/use-coupons";
 
 export default function BookingConfirmation() {
   const {
@@ -35,6 +36,12 @@ export default function BookingConfirmation() {
   const [coupon, setCoupon] = useState<any>(null);
   const [locationDetails, setLocationDetails] = useState<any>(null);
   const { fetchLocationTaxSettings, fetchTaxDetails } = useLocationTaxSettings();
+  const { validateCouponCode, getCouponById } = useCoupons();
+
+  // Log for debugging
+  useEffect(() => {
+    console.log("BookingConfirmation - appliedCouponId:", appliedCouponId);
+  }, [appliedCouponId]);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -77,7 +84,7 @@ export default function BookingConfirmation() {
         setTaxAmount(0);
         return;
       }
-      if(!tax){
+      
       const taxData = await fetchTaxDetails(appliedTaxId);
       if (taxData) {
         setTax(taxData);
@@ -86,54 +93,75 @@ export default function BookingConfirmation() {
         const afterCoupon = subtotal - couponDiscount;
         const newTaxAmount = afterCoupon * (taxData.percentage / 100);
         setTaxAmount(newTaxAmount);
-      }}
+      }
     };
     
     loadTaxDetails();
   }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails]);
 
+  // Fetch and load coupon details
   useEffect(() => {
     const loadCouponDetails = async () => {
       if (!appliedCouponId) {
+        console.log("No coupon ID applied");
         setCoupon(null);
         setCouponDiscount(0);
         return;
       }
       
       console.log("Fetching coupon details for ID:", appliedCouponId);
-      const { data, error } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('id', appliedCouponId)
-        .single();
-      
-      if (error) {
-        console.error("Error fetching coupon:", error);
+      try {
+        // Try to get from getCouponById first
+        const couponData = await getCouponById(appliedCouponId);
+        if (couponData) {
+          console.log("Coupon found via getCouponById:", couponData);
+          processCouponData(couponData);
+          return;
+        }
+        
+        // Fallback to direct database query
+        const { data, error } = await supabase
+          .from('coupons')
+          .select('*')
+          .eq('id', appliedCouponId)
+          .single();
+        
+        if (error) {
+          console.error("Error fetching coupon:", error);
+          setCoupon(null);
+          setCouponDiscount(0);
+          return;
+        }
+        
+        if (data) {
+          console.log("Coupon data loaded from direct query:", data);
+          processCouponData(data);
+        }
+      } catch (error) {
+        console.error("Error in loadCouponDetails:", error);
         setCoupon(null);
         setCouponDiscount(0);
-        return;
       }
+    };
+    
+    const processCouponData = (data: any) => {
+      setCoupon(data);
+      const subtotal = getTotalPrice();
+      const newDiscount = data.discount_type === 'percentage' 
+        ? subtotal * (data.discount_value / 100)
+        : Math.min(data.discount_value, subtotal);
       
-      if (data) {
-        console.log("Coupon data loaded:", data);
-        setCoupon(data);
-        const subtotal = getTotalPrice();
-        const newDiscount = data.discount_type === 'percentage' 
-          ? subtotal * (data.discount_value / 100)
-          : Math.min(data.discount_value, subtotal);
-        
-        setCouponDiscount(newDiscount);
-        
-        if (tax) {
-          const afterCoupon = subtotal - newDiscount;
-          const newTaxAmount = afterCoupon * (tax.percentage / 100);
-          setTaxAmount(newTaxAmount);
-        }
+      setCouponDiscount(newDiscount);
+      
+      if (tax) {
+        const afterCoupon = subtotal - newDiscount;
+        const newTaxAmount = afterCoupon * (tax.percentage / 100);
+        setTaxAmount(newTaxAmount);
       }
     };
     
     loadCouponDetails();
-  }, [appliedCouponId, getTotalPrice, tax]);
+  }, [appliedCouponId, getTotalPrice, tax, getCouponById]);
 
   if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
     navigate("/schedule");
@@ -208,7 +236,8 @@ export default function BookingConfirmation() {
         taxAmount,
         totalPrice,
         couponId: appliedCouponId,
-        taxId: appliedTaxId
+        taxId: appliedTaxId,
+        couponDetails: coupon
       });
 
       const { data: appointmentData, error: appointmentError } = await supabase
@@ -225,6 +254,8 @@ export default function BookingConfirmation() {
           tax_amount: taxAmount,
           tax_id: appliedTaxId,
           coupon_id: appliedCouponId,
+          discount_type: coupon?.discount_type || null,
+          discount_value: coupon?.discount_value || 0,
           location: selectedLocation
         })
         .select();
@@ -314,7 +345,7 @@ export default function BookingConfirmation() {
             if (allServices) {
               for (const serviceId of item.customized_services) {
                 const isBaseService = item.package?.package_services.some(
-                  (ps) => ps.service.id === serviceId
+                  (ps: any) => ps.service.id === serviceId
                 );
 
                 if (!isBaseService) {

@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useCoupons, Coupon } from "@/hooks/use-coupons";
+import { CouponDebugger } from "@/components/debug/CouponDebugger";
 
 type TaxRate = {
   id: string;
@@ -22,11 +24,10 @@ export default function Cart() {
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTaxRate, setSelectedTaxRate] = useState<TaxRate | null>(null);
-  const [coupons, setCoupons] = useState<any[]>([]);
-  const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
-  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+  const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
   const { fetchTaxRates } = useTaxRates();
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
+  const { coupons, isLoading: isLoadingCoupons, getCouponById } = useCoupons();
   
   const subtotal = getTotalPrice();
   const couponDiscount = selectedCoupon ? (
@@ -73,37 +74,41 @@ export default function Cart() {
     loadData();
   }, [selectedLocation]);
 
-  // Fetch available coupons
+  // Load coupon data when appliedCouponId changes
   useEffect(() => {
-    const fetchCoupons = async () => {
-      setIsLoadingCoupons(true);
-      try {
-        const { data, error } = await supabase
-          .from("coupons")
-          .select("*")
-          .eq("is_active", true)
-          .order("code");
+    const loadCouponData = async () => {
+      if (!appliedCouponId) {
+        setSelectedCoupon(null);
+        return;
+      }
 
-        if (error) throw error;
-        setCoupons(data || []);
-        
-        // If a coupon is already selected in the cart context, find its details
-        if (appliedCouponId) {
-          const coupon = data?.find(c => c.id === appliedCouponId);
-          if (coupon) {
-            setSelectedCoupon(coupon);
-          }
+      try {
+        console.log("Loading coupon data for ID:", appliedCouponId);
+        // Try from cache first (coupons array)
+        const couponFromCache = coupons.find(c => c.id === appliedCouponId);
+        if (couponFromCache) {
+          console.log("Found coupon in cache:", couponFromCache);
+          setSelectedCoupon(couponFromCache);
+          return;
+        }
+
+        // If not in cache, try to get it from the database
+        const coupon = await getCouponById(appliedCouponId);
+        if (coupon) {
+          console.log("Found coupon from getCouponById:", coupon);
+          setSelectedCoupon(coupon);
+        } else {
+          console.log("Coupon not found, clearing selection");
+          setSelectedCoupon(null);
         }
       } catch (error) {
-        console.error("Error fetching coupons:", error);
-        toast.error("Failed to load coupons");
-      } finally {
-        setIsLoadingCoupons(false);
+        console.error("Error loading coupon data:", error);
+        setSelectedCoupon(null);
       }
     };
 
-    fetchCoupons();
-  }, [appliedCouponId]);
+    loadCouponData();
+  }, [appliedCouponId, coupons, getCouponById]);
 
   const handleTaxChange = (taxId: string) => {
     if (taxId === "none") {
@@ -120,17 +125,13 @@ export default function Cart() {
   };
   
   const handleCouponChange = (couponId: string) => {
+    console.log("Changing coupon to:", couponId);
     if (couponId === "none") {
       setAppliedCouponId(null);
-      setSelectedCoupon(null);
       return;
     }
     
     setAppliedCouponId(couponId);
-    const coupon = coupons.find(c => c.id === couponId);
-    if (coupon) {
-      setSelectedCoupon(coupon);
-    }
   };
 
   return (
@@ -261,6 +262,9 @@ export default function Cart() {
           </Card>
         </div>
       </div>
+      
+      {/* Debugging section */}
+      {process.env.NODE_ENV !== 'production' && <CouponDebugger />}
     </div>
   );
 }

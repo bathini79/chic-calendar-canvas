@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type Coupon = {
+export type Coupon = {
   id: string;
   code: string;
   discount_type: 'percentage' | 'fixed';
@@ -33,7 +33,7 @@ export function useCoupons() {
       }
 
       console.log("Coupons fetched successfully:", data);
-      setCoupons(data || []);
+      setCoupons(data as Coupon[] || []);
       return data;
     } catch (error: any) {
       console.error("Error in fetchCoupons:", error);
@@ -51,18 +51,29 @@ export function useCoupons() {
   const getCouponById = useCallback(
     async (id: string) => {
       try {
+        console.log("Looking for coupon with ID:", id, "in cache:", coupons);
         if (coupons.length > 0) {
-          return coupons.find((coupon) => coupon.id === id);
+          const cachedCoupon = coupons.find((coupon) => coupon.id === id);
+          if (cachedCoupon) {
+            console.log("Found cached coupon:", cachedCoupon);
+            return cachedCoupon;
+          }
         }
 
+        console.log("Fetching coupon directly from database");
         const { data, error } = await supabase
           .from("coupons")
           .select("*")
           .eq("id", id)
           .single();
 
-        if (error) throw error;
-        return data;
+        if (error) {
+          console.error("Database error fetching coupon:", error);
+          throw error;
+        }
+        
+        console.log("Retrieved coupon from DB:", data);
+        return data as Coupon;
       } catch (error: any) {
         console.error("Error fetching coupon by ID:", error);
         return null;
@@ -74,6 +85,7 @@ export function useCoupons() {
   const validateCouponCode = useCallback(
     async (code: string) => {
       try {
+        console.log("Validating coupon code:", code);
         const { data, error } = await supabase
           .from("coupons")
           .select("*")
@@ -81,8 +93,13 @@ export function useCoupons() {
           .eq("is_active", true)
           .single();
 
-        if (error) throw error;
-        return data;
+        if (error) {
+          console.error("Error validating coupon code:", error);
+          throw error;
+        }
+        
+        console.log("Valid coupon found:", data);
+        return data as Coupon;
       } catch (error: any) {
         console.error("Error validating coupon code:", error);
         return null;
