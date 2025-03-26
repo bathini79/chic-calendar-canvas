@@ -16,6 +16,7 @@ export type Coupon = {
 export function useCoupons() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchCoupons = useCallback(async () => {
     setIsLoading(true);
@@ -108,11 +109,37 @@ export function useCoupons() {
     []
   );
 
+  // Helper function to calculate coupon discount
+  const calculateCouponDiscount = useCallback(
+    (coupon: Coupon, subtotal: number) => {
+      if (!coupon) return 0;
+      
+      return coupon.discount_type === 'percentage'
+        ? subtotal * (coupon.discount_value / 100)
+        : Math.min(coupon.discount_value, subtotal); // Don't exceed the subtotal
+    },
+    []
+  );
+
+  // Filtered coupons based on search query
+  const filteredCoupons = useCallback(() => {
+    if (!searchQuery) return coupons;
+    
+    return coupons.filter(coupon => 
+      coupon.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (coupon.description && coupon.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [coupons, searchQuery]);
+
   return {
     coupons,
+    filteredCoupons: filteredCoupons(),
     isLoading,
+    searchQuery,
+    setSearchQuery,
     fetchCoupons,
     getCouponById,
     validateCouponCode,
+    calculateCouponDiscount,
   };
 }

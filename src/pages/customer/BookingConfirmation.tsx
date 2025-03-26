@@ -1,3 +1,4 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +12,8 @@ import {
   Package,
   Store,
   Tag,
+  Search,
+  X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +22,14 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { useCoupons } from "@/hooks/use-coupons";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 
 export default function BookingConfirmation() {
   const {
@@ -32,6 +43,7 @@ export default function BookingConfirmation() {
     appliedTaxId,
     setAppliedTaxId,
     appliedCouponId,
+    setAppliedCouponId,
     selectedLocation,
   } = useCart();
   const navigate = useNavigate();
@@ -42,9 +54,10 @@ export default function BookingConfirmation() {
   const [tax, setTax] = useState<any>(null);
   const [coupon, setCoupon] = useState<any>(null);
   const [locationDetails, setLocationDetails] = useState<any>(null);
-  const { fetchLocationTaxSettings, fetchTaxDetails } =
-    useLocationTaxSettings();
-  const { validateCouponCode, getCouponById } = useCoupons();
+  const { fetchLocationTaxSettings, fetchTaxDetails } = useLocationTaxSettings();
+  const { coupons, isLoading: couponsLoading, validateCouponCode, getCouponById } = useCoupons();
+  const [couponSearchValue, setCouponSearchValue] = useState("");
+  const [openCouponPopover, setOpenCouponPopover] = useState(false);
 
   // Log for debugging
   useEffect(() => {
@@ -97,7 +110,8 @@ export default function BookingConfirmation() {
         setTaxAmount(0);
         return;
       }
-      if (!tax) {
+      
+      try {
         const taxData = await fetchTaxDetails(appliedTaxId);
         if (taxData) {
           setTax(taxData);
@@ -107,6 +121,8 @@ export default function BookingConfirmation() {
           const newTaxAmount = afterCoupon * (taxData.percentage / 100);
           setTaxAmount(newTaxAmount);
         }
+      } catch (error) {
+        console.error("Error loading tax details:", error);
       }
     };
 
@@ -178,10 +194,12 @@ export default function BookingConfirmation() {
     loadCouponDetails();
   }, [appliedCouponId, getTotalPrice, tax, getCouponById]);
 
-  if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
-    navigate("/schedule");
-    return null;
-  }
+  // Redirect if no date or timeslots
+  useEffect(() => {
+    if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
+      navigate("/schedule");
+    }
+  }, [selectedDate, selectedTimeSlots, navigate]);
 
   const sortedItems = [...items].sort((a, b) => {
     const aTime = selectedTimeSlots[a.id] || "00:00";
@@ -215,6 +233,39 @@ export default function BookingConfirmation() {
   const subtotal = getTotalPrice();
   const discountedSubtotal = subtotal - couponDiscount;
   const totalPrice = discountedSubtotal + taxAmount;
+
+  const handleCouponSelect = async (couponId: string) => {
+    try {
+      if (couponId === appliedCouponId) {
+        // If same coupon is selected again, remove it
+        setAppliedCouponId(null);
+        setCouponSearchValue("");
+        setOpenCouponPopover(false);
+        return;
+      }
+
+      // Fetch and validate the coupon before applying
+      const selectedCoupon = coupons.find(c => c.id === couponId);
+      if (!selectedCoupon) {
+        throw new Error("Coupon not found");
+      }
+
+      setAppliedCouponId(couponId);
+      setCouponSearchValue("");
+      setOpenCouponPopover(false);
+      toast.success(`Coupon ${selectedCoupon.code} applied!`);
+    } catch (error) {
+      console.error("Error applying coupon:", error);
+      toast.error("Error applying coupon");
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCouponId(null);
+    setCoupon(null);
+    setCouponDiscount(0);
+    toast.success("Coupon removed");
+  };
 
   const handleBookingConfirmation = async () => {
     setIsLoading(true);
@@ -287,6 +338,11 @@ export default function BookingConfirmation() {
 
       for (const item of sortedItems) {
         const itemStartTimeString = selectedTimeSlots[item.id];
+        if (!itemStartTimeString) {
+          console.error(`No start time found for item ${item.id}`);
+          continue;
+        }
+        
         let currentStartTime = new Date(
           `${format(selectedDate, "yyyy-MM-dd")} ${itemStartTimeString}`
         );
@@ -426,7 +482,14 @@ export default function BookingConfirmation() {
       await removeFromCart(item.id);
     }
   };
-console.log("couponDiscount",coupon)
+
+  // Filter coupons for search functionality
+  const filteredCoupons = couponsLoading
+    ? []
+    : coupons.filter((coupon) =>
+        coupon.code.toLowerCase().includes(couponSearchValue.toLowerCase())
+      );
+
   return (
     <div className="min-h-screen pb-24">
       <div className="container max-w-2xl mx-auto py-6 px-4">
@@ -531,27 +594,87 @@ console.log("couponDiscount",coupon)
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>₹{subtotal.toFixed(2)}</span>
                 </div>
-
-                {coupon && couponDiscount > 0 && (
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1">
-                      <Tag className="h-3 w-3 text-green-600" />
-                      <Badge
-                        variant="outline"
-                        className="text-xs font-medium text-green-600"
-                      >
-                        {coupon.code} -{" "}
-                        {coupon.discount_type === "percentage"
-                          ? `${coupon.discount_value}% off`
-                          : `₹${coupon.discount_value} off`}
-                      </Badge>
-                    </div>
+                
+                {/* Coupon selection */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Coupon</span>
+                    
+                    {coupon ? (
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant="outline" 
+                          className="px-2 py-1 text-xs flex items-center gap-1 text-green-600 border-green-200 bg-green-50"
+                        >
+                          <Tag className="h-3 w-3" />
+                          {coupon.code}
+                          <button 
+                            onClick={removeCoupon}
+                            className="ml-1 rounded-full hover:bg-green-100"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      </div>
+                    ) : (
+                      <Popover open={openCouponPopover} onOpenChange={setOpenCouponPopover}>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 text-xs border-dashed border-muted-foreground/50"
+                          >
+                            Apply coupon
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 w-72" align="end">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Search for coupons..." 
+                              value={couponSearchValue}
+                              onValueChange={setCouponSearchValue}
+                            />
+                            {couponsLoading ? (
+                              <div className="py-6 text-center text-sm">Loading coupons...</div>
+                            ) : (
+                              <CommandGroup>
+                                {filteredCoupons.length === 0 ? (
+                                  <CommandEmpty>No coupons found</CommandEmpty>
+                                ) : (
+                                  filteredCoupons.map((c) => (
+                                    <CommandItem 
+                                      key={c.id} 
+                                      value={c.code}
+                                      onSelect={() => handleCouponSelect(c.id)}
+                                      className="flex justify-between"
+                                    >
+                                      <div className="flex items-center">
+                                        <Tag className="mr-2 h-3 w-3 text-green-600" />
+                                        <span>{c.code}</span>
+                                      </div>
+                                      <span className="text-xs text-muted-foreground">
+                                        {c.discount_type === "percentage" 
+                                          ? `${c.discount_value}% off` 
+                                          : `₹${c.discount_value} off`}
+                                      </span>
+                                    </CommandItem>
+                                  ))
+                                )}
+                              </CommandGroup>
+                            )}
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                  
+                  {coupon && couponDiscount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Discount</span>
                       <span>-₹{couponDiscount.toFixed(2)}</span>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {tax && taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
