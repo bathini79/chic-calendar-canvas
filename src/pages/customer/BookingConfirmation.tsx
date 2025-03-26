@@ -14,8 +14,9 @@ import {
   Tag,
   Search,
   X,
+  Check,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,7 +30,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem,CommandList } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
+import confetti from "canvas-confetti";
 
 export default function BookingConfirmation() {
   const {
@@ -58,6 +61,8 @@ export default function BookingConfirmation() {
   const { coupons, isLoading: couponsLoading, validateCouponCode, getCouponById } = useCoupons();
   const [couponSearchValue, setCouponSearchValue] = useState("");
   const [openCouponPopover, setOpenCouponPopover] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const confettiRef = useRef<ConfettiRef>(null);
 
   // Log for debugging
   useEffect(() => {
@@ -112,24 +117,25 @@ export default function BookingConfirmation() {
         return;
       }
       if(!tax){
-      try {
-        const taxData = await fetchTaxDetails(appliedTaxId);
-        if (taxData) {
-          setTax(taxData);
+        try {
+          const taxData = await fetchTaxDetails(appliedTaxId);
+          if (taxData) {
+            setTax(taxData);
 
-          // Make sure to use a safe calculation in case items are not loaded yet
-          const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
-          const afterCoupon = subtotal - couponDiscount;
-          const newTaxAmount = afterCoupon * (taxData.percentage / 100);
-          setTaxAmount(newTaxAmount);
+            // Make sure to use a safe calculation in case items are not loaded yet
+            const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
+            const afterCoupon = subtotal - couponDiscount;
+            const newTaxAmount = afterCoupon * (taxData.percentage / 100);
+            setTaxAmount(newTaxAmount);
+          }
+        } catch (error) {
+          console.error("Error loading tax details:", error);
         }
-      } catch (error) {
-        console.error("Error loading tax details:", error);
       }
-    }};
+    };
 
     loadTaxDetails();
-  }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails, items]);
+  }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails, items, tax]);
 
   // Fetch and load coupon details
   useEffect(() => {
@@ -211,6 +217,53 @@ export default function BookingConfirmation() {
       navigate("/schedule");
     }
   }, [selectedDate, selectedTimeSlots, items, navigate]);
+
+  // Effect for confetti animation and redirect after success
+  useEffect(() => {
+    if (bookingSuccess) {
+      // Fire confetti
+      if (confettiRef.current) {
+        confettiRef.current.fire();
+      }
+      
+      // Trigger side cannon confetti effect
+      const end = Date.now() + 3 * 1000; // 3 seconds
+      const colors = ["#a786ff", "#fd8bbc", "#eca184", "#f8deb1"];
+
+      const frame = () => {
+        if (Date.now() > end) return;
+
+        confetti({
+          particleCount: 2,
+          angle: 60,
+          spread: 55,
+          startVelocity: 60,
+          origin: { x: 0, y: 0.5 },
+          colors: colors,
+        });
+        
+        confetti({
+          particleCount: 2,
+          angle: 120,
+          spread: 55,
+          startVelocity: 60,
+          origin: { x: 1, y: 0.5 },
+          colors: colors,
+        });
+
+        requestAnimationFrame(frame);
+      };
+
+      frame();
+      
+      // Navigate to profile after 5 seconds
+      const timer = setTimeout(() => {
+        navigate("/profile");
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [bookingSuccess, navigate]);
 
   // Guard against undefined items
   if (!items || items.length === 0) {
@@ -536,12 +589,18 @@ export default function BookingConfirmation() {
       }
 
       toast.success("Booking confirmed successfully!");
-      clearCart();
-      navigate("/profile");
+      
+      // Set booking success to trigger confetti and redirect
+      setBookingSuccess(true);
+      
+      // Clear cart after 5 seconds (same timing as redirect)
+      setTimeout(() => {
+        clearCart();
+      }, 5000);
+      
     } catch (error: any) {
       console.error("Booking error:", error);
       toast.error(error.message || "Failed to confirm booking");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -562,7 +621,19 @@ export default function BookingConfirmation() {
       );
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-24 relative">
+      {/* Confetti overlay */}
+      <Confetti 
+        ref={confettiRef}
+        className="fixed inset-0 z-[100] pointer-events-none"
+        manualstart={true}
+        options={{
+          particleCount: 150,
+          spread: 160,
+          origin: { y: 0.3 }
+        }}
+      />
+      
       <div className="container max-w-2xl mx-auto py-6 px-4">
         <div className="space-y-6">
           <div>
@@ -794,6 +865,17 @@ export default function BookingConfirmation() {
         </div>
       </div>
 
+      {/* Success overlay */}
+      {bookingSuccess && (
+        <div className="fixed inset-0 bg-black/60 flex flex-col items-center justify-center z-50 text-white">
+          <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
+            <Check className="h-8 w-8" />
+          </div>
+          <h2 className="text-3xl font-bold mb-2">Sale Completed!</h2>
+          <p className="text-gray-200">Redirecting to your bookings...</p>
+        </div>
+      )}
+
       <div className="fixed bottom-0 left-0 right-0 border-t bg-background">
         <div className="container max-w-2xl mx-auto px-4">
           <div className="py-4 space-y-3">
@@ -813,9 +895,9 @@ export default function BookingConfirmation() {
               size="lg"
               className="w-full"
               onClick={handleBookingConfirmation}
-              disabled={isLoading}
+              disabled={isLoading || bookingSuccess}
             >
-              {isLoading ? "Confirming..." : "Confirm"}
+              {isLoading ? "Confirming..." : bookingSuccess ? "Sale Completed" : "Confirm"}
             </Button>
           </div>
         </div>
