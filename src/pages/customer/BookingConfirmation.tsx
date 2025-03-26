@@ -28,7 +28,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem,CommandList } from "@/components/ui/command";
 
 export default function BookingConfirmation() {
   const {
@@ -110,7 +110,7 @@ export default function BookingConfirmation() {
         setTaxAmount(0);
         return;
       }
-      
+      if(!tax){
       try {
         const taxData = await fetchTaxDetails(appliedTaxId);
         if (taxData) {
@@ -125,7 +125,7 @@ export default function BookingConfirmation() {
       } catch (error) {
         console.error("Error loading tax details:", error);
       }
-    };
+    }};
 
     loadTaxDetails();
   }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails, items]);
@@ -643,53 +643,57 @@ export default function BookingConfirmation() {
                       </div>
                     ) : (
                       <Popover open={openCouponPopover} onOpenChange={setOpenCouponPopover}>
-                        <PopoverTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 text-xs border-dashed border-muted-foreground/50"
-                          >
-                            Apply coupon
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="p-0 w-72" align="end">
-                          <Command>
-                            <CommandInput 
-                              placeholder="Search for coupons..." 
-                              value={couponSearchValue}
-                              onValueChange={setCouponSearchValue}
-                            />
+                      <PopoverTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 text-xs border-dashed border-muted-foreground/50"
+                        >
+                          Apply coupon
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-0 w-72" align="end">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search for coupons..." 
+                            value={couponSearchValue}
+                            onValueChange={setCouponSearchValue}
+                          />
+                          <CommandList>
                             {couponsLoading ? (
                               <div className="py-6 text-center text-sm">Loading coupons...</div>
                             ) : (
-                              <CommandGroup>
-                                {filteredCoupons.length === 0 ? (
+                              <>
+                                {filteredCoupons?.length === 0 ? (
                                   <CommandEmpty>No coupons found</CommandEmpty>
                                 ) : (
-                                  filteredCoupons.map((c) => (
-                                    <CommandItem 
-                                      key={c.id} 
-                                      value={c.code}
-                                      onSelect={() => handleCouponSelect(c.id)}
-                                      className="flex justify-between"
-                                    >
-                                      <div className="flex items-center">
-                                        <Tag className="mr-2 h-3 w-3 text-green-600" />
-                                        <span>{c.code}</span>
-                                      </div>
-                                      <span className="text-xs text-muted-foreground">
-                                        {c.discount_type === "percentage" 
-                                          ? `${c.discount_value}% off` 
-                                          : `₹${c.discount_value} off`}
-                                      </span>
-                                    </CommandItem>
-                                  ))
+                                  <CommandGroup>
+                                    {filteredCoupons.map((c) => (
+                                      <CommandItem 
+                                        key={c.id} 
+                                        value={c.code}
+                                        onSelect={() => handleCouponSelect(c.id)}
+                                        className="flex justify-between"
+                                      >
+                                        <div className="flex items-center">
+                                          <Tag className="mr-2 h-3 w-3 text-green-600" />
+                                          <span>{c.code}</span>
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">
+                                          {c.discount_type === "percentage" 
+                                            ? `${c.discount_value}% off` 
+                                            : `₹${c.discount_value} off`}
+                                        </span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
                                 )}
-                              </CommandGroup>
+                              </>
                             )}
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     )}
                   </div>
                   
@@ -740,7 +744,7 @@ export default function BookingConfirmation() {
               </div>
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
-                <span>{items.length} services</span>
+                <span>{items?.length} services</span>
                 <span>•</span>
                 <Clock className="h-4 w-4" />
                 <span>{durationDisplay}</span>
