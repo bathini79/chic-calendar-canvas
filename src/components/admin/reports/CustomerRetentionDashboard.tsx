@@ -14,6 +14,7 @@ import { RetentionTrendChart } from './retention/RetentionTrendChart';
 import { CustomerSegmentRetention } from './retention/CustomerSegmentRetention';
 import { RetentionComparison } from './retention/RetentionComparison';
 import { RetentionInsights } from './retention/RetentionInsights';
+import { ChurnAnalysis } from './retention/ChurnAnalysis';
 
 interface CustomerRetentionDashboardProps {
   onBack?: () => void;
@@ -22,6 +23,7 @@ interface CustomerRetentionDashboardProps {
 export function CustomerRetentionDashboard({ onBack }: CustomerRetentionDashboardProps) {
   const [timeframe, setTimeframe] = useState('90');
   const [comparisonPeriod, setComparisonPeriod] = useState('month');
+  const [activeTab, setActiveTab] = useState('retention'); // Add activeTab state
   
   // Calculate dates for the analysis
   const endDate = new Date();
@@ -86,21 +88,33 @@ export function CustomerRetentionDashboard({ onBack }: CustomerRetentionDashboar
         const { data: activeCustomersData, error: activeError } = await supabase
           .from('appointments')
           .select('customer_id')
-          .distinct()
           .gte('created_at', startDateFormatted)
           .lte('created_at', endDateFormatted);
         
-        const activeCustomers = activeCustomersData?.length || 0;
+        // Count unique active customers
+        const activeCustomerIds = new Set();
+        if (activeCustomersData) {
+          activeCustomersData.forEach(item => {
+            activeCustomerIds.add(item.customer_id);
+          });
+        }
+        const activeCustomers = activeCustomerIds.size;
         
         // Get customers with activity in the previous period
         const { data: prevActiveCustomersData, error: prevActiveError } = await supabase
           .from('appointments')
           .select('customer_id')
-          .distinct()
           .gte('created_at', previousStartDateFormatted)
           .lte('created_at', previousEndDateFormatted);
         
-        const prevActiveCustomers = prevActiveCustomersData?.length || 0;
+        // Count unique previous active customers  
+        const prevActiveCustomerIds = new Set();
+        if (prevActiveCustomersData) {
+          prevActiveCustomersData.forEach(item => {
+            prevActiveCustomerIds.add(item.customer_id);
+          });
+        }
+        const prevActiveCustomers = prevActiveCustomerIds.size;
         
         // Calculate retention rate
         // Formula: (E - N) / S * 100 where:
@@ -123,19 +137,19 @@ export function CustomerRetentionDashboard({ onBack }: CustomerRetentionDashboar
         // Get high-value customers (made more than 3 appointments)
         const { data: highValueCustomersData, error: highValueError } = await supabase
           .from('appointments')
-          .select('customer_id, count')
+          .select('customer_id')
           .eq('status', 'completed')
           .gte('created_at', startDateFormatted)
-          .lte('created_at', endDateFormatted)
-          .order('count', { ascending: false })
-          .limit(100);
+          .lte('created_at', endDateFormatted);
         
         // Count unique high-value customers
         const customerAppointmentCounts = new Map();
-        highValueCustomersData?.forEach(item => {
-          const customerId = item.customer_id;
-          customerAppointmentCounts.set(customerId, (customerAppointmentCounts.get(customerId) || 0) + 1);
-        });
+        if (highValueCustomersData) {
+          highValueCustomersData.forEach(item => {
+            const customerId = item.customer_id;
+            customerAppointmentCounts.set(customerId, (customerAppointmentCounts.get(customerId) || 0) + 1);
+          });
+        }
         
         const highValueCustomers = Array.from(customerAppointmentCounts.entries())
           .filter(([_, count]) => count >= 3)
@@ -144,13 +158,22 @@ export function CustomerRetentionDashboard({ onBack }: CustomerRetentionDashboar
         // Get recurring customers (returned at least once)
         const { data: recurringCustomersData, error: recurringError } = await supabase
           .from('appointments')
-          .select('customer_id, count(*)')
+          .select('customer_id')
           .gte('created_at', startDateFormatted)
-          .lte('created_at', endDateFormatted)
-          .group('customer_id')
-          .having('count(*)', 'gte', 2);
+          .lte('created_at', endDateFormatted);
         
-        const recurringCustomers = recurringCustomersData?.length || 0;
+        // Count customers with multiple appointments
+        const customerRecurringCounts = new Map();
+        if (recurringCustomersData) {
+          recurringCustomersData.forEach(item => {
+            const customerId = item.customer_id;
+            customerRecurringCounts.set(customerId, (customerRecurringCounts.get(customerId) || 0) + 1);
+          });
+        }
+        
+        const recurringCustomers = Array.from(customerRecurringCounts.entries())
+          .filter(([_, count]) => count >= 2)
+          .length;
         
         // Get industry standard retention rate (mock data - would be replaced with actual benchmarks)
         const industryRetentionRate = 70; // Example industry benchmark
@@ -331,117 +354,131 @@ export function CustomerRetentionDashboard({ onBack }: CustomerRetentionDashboar
         </div>
       </div>
       
-      {/* 1. Key Metrics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <RetentionMetricCard
-          title="Total Customers"
-          value={retentionData?.totalCustomers || 0}
-          description="Total number of customers"
-          icon={<Users className="h-4 w-4 text-muted-foreground" />}
-        />
+      {/* Add tabs for Retention and Churn */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="retention" className="flex-1 max-w-[200px]">Retention Rate</TabsTrigger>
+          <TabsTrigger value="churn" className="flex-1 max-w-[200px]">Churn Analysis</TabsTrigger>
+        </TabsList>
         
-        <RetentionMetricCard
-          title="New Customers"
-          value={retentionData?.newCustomers || 0}
-          percentage={(retentionData?.newCustomers && retentionData?.totalCustomers) 
-            ? ((retentionData.newCustomers / retentionData.totalCustomers) * 100).toFixed(1) + '%' 
-            : '0%'}
-          description="Acquired during this period"
-          icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
-        />
-        
-        <RetentionMetricCard
-          title="Retention Rate"
-          value={retentionData?.retentionRate + '%' || '0%'}
-          trend={retentionData?.retentionTrend || 0}
-          description="(E-N)/S × 100"
-          tooltip="Retention Rate = (End of Period Customers - New Customers) / Start of Period Customers × 100"
-          icon={<Repeat className="h-4 w-4 text-muted-foreground" />}
-        />
-        
-        <RetentionMetricCard
-          title="Recurring Customers"
-          value={retentionData?.recurringCustomers || 0}
-          percentage={(retentionData?.recurringCustomers && retentionData?.totalCustomers) 
-            ? ((retentionData.recurringCustomers / retentionData.totalCustomers) * 100).toFixed(1) + '%' 
-            : '0%'}
-          description="Customers with repeat appointments"
-          icon={<UserCheck className="h-4 w-4 text-muted-foreground" />}
-        />
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 2. Retention Trends Over Time */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Retention Trends Over Time</CardTitle>
-                <CardDescription>Tracking retention rate changes over time</CardDescription>
-              </div>
-              <Select value={comparisonPeriod} onValueChange={setComparisonPeriod}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Weekly" />
-                </SelectTrigger>
-                <SelectContent>
-                  {periodOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <RetentionTrendChart data={retentionData?.trendData || []} />
-          </CardContent>
-        </Card>
-        
-        {/* 3. Customer Loyalty & Engagement Insights */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Retention by Segment</CardTitle>
-            <CardDescription>How different customer types retain</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CustomerSegmentRetention 
-              prepaidRate={retentionData?.prepaidCustomerRetentionRate || 0}
-              membershipRate={retentionData?.membershipCustomerRetentionRate || 0}
-              highValueRate={retentionData?.highValueCustomerRetentionRate || 0}
-              recurringRate={retentionData?.recurringCustomerRetentionRate || 0}
+        <TabsContent value="retention" className="space-y-6">
+          {/* 1. Key Metrics Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <RetentionMetricCard
+              title="Total Customers"
+              value={retentionData?.totalCustomers || 0}
+              description="Total number of customers"
+              icon={<Users className="h-4 w-4 text-muted-foreground" />}
             />
-          </CardContent>
-        </Card>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 4. Retention Rate Comparison */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Retention Benchmarks</CardTitle>
-            <CardDescription>How your retention compares to standards</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RetentionComparison 
-              companyRate={retentionData?.retentionRate || 0}
-              industryRate={retentionData?.industryRetentionRate || 0}
+            
+            <RetentionMetricCard
+              title="New Customers"
+              value={retentionData?.newCustomers || 0}
+              percentage={(retentionData?.newCustomers && retentionData?.totalCustomers) 
+                ? ((retentionData.newCustomers / retentionData.totalCustomers) * 100).toFixed(1) + '%' 
+                : '0%'}
+              description="Acquired during this period"
+              icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
             />
-          </CardContent>
-          <CardFooter className="text-xs text-muted-foreground">
-            <Info className="h-3 w-3 mr-1" /> Industry data based on beauty and wellness sector averages
-          </CardFooter>
-        </Card>
+            
+            <RetentionMetricCard
+              title="Retention Rate"
+              value={retentionData?.retentionRate + '%' || '0%'}
+              trend={retentionData?.retentionTrend || 0}
+              description="(E-N)/S × 100"
+              tooltip="Retention Rate = (End of Period Customers - New Customers) / Start of Period Customers × 100"
+              icon={<Repeat className="h-4 w-4 text-muted-foreground" />}
+            />
+            
+            <RetentionMetricCard
+              title="Recurring Customers"
+              value={retentionData?.recurringCustomers || 0}
+              percentage={(retentionData?.recurringCustomers && retentionData?.totalCustomers) 
+                ? ((retentionData.recurringCustomers / retentionData.totalCustomers) * 100).toFixed(1) + '%' 
+                : '0%'}
+              description="Customers with repeat appointments"
+              icon={<UserCheck className="h-4 w-4 text-muted-foreground" />}
+            />
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* 2. Retention Trends Over Time */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Retention Trends Over Time</CardTitle>
+                    <CardDescription>Tracking retention rate changes over time</CardDescription>
+                  </div>
+                  <Select value={comparisonPeriod} onValueChange={setComparisonPeriod}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Weekly" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {periodOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <RetentionTrendChart data={retentionData?.trendData || []} />
+              </CardContent>
+            </Card>
+            
+            {/* 3. Customer Loyalty & Engagement Insights */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Retention by Segment</CardTitle>
+                <CardDescription>How different customer types retain</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CustomerSegmentRetention 
+                  prepaidRate={retentionData?.prepaidCustomerRetentionRate || 0}
+                  membershipRate={retentionData?.membershipCustomerRetentionRate || 0}
+                  highValueRate={retentionData?.highValueCustomerRetentionRate || 0}
+                  recurringRate={retentionData?.recurringCustomerRetentionRate || 0}
+                />
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* 4. Retention Rate Comparison */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Retention Benchmarks</CardTitle>
+                <CardDescription>How your retention compares to standards</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RetentionComparison 
+                  companyRate={retentionData?.retentionRate || 0}
+                  industryRate={retentionData?.industryRetentionRate || 0}
+                />
+              </CardContent>
+              <CardFooter className="text-xs text-muted-foreground">
+                <Info className="h-3 w-3 mr-1" /> Industry data based on beauty and wellness sector averages
+              </CardFooter>
+            </Card>
+            
+            {/* 5. Recommendations & Next Steps */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Retention Insights & Recommendations</CardTitle>
+                <CardDescription>Actionable strategies to improve customer retention</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RetentionInsights recommendations={retentionData?.actionRecommendations || []} />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
         
-        {/* 5. Recommendations & Next Steps */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Retention Insights & Recommendations</CardTitle>
-            <CardDescription>Actionable strategies to improve customer retention</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RetentionInsights recommendations={retentionData?.actionRecommendations || []} />
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="churn">
+          <ChurnAnalysis timeframe={timeframe} onTimeframeChange={setTimeframe} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

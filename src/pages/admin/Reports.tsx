@@ -18,7 +18,8 @@ import {
   Bell, 
   Calendar, 
   Search,
-  ArrowLeft
+  ArrowLeft,
+  TrendingDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -27,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FinancialSummary } from "@/components/admin/reports/FinancialSummary";
 import { CustomerList } from "@/components/admin/reports/CustomerList";
 import { CustomerRetentionDashboard } from "@/components/admin/reports/CustomerRetentionDashboard";
+import { ChurnAnalysis } from "@/components/admin/reports/retention/ChurnAnalysis";
 
 const reportCategories = [
   {
@@ -78,7 +80,7 @@ const reportCategories = [
     reports: [
       { id: "client-list", name: "Client List", description: "Comprehensive list of all active clients" },
       { id: "retention-rate", name: "Retention Rate", description: "Customer return and loyalty metrics" },
-      { id: "churn", name: "Churn Analysis", description: "Analysis of customers who don't return" },
+      { id: "churn-analysis", name: "Churn Analysis", description: "Analysis of customers who don't return and strategies to reduce churn" },
       { id: "loyalty", name: "Loyalty Program Performance", description: "Effectiveness of loyalty initiatives" }
     ]
   },
@@ -154,6 +156,25 @@ export default function Reports() {
       return (
         <div className="space-y-4">
           <CustomerRetentionDashboard onBack={() => setExpandedReport(null)} />
+        </div>
+      );
+    }
+    
+    if (expandedReport === "churn-analysis") {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setExpandedReport(null)}
+              className="mr-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+            <h2 className="text-2xl font-bold">Churn Analysis</h2>
+          </div>
+          <ChurnAnalysis timeframe="90" />
         </div>
       );
     }
@@ -235,7 +256,7 @@ export default function Reports() {
               
               <TabsContent value="all" className="mt-6">
                 {activeCategory === "all" && searchQuery === "" && !expandedReport && (
-                  <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Card 
                       className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
                       onClick={() => handleReportClick("finance-summary")}
@@ -274,6 +295,30 @@ export default function Reports() {
                         </div>
                         <CardTitle className="text-xl">Retention Rate</CardTitle>
                         <CardDescription>Customer return and loyalty metrics</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-40 flex items-center justify-center bg-muted/30 rounded-md">
+                          <p className="text-muted-foreground text-center">
+                            Preview data will appear here
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card 
+                      className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => handleReportClick("churn-analysis")}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Customer Retention</p>
+                          </div>
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <CardTitle className="text-xl">Churn Analysis</CardTitle>
+                        <CardDescription>Analysis of customers who don't return and strategies to reduce churn</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="h-40 flex items-center justify-center bg-muted/30 rounded-md">
