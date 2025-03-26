@@ -1,10 +1,17 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { format, addMinutes, parseISO } from "date-fns";
-import { ArrowRight, Calendar, Clock, MapPin, Package, Store, Tag } from "lucide-react";
+import {
+  ArrowRight,
+  Calendar,
+  Clock,
+  MapPin,
+  Package,
+  Store,
+  Tag,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,7 +32,7 @@ export default function BookingConfirmation() {
     appliedTaxId,
     setAppliedTaxId,
     appliedCouponId,
-    selectedLocation
+    selectedLocation,
   } = useCart();
   const navigate = useNavigate();
   const [notes, setNotes] = useState("");
@@ -35,7 +42,8 @@ export default function BookingConfirmation() {
   const [tax, setTax] = useState<any>(null);
   const [coupon, setCoupon] = useState<any>(null);
   const [locationDetails, setLocationDetails] = useState<any>(null);
-  const { fetchLocationTaxSettings, fetchTaxDetails } = useLocationTaxSettings();
+  const { fetchLocationTaxSettings, fetchTaxDetails } =
+    useLocationTaxSettings();
   const { validateCouponCode, getCouponById } = useCoupons();
 
   // Log for debugging
@@ -47,11 +55,11 @@ export default function BookingConfirmation() {
     const fetchLocationDetails = async () => {
       if (selectedLocation) {
         const { data, error } = await supabase
-          .from('locations')
-          .select('*')
-          .eq('id', selectedLocation)
+          .from("locations")
+          .select("*")
+          .eq("id", selectedLocation)
           .single();
-        
+
         if (!error && data) {
           setLocationDetails(data);
         }
@@ -64,10 +72,10 @@ export default function BookingConfirmation() {
   useEffect(() => {
     const fetchTaxSettings = async () => {
       if (!selectedLocation) return;
-      
+
       if (!appliedTaxId) {
         const settings = await fetchLocationTaxSettings(selectedLocation);
-        
+
         if (settings && settings.service_tax_id) {
           setAppliedTaxId(settings.service_tax_id);
         }
@@ -75,7 +83,12 @@ export default function BookingConfirmation() {
     };
 
     fetchTaxSettings();
-  }, [selectedLocation, appliedTaxId, setAppliedTaxId, fetchLocationTaxSettings]);
+  }, [
+    selectedLocation,
+    appliedTaxId,
+    setAppliedTaxId,
+    fetchLocationTaxSettings,
+  ]);
 
   useEffect(() => {
     const loadTaxDetails = async () => {
@@ -84,18 +97,19 @@ export default function BookingConfirmation() {
         setTaxAmount(0);
         return;
       }
-      
-      const taxData = await fetchTaxDetails(appliedTaxId);
-      if (taxData) {
-        setTax(taxData);
-        
-        const subtotal = getTotalPrice();
-        const afterCoupon = subtotal - couponDiscount;
-        const newTaxAmount = afterCoupon * (taxData.percentage / 100);
-        setTaxAmount(newTaxAmount);
+      if (!tax) {
+        const taxData = await fetchTaxDetails(appliedTaxId);
+        if (taxData) {
+          setTax(taxData);
+
+          const subtotal = getTotalPrice();
+          const afterCoupon = subtotal - couponDiscount;
+          const newTaxAmount = afterCoupon * (taxData.percentage / 100);
+          setTaxAmount(newTaxAmount);
+        }
       }
     };
-    
+
     loadTaxDetails();
   }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails]);
 
@@ -108,7 +122,7 @@ export default function BookingConfirmation() {
         setCouponDiscount(0);
         return;
       }
-      
+
       console.log("Fetching coupon details for ID:", appliedCouponId);
       try {
         // Try to get from getCouponById first
@@ -118,21 +132,21 @@ export default function BookingConfirmation() {
           processCouponData(couponData);
           return;
         }
-        
+
         // Fallback to direct database query
         const { data, error } = await supabase
-          .from('coupons')
-          .select('*')
-          .eq('id', appliedCouponId)
+          .from("coupons")
+          .select("*")
+          .eq("id", appliedCouponId)
           .single();
-        
+
         if (error) {
           console.error("Error fetching coupon:", error);
           setCoupon(null);
           setCouponDiscount(0);
           return;
         }
-        
+
         if (data) {
           console.log("Coupon data loaded from direct query:", data);
           processCouponData(data);
@@ -143,23 +157,24 @@ export default function BookingConfirmation() {
         setCouponDiscount(0);
       }
     };
-    
+
     const processCouponData = (data: any) => {
       setCoupon(data);
       const subtotal = getTotalPrice();
-      const newDiscount = data.discount_type === 'percentage' 
-        ? subtotal * (data.discount_value / 100)
-        : Math.min(data.discount_value, subtotal);
-      
+      const newDiscount =
+        data.discount_type === "percentage"
+          ? subtotal * (data.discount_value / 100)
+          : Math.min(data.discount_value, subtotal);
+
       setCouponDiscount(newDiscount);
-      
+
       if (tax) {
         const afterCoupon = subtotal - newDiscount;
         const newTaxAmount = afterCoupon * (tax.percentage / 100);
         setTaxAmount(newTaxAmount);
       }
     };
-    
+
     loadCouponDetails();
   }, [appliedCouponId, getTotalPrice, tax, getCouponById]);
 
@@ -237,7 +252,7 @@ export default function BookingConfirmation() {
         totalPrice,
         couponId: appliedCouponId,
         taxId: appliedTaxId,
-        couponDetails: coupon
+        couponDetails: coupon,
       });
 
       const { data: appointmentData, error: appointmentError } = await supabase
@@ -256,7 +271,7 @@ export default function BookingConfirmation() {
           coupon_id: appliedCouponId,
           discount_type: coupon?.discount_type || null,
           discount_value: coupon?.discount_value || 0,
-          location: selectedLocation
+          location: selectedLocation,
         })
         .select();
 
@@ -267,7 +282,7 @@ export default function BookingConfirmation() {
       }
 
       const appointmentId = appointmentData[0].id;
-      
+
       const bookingPromises = [];
 
       for (const item of sortedItems) {
@@ -313,8 +328,8 @@ export default function BookingConfirmation() {
                 serviceDuration
               );
 
-              const servicePriceInPackage = 
-                packageService.package_selling_price !== undefined && 
+              const servicePriceInPackage =
+                packageService.package_selling_price !== undefined &&
                 packageService.package_selling_price !== null
                   ? packageService.package_selling_price
                   : packageService.service.selling_price;
@@ -364,7 +379,7 @@ export default function BookingConfirmation() {
                       selectedStylists[serviceId] !== "any"
                         ? selectedStylists[serviceId]
                         : null;
-                    
+
                     const bookingPromise = supabase.from("bookings").insert({
                       appointment_id: appointmentId,
                       service_id: serviceId,
@@ -411,7 +426,7 @@ export default function BookingConfirmation() {
       await removeFromCart(item.id);
     }
   };
-
+console.log("couponDiscount",coupon)
   return (
     <div className="min-h-screen pb-24">
       <div className="container max-w-2xl mx-auto py-6 px-4">
@@ -510,20 +525,24 @@ export default function BookingConfirmation() {
                 <Store className="h-4 w-4" />
                 <span className="font-bold">Pay at Salon</span>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>₹{subtotal.toFixed(2)}</span>
                 </div>
-                
+
                 {coupon && couponDiscount > 0 && (
                   <div className="space-y-1">
                     <div className="flex items-center gap-1">
                       <Tag className="h-3 w-3 text-green-600" />
-                      <Badge variant="outline" className="text-xs font-medium text-green-600">
-                        {coupon.code} - {coupon.discount_type === 'percentage' 
-                          ? `${coupon.discount_value}% off` 
+                      <Badge
+                        variant="outline"
+                        className="text-xs font-medium text-green-600"
+                      >
+                        {coupon.code} -{" "}
+                        {coupon.discount_type === "percentage"
+                          ? `${coupon.discount_value}% off`
                           : `₹${coupon.discount_value} off`}
                       </Badge>
                     </div>
@@ -533,7 +552,7 @@ export default function BookingConfirmation() {
                     </div>
                   </div>
                 )}
-                
+
                 {tax && taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
@@ -542,7 +561,7 @@ export default function BookingConfirmation() {
                     <span>₹{taxAmount.toFixed(2)}</span>
                   </div>
                 )}
-                
+
                 <div className="flex justify-between text-base font-medium pt-1 border-t">
                   <span>Total</span>
                   <span>₹{totalPrice.toFixed(2)}</span>
