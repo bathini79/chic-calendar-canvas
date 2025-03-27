@@ -1,3 +1,4 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -832,12 +833,12 @@ export default function BookingConfirmation() {
       </div>
 
       {bookingSuccess && (
-        <div className="fixed inset-0 bg-black/60 flex flex-col items-center justify-center z-50 text-white">
+        <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
           <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
-            <Check className="h-8 w-8" />
+            <Check className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold mb-2">Sale Completed!</h2>
-          <p className="text-gray-200">Redirecting to your bookings...</p>
+          <h2 className="text-3xl font-bold mb-2 text-gray-900">Sale Completed!</h2>
+          <p className="text-gray-600">Redirecting to your bookings...</p>
         </div>
       )}
 
