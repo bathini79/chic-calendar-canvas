@@ -2,9 +2,10 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format, formatDistanceToNow } from "date-fns";
-import { enUS } from 'date-fns/locale';
-import { formatPrice } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppointmentCard } from "@/components/customer/appointments/AppointmentCard";
+import { AppointmentDetails } from "@/components/customer/appointments/AppointmentDetails";
+import { EmptyAppointments } from "@/components/customer/appointments/EmptyAppointments";
 
 interface Appointment {
   id: string;
@@ -15,6 +16,7 @@ interface Appointment {
   status: string;
   total_price: number;
   bookings: Booking[];
+  location?: string;
 }
 
 interface Booking {
@@ -56,26 +58,11 @@ interface LocationData {
   status?: string;
 }
 
-interface AppointmentDisplayProps {
-  appointment: Appointment;
-  totalDuration: string; // Changed from durationDisplay
-}
-
-const AppointmentDisplay: React.FC<AppointmentDisplayProps> = ({ 
-  appointment,
-  totalDuration, // Changed from durationDisplay
-}) => {
-  return (
-    <div>
-      <p>Total Duration: {totalDuration}</p>
-    </div>
-  );
-};
-
 const Profile = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [location, setLocation] = useState<LocationData | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -151,75 +138,86 @@ const Profile = () => {
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="container mx-auto p-4 min-h-[60vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading your appointments...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Split appointments into upcoming and past
+  const now = new Date();
+  const upcomingAppointments = appointments.filter(
+    (appointment) => new Date(appointment.start_time) >= now
+  );
+  const pastAppointments = appointments.filter(
+    (appointment) => new Date(appointment.start_time) < now
+  );
+
+  if (selectedAppointment) {
+    return (
+      <div className="container mx-auto p-4 max-w-2xl">
+        <AppointmentDetails 
+          appointment={selectedAppointment} 
+          onBack={() => setSelectedAppointment(null)} 
+        />
+      </div>
+    );
   }
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Your Appointments</h1>
+      <h1 className="text-2xl font-bold mb-6">Appointments</h1>
 
-      {appointments.length === 0 ? (
-        <p>No appointments found.</p>
-      ) : (
-        <div className="space-y-4">
-          {appointments.map((appointment) => {
-            const totalDurationMinutes = appointment.bookings.reduce((total, booking) => {
-              return total + (booking.service?.duration || booking.package?.duration || 0);
-            }, 0);
+      <Tabs defaultValue="upcoming" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+          <TabsTrigger value="past">
+            Past
+            {pastAppointments.length > 0 && (
+              <span className="ml-2 bg-muted text-muted-foreground rounded-full px-2 py-1 text-xs">
+                {pastAppointments.length}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-            const hours = Math.floor(totalDurationMinutes / 60);
-            const minutes = totalDurationMinutes % 60;
-            const durationDisplay = `${hours}h ${minutes}m`;
+        <TabsContent value="upcoming" className="mt-0">
+          {upcomingAppointments.length === 0 ? (
+            <EmptyAppointments type="upcoming" />
+          ) : (
+            <div>
+              {upcomingAppointments.map((appointment) => (
+                <AppointmentCard
+                  key={appointment.id}
+                  appointment={appointment}
+                  onClick={() => setSelectedAppointment(appointment)}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
-            return (
-              <div key={appointment.id} className="border rounded p-4">
-                <h2 className="text-lg font-semibold">
-                  Appointment on {format(new Date(appointment.start_time), 'MMMM dd, yyyy')}
-                </h2>
-                <p>
-                  {format(new Date(appointment.start_time), 'h:mm a')} -{' '}
-                  {format(new Date(appointment.end_time), 'h:mm a')}
-                </p>
-                <p>
-                  {formatDistanceToNow(new Date(appointment.start_time), {
-                    addSuffix: true,
-                    locale: enUS,
-                  })}
-                </p>
-                <p>Status: {appointment.status}</p>
-                <p>Total Price: {formatPrice(appointment.total_price || 0)}</p>
-                <AppointmentDisplay appointment={appointment} totalDuration={durationDisplay} />
-
-                <h3 className="text-md font-semibold mt-2">Bookings:</h3>
-                {appointment.bookings.map((booking) => (
-                  <div key={booking.id} className="ml-4">
-                    <p>
-                      {booking.service
-                        ? `Service: ${booking.service.name} (${booking.service.duration} minutes)`
-                        : `Package: ${booking.package?.name} (${booking.package?.duration} minutes)`}
-                    </p>
-                    {booking.employee && <p>Employee: {booking.employee.name}</p>}
-                    <p>Price Paid: {formatPrice(booking.price_paid || 0)}</p>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <h2 className="text-xl font-bold mt-8">Our Location</h2>
-      {location ? (
-        <div>
-          <p>Name: {location.name}</p>
-          <p>Address: {location.address}</p>
-          <p>Phone: {location.phone}</p>
-          <p>Email: {location.email}</p>
-          <p>Status: {location.status}</p>
-        </div>
-      ) : (
-        <p>No location information found.</p>
-      )}
+        <TabsContent value="past" className="mt-0">
+          {pastAppointments.length === 0 ? (
+            <EmptyAppointments type="past" />
+          ) : (
+            <div>
+              {pastAppointments.map((appointment) => (
+                <AppointmentCard
+                  key={appointment.id}
+                  appointment={appointment}
+                  onClick={() => setSelectedAppointment(appointment)}
+                  isPast={true}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
