@@ -24,6 +24,20 @@ export const useAppointmentDetails = (appointmentId: string | undefined) => {
         .single();
       
       if (error) throw error;
+      
+      // Fetch location name if a location ID is provided
+      if (data.location) {
+        const { data: locationData, error: locationError } = await supabase
+          .from('locations')
+          .select('name')
+          .eq('id', data.location)
+          .single();
+          
+        if (!locationError && locationData) {
+          data.location_name = locationData.name;
+        }
+      }
+      
       return data;
     },
     enabled: !!appointmentId

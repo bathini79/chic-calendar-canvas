@@ -6,6 +6,9 @@ import { MapPin, ArrowLeft, ShoppingCart, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/pages/admin/bookings/components/StatusBadge";
 import type { AppointmentStatus } from "@/types/appointment";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "@/components/cart/CartContext";
+import { toast } from "sonner";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +34,9 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
   onReschedule,
   onCancel
 }) => {
+  const navigate = useNavigate();
+  const { addToCart, clearCart, setSelectedLocation } = useCart();
+  
   const appointmentDate = parseISO(appointment.start_time);
   const formattedDate = format(appointmentDate, "EEE, dd MMM, yyyy");
   const formattedTime = format(appointmentDate, "h:mm a");
@@ -54,6 +60,47 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
   const handleCancel = () => {
     if (onCancel) {
       onCancel(appointment.id);
+    }
+  };
+
+  const handleRebook = async () => {
+    try {
+      // Clear existing cart
+      await clearCart();
+      
+      // Set the location first
+      if (appointment.location) {
+        setSelectedLocation(appointment.location);
+      }
+      
+      // Add all services and packages from the appointment to the cart
+      for (const booking of appointment.bookings) {
+        if (booking.service) {
+          await addToCart(booking.service_id, undefined, {
+            name: booking.service.name,
+            price: booking.service.selling_price,
+            duration: booking.service.duration,
+            selling_price: booking.service.selling_price,
+            service: booking.service
+          });
+        } else if (booking.package) {
+          await addToCart(undefined, booking.package_id, {
+            name: booking.package.name,
+            price: booking.package.price,
+            duration: booking.package.duration || 0,
+            selling_price: booking.package.price,
+            package: booking.package
+          });
+        }
+      }
+      
+      toast.success("Previous services added to cart");
+      
+      // Navigate to services page
+      navigate('/services');
+    } catch (error) {
+      console.error("Error rebooking:", error);
+      toast.error("Failed to rebook appointment");
     }
   };
   
@@ -125,7 +172,7 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
       <div className="flex space-x-4">
         {isPast ? (
           <Button 
-            onClick={handleReschedule} 
+            onClick={handleRebook} 
             className="flex-1"
           >
             Rebook

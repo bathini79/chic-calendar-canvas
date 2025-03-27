@@ -9,7 +9,7 @@ import {
   RotateCcw,
   CalendarCheck
 } from "lucide-react";
-import type { AppointmentStatus } from '../types';
+import type { AppointmentStatus } from '@/types/appointment';
 
 interface StatusBadgeProps {
   status: AppointmentStatus;
