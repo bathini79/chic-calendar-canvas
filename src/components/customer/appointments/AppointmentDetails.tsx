@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Separator } from "@/components/ui/separator";
 
 interface AppointmentDetailsProps {
   appointment: any;
@@ -40,6 +41,8 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
   const appointmentDate = parseISO(appointment.start_time);
   const formattedDate = format(appointmentDate, "EEE, dd MMM, yyyy");
   const formattedTime = format(appointmentDate, "h:mm a");
+  
+  // Get the full location information
   const locationName = appointment.location || "Not specified";
 
   // Calculate total duration in minutes
@@ -124,11 +127,11 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center">
-        <MapPin className="h-5 w-5 text-primary mr-2" />
+      <div className="flex items-start">
+        <MapPin className="h-5 w-5 text-primary mr-2 mt-0.5" />
         <div>
           <h3 className="font-medium">Location</h3>
-          <p className="text-sm text-muted-foreground">{locationName}</p>
+          <p className="text-sm text-muted-foreground whitespace-pre-line">{locationName}</p>
         </div>
       </div>
 
@@ -162,7 +165,9 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
         </div>
       </div>
 
-      <div className="pt-4 border-t">
+      <Separator />
+
+      <div>
         <div className="flex justify-between font-semibold">
           <span>Total</span>
           <span>{formatPrice(appointment.total_price)}</span>
@@ -214,7 +219,9 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
         )}
       </div>
 
-      <div className="pt-4 border-t">
+      <Separator />
+
+      <div>
         <h3 className="text-lg font-semibold mb-2">Cancellation policy</h3>
         <p className="text-sm">
           Please avoid canceling within <strong>12 hours</strong> of your appointment time

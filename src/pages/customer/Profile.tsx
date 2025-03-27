@@ -17,6 +17,7 @@ interface Appointment {
   total_price: number;
   bookings: Booking[];
   location?: string;
+  location_id?: string;
 }
 
 interface Booking {
@@ -179,12 +180,13 @@ const Profile = () => {
     if (!location) return "Not specified";
     
     const addressParts = [];
+    if (location.name) addressParts.push(location.name);
     if (location.address) addressParts.push(location.address);
     if (location.city) addressParts.push(location.city);
     if (location.state) addressParts.push(location.state);
     if (location.zip_code) addressParts.push(location.zip_code);
     
-    return addressParts.join(", ") || location.name;
+    return addressParts.join("\n");
   };
 
   if (loading) {
@@ -198,23 +200,23 @@ const Profile = () => {
     );
   }
 
-  // Process appointments to include location names
-  const processedAppointments = appointments.map(appointment => ({
+  // Process appointments to add location names for cards
+  const processedAppointmentsForCards = appointments.map(appointment => ({
     ...appointment,
     location: getLocationName(appointment.location || "")
   }));
 
   // Split appointments into upcoming and past
   const now = new Date();
-  const upcomingAppointments = processedAppointments.filter(
+  const upcomingAppointments = processedAppointmentsForCards.filter(
     (appointment) => new Date(appointment.start_time) >= now
   );
-  const pastAppointments = processedAppointments.filter(
+  const pastAppointments = processedAppointmentsForCards.filter(
     (appointment) => new Date(appointment.start_time) < now
   );
 
   if (selectedAppointment) {
-    // Process the selected appointment to include location name
+    // Process the selected appointment to include full location details for the appointment details view
     const processedSelectedAppointment = {
       ...selectedAppointment,
       location: getFormattedAddress(selectedAppointment.location || "")

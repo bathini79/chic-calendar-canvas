@@ -77,7 +77,6 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
       
       // No-show cases - gray/outline
       case 'noshow':
-      case 'no-show':
         return {
           label: 'No Show',
           icon: <Ban className="h-3 w-3 mr-1" />,
@@ -87,7 +86,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
       // Default case
       default:
         return {
-          label: 'Pending',
+          label: status?.toString() || 'Pending',
           icon: <Clock className="h-3 w-3 mr-1" />,
           variant: 'outline' as const
         };
