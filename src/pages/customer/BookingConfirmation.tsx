@@ -1,4 +1,3 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -64,7 +63,6 @@ export default function BookingConfirmation() {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const confettiRef = useRef<ConfettiRef>(null);
 
-  // Log for debugging
   useEffect(() => {
     console.log("BookingConfirmation - appliedCouponId:", appliedCouponId);
     console.log("BookingConfirmation - items:", items);
@@ -122,7 +120,6 @@ export default function BookingConfirmation() {
           if (taxData) {
             setTax(taxData);
 
-            // Make sure to use a safe calculation in case items are not loaded yet
             const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
             const afterCoupon = subtotal - couponDiscount;
             const newTaxAmount = afterCoupon * (taxData.percentage / 100);
@@ -137,7 +134,6 @@ export default function BookingConfirmation() {
     loadTaxDetails();
   }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails, items, tax]);
 
-  // Fetch and load coupon details
   useEffect(() => {
     const loadCouponDetails = async () => {
       if (!appliedCouponId) {
@@ -149,7 +145,6 @@ export default function BookingConfirmation() {
 
       console.log("Fetching coupon details for ID:", appliedCouponId);
       try {
-        // Try to get from getCouponById first
         const couponData = await getCouponById(appliedCouponId);
         if (couponData) {
           console.log("Coupon found via getCouponById:", couponData);
@@ -157,7 +152,6 @@ export default function BookingConfirmation() {
           return;
         }
 
-        // Fallback to direct database query
         const { data, error } = await supabase
           .from("coupons")
           .select("*")
@@ -185,7 +179,6 @@ export default function BookingConfirmation() {
     const processCouponData = (data: any) => {
       setCoupon(data);
       
-      // Ensure items are available before calculating discount
       if (!items || items.length === 0) {
         console.log("Items array is empty, setting discount to 0");
         setCouponDiscount(0);
@@ -211,23 +204,19 @@ export default function BookingConfirmation() {
     loadCouponDetails();
   }, [appliedCouponId, getTotalPrice, tax, getCouponById, items]);
 
-  // Redirect if no date or timeslots
   useEffect(() => {
     if (!selectedDate || !items || items.length === 0 || Object.keys(selectedTimeSlots).length === 0) {
       navigate("/schedule");
     }
   }, [selectedDate, selectedTimeSlots, items, navigate]);
 
-  // Effect for confetti animation and redirect after success
   useEffect(() => {
     if (bookingSuccess) {
-      // Fire confetti
       if (confettiRef.current) {
         confettiRef.current.fire();
       }
       
-      // Trigger side cannon confetti effect
-      const end = Date.now() + 3 * 1000; // 3 seconds
+      const end = Date.now() + 3 * 1000;
       const colors = ["#a786ff", "#fd8bbc", "#eca184", "#f8deb1"];
 
       const frame = () => {
@@ -256,7 +245,6 @@ export default function BookingConfirmation() {
 
       frame();
       
-      // Navigate to profile after 5 seconds
       const timer = setTimeout(() => {
         navigate("/profile");
       }, 5000);
@@ -265,7 +253,6 @@ export default function BookingConfirmation() {
     }
   }, [bookingSuccess, navigate]);
 
-  // Guard against undefined items
   if (!items || items.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -311,33 +298,25 @@ export default function BookingConfirmation() {
   const discountedSubtotal = subtotal - couponDiscount;
   const totalPrice = discountedSubtotal + taxAmount;
 
-  // Calculate discount ratio for each item based on its price proportion
   const calculateItemDiscountedPrice = (itemOriginalPrice: number) => {
     if (couponDiscount <= 0 || subtotal <= 0) {
-      return itemOriginalPrice; // No discount applied
+      return itemOriginalPrice;
     }
     
-    // Calculate what proportion of the total price this item represents
     const priceRatio = itemOriginalPrice / subtotal;
-    
-    // Calculate the discount amount for this item
     const itemDiscountAmount = couponDiscount * priceRatio;
-    
-    // Return the discounted price (original - discount)
     return Math.max(0, itemOriginalPrice - itemDiscountAmount);
   };
 
   const handleCouponSelect = async (couponId: string) => {
     try {
       if (couponId === appliedCouponId) {
-        // If same coupon is selected again, remove it
         setAppliedCouponId(null);
         setCouponSearchValue("");
         setOpenCouponPopover(false);
         return;
       }
 
-      // Fetch and validate the coupon before applying
       const selectedCoupon = coupons.find(c => c.id === couponId);
       if (!selectedCoupon) {
         throw new Error("Coupon not found");
@@ -448,7 +427,6 @@ export default function BookingConfirmation() {
           const itemDuration = item.service?.duration || 0;
           const itemEndTime = addMinutes(currentStartTime, itemDuration);
 
-          // Calculate the discounted price for this service
           const originalPrice = item.selling_price || item.service?.selling_price || 0;
           const discountedPrice = calculateItemDiscountedPrice(originalPrice);
 
@@ -471,11 +449,8 @@ export default function BookingConfirmation() {
             item.package?.package_services &&
             item.package.package_services.length > 0
           ) {
-            // Get total package price to calculate discount distribution
             const packageTotalPrice = item.selling_price || item.package?.price || 0;
-            // Calculate the discounted package price
             const discountedPackagePrice = calculateItemDiscountedPrice(packageTotalPrice);
-            // Calculate discount ratio for all services in this package
             const packageDiscountRatio = packageTotalPrice > 0 
               ? discountedPackagePrice / packageTotalPrice 
               : 1;
@@ -492,14 +467,12 @@ export default function BookingConfirmation() {
                 serviceDuration
               );
 
-              // Get original price for this service in the package
               const servicePriceInPackage =
                 packageService.package_selling_price !== undefined &&
                 packageService.package_selling_price !== null
                   ? packageService.package_selling_price
                   : packageService.service.selling_price;
                   
-              // Apply the package discount ratio to this service price
               const adjustedServicePrice = servicePriceInPackage * packageDiscountRatio;
 
               console.log(`Package Service: ${packageService.service.name}, Original: ${servicePriceInPackage}, Adjusted: ${adjustedServicePrice}`);
@@ -551,7 +524,6 @@ export default function BookingConfirmation() {
                         ? selectedStylists[serviceId]
                         : null;
 
-                    // Apply the coupon discount to the custom service too
                     const originalCustomPrice = customService.selling_price || 0;
                     const discountedCustomPrice = calculateItemDiscountedPrice(originalCustomPrice);
 
@@ -590,10 +562,8 @@ export default function BookingConfirmation() {
 
       toast.success("Booking confirmed successfully!");
       
-      // Set booking success to trigger confetti and redirect
       setBookingSuccess(true);
       
-      // Clear cart after 5 seconds (same timing as redirect)
       setTimeout(() => {
         clearCart();
       }, 5000);
@@ -613,7 +583,6 @@ export default function BookingConfirmation() {
     }
   };
 
-  // Filter coupons for search functionality
   const filteredCoupons = couponsLoading
     ? []
     : coupons.filter((coupon) =>
@@ -622,7 +591,6 @@ export default function BookingConfirmation() {
 
   return (
     <div className="min-h-screen pb-24 relative">
-      {/* Confetti overlay */}
       <Confetti 
         ref={confettiRef}
         className="fixed inset-0 z-[100] pointer-events-none"
@@ -684,7 +652,6 @@ export default function BookingConfirmation() {
                   ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`
                   : `${minutes}m`;
 
-              // Calculate the discounted price for display
               const originalPrice = item.selling_price || 
                 item.service?.selling_price || 
                 item.package?.price || 0;
@@ -750,7 +717,6 @@ export default function BookingConfirmation() {
                   <span>₹{subtotal.toFixed(2)}</span>
                 </div>
                 
-                {/* Coupon selection */}
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Coupon</span>
@@ -865,7 +831,6 @@ export default function BookingConfirmation() {
         </div>
       </div>
 
-      {/* Success overlay */}
       {bookingSuccess && (
         <div className="fixed inset-0 bg-black/60 flex flex-col items-center justify-center z-50 text-white">
           <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
