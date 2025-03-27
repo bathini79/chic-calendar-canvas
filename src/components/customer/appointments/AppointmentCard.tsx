@@ -57,13 +57,13 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         
         <div className="flex-1">
           <div className="flex flex-col space-y-1">
-            <div className="flex items-center text-sm">
-              <Clock className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="text-gray-700">{formattedDate}{formattedEndTime}</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center text-sm">
+                <Clock className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="text-gray-700">{formattedDate}{formattedEndTime}</span>
+              </div>
               {appointment.status && (
-                <div className="ml-2">
-                  <StatusBadge status={appointment.status as AppointmentStatus} />
-                </div>
+                <StatusBadge status={appointment.status as AppointmentStatus} />
               )}
             </div>
             
