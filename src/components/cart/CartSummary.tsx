@@ -1,225 +1,346 @@
 
-import { Button } from "@/components/ui/button";
-import { formatPrice } from "@/lib/utils";
-import { formatDistanceToNow, format } from "date-fns";
 import { useCart } from "./CartContext";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
-import { MapPin, Calendar, Clock, ShoppingBag } from "lucide-react";
-import { toast } from "sonner";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card";
+import { useNavigate, useLocation } from "react-router-dom";
+import { format, addMinutes } from "date-fns";
+import { formatPrice } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
+import { useTaxRates } from "@/hooks/use-tax-rates";
+import { useCoupons, Coupon } from "@/hooks/use-coupons";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
-interface CartSummaryProps {
-  originalAppointmentId?: string;
-}
-
-export const CartSummary = ({ originalAppointmentId }: CartSummaryProps) => {
-  const {
-    items,
-    selectedDate,
+export function CartSummary() {
+  const { 
+    items, 
+    removeFromCart, 
+    selectedDate, 
     selectedTimeSlots,
-    selectedLocation,
     getTotalPrice,
-    getTotalDuration
+    getTotalDuration,
+    selectedLocation,
+    appliedTaxId,
+    setAppliedTaxId,
+    appliedCouponId,
+    setAppliedCouponId
   } = useCart();
-  const navigate = useNavigate();
-  const [isRescheduleLoading, setIsRescheduleLoading] = useState(false);
   
-  const { data: location } = useQuery({
-    queryKey: ["location", selectedLocation],
-    queryFn: async () => {
-      if (!selectedLocation) return null;
+  const [taxAmount, setTaxAmount] = useState(0);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const { fetchLocationTaxSettings } = useLocationTaxSettings();
+  const { taxRates, fetchTaxRates } = useTaxRates();
+  const { coupons, fetchCoupons, isLoading: couponsLoading, getCouponById } = useCoupons();
+  
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isSchedulingPage = location.pathname === '/schedule';
+  const isServicesPage = location.pathname === '/services';
+  
+  // Only show tax and coupons on booking-confirmation or other pages, not on services or schedule
+  const shouldShowTaxAndCoupon = !isServicesPage && !isSchedulingPage;
+
+  const subtotal = getTotalPrice();
+  const totalDuration = getTotalDuration();
+  const afterCouponSubtotal = subtotal - couponDiscount;
+  const totalPrice = afterCouponSubtotal + taxAmount;
+  const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
+  
+  // Debug logging for coupon state
+  useEffect(() => {
+    console.log("CartSummary - Current coupon state:", {
+      appliedCouponId,
+      couponsLoaded: coupons.length,
+      couponDiscount
+    });
+  }, [appliedCouponId, coupons.length, couponDiscount]);
+  
+  // Load tax data
+  useEffect(() => {
+    const loadTaxData = async () => {
+      await fetchTaxRates();
       
-      const { data, error } = await supabase
-        .from("locations")
-        .select("*")
-        .eq("id", selectedLocation)
-        .single();
+      if (selectedLocation && !appliedTaxId) {
+        const settings = await fetchLocationTaxSettings(selectedLocation);
+        
+        if (settings && settings.service_tax_id) {
+          setAppliedTaxId(settings.service_tax_id);
+        }
+      }
+    };
+    
+    loadTaxData();
+  }, [selectedLocation, appliedTaxId]);
+
+  // Load coupons
+  useEffect(() => {
+    console.log("Fetching coupons in CartSummary");
+    fetchCoupons();
+  }, [fetchCoupons]);
+
+  // Calculate tax amount whenever appliedTaxId or subtotal changes
+  useEffect(() => {
+    if (appliedTaxId && taxRates.length > 0) {
+      const taxRate = taxRates.find(tax => tax.id === appliedTaxId);
+      if (taxRate) {
+        setTaxAmount(afterCouponSubtotal * (taxRate.percentage / 100));
+      }
+    } else {
+      setTaxAmount(0);
+    }
+  }, [appliedTaxId, afterCouponSubtotal, taxRates]);
+  
+  // Calculate coupon discount
+  useEffect(() => {
+    const applyCoupon = async () => {
+      if (!appliedCouponId) {
+        console.log("No coupon applied, setting discount to 0");
+        setCouponDiscount(0);
+        return;
+      }
       
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedLocation
+      console.log("Applied coupon ID:", appliedCouponId);
+      
+      // First try from cache
+      const cachedCoupon = coupons.find(c => c.id === appliedCouponId);
+      if (cachedCoupon) {
+        console.log("Found coupon in cache:", cachedCoupon);
+        calculateDiscount(cachedCoupon);
+        return;
+      }
+      
+      // If not in cache, try direct lookup
+      try {
+        console.log("Coupon not in cache, fetching from database");
+        const coupon = await getCouponById(appliedCouponId);
+        if (coupon) {
+          console.log("Fetched coupon from database:", coupon);
+          calculateDiscount(coupon);
+        } else {
+          console.log("Coupon not found in database");
+          setCouponDiscount(0);
+        }
+      } catch (error) {
+        console.error("Error fetching coupon:", error);
+        setCouponDiscount(0);
+      }
+    };
+    
+    const calculateDiscount = (coupon: Coupon) => {
+      const discount = coupon.discount_type === 'percentage' 
+        ? subtotal * (coupon.discount_value / 100)
+        : Math.min(coupon.discount_value, subtotal); // Don't discount more than the subtotal
+      
+      console.log("Calculated coupon discount:", discount);
+      setCouponDiscount(discount);
+    };
+    
+    applyCoupon();
+  }, [appliedCouponId, subtotal, coupons, getCouponById]);
+  
+  // Sort items by their scheduled start time
+  const sortedItems = [...items].sort((a, b) => {
+    const aTime = selectedTimeSlots[a.id] || "00:00";
+    const bTime = selectedTimeSlots[b.id] || "00:00";
+    return aTime.localeCompare(bTime);
   });
 
-  const totalPrice = getTotalPrice();
-  const totalDuration = getTotalDuration();
-  
-  const hours = Math.floor(totalDuration / 60);
-  const minutes = totalDuration % 60;
-  const durationText = `${hours > 0 ? `${hours}h` : ""} ${minutes > 0 ? `${minutes}m` : ""}`.trim();
-  
-  const allItemsHaveTimeSlots = items.every(item => selectedTimeSlots[item.id]);
-  
-  const handleCheckout = () => {
-    if (!selectedDate) {
-      toast.error("Please select an appointment date");
-      return;
-    }
-    
-    if (!allItemsHaveTimeSlots) {
-      toast.error("Please select time slots for all services");
-      return;
-    }
-    
-    navigate("/checkout");
-  };
-
-  const handleReschedule = async () => {
-    if (!originalAppointmentId) {
-      return;
-    }
-    
-    if (!selectedDate) {
-      toast.error("Please select an appointment date");
-      return;
-    }
-    
-    if (!allItemsHaveTimeSlots) {
-      toast.error("Please select time slots for all services");
-      return;
-    }
-    
-    try {
-      setIsRescheduleLoading(true);
-      
-      // Update the original appointment with the new date/time
-      const firstTimeSlot = Object.values(selectedTimeSlots)[0];
-      const [hours, minutes] = firstTimeSlot.split(':').map(Number);
-      
-      const appointmentDate = new Date(selectedDate);
-      appointmentDate.setHours(hours, minutes, 0, 0);
-      
-      // Calculate end time based on total duration
-      const endTime = new Date(appointmentDate);
-      endTime.setMinutes(endTime.getMinutes() + totalDuration);
-      
-      const { error } = await supabase
-        .from('appointments')
-        .update({
-          start_time: appointmentDate.toISOString(),
-          end_time: endTime.toISOString()
-        })
-        .eq('id', originalAppointmentId);
-      
-      if (error) throw error;
-      
-      toast.success("Appointment successfully rescheduled");
-      navigate('/profile');
-    } catch (error: any) {
-      console.error("Error rescheduling appointment:", error);
-      toast.error("Failed to reschedule appointment: " + error.message);
-    } finally {
-      setIsRescheduleLoading(false);
+  const handleContinue = () => {
+    if (isSchedulingPage) {
+      if (selectedDate && isTimeSelected) {
+        navigate('/booking-confirmation');
+      }
+    } else {
+      navigate('/schedule');
     }
   };
 
-  if (items.length === 0) {
-    return (
-      <div className="border rounded-lg p-6 h-full flex flex-col justify-center items-center text-center space-y-4">
-        <ShoppingBag className="h-12 w-12 text-muted-foreground/50" />
-        <div>
-          <h3 className="font-medium text-lg">Your cart is empty</h3>
-          <p className="text-muted-foreground">
-            Add services to start booking your appointment
-          </p>
-        </div>
-        <Button onClick={() => navigate("/services")} className="mt-2">
-          Browse Services
-        </Button>
-      </div>
-    );
-  }
+  const handleTaxChange = (taxId: string) => {
+    if (taxId === "none") {
+      setAppliedTaxId(null);
+    } else {
+      setAppliedTaxId(taxId);
+    }
+  };
+
+  const handleCouponChange = (couponId: string) => {
+    console.log("Coupon changed to:", couponId);
+    if (couponId === "none") {
+      setAppliedCouponId(null);
+    } else {
+      setAppliedCouponId(couponId);
+    }
+  };
+
+  const getSelectedCoupon = () => {
+    return coupons.find(c => c.id === appliedCouponId);
+  };
+
+  const selectedCoupon = getSelectedCoupon();
 
   return (
-    <div className="border rounded-lg p-6 space-y-6 h-full flex flex-col">
-      <h2 className="text-xl font-semibold">Order Summary</h2>
-
-      <div className="space-y-4 flex-1">
-        <div className="border-b pb-4">
-          <div className="flex items-center mb-2">
-            <ShoppingBag className="h-4 w-4 text-primary mr-2" />
-            <h3 className="font-medium">Services</h3>
-          </div>
-          {items.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm mt-2">
-              <span>{item.name}</span>
-              <span>{formatPrice(item.price)}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="border-b pb-4">
-          <div className="flex items-center mb-2">
-            <MapPin className="h-4 w-4 text-primary mr-2" />
-            <h3 className="font-medium">Location</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {location?.name || "Loading..."}
-          </p>
-        </div>
-
-        <div className="border-b pb-4">
-          <div className="flex items-center mb-2">
-            <Calendar className="h-4 w-4 text-primary mr-2" />
-            <h3 className="font-medium">Date & Time</h3>
-          </div>
-          {selectedDate ? (
-            <div className="text-sm text-muted-foreground">
-              <p>{format(selectedDate, "EEEE, MMM d, yyyy")}</p>
-              <div className="mt-1 space-y-1">
-                {Object.entries(selectedTimeSlots).map(([itemId, time]) => {
-                  const item = items.find((i) => i.id === itemId);
-                  return (
-                    <div key={itemId} className="flex justify-between">
-                      <span>{item?.name}</span>
-                      <span>{time}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Select a date and time
-            </p>
-          )}
-        </div>
-
-        <div>
-          <div className="flex items-center mb-2">
-            <Clock className="h-4 w-4 text-primary mr-2" />
-            <h3 className="font-medium">Duration</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">{durationText}</p>
-        </div>
-      </div>
-
-      <div className="border-t pt-4">
-        <div className="flex justify-between font-semibold mb-4">
-          <span>Total</span>
-          <span>{formatPrice(totalPrice)}</span>
-        </div>
-        
-        {originalAppointmentId ? (
-          <Button
-            onClick={handleReschedule}
-            disabled={!selectedDate || !allItemsHaveTimeSlots || isRescheduleLoading}
-            className="w-full"
-          >
-            {isRescheduleLoading ? "Processing..." : "Confirm Reschedule"}
-          </Button>
-        ) : (
-          <Button
-            onClick={handleCheckout}
-            disabled={!selectedDate || !allItemsHaveTimeSlots}
-            className="w-full"
-          >
-            Proceed to Checkout
-          </Button>
+    <Card className="flex flex-col h-full">
+      <div className="p-4 border-b">
+        <h2 className="font-semibold text-lg">Your Cart ({items.length} items)</h2>
+        <p className="text-2xl font-bold mt-2">{formatPrice(shouldShowTaxAndCoupon ? totalPrice : subtotal)}</p>
+        {totalDuration > 0 && (
+          <p className="text-sm text-muted-foreground">Total duration: {totalDuration} min</p>
         )}
       </div>
-    </div>
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          {items.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              Your cart is empty
+            </p>
+          ) : (
+            sortedItems.map((item) => {
+              const itemDuration = item.duration || item.service?.duration || item.package?.duration || 0;
+              const itemPrice = item.selling_price || item.service?.selling_price || item.package?.price || item.price || 0;
+              
+              return (
+                <div
+                  key={item.id}
+                  className="flex flex-col space-y-2 p-4 border rounded-lg"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-medium">
+                        {item.name || item.service?.name || item.package?.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Duration: {itemDuration} min
+                      </p>
+                      <p className="text-sm font-medium">
+                        {formatPrice(itemPrice)}
+                      </p>
+                      {isSchedulingPage && selectedTimeSlots[item.id] && selectedDate && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {format(selectedDate, "MMM d")} at {selectedTimeSlots[item.id]} - 
+                          {format(
+                            addMinutes(
+                              new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${selectedTimeSlots[item.id]}`),
+                              itemDuration
+                            ),
+                            "HH:mm"
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    {!isSchedulingPage && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeFromCart(item.id)}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </ScrollArea>
+      
+      <div className="p-4 border-t">
+        <div className="space-y-2 mb-4">
+          {shouldShowTaxAndCoupon && (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+              
+              {/* Coupon selection */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm items-center">
+                  <span className="text-muted-foreground">Coupon</span>
+                  <Select value={appliedCouponId || "none"} onValueChange={handleCouponChange} disabled={couponsLoading}>
+                    <SelectTrigger className="h-8 w-[150px]">
+                      <SelectValue placeholder="No Coupon" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Coupon</SelectItem>
+                      {coupons.map(coupon => (
+                        <SelectItem key={coupon.id} value={coupon.id}>
+                          {coupon.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {selectedCoupon && (
+                  <div className="flex flex-col gap-1">
+                    <Badge variant="outline" className="w-fit">
+                      <span className="text-xs font-medium">
+                        {selectedCoupon.discount_type === 'percentage' 
+                          ? `${selectedCoupon.discount_value}% off` 
+                          : `${formatPrice(selectedCoupon.discount_value)} off`}
+                      </span>
+                    </Badge>
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Discount</span>
+                      <span>-{formatPrice(couponDiscount)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Tax selection */}
+              <div className="flex justify-between text-sm items-center">
+                <span className="text-muted-foreground">Tax</span>
+                <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
+                  <SelectTrigger className="h-8 w-[150px]">
+                    <SelectValue placeholder="No Tax" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Tax</SelectItem>
+                    {taxRates.map(tax => (
+                      <SelectItem key={tax.id} value={tax.id}>
+                        {tax.name} ({tax.percentage}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {appliedTaxId && taxAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Tax Amount
+                  </span>
+                  <span>{formatPrice(taxAmount)}</span>
+                </div>
+              )}
+            </>
+          )}
+          
+          <div className="flex justify-between text-base font-medium pt-1">
+            <span>Total</span>
+            <span>{formatPrice(shouldShowTaxAndCoupon ? totalPrice : subtotal)}</span>
+          </div>
+        </div>
+        
+        <Button 
+          className="w-full" 
+          onClick={handleContinue}
+          disabled={items.length === 0 || (isSchedulingPage && 
+            (!selectedDate || !isTimeSelected))}
+        >
+          {isSchedulingPage ? 'Continue to Booking' : 'Continue to Schedule'}
+        </Button>
+      </div>
+    </Card>
   );
-};
+}

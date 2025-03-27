@@ -53,45 +53,8 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
   
   const isPast = new Date(appointment.start_time) < new Date();
   
-  const handleReschedule = async () => {
-    try {
-      // Clear existing cart
-      await clearCart();
-      
-      // Set the location first
-      if (appointment.location) {
-        setSelectedLocation(appointment.location);
-      }
-      
-      // Add all services and packages from the appointment to the cart
-      for (const booking of appointment.bookings) {
-        if (booking.service) {
-          await addToCart(booking.service_id, undefined, {
-            name: booking.service.name,
-            price: booking.service.selling_price,
-            duration: booking.service.duration,
-            selling_price: booking.service.selling_price,
-            service: booking.service
-          });
-        } else if (booking.package) {
-          await addToCart(undefined, booking.package_id, {
-            name: booking.package.name,
-            price: booking.package.price,
-            duration: booking.package.duration || 0,
-            selling_price: booking.package.price,
-            package: booking.package
-          });
-        }
-      }
-      
-      toast.success("Previous services loaded for rescheduling");
-      
-      // Navigate to scheduling page
-      navigate('/schedule', { state: { appointmentId: appointment.id } });
-    } catch (error) {
-      console.error("Error preparing reschedule:", error);
-      toast.error("Failed to prepare rescheduling");
-    }
+  const handleReschedule = () => {
+    onReschedule(appointment.id);
   };
   
   const handleCancel = () => {
