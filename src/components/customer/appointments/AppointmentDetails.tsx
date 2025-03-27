@@ -1,11 +1,22 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { formatPrice } from "@/lib/utils";
 import { MapPin, ArrowLeft, ShoppingCart, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/pages/admin/bookings/components/StatusBadge";
 import type { AppointmentStatus } from "@/types/appointment";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface AppointmentDetailsProps {
   appointment: any;
@@ -112,21 +123,47 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
       </div>
 
       <div className="flex space-x-4">
-        <Button 
-          onClick={handleReschedule} 
-          className="flex-1"
-        >
-          Reschedule
-        </Button>
-        
-        {!isPast && (
+        {isPast ? (
           <Button 
-            variant="outline" 
-            className="flex-1 text-destructive border-destructive hover:bg-destructive/10"
-            onClick={handleCancel}
+            onClick={handleReschedule} 
+            className="flex-1"
           >
-            Cancel
+            Rebook
           </Button>
+        ) : (
+          <>
+            <Button 
+              onClick={handleReschedule} 
+              className="flex-1"
+            >
+              Reschedule
+            </Button>
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="flex-1 text-destructive border-destructive hover:bg-destructive/10"
+                >
+                  Cancel
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to cancel this appointment? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>No, keep it</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Yes, cancel appointment
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
         )}
       </div>
 

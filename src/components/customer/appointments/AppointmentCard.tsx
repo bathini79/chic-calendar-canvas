@@ -40,18 +40,6 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const dateNum = format(appointmentDate, "dd");
   const month = format(appointmentDate, "MMM");
   
-  const handleReschedule = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onReschedule(appointment.id);
-  };
-  
-  const handleCancel = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onCancel) {
-      onCancel(appointment.id);
-    }
-  };
-  
   return (
     <div 
       className="border rounded-lg p-4 mb-4 cursor-pointer hover:border-primary/50 transition-colors"
@@ -84,27 +72,6 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               <span className="text-gray-700">{locationName}</span>
             </div>
           </div>
-        </div>
-        
-        <div className="flex flex-col space-y-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleReschedule}
-          >
-            Reschedule
-          </Button>
-          
-          {!isPast && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="text-destructive border-destructive hover:bg-destructive/10"
-              onClick={handleCancel}
-            >
-              Cancel
-            </Button>
-          )}
         </div>
       </div>
     </div>

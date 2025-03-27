@@ -49,15 +49,45 @@ interface Employee {
   name: string;
 }
 
+interface Location {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+}
+
 const Profile = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [locations, setLocations] = useState<Record<string, Location>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchAppointments();
+    fetchLocations();
   }, []);
+
+  const fetchLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name, address, city, state, zip_code');
+      
+      if (error) throw error;
+      
+      const locationsMap: Record<string, Location> = {};
+      data?.forEach((location: Location) => {
+        locationsMap[location.id] = location;
+      });
+      
+      setLocations(locationsMap);
+    } catch (error: any) {
+      console.error("Error fetching locations:", error.message);
+    }
+  };
 
   const fetchAppointments = async () => {
     setLoading(true);
@@ -131,6 +161,32 @@ const Profile = () => {
     }
   };
 
+  // Helper function to get location name from ID
+  const getLocationName = (locationId: string) => {
+    if (!locationId) return "Not specified";
+    
+    const location = locations[locationId];
+    if (!location) return "Not specified";
+    
+    return location.name;
+  };
+
+  // Helper function to get formatted location address
+  const getFormattedAddress = (locationId: string) => {
+    if (!locationId) return "Not specified";
+    
+    const location = locations[locationId];
+    if (!location) return "Not specified";
+    
+    const addressParts = [];
+    if (location.address) addressParts.push(location.address);
+    if (location.city) addressParts.push(location.city);
+    if (location.state) addressParts.push(location.state);
+    if (location.zip_code) addressParts.push(location.zip_code);
+    
+    return addressParts.join(", ") || location.name;
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-4 min-h-[60vh] flex items-center justify-center">
@@ -142,20 +198,32 @@ const Profile = () => {
     );
   }
 
+  // Process appointments to include location names
+  const processedAppointments = appointments.map(appointment => ({
+    ...appointment,
+    location: getLocationName(appointment.location || "")
+  }));
+
   // Split appointments into upcoming and past
   const now = new Date();
-  const upcomingAppointments = appointments.filter(
+  const upcomingAppointments = processedAppointments.filter(
     (appointment) => new Date(appointment.start_time) >= now
   );
-  const pastAppointments = appointments.filter(
+  const pastAppointments = processedAppointments.filter(
     (appointment) => new Date(appointment.start_time) < now
   );
 
   if (selectedAppointment) {
+    // Process the selected appointment to include location name
+    const processedSelectedAppointment = {
+      ...selectedAppointment,
+      location: getFormattedAddress(selectedAppointment.location || "")
+    };
+
     return (
       <div className="container mx-auto p-4 max-w-2xl">
         <AppointmentDetails 
-          appointment={selectedAppointment} 
+          appointment={processedSelectedAppointment} 
           onBack={() => setSelectedAppointment(null)} 
           onReschedule={handleRescheduleAppointment}
           onCancel={handleCancelAppointment}
