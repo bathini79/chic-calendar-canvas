@@ -4,13 +4,19 @@ import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
 import { UnifiedCalendar } from "@/components/scheduling/UnifiedCalendar";
 import { CartSummary } from "@/components/cart/CartSummary";
 import { MobileCartBar } from "@/components/cart/MobileCartBar";
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAppointmentDetails } from "@/hooks/use-appointment-details";
 
 export default function UnifiedScheduling() {
+  const location = useLocation();
+  const appointmentId = location.state?.appointmentId;
+  const { appointment } = useAppointmentDetails(appointmentId);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  
   const { 
     items, 
     selectedDate, 
@@ -67,6 +73,18 @@ export default function UnifiedScheduling() {
     }
   }, [items, selectedStylists, setSelectedStylists]);
 
+  // Set the appointment date if rescheduling
+  useEffect(() => {
+    if (appointment && appointmentId && !isRescheduling) {
+      // Set the appointment date for rescheduling
+      const appointmentDate = new Date(appointment.start_time);
+      setSelectedDate(appointmentDate);
+      setIsRescheduling(true);
+      
+      toast.info("Select a new time for your appointment");
+    }
+  }, [appointment, appointmentId, setSelectedDate, isRescheduling]);
+
   useEffect(() => {
     if (items.length === 0) {
       navigate('/services');
@@ -98,6 +116,15 @@ export default function UnifiedScheduling() {
     <div className="container max-w-7xl mx-auto py-6 px-4">
       <div className="grid lg:grid-cols-[1fr_400px] gap-6">
         <div className="space-y-6 min-w-0">
+          {appointmentId && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-4">
+              <h3 className="font-medium text-blue-800">Rescheduling Appointment</h3>
+              <p className="text-sm text-blue-700">
+                You're rescheduling your existing appointment. Select a new date and time below.
+              </p>
+            </div>
+          )}
+          
           <ServiceSelector 
             items={items}
             selectedStylists={selectedStylists}
@@ -113,7 +140,7 @@ export default function UnifiedScheduling() {
           />
         </div>
         <div className="hidden lg:block h-[calc(100vh-8rem)] sticky top-24">
-          <CartSummary />
+          <CartSummary originalAppointmentId={appointmentId} />
         </div>
       </div>
       <MobileCartBar />

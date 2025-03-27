@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -142,7 +141,6 @@ const Profile = () => {
         throw error;
       }
 
-      // Update the appointment status in the local state
       setAppointments(prevAppointments => 
         prevAppointments.map(app => 
           app.id === appointmentId 
@@ -161,7 +159,6 @@ const Profile = () => {
     }
   };
 
-  // Helper function to get location name from ID
   const getLocationName = (locationId: string) => {
     if (!locationId) return "Not specified";
     
@@ -171,7 +168,6 @@ const Profile = () => {
     return location.name;
   };
 
-  // Helper function to get formatted location address
   const getFormattedAddress = (locationId: string) => {
     if (!locationId) return "Not specified";
     
@@ -198,13 +194,11 @@ const Profile = () => {
     );
   }
 
-  // Process appointments to include location names
   const processedAppointments = appointments.map(appointment => ({
     ...appointment,
     location: getLocationName(appointment.location || "")
   }));
 
-  // Split appointments into upcoming and past
   const now = new Date();
   const upcomingAppointments = processedAppointments.filter(
     (appointment) => new Date(appointment.start_time) >= now
@@ -214,7 +208,6 @@ const Profile = () => {
   );
 
   if (selectedAppointment) {
-    // Process the selected appointment to include location name
     const processedSelectedAppointment = {
       ...selectedAppointment,
       location: getFormattedAddress(selectedAppointment.location || "")
