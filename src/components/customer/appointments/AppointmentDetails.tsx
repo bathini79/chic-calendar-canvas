@@ -1,23 +1,28 @@
 
 import React from "react";
-import { format, formatDistanceToNow } from "date-fns";
-import { enUS } from "date-fns/locale";
+import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { formatPrice } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Store, ArrowLeft, ShoppingCart } from "lucide-react";
+import { MapPin, ArrowLeft, ShoppingCart, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/pages/admin/bookings/components/StatusBadge";
+import type { AppointmentStatus } from "@/types/appointment";
 
 interface AppointmentDetailsProps {
   appointment: any;
   onBack: () => void;
+  onReschedule: (id: string) => void;
+  onCancel?: (id: string) => void;
 }
 
 export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
   appointment,
   onBack,
+  onReschedule,
+  onCancel
 }) => {
-  const appointmentDate = new Date(appointment.start_time);
-  const formattedDate = format(appointmentDate, "EEE, dd MMM, yyyy 'at' h:mm a");
+  const appointmentDate = parseISO(appointment.start_time);
+  const formattedDate = format(appointmentDate, "EEE, dd MMM, yyyy");
+  const formattedTime = format(appointmentDate, "h:mm a");
   const locationName = appointment.location || "Not specified";
 
   // Calculate total duration in minutes
@@ -29,20 +34,18 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
   const minutes = totalDurationMinutes % 60;
   const durationText = `${hours > 0 ? `${hours} hours` : ""} ${minutes > 0 ? `${minutes} mins` : ""}`.trim();
   
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { variant: "success" | "destructive" | "default" | "outline" | "secondary", label: string }> = {
-      completed: { variant: "success", label: "Completed" },
-      canceled: { variant: "destructive", label: "Cancelled" },
-      "no-show": { variant: "destructive", label: "No-show" },
-      noshow: { variant: "destructive", label: "No-show" },
-      confirmed: { variant: "success", label: "Confirmed" },
-      pending: { variant: "outline", label: "Pending" },
-    };
-    
-    const statusInfo = statusMap[status.toLowerCase()] || { variant: "default", label: status };
-    return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
+  const isPast = new Date(appointment.start_time) < new Date();
+  
+  const handleReschedule = () => {
+    onReschedule(appointment.id);
   };
-
+  
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel(appointment.id);
+    }
+  };
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -50,32 +53,29 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
           <ArrowLeft className="h-5 w-5 mr-2" />
           Back
         </Button>
-        {appointment.status && getStatusBadge(appointment.status)}
+        {appointment.status && (
+          <StatusBadge status={appointment.status as AppointmentStatus} />
+        )}
       </div>
       
       <div>
         <h2 className="text-2xl font-bold">{formattedDate}</h2>
-        <p className="text-muted-foreground">{durationText} duration</p>
-      </div>
-
-      <div className="flex items-center">
-        <ShoppingCart className="h-5 w-5 text-primary mr-2" />
-        <div>
-          <h3 className="font-medium">Book again</h3>
-          <p className="text-sm text-muted-foreground">Book your next appointment</p>
+        <div className="flex items-center mt-1">
+          <Clock className="h-4 w-4 mr-2 text-primary" />
+          <p className="text-muted-foreground">{formattedTime} • {durationText} duration</p>
         </div>
       </div>
 
       <div className="flex items-center">
-        <Store className="h-5 w-5 text-primary mr-2" />
+        <MapPin className="h-5 w-5 text-primary mr-2" />
         <div>
-          <h3 className="font-medium">Venue details</h3>
+          <h3 className="font-medium">Location</h3>
           <p className="text-sm text-muted-foreground">{locationName}</p>
         </div>
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-2">Overview</h3>
+        <h3 className="text-lg font-semibold mb-2">Services</h3>
         <div className="space-y-4">
           {appointment.bookings.map((booking: any) => {
             const service = booking.service;
@@ -111,6 +111,25 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
         </div>
       </div>
 
+      <div className="flex space-x-4">
+        <Button 
+          onClick={handleReschedule} 
+          className="flex-1"
+        >
+          Reschedule
+        </Button>
+        
+        {!isPast && (
+          <Button 
+            variant="outline" 
+            className="flex-1 text-destructive border-destructive hover:bg-destructive/10"
+            onClick={handleCancel}
+          >
+            Cancel
+          </Button>
+        )}
+      </div>
+
       <div className="pt-4 border-t">
         <h3 className="text-lg font-semibold mb-2">Cancellation policy</h3>
         <p className="text-sm">
@@ -118,15 +137,8 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
         </p>
       </div>
 
-      {appointment.notes && (
-        <div className="pt-4 border-t">
-          <h3 className="text-lg font-semibold mb-2">Important info</h3>
-          <p className="text-sm">{appointment.notes}</p>
-        </div>
-      )}
-
       <div className="text-xs text-muted-foreground">
-        Booking ref: {appointment.id.substr(0, 8).toUpperCase()}
+        Booking ref: {appointment.id.substring(0, 8).toUpperCase()}
       </div>
     </div>
   );

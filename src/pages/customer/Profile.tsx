@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate } from "react-router-dom";
 import { AppointmentCard } from "@/components/customer/appointments/AppointmentCard";
 import { AppointmentDetails } from "@/components/customer/appointments/AppointmentDetails";
 import { EmptyAppointments } from "@/components/customer/appointments/EmptyAppointments";
@@ -49,93 +49,87 @@ interface Employee {
   name: string;
 }
 
-interface LocationData {
-  id: string;
-  name: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  status?: string;
-}
-
 const Profile = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [location, setLocation] = useState<LocationData | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchAppointments = async () => {
-      setLoading(true);
-      try {
-        const { data: profile } = await supabase.auth.getUser();
-        const customerId = profile.user?.id;
-
-        if (!customerId) {
-          toast.error("Could not get user ID.");
-          setLoading(false);
-          return;
-        }
-
-        const { data: appointmentsData, error } = await supabase
-          .from('appointments')
-          .select(`
-            *,
-            bookings (
-              *,
-              service:services (*),
-              package:packages (*),
-              employee:employees!bookings_employee_id_fkey(*)
-            )
-          `)
-          .eq('customer_id', customerId)
-          .order('start_time', { ascending: false });
-
-        if (error) {
-          throw error;
-        }
-
-        setAppointments(appointmentsData || []);
-      } catch (error: any) {
-        toast.error(error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchAppointments();
   }, []);
 
-  useEffect(() => {
-    const fetchLocation = async () => {
-      try {
-        const { data: locations, error } = await supabase
-          .from('locations')
-          .select('*')
-          .limit(1);
+  const fetchAppointments = async () => {
+    setLoading(true);
+    try {
+      const { data: profile } = await supabase.auth.getUser();
+      const customerId = profile.user?.id;
 
-        if (error) {
-          throw error;
-        }
-
-        if (locations && locations.length > 0) {
-          const locationData: LocationData = {
-            id: locations[0].id,
-            name: locations[0].name,
-            address: locations[0].address || undefined,
-            phone: locations[0].phone || undefined,
-            email: locations[0].email || undefined,
-            status: locations[0].status || undefined,
-          };
-          setLocation(locationData);
-        }
-      } catch (error: any) {
-        toast.error(error.message);
+      if (!customerId) {
+        toast.error("Could not get user ID.");
+        setLoading(false);
+        return;
       }
-    };
 
-    fetchLocation();
-  }, []);
+      const { data: appointmentsData, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          bookings (
+            *,
+            service:services (*),
+            package:packages (*),
+            employee:employees!bookings_employee_id_fkey(*)
+          )
+        `)
+        .eq('customer_id', customerId)
+        .order('start_time', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      setAppointments(appointmentsData || []);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRescheduleAppointment = (appointmentId: string) => {
+    navigate("/schedule", { state: { appointmentId } });
+  };
+
+  const handleCancelAppointment = async (appointmentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'canceled' })
+        .eq('id', appointmentId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update the appointment status in the local state
+      setAppointments(prevAppointments => 
+        prevAppointments.map(app => 
+          app.id === appointmentId 
+            ? { ...app, status: 'canceled' } 
+            : app
+        )
+      );
+
+      if (selectedAppointment?.id === appointmentId) {
+        setSelectedAppointment(prev => prev ? { ...prev, status: 'canceled' } : null);
+      }
+
+      toast.success("Appointment cancelled successfully");
+    } catch (error: any) {
+      toast.error(`Failed to cancel appointment: ${error.message}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -163,6 +157,8 @@ const Profile = () => {
         <AppointmentDetails 
           appointment={selectedAppointment} 
           onBack={() => setSelectedAppointment(null)} 
+          onReschedule={handleRescheduleAppointment}
+          onCancel={handleCancelAppointment}
         />
       </div>
     );
@@ -172,20 +168,9 @@ const Profile = () => {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6">Appointments</h1>
 
-      <Tabs defaultValue="upcoming" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-          <TabsTrigger value="past">
-            Past
-            {pastAppointments.length > 0 && (
-              <span className="ml-2 bg-muted text-muted-foreground rounded-full px-2 py-1 text-xs">
-                {pastAppointments.length}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="upcoming" className="mt-0">
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Upcoming Appointments</h2>
           {upcomingAppointments.length === 0 ? (
             <EmptyAppointments type="upcoming" />
           ) : (
@@ -195,13 +180,16 @@ const Profile = () => {
                   key={appointment.id}
                   appointment={appointment}
                   onClick={() => setSelectedAppointment(appointment)}
+                  onReschedule={handleRescheduleAppointment}
+                  onCancel={handleCancelAppointment}
                 />
               ))}
             </div>
           )}
-        </TabsContent>
+        </div>
 
-        <TabsContent value="past" className="mt-0">
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Past Appointments</h2>
           {pastAppointments.length === 0 ? (
             <EmptyAppointments type="past" />
           ) : (
@@ -212,12 +200,13 @@ const Profile = () => {
                   appointment={appointment}
                   onClick={() => setSelectedAppointment(appointment)}
                   isPast={true}
+                  onReschedule={handleRescheduleAppointment}
                 />
               ))}
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 };
