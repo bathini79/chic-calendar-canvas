@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumber, code, fullName } = await req.json()
+    const { phoneNumber, code, fullName, lead_source } = await req.json()
     
     if (!phoneNumber || !code) {
       throw new Error('Phone number and verification code are required')
@@ -150,6 +150,7 @@ serve(async (req) => {
             phone_number: phoneNumber,
             phone_verified: true,
             full_name: fullName,
+            lead_source: lead_source || null,
             role: 'customer'
           })
           

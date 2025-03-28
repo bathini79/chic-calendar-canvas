@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router-dom";
+
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -18,9 +19,31 @@ import { toast } from "sonner";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { AlertCircle, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Referral source options
+const referralSources = [
+  { value: "google", label: "Google Search" },
+  { value: "facebook", label: "Facebook" },
+  { value: "instagram", label: "Instagram" },
+  { value: "friend", label: "Friend or Family" },
+  { value: "existing_customer", label: "I'm an Existing Customer" },
+  { value: "walk_by", label: "Walk By" },
+  { value: "other", label: "Other" },
+];
 
 const Auth = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const referralSourceParam = queryParams.get('referral');
+
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,6 +58,8 @@ const Auth = () => {
   const [canResendOtp, setCanResendOtp] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(30);
   const [edgeFunctionError, setEdgeFunctionError] = useState<string | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState({ name: "India", code: "+91", flag: "🇮🇳" });
+  const [referralSource, setReferralSource] = useState(referralSourceParam || "");
 
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -77,6 +102,13 @@ const Auth = () => {
     };
   }, [otpSent, resendCountdown]);
 
+  useEffect(() => {
+    // Set referral source from URL parameter if available
+    if (referralSourceParam && referralSources.some(source => source.value === referralSourceParam)) {
+      setReferralSource(referralSourceParam);
+    }
+  }, [referralSourceParam]);
+
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -107,6 +139,10 @@ const Auth = () => {
     }
   };
 
+  const handleCountryChange = (country: {name: string, code: string, flag: string}) => {
+    setSelectedCountry(country);
+  };
+
   const sendWhatsAppOTP = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
       toast.error("Please enter a valid phone number");
@@ -121,8 +157,10 @@ const Auth = () => {
     setResendCountdown(30);
     
     try {
+      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      
       const response = await supabase.functions.invoke('send-whatsapp-otp', {
-        body: { phoneNumber },
+        body: { phoneNumber: fullPhoneNumber },
       });
 
       if (response.error) {
@@ -165,11 +203,14 @@ const Auth = () => {
     setEdgeFunctionError(null);
     
     try {
+      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      
       const response = await supabase.functions.invoke('verify-whatsapp-otp', {
         body: { 
-          phoneNumber, 
+          phoneNumber: fullPhoneNumber, 
           code: otp,
-          fullName: needsFullName ? fullName : undefined
+          fullName: needsFullName ? fullName : undefined,
+          lead_source: referralSource || undefined
         },
       });
 
@@ -223,14 +264,12 @@ const Auth = () => {
             </label>
             <PhoneInput
               id="phone"
-              placeholder="+1 (555) 000-0000"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              onChange={(value) => setPhoneNumber(value)}
+              selectedCountry={selectedCountry}
+              onCountryChange={handleCountryChange}
               required
             />
-            <p className="text-xs text-muted-foreground">
-              Enter your phone number with country code (e.g., +1 for US)
-            </p>
           </div>
           {verificationError && (
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
@@ -279,10 +318,26 @@ const Auth = () => {
               onChange={(e) => setFullName(e.target.value)}
               required
             />
-            <p className="text-xs text-muted-foreground">
-              Please enter your full name to complete registration
-            </p>
           </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="referralSource" className="text-sm font-medium">
+              How did you hear about us?
+            </label>
+            <Select value={referralSource} onValueChange={setReferralSource}>
+              <SelectTrigger id="referralSource">
+                <SelectValue placeholder="Select an option" />
+              </SelectTrigger>
+              <SelectContent>
+                {referralSources.map((source) => (
+                  <SelectItem key={source.value} value={source.value}>
+                    {source.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
           {verificationError && (
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
               <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
