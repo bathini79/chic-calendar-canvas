@@ -22,14 +22,18 @@ import BusinessSetup from "./pages/admin/settings/BusinessSetup";
 import Sales from "./pages/admin/settings/Sales";
 import Reports from "./pages/admin/Reports";
 
-// 1) Import DnD
+// Import DnD
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { UserStatus } from "./components/auth/UserStatus";
 
 export default function App() {
   return (
     <BrowserRouter>
-      {/* 2) Wrap all <Routes> (or at least admin routes) with DndProvider */}
+      {/* Add UserStatus component for persistent auth state */}
+      <UserStatus />
+      
+      {/* Wrap all routes with DndProvider */}
       <DndProvider backend={HTML5Backend}>
         <Routes>
           {/* Customer Routes */}

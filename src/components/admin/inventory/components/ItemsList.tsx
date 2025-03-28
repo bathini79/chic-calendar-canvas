@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { InventoryTable } from "./list/InventoryTable";
@@ -20,7 +21,7 @@ export function ItemsList() {
 
   // Fetch inventory items with location-specific data
   const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["inventory_items"],
+    queryKey: ["inventory_items", selectedLocation],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("inventory_items")
