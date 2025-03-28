@@ -3,13 +3,12 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Pencil, Home, Briefcase, Plus, Linkedin, Twitter, Instagram, Facebook } from "lucide-react";
+import { Pencil, Plus, Linkedin, Twitter, Instagram, Facebook } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ProfileSidebar } from "./ProfileSidebar";
-import { Badge } from "@/components/ui/badge";
 import { ProfileEditDialog } from "./ProfileEditDialog";
 import { AddressCard } from "./AddressCard";
 import { AddAddressDialog } from "./AddAddressDialog";
@@ -106,12 +105,18 @@ export const ProfilePage = () => {
       const userId = profile?.id;
       if (!userId) return;
 
+      // Format birth_date as string if it's a Date object
+      let birthDate = updatedProfile.birth_date;
+      if (birthDate instanceof Date) {
+        birthDate = birthDate.toISOString().split('T')[0];
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: updatedProfile.full_name,
           phone_number: updatedProfile.phone_number,
-          birth_date: updatedProfile.birth_date,
+          birth_date: birthDate,
           gender: updatedProfile.gender,
           linkedin_url: updatedProfile.linkedin_url,
           twitter_url: updatedProfile.twitter_url,
@@ -136,6 +141,7 @@ export const ProfilePage = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Add the new address
       const { error } = await supabase
         .from('user_addresses')
         .insert({

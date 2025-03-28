@@ -1,9 +1,10 @@
+
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input, type InputProps } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 
-export interface PhoneInputProps extends Omit<InputProps, "type" | "onChange"> {
+export interface PhoneInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
   onChange?: (value: string) => void;
 }
 
