@@ -60,14 +60,19 @@ export const UpcomingAppointments = ({ locations, upcomingAppointmentsLocationId
   useEffect(() => { fetchUpcomingAppointments(); }, [fetchUpcomingAppointments]);
 
   return (
-    <Card className="shadow-sm h-full">
+    <Card className="shadow-sm h-full overflow-hidden">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-2 sm:space-y-0">
         <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
         <div className="w-full sm:w-auto">
-          <LocationSelector value={upcomingAppointmentsLocationId} onChange={setUpcomingAppointmentsLocationId} locations={locations} />
+          <LocationSelector 
+            value={upcomingAppointmentsLocationId} 
+            onChange={setUpcomingAppointmentsLocationId} 
+            locations={locations} 
+            className="w-full"
+          />
         </div>
       </CardHeader>
-      <CardContent className="overflow-x-auto overflow-y-auto">
+      <CardContent className="overflow-x-auto overflow-y-auto max-h-[400px]">
         {upcomingAppointmentsChart.length > 0 ? (
           <StatsPanel
             stats={[]} 

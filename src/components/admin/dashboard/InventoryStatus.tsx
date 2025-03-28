@@ -33,17 +33,22 @@ export const InventoryStatus = ({ locations, inventoryLocationId, setInventoryLo
   useEffect(() => { fetchLowStockItems(); }, [fetchLowStockItems]);
 
   return (
-    <Card className="shadow-sm h-full">
+    <Card className="shadow-sm h-full overflow-hidden">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-2 sm:space-y-0">
         <CardTitle className="text-lg">Inventory Status</CardTitle>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 w-full sm:w-auto">
-          <LocationSelector value={inventoryLocationId} onChange={setInventoryLocationId} className="w-full sm:w-[160px]" locations={locations} />
-          <Link to="/admin/inventory" className="text-sm text-blue-600 hover:underline flex items-center">
+          <LocationSelector 
+            value={inventoryLocationId} 
+            onChange={setInventoryLocationId} 
+            className="w-full sm:w-[160px]" 
+            locations={locations} 
+          />
+          <Link to="/admin/inventory" className="text-sm text-blue-600 hover:underline flex items-center whitespace-nowrap">
             View Inventory <ChevronRight className="h-4 w-4 ml-1" />
           </Link>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-y-auto max-h-[400px]">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-card p-4 rounded-lg border">
             <h3 className="font-medium mb-2 text-gray-500">Total Items</h3>

@@ -12,9 +12,9 @@ export default function CustomerLayout() {
   return (
     <CartProvider>
       <SidebarProvider>
-        <div className="min-h-screen bg-background w-full">
+        <div className="min-h-screen bg-background w-full overflow-hidden">
           <CustomerNavbar onCartClick={() => setCartOpen(true)} />
-          <main>
+          <main className="overflow-y-auto overflow-x-hidden">
             <Outlet />
           </main>
           <CartDrawer 

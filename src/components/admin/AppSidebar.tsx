@@ -66,7 +66,7 @@ export function AppSidebar() {
   const { setOpen, open, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const [businessDetails, setBusinessDetails] = useState({
-    name: "", // Empty default - no "Define Salon" text
+    name: "",
     logo_url: null
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -122,7 +122,7 @@ export function AppSidebar() {
           {businessDetails.logo_url ? (
             <img 
               src={businessDetails.logo_url} 
-              alt={businessDetails.name} 
+              alt={businessDetails.name || "Salon Logo"} 
               className="h-8 w-8 rounded" 
             />
           ) : (
