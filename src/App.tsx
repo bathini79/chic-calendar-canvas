@@ -8,6 +8,7 @@ import Services from "@/pages/customer/Services";
 import Packages from "@/pages/customer/Packages";
 import Cart from "@/pages/customer/Cart";
 import Profile from "@/pages/customer/Profile";
+import UserDetails from "@/pages/customer/UserDetails";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminServices from "@/pages/admin/AdminServices";
 import Staff from "@/pages/admin/Staff";
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="packages" element={<Packages />} />
             <Route path="cart" element={<Cart />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="profile/details" element={<UserDetails />} />
             <Route path="schedule" element={<UnifiedScheduling />} />
             <Route path="booking-confirmation" element={<BookingConfirmation />} />
           </Route>
