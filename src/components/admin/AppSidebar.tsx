@@ -63,7 +63,7 @@ const sidebarNavItems = [
 
 export function AppSidebar() {
   const { pathname } = useLocation();
-  const { state, setOpen, open, toggleSidebar } = useSidebar();
+  const { setOpen, open, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const [businessDetails, setBusinessDetails] = useState({
     name: "Beauty SaaS",
@@ -120,20 +120,18 @@ export function AppSidebar() {
       )}
     >
       <div className="flex h-14 items-center px-3 border-b justify-between">
-        <Link to="/admin" className={cn("flex items-center", !open && "justify-center")}>
+        <Link to="/admin" className={cn("flex items-center", !open && "justify-center w-full")}>
           {businessDetails.logo_url ? (
             <img 
               src={businessDetails.logo_url} 
               alt={businessDetails.name} 
-              className="h-6 w-6 rounded" 
+              className="h-8 w-8 rounded" 
             />
           ) : (
-            <CreditCard className="h-6 w-6" />
+            <CreditCard className="h-8 w-8" />
           )}
           {open && (
-            <span className={cn("ml-2 text-lg font-semibold transition-opacity", 
-              open ? "opacity-100" : "opacity-0 w-0"
-            )}>
+            <span className={cn("ml-2 text-lg font-semibold transition-opacity truncate max-w-[150px]")}>
               {isLoading ? <Skeleton className="h-5 w-24" /> : businessDetails.name}
             </span>
           )}
@@ -141,14 +139,15 @@ export function AppSidebar() {
         <Button 
           variant="ghost" 
           size="icon" 
-          className={cn("ml-auto", !open && "rotate-180")}
+          className="flex-shrink-0"
           onClick={toggleSidebar}
+          aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
         >
           {open ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
       </div>
       <ScrollArea className="flex-1">
-        <nav className="grid items-start px-2 py-4">
+        <nav className="grid items-start px-2 py-4 gap-1">
           {sidebarNavItems.map((item, index) => (
             <Link to={item.href} key={index}>
               <Button
@@ -156,9 +155,15 @@ export function AppSidebar() {
                 className={cn("w-full justify-start", {
                   "bg-muted": pathname === item.href,
                 })}
+                title={!open ? item.title : undefined}
               >
-                {item.icon}
-                {open && <span className="transition-opacity">{item.title}</span>}
+                {React.cloneElement(item.icon, { 
+                  className: cn(
+                    item.icon.props.className, 
+                    !open && "mr-0 mx-auto"
+                  ) 
+                })}
+                {open && <span className="transition-opacity truncate">{item.title}</span>}
               </Button>
             </Link>
           ))}

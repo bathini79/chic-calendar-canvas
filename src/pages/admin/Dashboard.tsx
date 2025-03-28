@@ -77,46 +77,58 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="p-8 space-y-6">
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <RecentSales
-          timeRange={timeRange}
-          setTimeRange={setTimeRange}
-          locations={locations}
-          recentSalesLocationId={recentSalesLocationId}
-          setRecentSalesLocationId={setRecentSalesLocationId}
-        />
-        <TodaysAppointments
-          locations={locations}
-          todayAppointmentsLocationId={todayAppointmentsLocationId}
-          setTodayAppointmentsLocationId={setTodayAppointmentsLocationId}
-          onAppointmentClick={handleAppointmentClick}
-        />
+    <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
+      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-hidden">
+        <div className="overflow-x-auto">
+          <RecentSales
+            timeRange={timeRange}
+            setTimeRange={setTimeRange}
+            locations={locations}
+            recentSalesLocationId={recentSalesLocationId}
+            setRecentSalesLocationId={setRecentSalesLocationId}
+          />
+        </div>
+        <div className="overflow-x-auto">
+          <TodaysAppointments
+            locations={locations}
+            todayAppointmentsLocationId={todayAppointmentsLocationId}
+            setTodayAppointmentsLocationId={setTodayAppointmentsLocationId}
+            onAppointmentClick={handleAppointmentClick}
+          />
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <UpcomingAppointments
-          locations={locations}
-          upcomingAppointmentsLocationId={upcomingAppointmentsLocationId}
-          setUpcomingAppointmentsLocationId={setUpcomingAppointmentsLocationId}
-        />
-        <InventoryStatus
-          locations={locations}
-          inventoryLocationId={inventoryLocationId}
-          setInventoryLocationId={setInventoryLocationId}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-hidden">
+        <div className="overflow-x-auto">
+          <UpcomingAppointments
+            locations={locations}
+            upcomingAppointmentsLocationId={upcomingAppointmentsLocationId}
+            setUpcomingAppointmentsLocationId={setUpcomingAppointmentsLocationId}
+          />
+        </div>
+        <div className="overflow-x-auto">
+          <InventoryStatus
+            locations={locations}
+            inventoryLocationId={inventoryLocationId}
+            setInventoryLocationId={setInventoryLocationId}
+          />
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <TopServices
-          locations={locations}
-          topServicesLocationId={topServicesLocationId}
-          setTopServicesLocationId={setTopServicesLocationId}
-        />
-        <TopTeamMembers
-          locations={locations}
-          topStylistsLocationId={topStylistsLocationId}
-          setTopStylistsLocationId={setTopStylistsLocationId}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-hidden">
+        <div className="overflow-x-auto">
+          <TopServices
+            locations={locations}
+            topServicesLocationId={topServicesLocationId}
+            setTopServicesLocationId={setTopServicesLocationId}
+          />
+        </div>
+        <div className="overflow-x-auto">
+          <TopTeamMembers
+            locations={locations}
+            topStylistsLocationId={topStylistsLocationId}
+            setTopStylistsLocationId={setTopStylistsLocationId}
+          />
+        </div>
       </div>
       <AppointmentDetailsDialog 
         appointment={selectedAppointment}

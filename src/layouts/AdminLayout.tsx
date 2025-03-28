@@ -6,9 +6,9 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 export function AdminLayout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full overflow-hidden">
         <AppSidebar />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto w-full">
           <Outlet />
         </main>
       </div>
