@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -24,13 +24,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package } from "lucide-react";
 
 interface InventoryItem {
   id: string;
   name: string;
   quantity: number;
   unit_of_quantity: string;
+}
+
+interface LocationInventoryItem {
+  id: string;
+  item_id: string;
+  location_id: string;
+  quantity: number;
+  item: {
+    name: string;
+    unit_of_quantity: string;
+  };
 }
 
 interface Service {
@@ -78,12 +88,38 @@ interface ItemInput {
   quantity: number;
 }
 
+interface Location {
+  id: string;
+  name: string;
+}
+
 export function AutoConsumption() {
   const [activeTab, setActiveTab] = useState<"services" | "packages">("services");
   const [selectedService, setSelectedService] = useState<string>("");
   const [selectedPackage, setSelectedPackage] = useState<string>("");
   const [requirements, setRequirements] = useState<ServiceRequirement[]>([]);
   const [itemInputs, setItemInputs] = useState<ItemInput[]>([{ itemId: "", quantity: 1 }]);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+
+  // Fetch locations
+  const { data: locations, isLoading: locationsLoading } = useQuery({
+    queryKey: ["locations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, name")
+        .eq("is_active", true);
+
+      if (error) throw error;
+      return data as Location[];
+    },
+  });
+
+  useEffect(() => {
+    if (locations && locations.length > 0 && !selectedLocationId) {
+      setSelectedLocationId(locations[0].id);
+    }
+  }, [locations, selectedLocationId]);
 
   // Fetch services
   const { data: services, isLoading: servicesLoading } = useQuery({
@@ -123,18 +159,31 @@ export function AutoConsumption() {
     },
   });
 
-  // Fetch inventory items
-  const { data: inventoryItems, isLoading: itemsLoading, refetch: refetchInventory } = useQuery({
-    queryKey: ["inventory_items"],
+  // Fetch inventory items for the selected location
+  const { 
+    data: locationInventoryItems, 
+    isLoading: locationItemsLoading, 
+    refetch: refetchLocationInventory 
+  } = useQuery({
+    queryKey: ["location_inventory_items", selectedLocationId],
     queryFn: async () => {
+      if (!selectedLocationId) return [];
+      
       const { data, error } = await supabase
-        .from("inventory_items")
-        .select("id, name, quantity, unit_of_quantity")
-        .eq("status", "active");
+        .from("inventory_location_items")
+        .select(`
+          id,
+          item_id,
+          location_id,
+          quantity,
+          item:inventory_items (name, unit_of_quantity)
+        `)
+        .eq("location_id", selectedLocationId);
 
       if (error) throw error;
-      return data as InventoryItem[];
+      return data as LocationInventoryItem[];
     },
+    enabled: !!selectedLocationId,
   });
 
   // Fetch existing service inventory requirements
@@ -213,6 +262,10 @@ export function AutoConsumption() {
 
   const handlePackageSelect = (packageId: string) => {
     setSelectedPackage(packageId);
+  };
+
+  const handleLocationSelect = (locationId: string) => {
+    setSelectedLocationId(locationId);
   };
 
   const handleSaveRequirements = async () => {
@@ -299,7 +352,7 @@ export function AutoConsumption() {
       setSelectedPackage("");
       setItemInputs([{ itemId: "", quantity: 1 }]);
       refetchRequirements();
-      refetchInventory(); // Refresh inventory items after updating requirements
+      refetchLocationInventory(); // Refresh inventory items after updating requirements
 
     } catch (error: any) {
       toast.error(error.message);
@@ -322,12 +375,34 @@ export function AutoConsumption() {
     }
   };
 
-  if (servicesLoading || itemsLoading || packagesLoading || requirementsLoading) {
+  if (servicesLoading || locationItemsLoading || packagesLoading || requirementsLoading || locationsLoading) {
     return <div>Loading...</div>;
   }
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Auto Consumption Rules</h2>
+        <div className="flex items-center space-x-2">
+          <MapPin className="h-4 w-4" />
+          <Select
+            value={selectedLocationId}
+            onValueChange={handleLocationSelect}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select location" />
+            </SelectTrigger>
+            <SelectContent>
+              {locations?.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <Card className="p-6">
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "services" | "packages")}>
           <TabsList>
@@ -400,16 +475,16 @@ export function AutoConsumption() {
                 <div className="flex-1">
                   <Label className="text-xs">Item</Label>
                   <Select
-                    value={input.itemId}
+                    value={input.itemId || undefined}
                     onValueChange={(value) => handleItemChange(index, 'itemId', value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select an item" />
                     </SelectTrigger>
                     <SelectContent>
-                      {inventoryItems?.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name} ({item.quantity} {item.unit_of_quantity})
+                      {locationInventoryItems?.map((item) => (
+                        <SelectItem key={item.item_id} value={item.item_id}>
+                          {item.item.name} ({item.quantity} {item.item.unit_of_quantity})
                         </SelectItem>
                       ))}
                     </SelectContent>
