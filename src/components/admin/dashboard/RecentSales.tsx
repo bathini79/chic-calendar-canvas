@@ -56,7 +56,6 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
           completedCount += 1;
         }
       });
-console.log("tot",total)
       setRevenueData(Object.values(groupedData));
       setTotalRevenue(total);
       setAppointmentsStats({ count: data.length, value: total, completed: completedCount, completedValue: completedTotal });

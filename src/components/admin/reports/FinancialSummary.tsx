@@ -54,10 +54,7 @@ export function FinancialSummary({ onBack }: FinancialSummaryProps) {
     queryFn: async () => {
       try {
         // Get start date (X months ago)
-        const startDate = format(subMonths(new Date(), parseInt(monthRange)), 'yyyy-MM-dd');
-        
-        console.log('Fetching financial data from:', startDate);
-        
+        const startDate = format(subMonths(new Date(), parseInt(monthRange)), 'yyyy-MM-dd');        
         // Fetch appointments for financial calculations
         const { data, error } = await supabase
           .from('appointments')
@@ -65,10 +62,7 @@ export function FinancialSummary({ onBack }: FinancialSummaryProps) {
           .gte('created_at', startDate)
           .order('created_at', { ascending: false });
         
-        if (error) throw error;
-        
-        console.log(`Retrieved ${data?.length || 0} appointments`);
-        
+        if (error) throw error;        
         // Process data
         const processedData = processFinancialData(data || [], months);
         return processedData;
@@ -81,9 +75,7 @@ export function FinancialSummary({ onBack }: FinancialSummaryProps) {
   });
   
   // Process financial data by month
-  const processFinancialData = (appointments: any[], months: any[]) => {
-    console.log('Processing financial data...');
-    
+  const processFinancialData = (appointments: any[], months: any[]) => {    
     // Initialize result structure
     const result = {
       totals: {
@@ -167,9 +159,7 @@ export function FinancialSummary({ onBack }: FinancialSummaryProps) {
       result.totals.totalSales += netSale;
       result.totals.tips += tips;
     });
-    
-    console.log('Financial data processing complete');
-    return result;
+        return result;
   };
   
   const formatCurrency = (amount: number) => {

@@ -27,13 +27,17 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
           variant: 'success' as const
         };
       
-      // Active/Positive statuses - primary color
       case 'confirmed':
+        return {
+          label: 'Confirmed' ,
+          icon: <CalendarCheck className="h-3 w-3 mr-1" />,
+          variant: 'info' as const
+        };
       case 'booked':
         return {
-          label: status === 'confirmed' ? 'Confirmed' : 'Booked',
+          label: 'Booked',
           icon: <CalendarCheck className="h-3 w-3 mr-1" />,
-          variant: 'default' as const
+          variant: 'info2' as const
         };
       
       // In-progress statuses - amber/warning

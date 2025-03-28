@@ -14,7 +14,7 @@ interface AppointmentCardProps {
     start_time: string;
     total_price: number;
     bookings: any[];
-    location?: string;
+    locationName?: string;
   };
   onClick: () => void;
   isPast?: boolean;
@@ -29,7 +29,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onReschedule,
   onCancel
 }) => {
-  const locationName = appointment.location || "Not specified";
+  const locationName = appointment.locationName || "Not specified";
   const appointmentDate = parseISO(appointment.start_time);
   const formattedDate = format(appointmentDate, "HH:mm - ");
   const endDate = new Date(appointmentDate.getTime() + 30 * 60000); // Adding 30 minutes as default duration

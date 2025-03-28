@@ -141,10 +141,7 @@ serve(async (req) => {
         }
         
         userId = newAuthUser.user.id
-        newUser = true
-        
-        console.log('User created successfully with ID:', userId)
-        
+        newUser = true        
         // Manually create profile since the trigger might not work in all cases
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
@@ -160,10 +157,7 @@ serve(async (req) => {
           console.error('Error creating profile:', profileError)
           // We don't fail here since the auth user was already created,
           // the profile might be created by a trigger
-          console.log('Profile creation failed, but continuing with auth...')
-        } else {
-          console.log('Profile created successfully')
-        }
+        } 
       } catch (createError) {
         console.error('Exception during user creation:', createError)
         return new Response(
@@ -180,11 +174,9 @@ serve(async (req) => {
       }
     } else {
       userId = existingUser.id
-      console.log('Existing user found with ID:', userId)
     }
     
     // Sign in the user and get session
-    console.log('Attempting to sign in user with phone:', phoneNumber)
     const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email: `${userId}@phone.auth`, // Create a fake email for phone auth
@@ -217,8 +209,6 @@ serve(async (req) => {
     if (deleteError) {
       console.warn('Error deleting used OTP:', deleteError)
       // Not failing on this error, just logging
-    } else {
-      console.log('Used OTP deleted successfully')
     }
     
     return new Response(

@@ -119,13 +119,10 @@ export function CartSummary() {
       
       // If not in cache, try direct lookup
       try {
-        console.log("Coupon not in cache, fetching from database");
         const coupon = await getCouponById(appliedCouponId);
         if (coupon) {
-          console.log("Fetched coupon from database:", coupon);
           calculateDiscount(coupon);
         } else {
-          console.log("Coupon not found in database");
           setCouponDiscount(0);
         }
       } catch (error) {
@@ -172,7 +169,6 @@ export function CartSummary() {
   };
 
   const handleCouponChange = (couponId: string) => {
-    console.log("Coupon changed to:", couponId);
     if (couponId === "none") {
       setAppliedCouponId(null);
     } else {

@@ -119,7 +119,7 @@ const Profile = () => {
       if (error) {
         throw error;
       }
-
+      console.log("appointmentsData",appointmentsData)
       setAppointments(appointmentsData || []);
     } catch (error: any) {
       toast.error(error.message);
@@ -174,6 +174,7 @@ const Profile = () => {
 
   // Helper function to get formatted location address
   const getFormattedAddress = (locationId: string) => {
+    console.log("locationId",locationId,"  ",locations)
     if (!locationId) return "Not specified";
     
     const location = locations[locationId];
@@ -203,7 +204,7 @@ const Profile = () => {
   // Process appointments to add location names for cards
   const processedAppointmentsForCards = appointments.map(appointment => ({
     ...appointment,
-    location: getLocationName(appointment.location || "")
+    locationName: getLocationName(appointment.location || "")
   }));
 
   // Split appointments into upcoming and past
@@ -219,7 +220,7 @@ const Profile = () => {
     // Process the selected appointment to include full location details for the appointment details view
     const processedSelectedAppointment = {
       ...selectedAppointment,
-      location: getFormattedAddress(selectedAppointment.location || "")
+      location: getFormattedAddress(selectedAppointment?.location || "")
     };
 
     return (

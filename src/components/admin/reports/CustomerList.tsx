@@ -31,10 +31,7 @@ export function CustomerList({ onBack }: CustomerListProps) {
     queryKey: ['customers', timeRange, sortField, sortDirection],
     queryFn: async () => {
       try {
-        const startDate = format(subDays(new Date(), parseInt(timeRange)), 'yyyy-MM-dd');
-        
-        console.log('Fetching customer data from:', startDate);
-        
+        const startDate = format(subDays(new Date(), parseInt(timeRange)), 'yyyy-MM-dd');        
         // Fetch profiles (customers)
         let query = supabase
           .from('profiles')
@@ -48,10 +45,7 @@ export function CustomerList({ onBack }: CustomerListProps) {
         
         const { data, error } = await query;
         
-        if (error) throw error;
-        
-        console.log(`Retrieved ${data?.length || 0} customers`);
-        
+        if (error) throw error;        
         // Process data to include first and last appointment dates
         const processedData = data?.map(customer => {
           const appointments = customer.appointments || [];
