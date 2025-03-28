@@ -15,6 +15,7 @@ interface AppointmentCardProps {
     total_price: number;
     bookings: any[];
     locationName?: string;
+    locationAddress?: string;
   };
   onClick: () => void;
   isPast?: boolean;

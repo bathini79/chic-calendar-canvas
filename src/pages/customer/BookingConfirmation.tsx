@@ -1,4 +1,3 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -52,6 +51,7 @@ export default function BookingConfirmation() {
   const navigate = useNavigate();
   const [notes, setNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
   const [taxAmount, setTaxAmount] = useState(0);
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [tax, setTax] = useState(null);
@@ -217,31 +217,37 @@ export default function BookingConfirmation() {
         confettiRef.current.fire();
       }
       
-      const end = Date.now() + 3 * 1000;
+      const end = Date.now() + 5 * 1000;
       const colors = ["#a786ff", "#fd8bbc", "#eca184", "#f8deb1"];
 
       const frame = () => {
         if (Date.now() > end) return;
 
         confetti({
-          particleCount: 2,
+          particleCount: 1,
           angle: 60,
           spread: 55,
-          startVelocity: 60,
+          startVelocity: 45,
           origin: { x: 0, y: 0.5 },
           colors: colors,
+          gravity: 0.7,
+          ticks: 300,
         });
         
         confetti({
-          particleCount: 2,
+          particleCount: 1,
           angle: 120,
           spread: 55,
-          startVelocity: 60,
+          startVelocity: 45,
           origin: { x: 1, y: 0.5 },
           colors: colors,
+          gravity: 0.7,
+          ticks: 300,
         });
 
-        requestAnimationFrame(frame);
+        setTimeout(() => {
+          requestAnimationFrame(frame);
+        }, 150);
       };
 
       frame();
@@ -342,12 +348,16 @@ export default function BookingConfirmation() {
 
   const handleBookingConfirmation = async () => {
     setIsLoading(true);
+    setBookingError(null);
+    
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Please login to continue");
+        setBookingError("Authentication error. Please login to continue.");
+        setIsLoading(false);
         return;
       }
 
@@ -402,6 +412,8 @@ export default function BookingConfirmation() {
       if (appointmentError) {
         console.error("Error inserting appointment:", appointmentError);
         toast.error("Failed to create appointment. Please try again.");
+        setBookingError("Failed to create your appointment. Please try again.");
+        setIsLoading(false);
         throw appointmentError;
       }
 
@@ -572,6 +584,7 @@ export default function BookingConfirmation() {
     } catch (error: any) {
       console.error("Booking error:", error);
       toast.error(error.message || "Failed to confirm booking");
+      setBookingError(error.message || "Failed to confirm your booking. Please try again.");
       setIsLoading(false);
     }
   };
@@ -597,9 +610,11 @@ export default function BookingConfirmation() {
         className="fixed inset-0 z-[100] pointer-events-none"
         manualstart={true}
         options={{
-          particleCount: 150,
+          particleCount: 100,
           spread: 160,
-          origin: { y: 0.3 }
+          origin: { y: 0.3 },
+          gravity: 0.7,
+          ticks: 400,
         }}
       />
       
@@ -842,6 +857,22 @@ export default function BookingConfirmation() {
         </div>
       )}
 
+      {bookingError && (
+        <div className="fixed inset-0 bg-red-50/95 flex flex-col items-center justify-center z-50">
+          <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mb-4">
+            <X className="h-8 w-8 text-white" />
+          </div>
+          <h2 className="text-3xl font-bold mb-2 text-gray-900">Booking Failed</h2>
+          <p className="text-gray-600 text-center mb-4 max-w-md">{bookingError}</p>
+          <Button 
+            variant="default"
+            onClick={() => setBookingError(null)}
+          >
+            Try Again
+          </Button>
+        </div>
+      )}
+
       <div className="fixed bottom-0 left-0 right-0 border-t bg-background">
         <div className="container max-w-2xl mx-auto px-4">
           <div className="py-4 space-y-3">
@@ -861,7 +892,7 @@ export default function BookingConfirmation() {
               size="lg"
               className="w-full"
               onClick={handleBookingConfirmation}
-              disabled={isLoading || bookingSuccess}
+              disabled={isLoading || bookingSuccess || !!bookingError}
             >
               {isLoading ? "Confirming..." : bookingSuccess ? "Sale Completed" : "Confirm"}
             </Button>

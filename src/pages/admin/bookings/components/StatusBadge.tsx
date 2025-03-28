@@ -27,9 +27,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
           variant: 'success' as const
         };
       
+      // Active/Positive statuses - primary color (blue/purple)
       case 'confirmed':
         return {
-          label: 'Confirmed' ,
+          label: 'Confirmed',
           icon: <CalendarCheck className="h-3 w-3 mr-1" />,
           variant: 'info' as const
         };
@@ -49,7 +50,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
           variant: 'warning' as const
         };
       
-      // Canceled/negative statuses - red
+      // Canceled statuses - red
       case 'canceled':
         return {
           label: 'Canceled',
@@ -90,7 +91,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
       // Default case
       default:
         return {
-          label: status?.toString() || 'Pending',
+          label: status || 'Pending',
           icon: <Clock className="h-3 w-3 mr-1" />,
           variant: 'outline' as const
         };

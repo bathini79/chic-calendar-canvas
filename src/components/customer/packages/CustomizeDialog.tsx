@@ -110,6 +110,17 @@ export function CustomizeDialog({
     ? externalTotalDuration
     : calculatePackageDuration(selectedPackage, additionalServices, localServices);
 
+  // Format duration to hours and minutes
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (hours > 0) {
+      return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ""}`;
+    }
+    return `${remainingMinutes}m`;
+  };
+
   if (!selectedPackage) return null;
 
   return (
@@ -136,7 +147,7 @@ export function CustomizeDialog({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                {selectedServices.length} services selected • {calculatedTotalDuration} min
+                {selectedServices.length} services selected • {formatDuration(calculatedTotalDuration)}
               </div>
               <div className="text-2xl font-bold">
                 ₹{calculatedTotalPrice}
