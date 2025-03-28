@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,52 +16,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { AlertCircle, ChevronDown, Loader2 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
-
-// Country codes for phone numbers
-const countryCodes = [
-  { code: "+91", country: "India", flag: "🇮🇳" },
-  { code: "+1", country: "United States", flag: "🇺🇸" },
-  { code: "+44", country: "United Kingdom", flag: "🇬🇧" },
-  { code: "+61", country: "Australia", flag: "🇦🇺" },
-  { code: "+86", country: "China", flag: "🇨🇳" },
-  { code: "+49", country: "Germany", flag: "🇩🇪" },
-  { code: "+33", country: "France", flag: "🇫🇷" },
-  { code: "+81", country: "Japan", flag: "🇯🇵" },
-  { code: "+7", country: "Russia", flag: "🇷🇺" },
-  { code: "+55", country: "Brazil", flag: "🇧🇷" },
-  { code: "+39", country: "Italy", flag: "🇮🇹" },
-  { code: "+34", country: "Spain", flag: "🇪🇸" },
-  { code: "+82", country: "South Korea", flag: "🇰🇷" },
-  { code: "+1", country: "Canada", flag: "🇨🇦" },
-  { code: "+52", country: "Mexico", flag: "🇲🇽" },
-  { code: "+31", country: "Netherlands", flag: "🇳🇱" },
-  { code: "+46", country: "Sweden", flag: "🇸🇪" },
-  { code: "+41", country: "Switzerland", flag: "🇨🇭" },
-  { code: "+65", country: "Singapore", flag: "🇸🇬" },
-  { code: "+971", country: "United Arab Emirates", flag: "🇦🇪" },
-];
-
-// Lead source options
-const leadSourceOptions = [
-  { value: "google", label: "Google Search" },
-  { value: "facebook", label: "Facebook" },
-  { value: "instagram", label: "Instagram" },
-  { value: "friend", label: "Friend/Family" },
-  { value: "advertisement", label: "Advertisement" },
-  { value: "other", label: "Other" },
-];
+import { PhoneInput } from "@/components/ui/phone-input";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -71,7 +26,6 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [countryCode, setCountryCode] = useState("+91"); // Default to India
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [fullName, setFullName] = useState("");
@@ -81,7 +35,6 @@ const Auth = () => {
   const [canResendOtp, setCanResendOtp] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(30);
   const [edgeFunctionError, setEdgeFunctionError] = useState<string | null>(null);
-  const [leadSource, setLeadSource] = useState<string | null>(null);
 
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -92,13 +45,6 @@ const Auth = () => {
   });
 
   useEffect(() => {
-    // Check for lead source from URL parameters
-    const params = new URLSearchParams(window.location.search);
-    const sourceParam = params.get('source');
-    if (sourceParam && leadSourceOptions.some(opt => opt.value === sourceParam)) {
-      setLeadSource(sourceParam);
-    }
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
         await queryClient.invalidateQueries({ queryKey: ["session"] });
@@ -162,11 +108,9 @@ const Auth = () => {
   };
 
   const sendWhatsAppOTP = async () => {
-    // Validate phone number (should be 10 digits for Indian numbers)
-    const phoneRegex = /^\d{10}$/;
-    if (!phoneNumber || !phoneRegex.test(phoneNumber)) {
-      toast.error("Please enter a valid 10-digit phone number");
-      setVerificationError("Please enter a valid 10-digit phone number");
+    if (!phoneNumber || phoneNumber.length < 10) {
+      toast.error("Please enter a valid phone number");
+      setVerificationError("Please enter a valid phone number");
       return;
     }
 
@@ -177,11 +121,8 @@ const Auth = () => {
     setResendCountdown(30);
     
     try {
-      // Format phone number with country code
-      const formattedPhone = `${countryCode}${phoneNumber}`;
-      
       const response = await supabase.functions.invoke('send-whatsapp-otp', {
-        body: { phoneNumber: formattedPhone },
+        body: { phoneNumber },
       });
 
       if (response.error) {
@@ -224,15 +165,11 @@ const Auth = () => {
     setEdgeFunctionError(null);
     
     try {
-      // Format phone number with country code
-      const formattedPhone = `${countryCode}${phoneNumber}`;
-      
       const response = await supabase.functions.invoke('verify-whatsapp-otp', {
         body: { 
-          phoneNumber: formattedPhone, 
+          phoneNumber, 
           code: otp,
-          fullName: needsFullName ? fullName : undefined,
-          leadSource: leadSource
+          fullName: needsFullName ? fullName : undefined
         },
       });
 
@@ -281,67 +218,19 @@ const Auth = () => {
       return (
         <>
           <div className="space-y-2">
-            <Label htmlFor="phone" className="text-sm font-medium">
+            <label htmlFor="phone" className="text-sm font-medium">
               Phone Number
-            </Label>
-            <div className="flex">
-              <Select
-                value={countryCode}
-                onValueChange={setCountryCode}
-              >
-                <SelectTrigger className="w-[140px] rounded-r-none">
-                  <SelectValue placeholder="Code" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto">
-                  <SelectGroup>
-                    <SelectLabel>Countries</SelectLabel>
-                    {countryCodes.map((country) => (
-                      <SelectItem key={`${country.code}-${country.country}`} value={country.code}>
-                        <span className="flex items-center">
-                          <span className="mr-2">{country.flag}</span>
-                          <span>{country.code}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <Input
-                id="phone"
-                type="tel"
-                className="rounded-l-none"
-                placeholder="9876543210"
-                value={phoneNumber}
-                onChange={(e) => {
-                  // Only allow digits, max 10 characters
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                  setPhoneNumber(value);
-                }}
-                required
-              />
-            </div>
-            <div className="mt-4">
-              <Label htmlFor="leadSource" className="text-sm font-medium">
-                How did you hear about us?
-              </Label>
-              <Select
-                value={leadSource || ""}
-                onValueChange={setLeadSource}
-              >
-                <SelectTrigger className="w-full" id="leadSource">
-                  <SelectValue placeholder="Select an option" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {leadSourceOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
+            </label>
+            <PhoneInput
+              id="phone"
+              placeholder="+1 (555) 000-0000"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter your phone number with country code (e.g., +1 for US)
+            </p>
           </div>
           {verificationError && (
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
@@ -380,9 +269,9 @@ const Auth = () => {
       return (
         <>
           <div className="space-y-2">
-            <Label htmlFor="fullName" className="text-sm font-medium">
+            <label htmlFor="fullName" className="text-sm font-medium">
               Full Name <span className="text-red-500">*</span>
-            </Label>
+            </label>
             <Input
               id="fullName"
               placeholder="John Doe"
@@ -446,24 +335,23 @@ const Auth = () => {
     return (
       <>
         <div className="space-y-2">
-          <Label htmlFor="otp" className="text-sm font-medium">
+          <label htmlFor="otp" className="text-sm font-medium">
             Enter OTP
-          </Label>
+          </label>
           <div className="flex justify-center">
-            <InputOTP
+          <InputOTP
               maxLength={6}
               value={otp}
               onChange={setOtp}
-            >
-              <InputOTPGroup>
-                <InputOTPSlot index={0} />
-                <InputOTPSlot index={1} />
-                <InputOTPSlot index={2} />
-                <InputOTPSlot index={3} />
-                <InputOTPSlot index={4} />
-                <InputOTPSlot index={5} />
-              </InputOTPGroup>
-            </InputOTP>
+            ><InputOTPGroup>
+            <InputOTPSlot index={0} />
+            <InputOTPSlot index={1} />
+            <InputOTPSlot index={2} />
+            <InputOTPSlot index={3} />
+            <InputOTPSlot index={4} />
+            <InputOTPSlot index={5} />
+          </InputOTPGroup>
+        </InputOTP>
           </div>
           <p className="text-xs text-muted-foreground text-center">
             Check your WhatsApp for the 6-digit verification code
@@ -554,9 +442,9 @@ const Auth = () => {
             <CardContent>
               <form onSubmit={handleEmailSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">
+                  <label htmlFor="email" className="text-sm font-medium">
                     Email
-                  </Label>
+                  </label>
                   <Input
                     id="email"
                     type="email"
@@ -567,9 +455,9 @@ const Auth = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium">
+                  <label htmlFor="password" className="text-sm font-medium">
                     Password
-                  </Label>
+                  </label>
                   <Input
                     id="password"
                     type="password"

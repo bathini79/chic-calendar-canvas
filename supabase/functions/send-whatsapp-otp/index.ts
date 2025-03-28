@@ -1,17 +1,61 @@
 
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
+const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
+const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
+const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')
+
+// Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log("Hello from send-whatsapp-otp function!")
+function generateOTP() {
+  // Generate a 6-digit OTP
+  return Math.floor(100000 + Math.random() * 900000).toString()
+}
+
+async function sendWhatsAppOTP(phoneNumber: string, otp: string) {
+  // Make sure the phone number is in E.164 format
+  const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`
+  
+  console.log(`Attempting to send OTP to: ${formattedPhone} using Twilio WhatsApp`)
+  
+  const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
+  
+  const formData = new URLSearchParams()
+  formData.append('From', `whatsapp:${TWILIO_PHONE_NUMBER}`)
+  formData.append('To', `whatsapp:${formattedPhone}`)
+  formData.append('Body', `Your verification code is: ${otp}`)
+
+  const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)
+  
+  try {
+    const response = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${auth}`
+      },
+      body: formData
+    })
+    
+    const responseData = await response.json()
+    
+    if (!response.ok) {
+      console.error('Error from Twilio:', responseData)
+      throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || JSON.stringify(responseData)}`)
+    }
+    
+    console.log('Twilio message sent successfully:', responseData.sid)
+    return responseData
+  } catch (error) {
+    console.error('Failed to send WhatsApp message:', error)
+    throw error
+  }
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -20,84 +64,98 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumber } = await req.json()
-    console.log(`Processing OTP request for phone: ${phoneNumber}`)
-
-    // Generate a 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString()
-    console.log(`Generated OTP: ${otp} for phone: ${phoneNumber}`)
-
-    // Create a Supabase client with the service role key
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // Store the OTP in the database with an expiration time (15 minutes from now)
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
-
-    const { data: otpData, error: otpError } = await supabase
-      .from('phone_auth_codes')
-      .insert([
-        {
-          phone_number: phoneNumber,
-          code: otp,
-          expires_at: expiresAt.toISOString(),
-        },
-      ])
-      .select()
-
-    if (otpError) {
-      throw new Error(`Error storing OTP: ${otpError.message}`)
-    }
-
-    console.log(`OTP stored in database for phone: ${phoneNumber}`)
-
-    // Send the OTP via Twilio WhatsApp
-    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
-    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN')
-    const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
-    const companyName = Deno.env.get('COMPANY_NAME') || 'Salon App'
-
-    if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+      console.error('Twilio credentials missing:', {
+        ACCOUNT_SID_EXISTS: !!TWILIO_ACCOUNT_SID,
+        AUTH_TOKEN_EXISTS: !!TWILIO_AUTH_TOKEN,
+        PHONE_NUMBER_EXISTS: !!TWILIO_PHONE_NUMBER
+      })
       throw new Error('Twilio credentials not configured')
     }
-
-    console.log(`Attempting to send OTP to: ${phoneNumber} using Twilio WhatsApp`)
-
-    // Format the message
-    const message = `Your ${companyName} verification code is: ${otp}. This code will expire in 15 minutes.`
-
-    // Send the message via Twilio
-    const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`
-    const twilioResponse = await fetch(twilioEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
-      },
-      body: new URLSearchParams({
-        To: `${phoneNumber}`,
-        From: twilioPhoneNumber,
-        Body: message,
-      }),
-    })
-
-    if (!twilioResponse.ok) {
-      const twilioError = await twilioResponse.text()
-      throw new Error(`Twilio API error: ${twilioError}`)
+    
+    // Parse request body
+    const { phoneNumber } = await req.json()
+    
+    if (!phoneNumber) {
+      throw new Error('Phone number is required')
     }
 
-    const twilioData = await twilioResponse.json()
-    console.log(`Twilio message sent successfully: ${twilioData.sid}`)
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  } catch (err) {
-    console.error(`Error in send-whatsapp-otp: ${err.message}`)
+    console.log(`Processing OTP request for phone: ${phoneNumber}`)
+    
+    // Generate OTP
+    const otp = generateOTP()
+    console.log(`Generated OTP: ${otp} for phone: ${phoneNumber}`)
+    
+    // Store OTP in database for verification
+    const supabaseClient = Deno.env.get('SUPABASE_URL') && Deno.env.get('SUPABASE_ANON_KEY')
+      ? createClient(
+          Deno.env.get('SUPABASE_URL') as string,
+          Deno.env.get('SUPABASE_ANON_KEY') as string,
+          { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+        )
+      : null
+      
+    if (supabaseClient) {
+      try {
+        // First, delete any existing OTP for this phone number
+        await supabaseClient
+          .from('phone_auth_codes')
+          .delete()
+          .eq('phone_number', phoneNumber);
+        
+        // Then store the new OTP with expiration (10 minutes)
+        const expiresAt = new Date()
+        expiresAt.setMinutes(expiresAt.getMinutes() + 10)
+        
+        const { error } = await supabaseClient
+          .from('phone_auth_codes')
+          .insert({
+            phone_number: phoneNumber,
+            code: otp,
+            expires_at: expiresAt.toISOString(),
+            created_at: new Date().toISOString()
+          })
+          
+        if (error) {
+          console.error('Error storing OTP in database:', error)
+          throw new Error(`Failed to store OTP: ${error.message}`)
+        }
+        
+        console.log(`OTP stored in database for phone: ${phoneNumber}`)
+      } catch (error: any) {
+        console.error('Database operation failed:', error)
+        throw new Error(`Failed to store OTP: ${error.message}`)
+      }
+    } else {
+      console.error('Supabase client could not be initialized')
+      throw new Error('Database connection error')
+    }
+    
+    // Send OTP via WhatsApp
+    await sendWhatsAppOTP(phoneNumber, otp)
+    
     return new Response(
-      JSON.stringify({ error: err.message || 'Internal server error' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ message: 'OTP sent successfully' }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        },
+        status: 200 
+      }
+    )
+  } catch (error: any) {
+    console.error('Error sending OTP:', error)
+    
+    return new Response(
+      JSON.stringify({ error: error.message || "Unknown error occurred" }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        },
+        status: 400 
+      }
     )
   }
 })
