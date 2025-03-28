@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addDays, startOfToday, isSameDay, addMinutes, parseISO } from "date-fns";
+import { format, addDays, startOfToday, isSameDay, addMinutes, parseISO, isToday, isBefore } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +115,8 @@ export function UnifiedCalendar({
     const generateTimeSlots = () => {
       const slots: TimeSlot[] = [];
       const dayOfWeek = selectedDate.getDay();
+      const currentTime = new Date();
+      const isSelectedDateToday = isToday(selectedDate);
       
       const locationHours = locationData.location_hours?.find(
         (h: any) => h.day_of_week === dayOfWeek
@@ -140,6 +142,17 @@ export function UnifiedCalendar({
           
           const closingTime = new Date(selectedDate);
           closingTime.setHours(endHour, endMinute, 0, 0);
+          
+          // Skip past time slots for today
+          if (isSelectedDateToday && isBefore(slotStart, currentTime)) {
+            // Increment by 30 minutes and continue to next iteration
+            currentMinute += 30;
+            if (currentMinute >= 60) {
+              currentHour += 1;
+              currentMinute = 0;
+            }
+            continue;
+          }
           
           // Only add the slot if it ends before closing time
           if (slotEnd <= closingTime) {
@@ -292,9 +305,11 @@ export function UnifiedCalendar({
               </div>
               <h3 className="text-lg font-semibold mb-2">No available slots</h3>
               <p className="text-muted-foreground mb-4">
-                {locationData?.location_hours?.some((h: any) => h.day_of_week === selectedDate.getDay() && !h.is_closed)
-                  ? "Please select a different date or time"
-                  : "Location is closed on this day"}
+                {isToday(selectedDate) 
+                  ? "No more available time slots for today"
+                  : locationData?.location_hours?.some((h: any) => h.day_of_week === selectedDate.getDay() && !h.is_closed)
+                    ? "Please select a different date or time"
+                    : "Location is closed on this day"}
               </p>
             </div>
           )
