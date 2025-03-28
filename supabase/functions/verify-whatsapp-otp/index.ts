@@ -1,12 +1,17 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
+// Follow this setup guide to integrate the Deno language server with your editor:
+// https://deno.land/manual/getting_started/setup_your_environment
+// This enables autocomplete, go to definition, etc.
 
-// Define CORS headers
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+console.log("Hello from verify-whatsapp-otp function!")
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -15,236 +20,160 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumber, code, fullName } = await req.json()
-    
-    if (!phoneNumber || !code) {
-      throw new Error('Phone number and verification code are required')
-    }
-    
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    
-    if (!supabaseUrl || !supabaseServiceRoleKey) {
-      throw new Error('Supabase credentials not configured')
-    }
-    
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
-    
-    console.log("Verifying OTP for phone number:", phoneNumber)
-    
-    // Verify OTP from database
-    const { data, error } = await supabaseAdmin
+    const { phoneNumber, code, fullName, leadSource } = await req.json()
+    console.log(`Verifying OTP for phone: ${phoneNumber}, code: ${code}, fullName: ${fullName || 'not provided'}, leadSource: ${leadSource || 'not provided'}`)
+
+    // Create a Supabase client with the service role key
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Check if the OTP is valid
+    const { data: otpData, error: otpError } = await supabase
       .from('phone_auth_codes')
       .select('*')
       .eq('phone_number', phoneNumber)
-      .eq('code', code)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single()
-      
-    if (error || !data) {
-      console.error('OTP verification error:', error)
+
+    if (otpError || !otpData) {
+      console.error('Error retrieving OTP:', otpError)
       return new Response(
-        JSON.stringify({ 
-          error: 'invalid_code',
-          message: 'Invalid verification code'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 // Using 200 even for errors to avoid non-2xx handling issues
-        }
+        JSON.stringify({ error: 'invalid_otp', message: 'Invalid or expired OTP. Please request a new code.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
-    
-    // Check if OTP has expired
-    const expiresAt = new Date(data.expires_at)
-    const currentTime = new Date()
-    
-    if (currentTime > expiresAt) {
+
+    // Check if OTP is expired (15 minutes)
+    const expiryTime = new Date(otpData.expires_at)
+    if (new Date() > expiryTime) {
       console.error('OTP expired')
       return new Response(
-        JSON.stringify({ 
-          error: 'code_expired',
-          message: 'Verification code has expired'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 // Using 200 even for errors to avoid non-2xx handling issues
-        }
+        JSON.stringify({ error: 'expired_otp', message: 'OTP has expired. Please request a new code.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
-    
-    // Check if user exists
-    const { data: existingUser, error: userError } = await supabaseAdmin
+
+    // Verify the OTP
+    if (otpData.code !== code) {
+      console.error('OTP mismatch')
+      return new Response(
+        JSON.stringify({ error: 'invalid_otp', message: 'Invalid OTP. Please check and try again.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+
+    // Clean the phone number for auth compatibility
+    // For example, convert +91XXXXXXXXXX to just the number part
+    const cleanPhone = phoneNumber.replace(/\+/g, '')
+
+    // Check if a user already exists with this phone number
+    const { data: existingUser, error: userCheckError } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, phone_number, full_name, phone_verified')
       .eq('phone_number', phoneNumber)
+      .limit(1)
       .single()
-    
-    let userId = null
-    let newUser = false
-    
-    if (userError || !existingUser) {
-      console.log('New user detected')
-      // Creating a new user requires a full name
+
+    let userId
+    let isNewUser = false
+
+    if (!existingUser) {
+      // New user - require full name
       if (!fullName) {
-        console.log('New user registration requires full name')
-        // Return specific error for missing name but with 200 status code
+        console.log('New user requires full name')
         return new Response(
-          JSON.stringify({ 
-            error: "new_user_requires_name",
-            message: "New user registration requires a full name"
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 // Using 200 to avoid non-2xx handling issues
-          }
+          JSON.stringify({ error: 'new_user_requires_name', message: 'Please provide your full name to register.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         )
       }
 
-      console.log('Creating new user with name:', fullName, 'and phone:', phoneNumber)
-      
-      try {
-        // First create the auth user
-        console.log("Starting user creation with phone:", phoneNumber)
-        const { data: newAuthUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-          phone: phoneNumber,
-          phone_confirm: true,
-          email_confirm: true,
-          user_metadata: { 
+      // Create a new user in auth
+      const { data: newAuthUser, error: signUpError } = await supabase.auth.signUp({
+        phone: phoneNumber,
+        options: {
+          data: {
+            phone: phoneNumber,
+            phone_confirmed_at: new Date().toISOString(),
             full_name: fullName,
-            phone_verified: true
           }
-        })
-        
-        if (createUserError) {
-          console.error('Error creating auth user:', createUserError)
-          return new Response(
-            JSON.stringify({ 
-              error: "user_creation_failed",
-              message: "Failed to create user account",
-              details: createUserError.message
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200 // Using 200 to avoid non-2xx handling issues
-            }
-          )
         }
-        
-        if (!newAuthUser || !newAuthUser.user) {
-          throw new Error('User creation returned no user data')
-        }
-        
-        userId = newAuthUser.user.id
-        newUser = true        
-        // Manually create profile since the trigger might not work in all cases
-        const { error: profileError } = await supabaseAdmin
-          .from('profiles')
-          .insert({
-            id: userId,
-            phone_number: phoneNumber,
-            phone_verified: true,
-            full_name: fullName,
-            role: 'customer'
-          })
-          
-        if (profileError) {
-          console.error('Error creating profile:', profileError)
-          // We don't fail here since the auth user was already created,
-          // the profile might be created by a trigger
-        } 
-      } catch (createError) {
-        console.error('Exception during user creation:', createError)
+      })
+
+      if (signUpError || !newAuthUser.user) {
+        console.error('Error creating new user:', signUpError)
         return new Response(
-          JSON.stringify({ 
-            error: "user_creation_exception",
-            message: "Failed to create user account due to an exception",
-            details: createError.message
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 // Using 200 to avoid non-2xx handling issues
-          }
+          JSON.stringify({ error: 'registration_failed', message: 'Registration failed. Please try again.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
         )
       }
+
+      userId = newAuthUser.user.id
+      isNewUser = true
+
+      // Add lead_source to the profile if provided
+      if (leadSource) {
+        // Update the profile with the lead source
+        await supabase
+          .from('profiles')
+          .update({ lead_source: leadSource })
+          .eq('id', userId);
+      }
+
+      console.log(`New user created with ID: ${userId}`)
     } else {
       userId = existingUser.id
-    }
-    
-    // Sign in the user and get session
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: `${userId}@phone.auth`, // Create a fake email for phone auth
-      options: {
-        redirectTo: 'http://localhost:3000/',
-      }
-    })
-    
-    if (sessionError || !sessionData) {
-      console.error('Error generating auth link:', sessionError)
-      return new Response(
-        JSON.stringify({ 
-          error: "signin_failed",
-          message: "Failed to sign in user",
-          details: sessionError?.message || "No session data returned"
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 // Using 200 to avoid non-2xx handling issues
+
+      // Sign in the existing user
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPhone({
+        phone: phoneNumber,
+        options: {
+          data: {
+            phone_confirmed_at: new Date().toISOString(),
+          }
         }
-      )
+      })
+
+      if (signInError) {
+        console.error('Error signing in existing user:', signInError)
+        return new Response(
+          JSON.stringify({ error: 'login_failed', message: 'Login failed. Please try again.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        )
+      }
+
+      // Update the profile phone_verified flag if not already set
+      if (!existingUser.phone_verified) {
+        await supabase
+          .from('profiles')
+          .update({ phone_verified: true })
+          .eq('id', userId)
+      }
+
+      console.log(`Existing user signed in: ${userId}`)
     }
-    
-    // Delete used OTP
-    const { error: deleteError } = await supabaseAdmin
+
+    // Delete the used OTP
+    await supabase
       .from('phone_auth_codes')
       .delete()
-      .eq('phone_number', phoneNumber)
-      
-    if (deleteError) {
-      console.warn('Error deleting used OTP:', deleteError)
-      // Not failing on this error, just logging
-    }
-    
+      .eq('id', otpData.id)
+
+    // Return success response
     return new Response(
       JSON.stringify({ 
-        message: newUser ? 'Registration successful' : 'Login successful',
-        isNewUser: newUser,
-        user: { id: userId, phone_number: phoneNumber },
-        properties: {
-          hashed_token: sessionData.properties.hashed_token,
-          action_link: sessionData.properties.action_link
-        }
+        success: true, 
+        isNewUser, 
+        message: isNewUser ? 'Registration successful!' : 'Login successful!' 
       }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json' 
-        },
-        status: 200 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
-    console.error('Error verifying OTP:', error)
-    
+  } catch (err) {
+    console.error('Unexpected error:', err)
     return new Response(
-      JSON.stringify({ 
-        error: "unknown_error", 
-        message: error.message || "Unknown error occurred",
-        details: error.stack
-      }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
-        status: 200 // Using 200 to avoid non-2xx handling issues
-      }
+      JSON.stringify({ error: 'server_error', message: 'An unexpected error occurred.' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
 })
