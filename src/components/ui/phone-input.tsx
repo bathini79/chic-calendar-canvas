@@ -151,7 +151,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
           inputMode="numeric"
           onChange={handleChange}
           className={cn("rounded-l-none", className)}
-          placeholder="9876543210"
+          placeholder="9876543210..."
           {...props}
         />
       </div>
