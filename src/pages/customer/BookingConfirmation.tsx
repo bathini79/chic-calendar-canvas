@@ -837,7 +837,7 @@ export default function BookingConfirmation() {
           <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
             <Check className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold mb-2 text-gray-900">Sale Completed!</h2>
+          <h2 className="text-3xl font-bold mb-2 text-gray-900">Appointment Booked!</h2>
           <p className="text-gray-600">Redirecting to your bookings...</p>
         </div>
       )}
