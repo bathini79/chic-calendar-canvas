@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -12,7 +11,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
   const [revenueData, setRevenueData] = useState([]);
   const [appointmentsStats, setAppointmentsStats] = useState({ count: 0, value: 0, completed: 0, completedValue: 0 });
   const [totalRevenue, setTotalRevenue] = useState(0);
-  const [businessMetrics, setBusinessMetrics] = useState({
+  const [businessMetrics, setBusinessMetrics = useState({
     revenue: "0.00", occupancyRate: "0.00", returningCustomerRate: "0.00", tips: "0.00",
     revenueChange: "0.00", occupancyChange: "0.00", returningCustomerChange: "0.00", tipsChange: "--"
   });
@@ -289,25 +288,28 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
     setIsLoading(true);
     Promise.all([fetchRevenueData(), fetchBusinessMetrics()])
       .finally(() => setIsLoading(false));
-  }, [timeRange,recentSalesLocationId]);
+  }, [timeRange, recentSalesLocationId, fetchRevenueData, fetchBusinessMetrics]);
 
   const getTimeRangeLabel = () => {
     return { "today": "Today", "week": "Last 7 days", "month": "Last 30 days", "year": "Last 365 days" }[timeRange] || "Today";
   };
 
-  if (isLoading) return <div>Loading...</div>;
-
   return (
-    <Card className="shadow-sm h-full">
+    <Card className="shadow-sm h-full overflow-hidden">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-2 sm:space-y-0">
         <div>
           <CardTitle className="text-lg">Recent Sales</CardTitle>
           <CardDescription>{getTimeRangeLabel()}</CardDescription>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <LocationSelector value={recentSalesLocationId} onChange={setRecentSalesLocationId} locations={locations} />
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-full sm:w-[120px]"><SelectValue placeholder="Select..." /></SelectTrigger>
+          <LocationSelector 
+            value={recentSalesLocationId} 
+            onChange={setRecentSalesLocationId} 
+            locations={locations} 
+            className="w-full sm:w-[160px]"
+          />
+          <Select value={timeRange} onValueChange={setTimeRange} className="w-full sm:w-[120px]">
+            <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
             <SelectContent>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="week">Week</SelectItem>
@@ -317,49 +319,55 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
           </Select>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          <div className="text-3xl font-bold text-gray-900">₹{appointmentsStats.completedValue.toFixed(2)}</div>
-          <div>
-            <div className="text-sm text-gray-500">Appointments {appointmentsStats.count}</div>
-            <div className="text-lg font-semibold">Appointments value ₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
+      <CardContent className="overflow-x-auto overflow-y-auto">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-[400px]">
+            <p className="text-muted-foreground">Loading...</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-gray-600">Occupancy Rate</div>
-                <Percent className="h-4 w-4 text-gray-400" />
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.occupancyRate}%</div>
+        ) : (
+          <div className="space-y-6">
+            <div className="text-3xl font-bold text-gray-900">₹{appointmentsStats.completedValue.toFixed(2)}</div>
+            <div>
+              <div className="text-sm text-gray-500">Appointments {appointmentsStats.count}</div>
+              <div className="text-lg font-semibold">Appointments value ₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
             </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-gray-600">Returning Customer Rate</div>
-                <User className="h-4 w-4 text-gray-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
+              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium text-gray-600">Occupancy Rate</div>
+                  <Percent className="h-4 w-4 text-gray-400" />
+                </div>
+                <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.occupancyRate}%</div>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.returningCustomerRate}%</div>
+              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium text-gray-600">Returning Customer Rate</div>
+                  <User className="h-4 w-4 text-gray-400" />
+                </div>
+                <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.returningCustomerRate}%</div>
+              </div>
+            </div>
+            <div className="h-[300px] aspect-square max-w-full overflow-hidden">
+              {revenueData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={revenueData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="sales" stroke="#8884d8" name="Sales" dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="appointments" stroke="#82ca9d" name="Appointments" dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground">No data available for the selected period</p>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-        <div className="h-[300px] mt-6 overflow-x-auto overflow-y-auto">
-          {revenueData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={revenueData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="sales" stroke="#8884d8" name="Sales" dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="appointments" stroke="#82ca9d" name="Appointments" dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <p className="text-muted-foreground">No data available for the selected period</p>
-            </div>
-          )}
-        </div>
+        )}
       </CardContent>
     </Card>
   );
