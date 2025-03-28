@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -13,13 +13,9 @@ import {
   Users,
   FileBarChart,
   Map,
-  Menu,
-  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { useSidebar } from "@/components/ui/sidebar";
 
 const sidebarNavItems = [
   {
@@ -61,41 +57,14 @@ const sidebarNavItems = [
 
 export function AppSidebar() {
   const { pathname } = useLocation();
-  const isMobile = useIsMobile();
-  const { collapsed, setCollapsed } = useSidebar();
-  
-  // Automatically collapse sidebar on mobile
-  useEffect(() => {
-    if (isMobile) {
-      setCollapsed(true);
-    }
-  }, [isMobile, setCollapsed]);
 
   return (
-    <div 
-      className={cn(
-        "flex h-screen flex-col border-r transition-all duration-300", 
-        collapsed ? "w-[70px]" : "w-[240px]"
-      )}
-    >
-      <div className="flex h-14 items-center px-6 border-b justify-between">
+    <div className="flex h-screen w-[240px] flex-col border-r">
+      <div className="flex h-14 items-center px-6 border-b">
         <Link to="/admin" className="flex items-center">
-          {!collapsed && (
-            <>
-              <CreditCard className="h-6 w-6" />
-              <span className="ml-2 text-lg font-semibold">Beauty SaaS</span>
-            </>
-          )}
-          {collapsed && <CreditCard className="h-6 w-6" />}
+          <CreditCard className="h-6 w-6" />
+          <span className="ml-2 text-lg font-semibold">Beauty SaaS</span>
         </Link>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="md:hidden" 
-          onClick={() => setCollapsed(!collapsed)}
-        >
-          {collapsed ? <Menu size={18} /> : <X size={18} />}
-        </Button>
       </div>
       <ScrollArea className="flex-1">
         <nav className="grid items-start px-2 py-4">
@@ -105,27 +74,15 @@ export function AppSidebar() {
                 variant={pathname === item.href ? "secondary" : "ghost"}
                 className={cn("w-full justify-start", {
                   "bg-muted": pathname === item.href,
-                  "px-3": collapsed,
-                  "justify-center": collapsed,
                 })}
               >
                 {item.icon}
-                {!collapsed && item.title}
+                {item.title}
               </Button>
             </Link>
           ))}
         </nav>
       </ScrollArea>
-      <div className="p-2 border-t hidden md:block">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full justify-center"
-        >
-          {collapsed ? <Menu size={18} /> : <X size={18} />}
-        </Button>
-      </div>
     </div>
   );
 }
