@@ -82,7 +82,6 @@ export function AutoConsumption() {
   const [activeTab, setActiveTab] = useState<"services" | "packages">("services");
   const [selectedService, setSelectedService] = useState<string>("");
   const [selectedPackage, setSelectedPackage] = useState<string>("");
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [requirements, setRequirements] = useState<ServiceRequirement[]>([]);
   const [itemInputs, setItemInputs] = useState<ItemInput[]>([{ itemId: "", quantity: 1 }]);
 
@@ -124,60 +123,17 @@ export function AutoConsumption() {
     },
   });
 
-  // Fetch locations
-  const { data: locations, isLoading: locationsLoading } = useQuery({
-    queryKey: ["locations"],
+  // Fetch inventory items
+  const { data: inventoryItems, isLoading: itemsLoading, refetch: refetchInventory } = useQuery({
+    queryKey: ["inventory_items"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("locations")
-        .select("id, name")
+        .from("inventory_items")
+        .select("id, name, quantity, unit_of_quantity")
         .eq("status", "active");
 
       if (error) throw error;
-      return data as Array<{ id: string; name: string }>;
-    },
-  });
-
-  // Fetch inventory items for selected location or all locations
-  const { data: inventoryItems, isLoading: itemsLoading, refetch: refetchInventory } = useQuery({
-    queryKey: ["inventory_items_for_consumption", selectedLocation],
-    queryFn: async () => {
-      let query = supabase.from("inventory_items").select("id, name, unit_of_quantity");
-      
-      // If location is selected, fetch location-specific quantities
-      if (selectedLocation) {
-        query = query.eq("location_items.location_id", selectedLocation).select(`
-          id, 
-          name, 
-          unit_of_quantity,
-          location_items:inventory_location_items!inner(
-            quantity,
-            location_id
-          )
-        `);
-      }
-
-      const { data, error } = await query.eq("status", "active");
-
-      if (error) throw error;
-      
-      // Transform data for consistent format
-      return data.map((item: any) => {
-        if (selectedLocation && item.location_items && item.location_items.length) {
-          return {
-            id: item.id,
-            name: item.name,
-            unit_of_quantity: item.unit_of_quantity,
-            quantity: item.location_items[0]?.quantity || 0
-          };
-        }
-        return {
-          id: item.id,
-          name: item.name,
-          unit_of_quantity: item.unit_of_quantity,
-          quantity: 0  // Default quantity if no location-specific data
-        };
-      }) as InventoryItem[];
+      return data as InventoryItem[];
     },
   });
 
@@ -187,9 +143,9 @@ export function AutoConsumption() {
     isLoading: requirementsLoading,
     refetch: refetchRequirements,
   } = useQuery({
-    queryKey: ["service_inventory_requirements", selectedLocation],
+    queryKey: ["service_inventory_requirements"],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from("service_inventory_requirements")
         .select(`
           id,
@@ -199,13 +155,6 @@ export function AutoConsumption() {
           service:services (name),
           item:inventory_items (name, unit_of_quantity)
         `);
-        
-      // Filter by location if selected
-      if (selectedLocation) {
-        query = query.eq("location_id", selectedLocation);
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       return data as ExistingRequirement[];
@@ -266,13 +215,6 @@ export function AutoConsumption() {
     setSelectedPackage(packageId);
   };
 
-  const handleLocationSelect = (locationId: string) => {
-    setSelectedLocation(locationId);
-    // Reset selected service/package when location changes
-    refetchRequirements();
-    refetchInventory();
-  };
-
   const handleSaveRequirements = async () => {
     if (!selectedService && activeTab === "services") {
       toast.error("Please select a service");
@@ -303,20 +245,19 @@ export function AutoConsumption() {
           service_id: selectedService,
           item_id: item.itemId,
           quantity_required: item.quantity,
-          location_id: selectedLocation || null  // Include location if selected
         }));
 
         // Insert data
         const { error } = await supabase
           .from('service_inventory_requirements')
           .upsert(insertData, {
-            onConflict: 'service_id,item_id,location_id',
+            onConflict: 'service_id,item_id',
             ignoreDuplicates: false
           });
 
         if (error) throw error;
 
-        toast.success(`Requirements saved for ${service.name}${selectedLocation ? ' at this location' : ''}`);
+        toast.success(`Requirements saved for ${service.name}`);
       } else if (activeTab === "packages") {
         // Get package
         const pkg = packages?.find(p => p.id === selectedPackage);
@@ -336,7 +277,6 @@ export function AutoConsumption() {
               service_id: serviceId,
               item_id: item.itemId,
               quantity_required: item.quantity,
-              location_id: selectedLocation || null  // Include location if selected
             });
           }
         }
@@ -345,13 +285,13 @@ export function AutoConsumption() {
         const { error } = await supabase
           .from('service_inventory_requirements')
           .upsert(allInserts, {
-            onConflict: 'service_id,item_id,location_id',
+            onConflict: 'service_id,item_id',
             ignoreDuplicates: false
           });
 
         if (error) throw error;
 
-        toast.success(`Requirements saved for ${pkg.name} package${selectedLocation ? ' at this location' : ''}`);
+        toast.success(`Requirements saved for ${pkg.name} package`);
       }
 
       // Reset form
@@ -359,7 +299,7 @@ export function AutoConsumption() {
       setSelectedPackage("");
       setItemInputs([{ itemId: "", quantity: 1 }]);
       refetchRequirements();
-      refetchInventory();
+      refetchInventory(); // Refresh inventory items after updating requirements
 
     } catch (error: any) {
       toast.error(error.message);
@@ -382,43 +322,13 @@ export function AutoConsumption() {
     }
   };
 
-  if (servicesLoading || itemsLoading || packagesLoading || requirementsLoading || locationsLoading) {
+  if (servicesLoading || itemsLoading || packagesLoading || requirementsLoading) {
     return <div>Loading...</div>;
   }
 
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <div className="mb-6">
-          <Label htmlFor="location">Location</Label>
-          <Select
-            value={selectedLocation}
-            onValueChange={handleLocationSelect}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="All Locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All Locations</SelectItem>
-              {locations?.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {selectedLocation && (
-            <p className="text-sm text-muted-foreground mt-1">
-              Showing items and requirements specific to the selected location
-            </p>
-          )}
-          {!selectedLocation && (
-            <p className="text-sm text-muted-foreground mt-1">
-              Select a location to configure location-specific consumption settings
-            </p>
-          )}
-        </div>
-
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "services" | "packages")}>
           <TabsList>
             <TabsTrigger value="services">Services</TabsTrigger>
@@ -546,11 +456,7 @@ export function AutoConsumption() {
         </div>
       </Card>
 
-      <h2 className="text-lg font-semibold mt-8">
-        {selectedLocation 
-          ? `Consumption Requirements - ${locations?.find(l => l.id === selectedLocation)?.name || 'Selected Location'}` 
-          : 'Global Consumption Requirements'}
-      </h2>
+      <h2 className="text-lg font-semibold mt-8">Existing Consumption Requirements</h2>
       
       {requirements.length > 0 ? (
         <Table>
@@ -591,9 +497,7 @@ export function AutoConsumption() {
         </Table>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
-          {selectedLocation 
-            ? "No location-specific consumption requirements configured yet." 
-            : "No global consumption requirements configured yet."}
+          No consumption requirements configured yet.
         </div>
       )}
     </div>
