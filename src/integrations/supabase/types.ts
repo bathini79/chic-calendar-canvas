@@ -1498,6 +1498,7 @@ export type Database = {
         Row: {
           admin_created: boolean | null
           anniversary_date: string | null
+          avatar_url: string | null
           birth_date: string | null
           cashback_balance: number | null
           created_at: string
@@ -1519,6 +1520,7 @@ export type Database = {
         Insert: {
           admin_created?: boolean | null
           anniversary_date?: string | null
+          avatar_url?: string | null
           birth_date?: string | null
           cashback_balance?: number | null
           created_at?: string
@@ -1540,6 +1542,7 @@ export type Database = {
         Update: {
           admin_created?: boolean | null
           anniversary_date?: string | null
+          avatar_url?: string | null
           birth_date?: string | null
           cashback_balance?: number | null
           created_at?: string
