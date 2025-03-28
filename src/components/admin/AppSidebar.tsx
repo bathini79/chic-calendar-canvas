@@ -122,18 +122,11 @@ export function AppSidebar() {
           {businessDetails.logo_url ? (
             <img 
               src={businessDetails.logo_url} 
-              alt={businessDetails.name || "Salon Logo"} 
+              alt="Salon Logo" 
               className="h-8 w-8 rounded" 
             />
           ) : (
             <CreditCard className="h-8 w-8" />
-          )}
-          {open && businessDetails.name && (
-            <span className={cn("ml-2 text-lg font-semibold transition-opacity overflow-hidden text-ellipsis whitespace-nowrap", 
-              open ? "opacity-100 max-w-[160px]" : "opacity-0 max-w-0"
-            )}>
-              {isLoading ? <Skeleton className="h-5 w-24" /> : businessDetails.name}
-            </span>
           )}
         </Link>
         <Button 

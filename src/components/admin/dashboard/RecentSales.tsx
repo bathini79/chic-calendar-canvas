@@ -13,8 +13,14 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
   const [appointmentsStats, setAppointmentsStats] = useState({ count: 0, value: 0, completed: 0, completedValue: 0 });
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [businessMetrics, setBusinessMetrics] = useState({
-    revenue: "0.00", occupancyRate: "0.00", returningCustomerRate: "0.00", tips: "0.00",
-    revenueChange: "0.00", occupancyChange: "0.00", returningCustomerChange: "0.00", tipsChange: "--"
+    revenue: "0.00", 
+    occupancyRate: "0.00", 
+    returningCustomerRate: "0.00", 
+    tips: "0.00",
+    revenueChange: "0.00", 
+    occupancyChange: "0.00", 
+    returningCustomerChange: "0.00", 
+    tipsChange: "--"
   });
   const [isLoading, setIsLoading] = useState(true);
   const today = new Date();
@@ -295,19 +301,27 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
     return { "today": "Today", "week": "Last 7 days", "month": "Last 30 days", "year": "Last 365 days" }[timeRange] || "Today";
   };
 
-  if (isLoading) return <div>Loading...</div>;
+  if (isLoading) {
+    return (
+      <Card className="shadow-sm h-full">
+        <CardContent className="flex items-center justify-center h-full">
+          <div className="text-center py-8">Loading...</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="shadow-sm h-full">
+    <Card className="shadow-sm h-full overflow-hidden">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-2 sm:space-y-0">
         <div>
           <CardTitle className="text-lg">Recent Sales</CardTitle>
           <CardDescription>{getTimeRangeLabel()}</CardDescription>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <LocationSelector value={recentSalesLocationId} onChange={setRecentSalesLocationId} locations={locations} />
+        <div className="flex flex-row gap-2 w-full sm:w-auto">
+          <LocationSelector value={recentSalesLocationId} onChange={setRecentSalesLocationId} locations={locations} className="w-auto min-w-[120px]" />
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-full sm:w-[120px]"><SelectValue placeholder="Select..." /></SelectTrigger>
+            <SelectTrigger className="w-[120px]"><SelectValue placeholder="Select..." /></SelectTrigger>
             <SelectContent>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="week">Week</SelectItem>
@@ -317,7 +331,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
           </Select>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-auto">
         <div className="space-y-6">
           <div className="text-3xl font-bold text-gray-900">₹{appointmentsStats.completedValue.toFixed(2)}</div>
           <div>
@@ -341,15 +355,19 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
             </div>
           </div>
         </div>
-        <div className="h-[300px] mt-6 overflow-x-auto overflow-y-auto">
+        <div className="h-[300px] mt-6 aspect-square max-w-full overflow-y-auto overflow-x-auto">
           {revenueData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={revenueData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+              <LineChart data={revenueData} margin={{ top: 5, right: 5, left: 5, bottom: 25 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Legend />
+                <Legend 
+                  verticalAlign="bottom" 
+                  align="left"
+                  wrapperStyle={{ bottom: 0, left: 10 }}
+                />
                 <Line type="monotone" dataKey="sales" stroke="#8884d8" name="Sales" dot={{ r: 4 }} />
                 <Line type="monotone" dataKey="appointments" stroke="#82ca9d" name="Appointments" dot={{ r: 4 }} />
               </LineChart>
