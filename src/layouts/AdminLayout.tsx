@@ -8,7 +8,7 @@ export function AdminLayout() {
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <main className="flex-1">
+        <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>
