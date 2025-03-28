@@ -9,6 +9,7 @@ import Packages from "@/pages/customer/Packages";
 import Cart from "@/pages/customer/Cart";
 import Profile from "@/pages/customer/Profile";
 import UserDetails from "@/pages/customer/UserDetails";
+import ProfileDetails from "@/pages/customer/ProfileDetails";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminServices from "@/pages/admin/AdminServices";
 import Staff from "@/pages/admin/Staff";
@@ -43,9 +44,14 @@ export default function App() {
             <Route path="packages" element={<Packages />} />
             <Route path="cart" element={<Cart />} />
             <Route path="profile" element={<Profile />} />
-            <Route path="profile/details" element={<UserDetails />} />
+            <Route path="profile/details" element={<ProfileDetails />} />
             <Route path="schedule" element={<UnifiedScheduling />} />
             <Route path="booking-confirmation" element={<BookingConfirmation />} />
+            <Route path="wallet" element={<ProfileDetails />} />
+            <Route path="favourites" element={<ProfileDetails />} />
+            <Route path="forms" element={<ProfileDetails />} />
+            <Route path="orders" element={<ProfileDetails />} />
+            <Route path="settings" element={<ProfileDetails />} />
           </Route>
 
           <Route path="/auth" element={<Auth />} />

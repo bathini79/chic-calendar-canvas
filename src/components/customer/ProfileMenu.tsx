@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -20,6 +20,7 @@ export function ProfileMenu() {
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [initials, setInitials] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   
   const { data: session, isLoading } = useQuery({
     queryKey: ["session"],
@@ -34,29 +35,7 @@ export function ProfileMenu() {
       const email = session.user.email || "";
       setUserEmail(email);
       
-      // Try to get user's name from metadata or from profiles table
-      const metaName = session.user.user_metadata?.full_name || 
-                       session.user.user_metadata?.name || 
-                       "";
-      
-      if (metaName) {
-        setUserName(metaName);
-        // Generate initials from name
-        const nameInitials = metaName
-          .split(" ")
-          .map(part => part.charAt(0))
-          .join("")
-          .toUpperCase();
-        setInitials(nameInitials);
-      } else {
-        // If no name in metadata, use the first part of email
-        const emailName = email.split("@")[0];
-        setUserName(emailName);
-        setInitials(emailName.charAt(0).toUpperCase());
-        
-        // Try to get profile info from database
-        fetchUserProfile(session.user.id);
-      }
+      fetchUserProfile(session.user.id);
     }
   }, [session]);
 
@@ -64,7 +43,7 @@ export function ProfileMenu() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('first_name, last_name')
+        .select('full_name, avatar_url')
         .eq('id', userId)
         .single();
         
@@ -73,8 +52,9 @@ export function ProfileMenu() {
         return;
       }
       
-      if (data && (data.first_name || data.last_name)) {
-        const fullName = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+      if (data) {
+        const fullName = data.full_name || "";
+        
         if (fullName) {
           setUserName(fullName);
           // Generate initials from name
@@ -84,6 +64,15 @@ export function ProfileMenu() {
             .join("")
             .toUpperCase();
           setInitials(nameInitials);
+        } else {
+          // If no name, use the first part of email
+          const emailName = userEmail.split("@")[0];
+          setUserName(emailName);
+          setInitials(emailName.charAt(0).toUpperCase());
+        }
+
+        if (data.avatar_url) {
+          setAvatarUrl(data.avatar_url);
         }
       }
     } catch (error) {
@@ -109,7 +98,11 @@ export function ProfileMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Avatar className="h-8 w-8 bg-primary text-primary-foreground cursor-pointer hover:opacity-90">
-          <AvatarFallback>{initials}</AvatarFallback>
+          {avatarUrl ? (
+            <AvatarImage src={avatarUrl} alt={userName} />
+          ) : (
+            <AvatarFallback>{initials}</AvatarFallback>
+          )}
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -126,7 +119,7 @@ export function ProfileMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate("/profile/details")}>
           <User className="mr-2 h-4 w-4" />
-          <span>My Details</span>
+          <span>My Profile</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>

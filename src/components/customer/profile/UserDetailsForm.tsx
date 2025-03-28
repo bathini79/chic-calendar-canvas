@@ -20,8 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PhoneInput } from "@/components/ui/phone-input";
 
 const formSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().optional(),
+  fullName: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email address").min(1, "Email is required"),
   phone: z.string().optional(),
 });
@@ -41,8 +40,7 @@ export function UserDetailsForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      firstName: "",
-      lastName: "",
+      fullName: "",
       email: "",
       phone: "",
     },
@@ -74,16 +72,14 @@ export function UserDetailsForm() {
         if (profileData) {
           setProfileId(profileData.id);
           form.reset({
-            firstName: profileData.first_name || "",
-            lastName: profileData.last_name || "",
+            fullName: profileData.full_name || "",
             email: email,
-            phone: profileData.phone || "",
+            phone: profileData.phone_number || "",
           });
         } else {
           // If no profile exists, just set the email
           form.reset({
-            firstName: session.user.user_metadata?.first_name || "",
-            lastName: session.user.user_metadata?.last_name || "",
+            fullName: session.user.user_metadata?.full_name || "",
             email: email,
             phone: session.user.phone || "",
           });
@@ -112,8 +108,7 @@ export function UserDetailsForm() {
       // Update auth metadata (this doesn't actually change the email address for authentication)
       await supabase.auth.updateUser({
         data: {
-          first_name: values.firstName,
-          last_name: values.lastName,
+          full_name: values.fullName,
         }
       });
       
@@ -123,9 +118,8 @@ export function UserDetailsForm() {
         const { error } = await supabase
           .from('profiles')
           .update({
-            first_name: values.firstName,
-            last_name: values.lastName,
-            phone: values.phone,
+            full_name: values.fullName,
+            phone_number: values.phone,
             updated_at: new Date().toISOString(),
           })
           .eq('id', userId);
@@ -137,9 +131,8 @@ export function UserDetailsForm() {
           .from('profiles')
           .insert({
             id: userId,
-            first_name: values.firstName,
-            last_name: values.lastName,
-            phone: values.phone,
+            full_name: values.fullName,
+            phone_number: values.phone,
           });
 
         if (error) throw error;
@@ -175,34 +168,19 @@ export function UserDetailsForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="firstName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="First name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Last name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="fullName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Full name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
