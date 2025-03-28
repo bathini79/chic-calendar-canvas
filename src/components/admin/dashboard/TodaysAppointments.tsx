@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,16 +26,18 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
   };
 
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+    <Card className="shadow-sm h-full">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-2 sm:space-y-0">
         <CardTitle className="text-lg">Today's Next Appointments</CardTitle>
-        <LocationSelector value={todayAppointmentsLocationId} onChange={setTodayAppointmentsLocationId} locations={locations} />
+        <div className="w-full sm:w-auto">
+          <LocationSelector value={todayAppointmentsLocationId} onChange={setTodayAppointmentsLocationId} locations={locations} />
+        </div>
       </CardHeader>
       <CardContent>
         <div className="mb-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Today's Schedule</h2>
-            <div className="space-x-1">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <h2 className="text-xl sm:text-2xl font-bold">Today's Schedule</h2>
+            <div className="flex flex-wrap gap-1">
               <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Booked: {appointments.filter(a => a.status === 'booked').length}</span>
               <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Confirmed: {appointments.filter(a => a.status === 'confirmed').length}</span>
             </div>
@@ -57,15 +60,15 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
                     className="flex items-start hover:bg-gray-50 p-2 rounded cursor-pointer transition-colors"
                     onClick={() => onAppointmentClick(appointment)}
                   >
-                    <div className="mr-4 text-center">
+                    <div className="mr-4 text-center flex-shrink-0">
                       <div className="font-bold">{format(new Date(appointment.start_time), "HH:mm")}</div>
                     </div>
-                    <div className="flex flex-1 justify-between">
+                    <div className="flex flex-1 flex-col sm:flex-row justify-between gap-2">
                       <div>
-                        <div className="font-medium">{serviceName}</div>
-                        <div className="text-sm text-gray-500">{appointment.customer?.full_name} {stylist && `with ${stylist}`}</div>
+                        <div className="font-medium truncate max-w-[200px] sm:max-w-none">{serviceName}</div>
+                        <div className="text-sm text-gray-500 truncate max-w-[200px] sm:max-w-none">{appointment.customer?.full_name} {stylist && `with ${stylist}`}</div>
                       </div>
-                      <div className="text-right">
+                      <div className="sm:text-right">
                         <div className="font-bold">₹{price.toFixed(2)}</div>
                         <div className="mt-1">{formatAppointmentStatus(appointment.status)}</div>
                       </div>

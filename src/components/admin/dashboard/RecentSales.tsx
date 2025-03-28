@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -297,16 +298,16 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
   if (isLoading) return <div>Loading...</div>;
 
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+    <Card className="shadow-sm h-full">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-2 sm:space-y-0">
         <div>
           <CardTitle className="text-lg">Recent Sales</CardTitle>
           <CardDescription>{getTimeRangeLabel()}</CardDescription>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <LocationSelector value={recentSalesLocationId} onChange={setRecentSalesLocationId} locations={locations} />
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[120px]"><SelectValue placeholder="Select..." /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[120px]"><SelectValue placeholder="Select..." /></SelectTrigger>
             <SelectContent>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="week">Week</SelectItem>
@@ -323,30 +324,30 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
             <div className="text-sm text-gray-500">Appointments {appointmentsStats.count}</div>
             <div className="text-lg font-semibold">Appointments value ₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
           </div>
-          <div className="grid grid-cols-2 gap-4 my-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
             <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-sm font-medium text-gray-600">Occupancy Rate</div>
                 <Percent className="h-4 w-4 text-gray-400" />
               </div>
-              <div className="text-2xl font-bold text-indigo-700">{businessMetrics.occupancyRate}%</div>
+              <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.occupancyRate}%</div>
             </div>
             <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-sm font-medium text-gray-600">Returning Customer Rate</div>
                 <User className="h-4 w-4 text-gray-400" />
               </div>
-              <div className="text-2xl font-bold text-indigo-700">{businessMetrics.returningCustomerRate}%</div>
+              <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.returningCustomerRate}%</div>
             </div>
           </div>
         </div>
-        <div className="h-[300px] mt-6">
+        <div className="h-[300px] mt-6 overflow-x-auto overflow-y-auto">
           {revenueData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={revenueData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
                 <Legend />
                 <Line type="monotone" dataKey="sales" stroke="#8884d8" name="Sales" dot={{ r: 4 }} />

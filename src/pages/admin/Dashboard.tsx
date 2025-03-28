@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
@@ -29,7 +30,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchLocations();
     fetchEmployees();
-    console.log("rr")
   }, []);
 
   const fetchLocations = async () => {
@@ -77,10 +77,12 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
+    <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 overflow-hidden">
       <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-hidden">
-        <div className="overflow-x-auto">
+      
+      {/* First Row */}
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 w-full">
+        <div className="w-full md:w-1/2 overflow-x-auto">
           <RecentSales
             timeRange={timeRange}
             setTimeRange={setTimeRange}
@@ -89,7 +91,7 @@ export default function AdminDashboard() {
             setRecentSalesLocationId={setRecentSalesLocationId}
           />
         </div>
-        <div className="overflow-x-auto">
+        <div className="w-full md:w-1/2 overflow-x-auto">
           <TodaysAppointments
             locations={locations}
             todayAppointmentsLocationId={todayAppointmentsLocationId}
@@ -98,15 +100,17 @@ export default function AdminDashboard() {
           />
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-hidden">
-        <div className="overflow-x-auto">
+      
+      {/* Second Row */}
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 w-full">
+        <div className="w-full md:w-1/2 overflow-x-auto">
           <UpcomingAppointments
             locations={locations}
             upcomingAppointmentsLocationId={upcomingAppointmentsLocationId}
             setUpcomingAppointmentsLocationId={setUpcomingAppointmentsLocationId}
           />
         </div>
-        <div className="overflow-x-auto">
+        <div className="w-full md:w-1/2 overflow-x-auto">
           <InventoryStatus
             locations={locations}
             inventoryLocationId={inventoryLocationId}
@@ -114,15 +118,17 @@ export default function AdminDashboard() {
           />
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-hidden">
-        <div className="overflow-x-auto">
+      
+      {/* Third Row */}
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 w-full">
+        <div className="w-full md:w-1/2 overflow-x-auto">
           <TopServices
             locations={locations}
             topServicesLocationId={topServicesLocationId}
             setTopServicesLocationId={setTopServicesLocationId}
           />
         </div>
-        <div className="overflow-x-auto">
+        <div className="w-full md:w-1/2 overflow-x-auto">
           <TopTeamMembers
             locations={locations}
             topStylistsLocationId={topStylistsLocationId}
@@ -130,6 +136,8 @@ export default function AdminDashboard() {
           />
         </div>
       </div>
+      
+      {/* Appointment Dialogs */}
       <AppointmentDetailsDialog 
         appointment={selectedAppointment}
         open={isDetailsDialogOpen}

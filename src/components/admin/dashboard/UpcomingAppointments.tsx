@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,12 +60,14 @@ export const UpcomingAppointments = ({ locations, upcomingAppointmentsLocationId
   useEffect(() => { fetchUpcomingAppointments(); }, [fetchUpcomingAppointments]);
 
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+    <Card className="shadow-sm h-full">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-2 sm:space-y-0">
         <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
-        <LocationSelector value={upcomingAppointmentsLocationId} onChange={setUpcomingAppointmentsLocationId} locations={locations} />
+        <div className="w-full sm:w-auto">
+          <LocationSelector value={upcomingAppointmentsLocationId} onChange={setUpcomingAppointmentsLocationId} locations={locations} />
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-x-auto overflow-y-auto">
         {upcomingAppointmentsChart.length > 0 ? (
           <StatsPanel
             stats={[]} 
@@ -78,7 +81,7 @@ export const UpcomingAppointments = ({ locations, upcomingAppointmentsLocationId
           <div className="h-[300px] flex flex-col items-center justify-center">
             <div className="text-4xl mb-4">📊</div>
             <h3 className="text-xl font-semibold">Your schedule is empty</h3>
-            <p className="text-gray-500 mt-2">Make some appointments for schedule data to appear</p>
+            <p className="text-gray-500 mt-2 text-center">Make some appointments for schedule data to appear</p>
           </div>
         )}
       </CardContent>

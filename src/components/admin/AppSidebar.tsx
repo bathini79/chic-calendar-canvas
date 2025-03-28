@@ -66,7 +66,7 @@ export function AppSidebar() {
   const { setOpen, open, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const [businessDetails, setBusinessDetails] = useState({
-    name: "Beauty SaaS",
+    name: "", // Empty default - no "Define Salon" text
     logo_url: null
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -75,8 +75,6 @@ export function AppSidebar() {
   useEffect(() => {
     if (isMobile) {
       setOpen(false);
-    } else {
-      setOpen(true);
     }
   }, [isMobile, setOpen]);
 
@@ -98,7 +96,7 @@ export function AppSidebar() {
 
         if (data) {
           setBusinessDetails({
-            name: data.name || "Beauty SaaS",
+            name: data.name || "",
             logo_url: data.logo_url
           });
         }
@@ -120,7 +118,7 @@ export function AppSidebar() {
       )}
     >
       <div className="flex h-14 items-center px-3 border-b justify-between">
-        <Link to="/admin" className={cn("flex items-center", !open && "justify-center w-full")}>
+        <Link to="/admin" className={cn("flex items-center flex-1", !open && "justify-center")}>
           {businessDetails.logo_url ? (
             <img 
               src={businessDetails.logo_url} 
@@ -130,8 +128,10 @@ export function AppSidebar() {
           ) : (
             <CreditCard className="h-8 w-8" />
           )}
-          {open && (
-            <span className={cn("ml-2 text-lg font-semibold transition-opacity truncate max-w-[150px]")}>
+          {open && businessDetails.name && (
+            <span className={cn("ml-2 text-lg font-semibold transition-opacity overflow-hidden text-ellipsis whitespace-nowrap", 
+              open ? "opacity-100 max-w-[160px]" : "opacity-0 max-w-0"
+            )}>
               {isLoading ? <Skeleton className="h-5 w-24" /> : businessDetails.name}
             </span>
           )}
@@ -163,7 +163,7 @@ export function AppSidebar() {
                     !open && "mr-0 mx-auto"
                   ) 
                 })}
-                {open && <span className="transition-opacity truncate">{item.title}</span>}
+                {open && <span className="transition-opacity">{item.title}</span>}
               </Button>
             </Link>
           ))}
