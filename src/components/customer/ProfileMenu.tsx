@@ -20,7 +20,6 @@ export function ProfileMenu() {
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [initials, setInitials] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   
   const { data: session, isLoading } = useQuery({
     queryKey: ["session"],
@@ -30,55 +29,55 @@ export function ProfileMenu() {
     },
   });
 
-  useEffect(() => {
-    if (session?.user) {
-      const email = session.user.email || "";
-      setUserEmail(email);
+  const { data: profile } = useQuery({
+    queryKey: ["user_profile", session?.user?.id],
+    queryFn: async () => {
+      if (!session?.user?.id) return null;
       
-      fetchUserProfile(session.user.id);
-    }
-  }, [session]);
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('full_name, avatar_url')
-        .eq('id', userId)
+        .select('*')
+        .eq('id', session.user.id)
         .single();
         
       if (error) {
         console.error("Error fetching profile:", error);
-        return;
+        return null;
       }
       
-      if (data) {
-        const fullName = data.full_name || "";
-        
-        if (fullName) {
-          setUserName(fullName);
-          // Generate initials from name
-          const nameInitials = fullName
-            .split(" ")
-            .map(part => part.charAt(0))
-            .join("")
-            .toUpperCase();
-          setInitials(nameInitials);
-        } else {
-          // If no name, use the first part of email
-          const emailName = userEmail.split("@")[0];
-          setUserName(emailName);
-          setInitials(emailName.charAt(0).toUpperCase());
-        }
+      return data;
+    },
+    enabled: !!session?.user?.id
+  });
 
-        if (data.avatar_url) {
-          setAvatarUrl(data.avatar_url);
-        }
-      }
-    } catch (error) {
-      console.error("Error in fetchUserProfile:", error);
+  useEffect(() => {
+    if (session?.user) {
+      const email = session.user.email || "";
+      setUserEmail(email);
     }
-  };
+  }, [session]);
+
+  useEffect(() => {
+    if (profile) {
+      const fullName = profile.full_name || "";
+      
+      if (fullName) {
+        setUserName(fullName);
+        // Generate initials from name
+        const nameInitials = fullName
+          .split(" ")
+          .map(part => part.charAt(0))
+          .join("")
+          .toUpperCase();
+        setInitials(nameInitials);
+      } else {
+        // If no name, use the first part of email
+        const emailName = userEmail.split("@")[0];
+        setUserName(emailName);
+        setInitials(emailName.charAt(0).toUpperCase());
+      }
+    }
+  }, [profile, userEmail]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -98,11 +97,7 @@ export function ProfileMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Avatar className="h-8 w-8 bg-primary text-primary-foreground cursor-pointer hover:opacity-90">
-          {avatarUrl ? (
-            <AvatarImage src={avatarUrl} alt={userName} />
-          ) : (
-            <AvatarFallback>{initials}</AvatarFallback>
-          )}
+          <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
