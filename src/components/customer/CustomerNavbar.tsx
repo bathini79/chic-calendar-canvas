@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ProfileMenu } from "@/components/customer/ProfileMenu";
+import { cn } from "@/lib/utils";
 
 interface CustomerNavbarProps {
   onCartClick: () => void;
@@ -18,23 +19,34 @@ export function CustomerNavbar({ onCartClick }: CustomerNavbarProps) {
     },
   });
 
+  const { data: businessDetails } = useQuery({
+    queryKey: ["businessDetails"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("business_details")
+        .select("*")
+        .single();
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   return (
     <nav className="border-b">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center space-x-8">
-            <NavLink to="/" className="text-xl font-bold">
-              Salon
-            </NavLink>
-            <NavLink
-              to="/services"
-              className={({ isActive }) =>
-                `transition-colors hover:text-primary ${
-                  isActive ? "text-primary" : "text-muted-foreground"
-                }`
-              }
-            >
-              Services
+            <NavLink to="/services" className="text-xl font-bold">
+              {businessDetails?.logo_url ? (
+                <img 
+                  src={businessDetails.logo_url} 
+                  alt="Business Logo" 
+                  className="h-8 w-auto"
+                />
+              ) : (
+                "Salon"
+              )}
             </NavLink>
           </div>
           <div className="flex items-center space-x-4">

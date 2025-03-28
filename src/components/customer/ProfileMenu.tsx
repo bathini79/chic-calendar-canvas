@@ -17,12 +17,9 @@ import { useQuery } from "@tanstack/react-query";
 
 export function ProfileMenu() {
   const navigate = useNavigate();
-  const [userName, setUserName] = useState("");
-  const [userEmail, setUserEmail] = useState("");
   const [initials, setInitials] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   
-  const { data: session, isLoading } = useQuery({
+  const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ["session"],
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -30,55 +27,46 @@ export function ProfileMenu() {
     },
   });
 
-  useEffect(() => {
-    if (session?.user) {
-      const email = session.user.email || "";
-      setUserEmail(email);
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ["profile", session?.user?.id],
+    queryFn: async () => {
+      if (!session?.user?.id) return null;
       
-      fetchUserProfile(session.user.id);
-    }
-  }, [session]);
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('full_name, avatar_url')
-        .eq('id', userId)
+        .select('*')
+        .eq('id', session.user.id)
         .single();
         
       if (error) {
         console.error("Error fetching profile:", error);
-        return;
+        throw error;
       }
       
-      if (data) {
-        const fullName = data.full_name || "";
-        
-        if (fullName) {
-          setUserName(fullName);
-          // Generate initials from name
-          const nameInitials = fullName
-            .split(" ")
-            .map(part => part.charAt(0))
-            .join("")
-            .toUpperCase();
-          setInitials(nameInitials);
-        } else {
-          // If no name, use the first part of email
-          const emailName = userEmail.split("@")[0];
-          setUserName(emailName);
-          setInitials(emailName.charAt(0).toUpperCase());
-        }
+      return data;
+    },
+    enabled: !!session?.user?.id
+  });
 
-        if (data.avatar_url) {
-          setAvatarUrl(data.avatar_url);
-        }
+  useEffect(() => {
+    if (profile) {
+      const fullName = profile.full_name || "";
+      
+      if (fullName) {
+        // Generate initials from name
+        const nameInitials = fullName
+          .split(" ")
+          .map(part => part.charAt(0))
+          .join("")
+          .toUpperCase();
+        setInitials(nameInitials);
+      } else if (profile.email) {
+        // If no name, use the first part of email
+        const emailName = profile.email.split("@")[0];
+        setInitials(emailName.charAt(0).toUpperCase());
       }
-    } catch (error) {
-      console.error("Error in fetchUserProfile:", error);
     }
-  };
+  }, [profile]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -90,26 +78,26 @@ export function ProfileMenu() {
     }
   };
 
-  if (isLoading || !session) {
+  if (sessionLoading || profileLoading || !session) {
     return null;
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Avatar className="h-8 w-8 bg-primary text-primary-foreground cursor-pointer hover:opacity-90">
-          {avatarUrl ? (
-            <AvatarImage src={avatarUrl} alt={userName} />
+        <Avatar className="h-8 w-8 bg-black text-primary-foreground cursor-pointer hover:opacity-90">
+          {profile?.avatar_url ? (
+            <AvatarImage src={profile.avatar_url} alt={profile.full_name || 'User'} />
           ) : (
-            <AvatarFallback>{initials}</AvatarFallback>
+            <AvatarFallback className="bg-black text-white">{initials}</AvatarFallback>
           )}
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{userName}</p>
-            <p className="text-xs leading-none text-muted-foreground">{userEmail}</p>
+            <p className="text-sm font-medium leading-none">{profile?.full_name || 'User'}</p>
+            <p className="text-xs leading-none text-muted-foreground">{profile?.email || session.user.email}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

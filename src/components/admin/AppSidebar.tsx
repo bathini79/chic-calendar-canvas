@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSidebar } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const sidebarNavItems = [
   {
@@ -57,6 +59,17 @@ const sidebarNavItems = [
 
 export function AppSidebar() {
   const { pathname } = useLocation();
+  const { state, setOpen } = useSidebar();
+  const isMobile = useIsMobile();
+
+  // Auto-collapse sidebar on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setOpen(false);
+    } else {
+      setOpen(true);
+    }
+  }, [isMobile, setOpen]);
 
   return (
     <div className="flex h-screen w-[240px] flex-col border-r">

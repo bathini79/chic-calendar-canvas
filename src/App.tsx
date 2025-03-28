@@ -1,5 +1,5 @@
 
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { AdminRoute } from "@/components/auth/AdminRoute";
 import CustomerLayout from "@/layouts/CustomerLayout";
@@ -38,8 +38,8 @@ export default function App() {
       <DndProvider backend={HTML5Backend}>
         <Routes>
           {/* Customer Routes */}
+          <Route path="/" element={<Navigate to="/services" replace />} />
           <Route path="/" element={<CustomerLayout />}>
-            <Route index element={<Home />} />
             <Route path="services" element={<Services />} />
             <Route path="packages" element={<Packages />} />
             <Route path="cart" element={<Cart />} />
