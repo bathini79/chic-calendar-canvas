@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { MembershipSale } from "@/components/admin/sales/MembershipSale";
-import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -55,7 +54,6 @@ export default function AdminBookings() {
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -125,8 +123,8 @@ export default function AdminBookings() {
             .map((n) => n[0])
             .join(""),
           is_active: true,
-          photo_url: employee.photo_url || null
-        })) as Employee[];
+          photo_url: employee.photo_url || null // Add missing property
+        }));
 
         const defaultEmployeeName = `${businessDetails?.name || 'Salon'} Employee`;
         const defaultEmployee: Employee = {
@@ -140,7 +138,7 @@ export default function AdminBookings() {
           updated_at: new Date().toISOString(),
           phone: '',
           is_active: true,
-          photo_url: null
+          photo_url: null // Add missing property
         };
         
         employeeList = [defaultEmployee, ...employeeList];
@@ -217,26 +215,12 @@ export default function AdminBookings() {
 
   const handleAppointmentClick = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
-    setIsDetailsDialogOpen(true);
-  };
-
-  const handleEditAppointment = () => {
-    if (selectedAppointment) {
-      const startDate = new Date(selectedAppointment.start_time);
-      setAppointmentDate(startDate);
-      setAppointmentTime(format(startDate, 'HH:mm'));
-      setIsAddAppointmentOpen(true);
-      setIsDetailsDialogOpen(false);
-    }
-  };
-
-  const handleCheckout = (appointment: Appointment) => {
-    setSelectedAppointment(appointment);
+    
     const startDate = new Date(appointment.start_time);
     setAppointmentDate(startDate);
     setAppointmentTime(format(startDate, 'HH:mm'));
+    
     setIsAddAppointmentOpen(true);
-    setIsDetailsDialogOpen(false);
   };
 
   return (
@@ -326,18 +310,6 @@ export default function AdminBookings() {
             </div>
           </div>
         )}
-
-        <AppointmentDetailsDialog
-          appointment={selectedAppointment}
-          open={isDetailsDialogOpen}
-          onOpenChange={setIsDetailsDialogOpen}
-          onEdit={handleEditAppointment}
-          onUpdated={() => {
-            setIsDetailsDialogOpen(false);
-            refetchAppointments();
-          }}
-          onCheckout={handleCheckout}
-        />
 
         {isAddAppointmentOpen && appointmentDate && (
           <AppointmentManager

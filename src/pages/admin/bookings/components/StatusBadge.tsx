@@ -16,13 +16,6 @@ interface StatusBadgeProps {
   className?: string;
 }
 
-// Extend the Badge component to support these additional variants
-declare module "@/components/ui/badge" {
-  interface BadgeVariantsProps {
-    variant: "default" | "destructive" | "outline" | "secondary" | "success" | "info" | "info2" | "warning";
-  }
-}
-
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) => {
   const getStatusConfig = () => {
     switch (status) {

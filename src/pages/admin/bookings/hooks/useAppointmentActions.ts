@@ -1,9 +1,7 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
-import { AppointmentStatus } from '@/types/appointment';
 
 // Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
@@ -48,7 +46,10 @@ export const useAppointmentActions = () => {
       if (appointmentError) throw appointmentError;
 
       // Cast the data to match our expected types
-      const typedAppointment = appointment as unknown as Appointment;
+      const typedAppointment = {
+        ...appointment,
+        discount_type: appointment.discount_type as Appointment['discount_type']
+      } as Appointment;
 
       // If this is a refund, get the original sale
       if (typedAppointment.transaction_type === 'refund') {
@@ -70,7 +71,10 @@ export const useAppointmentActions = () => {
         if (originalError) throw originalError;
 
         // Cast the original sale data
-        const typedOriginalSale = originalSale as unknown as Appointment;
+        const typedOriginalSale = {
+          ...originalSale,
+          discount_type: originalSale.discount_type as Appointment['discount_type']
+        } as Appointment;
 
         // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
@@ -91,7 +95,10 @@ export const useAppointmentActions = () => {
         if (refundsError) throw refundsError;
 
         // Cast the refunds data
-        const typedRefunds = refunds as unknown as Appointment[];
+        const typedRefunds = refunds?.map(refund => ({
+          ...refund,
+          discount_type: refund.discount_type as Appointment['discount_type']
+        })) as Appointment[];
 
         // Create TransactionDetails with all required properties
         return {
@@ -99,7 +106,8 @@ export const useAppointmentActions = () => {
           amount: typedOriginalSale.total_price,
           status: typedOriginalSale.status,
           payment_method: typedOriginalSale.payment_method,
-          created_at: typedOriginalSale.created_at || '',
+          created_at: typedOriginalSale.created_at,
+          tax: appointment.tax,
           originalSale: typedOriginalSale,
           refunds: typedRefunds || []
         };
@@ -123,7 +131,10 @@ export const useAppointmentActions = () => {
         if (refundsError) throw refundsError;
 
         // Cast the refunds data
-        const typedRefunds = refunds as unknown as Appointment[];
+        const typedRefunds = refunds?.map(refund => ({
+          ...refund,
+          discount_type: refund.discount_type as Appointment['discount_type']
+        })) as Appointment[];
 
         // Create TransactionDetails with all required properties
         return {
@@ -131,7 +142,8 @@ export const useAppointmentActions = () => {
           amount: typedAppointment.total_price,
           status: typedAppointment.status,
           payment_method: typedAppointment.payment_method,
-          created_at: typedAppointment.created_at || '',
+          created_at: typedAppointment.created_at,
+          tax: appointment.tax,
           originalSale: typedAppointment,
           refunds: typedRefunds || []
         };
@@ -265,7 +277,7 @@ export const useAppointmentActions = () => {
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: AppointmentStatus,
+    status: Appointment['status'],
     bookingIds: string[]
   ) => {
     try {
@@ -316,38 +328,6 @@ export const useAppointmentActions = () => {
     }
   };
 
-  const cancelAppointment = async (appointmentId: string) => {
-    const { data: appointment, error: fetchError } = await supabase
-      .from('appointments')
-      .select('bookings(id)')
-      .eq('id', appointmentId)
-      .single();
-
-    if (fetchError) {
-      toast.error('Failed to fetch appointment details');
-      return false;
-    }
-
-    const bookingIds = appointment.bookings.map((booking: any) => booking.id);
-    return await updateAppointmentStatus(appointmentId, 'canceled', bookingIds);
-  };
-
-  const markAppointmentAs = async (appointmentId: string, status: 'noshow' | 'completed') => {
-    const { data: appointment, error: fetchError } = await supabase
-      .from('appointments')
-      .select('bookings(id)')
-      .eq('id', appointmentId)
-      .single();
-
-    if (fetchError) {
-      toast.error('Failed to fetch appointment details');
-      return false;
-    }
-
-    const bookingIds = appointment.bookings.map((booking: any) => booking.id);
-    return await updateAppointmentStatus(appointmentId, status, bookingIds);
-  };
-
   const updateBookingStylelist = async (bookingId: string, employeeId: string) => {
     try {
       const { error } = await supabase
@@ -369,8 +349,6 @@ export const useAppointmentActions = () => {
     fetchAppointmentDetails,
     updateAppointmentStatus,
     processRefund,
-    updateBookingStylelist,
-    cancelAppointment,
-    markAppointmentAs
+    updateBookingStylelist
   };
 };
