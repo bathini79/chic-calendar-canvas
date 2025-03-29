@@ -44,6 +44,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRefundReason } from '../utils/formatters';
 import { formatPrice } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
@@ -58,9 +59,11 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   membershipName,
   membershipDiscount
 }) => {
+  const navigate = useNavigate();
   const [showVoidDialog, setShowVoidDialog] = React.useState(false);
   const [showRefundDialog, setShowRefundDialog] = React.useState(false);
   const [showAddNoteDialog, setShowAddNoteDialog] = React.useState(false);
+  const [showEditSaleDialog, setShowEditSaleDialog] = React.useState(false);
   const [note, setNote] = React.useState('');
   const [refundItems, setRefundItems] = React.useState<{[key: string]: boolean}>({});
   const [transactionDetails, setTransactionDetails] = React.useState<TransactionDetails | null>(null);
@@ -70,7 +73,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [employees, setEmployees] = React.useState<Array<{ id: string; name: string }>>([]);
   const [selectAll, setSelectAll] = React.useState(false);
   const [locations, setLocations] = useState<{id: string; name: string}[]>([]);
-  const { fetchAppointmentDetails, updateAppointmentStatus, processRefund } = useAppointmentActions();
+  const [selectedBookings, setSelectedBookings] = useState<any[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<{[key: string]: string}>({});
+  const { fetchAppointmentDetails, updateAppointmentStatus, processRefund, updateBookingStylelist } = useAppointmentActions();
   const { appointment } = useAppointmentDetails(appointmentId);
 
   React.useEffect(() => {
@@ -87,6 +92,20 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     const details = await fetchAppointmentDetails(appointmentId);
     if (details) {
       setTransactionDetails(details);
+      
+      // Initialize selected bookings if we have transaction details
+      if (details.originalSale && details.originalSale.bookings) {
+        setSelectedBookings(details.originalSale.bookings);
+        
+        // Initialize selected stylists with current values
+        const initialStylists: {[key: string]: string} = {};
+        details.originalSale.bookings.forEach(booking => {
+          if (booking.employee_id) {
+            initialStylists[booking.id] = booking.employee_id;
+          }
+        });
+        setSelectedEmployees(initialStylists);
+      }
     }
   };
 
@@ -121,7 +140,63 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const getLocationNameById = (locationId?: string | null) => {
     if (!locationId) return 'Unknown Location';
     const location = locations.find(loc => loc.id === locationId);
-    return location ? location.name : locationId;
+    return location ? location.name : 'Unknown Location';
+  };
+
+  const handleRebook = () => {
+    if (!transactionDetails || !transactionDetails.originalSale) return;
+    
+    // Navigate to booking page with prefilled data
+    navigate('/admin/bookings/new', { 
+      state: { 
+        rebookData: {
+          customer: transactionDetails.originalSale.customer,
+          services: transactionDetails.originalSale.bookings
+            .filter(b => b.service_id)
+            .map(b => ({
+              id: b.service_id,
+              name: b.service?.name || '',
+              price: b.service?.selling_price || 0,
+              duration: b.service?.duration || 0
+            })),
+          packages: transactionDetails.originalSale.bookings
+            .filter(b => b.package_id)
+            .map(b => ({
+              id: b.package_id,
+              name: b.package?.name || '',
+              price: b.package?.price || 0,
+              duration: b.package?.duration || 0
+            })),
+          employee_preferences: transactionDetails.originalSale.bookings.reduce((acc, b) => {
+            if (b.employee_id) {
+              if (b.service_id) acc[b.service_id] = b.employee_id;
+              if (b.package_id) acc[b.package_id] = b.employee_id;
+            }
+            return acc;
+          }, {})
+        }
+      }
+    });
+  };
+
+  const handleSaveEdits = async () => {
+    if (!appointmentId) return;
+    
+    try {
+      // Update each booking's stylist
+      const updatePromises = Object.entries(selectedEmployees).map(([bookingId, employeeId]) => {
+        return updateBookingStylelist(bookingId, employeeId);
+      });
+      
+      await Promise.all(updatePromises);
+      await loadAppointmentDetails(); // Reload the details to show updated information
+      
+      setShowEditSaleDialog(false);
+      toast.success('Sale details updated successfully');
+    } catch (error) {
+      console.error("Error updating sale details:", error);
+      toast.error('Failed to update sale details');
+    }
   };
 
   const renderNewReceipt = () => {
@@ -437,7 +512,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                     </div>
                     {!isRefund && (
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" className="bg-black text-white">
+                        <Button variant="outline" className="bg-black text-white" onClick={handleRebook}>
                           Rebook
                         </Button>
                         <DropdownMenu>
@@ -451,7 +526,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                               <CreditCard className="mr-2 h-4 w-4" />
                               Refund sale
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setShowEditSaleDialog(true)}>
                               <PencilLine className="mr-2 h-4 w-4" />
                               Edit sale details
                             </DropdownMenuItem>
@@ -778,6 +853,74 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               </Button>
               <Button onClick={handleAddNote}>
                 Save Note
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        <Dialog open={showEditSaleDialog} onOpenChange={setShowEditSaleDialog}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Edit Sale Details</DialogTitle>
+              <DialogDescription>
+                Update stylist assignments for services
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="max-h-96 overflow-y-auto space-y-4">
+                {selectedBookings.map((booking) => {
+                  const serviceName = booking.service?.name || (booking.package?.name + " (Package)");
+                  return (
+                    <div key={booking.id} className="py-3 border-b">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h3 className="font-medium">{serviceName}</h3>
+                          {booking.service?.duration && (
+                            <p className="text-sm text-gray-500">Duration: {booking.service.duration} min</p>
+                          )}
+                          {booking.start_time && (
+                            <p className="text-sm text-gray-500">
+                              {format(new Date(booking.start_time), 'MMM dd, h:mm a')}
+                            </p>
+                          )}
+                        </div>
+                        <div className="w-60">
+                          <Label htmlFor={`stylist-${booking.id}`} className="mb-1 block">
+                            Assigned Stylist
+                          </Label>
+                          <Select
+                            value={selectedEmployees[booking.id] || booking.employee_id || ''}
+                            onValueChange={(value) => {
+                              setSelectedEmployees({
+                                ...selectedEmployees,
+                                [booking.id]: value
+                              });
+                            }}
+                          >
+                            <SelectTrigger id={`stylist-${booking.id}`}>
+                              <SelectValue placeholder="Select stylist" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {employees.map((employee) => (
+                                <SelectItem key={employee.id} value={employee.id}>
+                                  {employee.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditSaleDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdits}>
+                Save Changes
               </Button>
             </DialogFooter>
           </DialogContent>
