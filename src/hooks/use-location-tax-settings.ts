@@ -1,7 +1,6 @@
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 type LocationTaxSettings = {
   id: string;
@@ -12,9 +11,27 @@ type LocationTaxSettings = {
 
 export function useLocationTaxSettings() {
   const [isLoading, setIsLoading] = useState(false);
+  const settingsCache = useRef<Record<string, { data: LocationTaxSettings | null, timestamp: number }>>({});
+  const taxDetailsCache = useRef<Record<string, { data: any, timestamp: number }>>({});
+  const cacheTimeoutMs = 30000; // 30 seconds cache validity
+  const fetchInProgressRef = useRef<Record<string, boolean>>({});
   
   async function fetchLocationTaxSettings(locationId: string) {
+    // Check if we have a valid cached version
+    const currentTime = Date.now();
+    const cachedSettings = settingsCache.current[locationId];
+    
+    if (cachedSettings && currentTime - cachedSettings.timestamp < cacheTimeoutMs) {
+      return cachedSettings.data;
+    }
+    
+    // Prevent concurrent fetches for the same location
+    if (fetchInProgressRef.current[`settings_${locationId}`]) {
+      return cachedSettings?.data || null;
+    }
+
     try {
+      fetchInProgressRef.current[`settings_${locationId}`] = true;
       setIsLoading(true);
       const { data, error } = await supabase
         .from("location_tax_settings")
@@ -26,19 +43,40 @@ export function useLocationTaxSettings() {
         throw error;
       }
       
+      // Cache the result
+      settingsCache.current[locationId] = { 
+        data: data || null, 
+        timestamp: currentTime 
+      };
+      
       return data || null;
     } catch (error: any) {
       console.error(`Error fetching location tax settings:`, error);
       return null;
     } finally {
       setIsLoading(false);
+      fetchInProgressRef.current[`settings_${locationId}`] = false;
     }
   }
 
   async function fetchTaxDetails(taxId: string) {
+    if (!taxId) return null;
+    
+    // Check cache
+    const currentTime = Date.now();
+    const cachedDetails = taxDetailsCache.current[taxId];
+    
+    if (cachedDetails && currentTime - cachedDetails.timestamp < cacheTimeoutMs) {
+      return cachedDetails.data;
+    }
+    
+    // Prevent concurrent fetches for the same tax
+    if (fetchInProgressRef.current[`tax_${taxId}`]) {
+      return cachedDetails?.data || null;
+    }
+    
     try {
-      if (!taxId) return null;
-      
+      fetchInProgressRef.current[`tax_${taxId}`] = true;
       const { data, error } = await supabase
         .from("tax_rates")
         .select("*")
@@ -49,10 +87,18 @@ export function useLocationTaxSettings() {
         throw error;
       }
       
+      // Cache the result
+      taxDetailsCache.current[taxId] = {
+        data,
+        timestamp: currentTime
+      };
+      
       return data;
     } catch (error: any) {
       console.error(`Error fetching tax details:`, error);
       return null;
+    } finally {
+      fetchInProgressRef.current[`tax_${taxId}`] = false;
     }
   }
 
@@ -60,6 +106,9 @@ export function useLocationTaxSettings() {
   async function resetLocationSettings(locationId: string) {
     try {
       setIsLoading(true);
+      
+      // Clear the cache for this location
+      delete settingsCache.current[locationId];
       
       // Fetch new settings for the changed location
       const settings = await fetchLocationTaxSettings(locationId);

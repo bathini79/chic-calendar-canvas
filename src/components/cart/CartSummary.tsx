@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { useNavigate, useLocation } from "react-router-dom";
 import { format, addMinutes } from "date-fns";
 import { formatPrice } from "@/lib/utils";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useCoupons, Coupon } from "@/hooks/use-coupons";
@@ -62,6 +62,12 @@ export function CartSummary() {
   const totalPrice = afterCouponSubtotal + taxAmount;
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
   
+  // Refs to prevent infinite loops
+  const taxLoadedRef = useRef(false);
+  const locationSettingsLoadedRef = useRef(false);
+  const membershipFetchedRef = useRef(false);
+  const couponsFetchedRef = useRef(false);
+  
   // Debug logging for coupon state
   useEffect(() => {
     console.log("CartSummary - Current coupon state:", {
@@ -73,9 +79,10 @@ export function CartSummary() {
   
   // Fetch customer memberships when the component loads (if we're not in booking confirmation)
   const fetchMemberships = useCallback(async () => {
-    if (isBookingConfirmation) return; // Skip if we're on booking confirmation page
+    if (isBookingConfirmation || membershipFetchedRef.current) return;
     
     try {
+      membershipFetchedRef.current = true;
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         await fetchCustomerMemberships(session.user.id);
@@ -143,9 +150,13 @@ export function CartSummary() {
   // Load tax data
   useEffect(() => {
     const loadTaxData = async () => {
+      if (taxLoadedRef.current) return;
+      
+      taxLoadedRef.current = true;
       await fetchTaxRates();
       
-      if (selectedLocation && !appliedTaxId) {
+      if (selectedLocation && !appliedTaxId && !locationSettingsLoadedRef.current) {
+        locationSettingsLoadedRef.current = true;
         const settings = await fetchLocationTaxSettings(selectedLocation);
         
         if (settings && settings.service_tax_id) {
@@ -155,11 +166,14 @@ export function CartSummary() {
     };
     
     loadTaxData();
-  }, [selectedLocation, appliedTaxId, fetchTaxRates, fetchLocationTaxSettings]);
+  }, [selectedLocation, appliedTaxId, fetchTaxRates, fetchLocationTaxSettings, setAppliedTaxId]);
 
   // Load coupons
   useEffect(() => {
+    if (couponsFetchedRef.current) return;
+    
     console.log("Fetching coupons in CartSummary");
+    couponsFetchedRef.current = true;
     fetchCoupons();
   }, [fetchCoupons]);
 
@@ -259,6 +273,13 @@ export function CartSummary() {
   };
 
   const selectedCoupon = getSelectedCoupon();
+
+  // Reset reference flags when location changes
+  useEffect(() => {
+    if (selectedLocation) {
+      locationSettingsLoadedRef.current = false;
+    }
+  }, [selectedLocation]);
 
   return (
     <Card className="flex flex-col h-full">
