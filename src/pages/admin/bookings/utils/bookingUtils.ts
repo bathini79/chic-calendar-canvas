@@ -201,4 +201,93 @@ export const calculatePackageDuration = (
   return duration;
 };
 
-// Use the shared getMembershipDiscount function from utils.ts instead of duplicating it here
+// New function to calculate adjusted price after all discounts
+export const calculateAdjustedPrice = (
+  originalPrice: number,
+  totalPrice: number,
+  discountedTotalPrice: number
+) => {
+  if (totalPrice === 0) return originalPrice;
+  // Calculate discount percentage based on total values
+  const discountRatio = discountedTotalPrice / totalPrice;
+  // Apply the same discount ratio to the individual price
+  return originalPrice * discountRatio;
+};
+
+// Calculate service prices adjusted for all discounts (membership, coupon, manual discount)
+export const getAdjustedServicePrices = (
+  selectedServices: string[],
+  selectedPackages: string[],
+  services: Service[],
+  packages: Package[],
+  customizedServices: Record<string, string[]> = {},
+  discountType: 'none' | 'percentage' | 'fixed' = 'none',
+  discountValue: number = 0,
+  membershipDiscount: number = 0,
+  couponDiscount: number = 0
+) => {
+  // Calculate original total price
+  const originalTotal = getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices);
+  
+  // Calculate total after manual discount
+  const afterManualDiscount = getFinalPrice(originalTotal, discountType, discountValue);
+  
+  // Calculate final total after all discounts
+  const finalTotal = Math.max(0, afterManualDiscount - membershipDiscount - couponDiscount);
+  
+  // Prepare result object for all services and package services
+  const result: Record<string, number> = {};
+  
+  // Calculate adjusted prices for individual services
+  selectedServices.forEach((serviceId) => {
+    const service = services?.find((s) => s.id === serviceId);
+    if (service) {
+      result[serviceId] = calculateAdjustedPrice(
+        service.selling_price,
+        originalTotal,
+        finalTotal
+      );
+    }
+  });
+  
+  // Calculate adjusted prices for package services
+  selectedPackages.forEach((packageId) => {
+    const pkg = packages?.find((p) => p.id === packageId);
+    if (pkg) {
+      // First handle the base package
+      pkg.package_services?.forEach((ps) => {
+        // Use package_selling_price if available, otherwise service's selling_price
+        const originalServicePrice = ps.package_selling_price !== undefined && ps.package_selling_price !== null
+          ? ps.package_selling_price
+          : ps.service.selling_price;
+          
+        result[ps.service.id] = calculateAdjustedPrice(
+          originalServicePrice,
+          originalTotal,
+          finalTotal
+        );
+      });
+      
+      // Then handle customized services
+      if (pkg.is_customizable && customizedServices[packageId]) {
+        customizedServices[packageId].forEach((serviceId) => {
+          // Skip if already in package
+          if (pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+            return;
+          }
+          
+          const service = services?.find((s) => s.id === serviceId);
+          if (service) {
+            result[serviceId] = calculateAdjustedPrice(
+              service.selling_price,
+              originalTotal,
+              finalTotal
+            );
+          }
+        });
+      }
+    }
+  });
+  
+  return result;
+};

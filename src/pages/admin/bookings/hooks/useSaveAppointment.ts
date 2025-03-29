@@ -142,7 +142,8 @@ export default function useSaveAppointment({
         taxAmount: calculatedTaxAmount,
         taxId: usedTaxId,
         couponDiscount: calculatedCouponDiscount,
-        couponId: usedCouponId
+        couponId: usedCouponId,
+        adjustedPrices: summaryParams.adjustedPrices
       });
 
       // Create or update appointment with properly typed status
@@ -204,6 +205,11 @@ export default function useSaveAppointment({
         const serviceStartTime = new Date(startTime);
         const bookingStatus: AppointmentStatus = 
           currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
+          
+        // Use adjusted price if available, otherwise use original price
+        const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[serviceId] !== undefined
+          ? summaryParams.adjustedPrices[serviceId]
+          : service.selling_price;
 
         const bookingData = {
           appointment_id: createdAppointmentId,
@@ -212,7 +218,7 @@ export default function useSaveAppointment({
           status: bookingStatus,
           start_time: serviceStartTime.toISOString(),
           end_time: addMinutes(serviceStartTime, service.duration).toISOString(),
-          price_paid: service.selling_price,
+          price_paid: pricePaid,
           original_price: service.original_price || service.selling_price,
         };
 
@@ -236,7 +242,11 @@ export default function useSaveAppointment({
           if (!packageService) continue;
 
           const packageServiceStartTime = new Date(startTime);
-          // TODO: Calculate proper start time based on previous services
+          
+          // Use adjusted price if available
+          const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[packageServiceId] !== undefined
+            ? summaryParams.adjustedPrices[packageServiceId]
+            : 0; // Package services typically don't have individual prices
 
           const bookingData = {
             appointment_id: createdAppointmentId,
@@ -246,7 +256,7 @@ export default function useSaveAppointment({
             status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
             start_time: packageServiceStartTime.toISOString(),
             end_time: addMinutes(packageServiceStartTime, packageService.duration).toISOString(),
-            price_paid: 0, // Package services typically don't have individual prices
+            price_paid: pricePaid,
             original_price: packageService.selling_price,
           };
 
@@ -264,7 +274,15 @@ export default function useSaveAppointment({
           if (!customService) continue;
 
           const customServiceStartTime = new Date(startTime);
-          // TODO: Calculate proper start time based on previous services
+          
+          // Check if this service is already in the package
+          const isInPackage = packageServiceIds.includes(customServiceId);
+          if (isInPackage) continue; // Skip if already handled above
+          
+          // Use adjusted price if available
+          const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[customServiceId] !== undefined
+            ? summaryParams.adjustedPrices[customServiceId]
+            : customService.selling_price;
 
           const bookingData = {
             appointment_id: createdAppointmentId,
@@ -274,7 +292,7 @@ export default function useSaveAppointment({
             status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
             start_time: customServiceStartTime.toISOString(),
             end_time: addMinutes(customServiceStartTime, customService.duration).toISOString(),
-            price_paid: customService.selling_price,
+            price_paid: pricePaid,
             original_price: customService.selling_price,
           };
 

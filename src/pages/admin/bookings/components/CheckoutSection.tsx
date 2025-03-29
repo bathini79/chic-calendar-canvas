@@ -38,7 +38,8 @@ import {
   getTotalDuration, 
   getFinalPrice, 
   getServicePriceInPackage,
-  calculatePackagePrice
+  calculatePackagePrice,
+  getAdjustedServicePrices
 } from "../utils/bookingUtils";
 import { getMembershipDiscount } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -391,6 +392,35 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [subtotal, discountedSubtotal, couponDiscount, membershipDiscount]
   );
 
+  const adjustedPrices = useMemo(() => {
+    return getAdjustedServicePrices(
+      selectedServices, 
+      selectedPackages, 
+      services, 
+      packages, 
+      customizedServices,
+      discountType, 
+      discountValue,
+      membershipDiscount,
+      couponDiscount
+    );
+  }, [
+    selectedServices, 
+    selectedPackages, 
+    services, 
+    packages, 
+    customizedServices, 
+    discountType, 
+    discountValue,
+    membershipDiscount,
+    couponDiscount
+  ]);
+
+  const getServiceDisplayPrice = (serviceId: string) => {
+    return adjustedPrices[serviceId] !== undefined ? adjustedPrices[serviceId] : 
+      (services?.find(s => s.id === serviceId)?.selling_price || 0);
+  };
+
   const selectedItems = useMemo(() => {
     const individualServices = selectedServices.map((id) => {
       const service = services.find((s) => s.id === id);
@@ -398,6 +428,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         id,
         name: service.name,
         price: service.selling_price,
+        adjustedPrice: getServiceDisplayPrice(id),
         duration: service.duration,
         type: "service" as const,
         packageId: null as string | null,
@@ -429,6 +460,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           id: string;
           name: string;
           price: number;
+          adjustedPrice: number;
           duration: number;
           stylist: string | null;
           stylistName: string | null;
@@ -438,17 +470,20 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       
       if (pkg.package_services) {
         packageItem.services = pkg.package_services.map(ps => {
-          const adjustedPrice = ps.package_selling_price !== undefined && ps.package_selling_price !== null
+          const serviceId = ps.service.id;
+          const adjustedPrice = getServiceDisplayPrice(serviceId);
+          const originalPrice = ps.package_selling_price !== undefined && ps.package_selling_price !== null
             ? ps.package_selling_price 
             : ps.service.selling_price;
             
           return {
-            id: ps.service.id,
+            id: serviceId,
             name: ps.service.name,
-            price: adjustedPrice,
+            price: originalPrice,
+            adjustedPrice: adjustedPrice,
             duration: ps.service.duration,
-            stylist: selectedStylists[ps.service.id] || selectedStylists[packageId] || null,
-            stylistName: getStylistName(selectedStylists[ps.service.id] || selectedStylists[packageId] || ''),
+            stylist: selectedStylists[serviceId] || selectedStylists[packageId] || null,
+            stylistName: getStylistName(selectedStylists[serviceId] || selectedStylists[packageId] || ''),
             isCustomized: false
           };
         });
@@ -467,6 +502,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               id: service.id,
               name: service.name,
               price: service.selling_price,
+              adjustedPrice: getServiceDisplayPrice(service.id),
               duration: service.duration,
               stylist: selectedStylists[service.id] || selectedStylists[packageId] || null,
               stylistName: getStylistName(selectedStylists[service.id] || selectedStylists[packageId] || ''),
@@ -491,7 +527,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     selectedTimeSlots, 
     appointmentId, 
     customizedServices,
-    employees
+    employees,
+    adjustedPrices
   ]);
 
   const handlePayment = async () => {
@@ -509,7 +546,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         membershipId,
         membershipName,
         membershipDiscount,
-        total
+        total,
+        adjustedPrices
       });
       
       const saveAppointmentParams = {
@@ -521,7 +559,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         membershipId,
         membershipName,
         membershipDiscount,
-        total
+        total,
+        adjustedPrices
       };
       
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
@@ -645,10 +684,18 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                                   )}
                                 </div>
                               </div>
-                              <p className="text-sm">
-                                <IndianRupee className="inline h-3 w-3" />
-                                {service.price}
-                              </p>
+                              <div className="text-sm flex flex-col items-end">
+                                {service.price !== service.adjustedPrice && (
+                                  <span className="text-xs line-through text-muted-foreground">
+                                    <IndianRupee className="inline h-3 w-3" />
+                                    {service.price.toFixed(2)}
+                                  </span>
+                                )}
+                                <span className={service.price !== service.adjustedPrice ? "text-green-600" : ""}>
+                                  <IndianRupee className="inline h-3 w-3" />
+                                  {service.adjustedPrice.toFixed(2)}
+                                </span>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -656,9 +703,15 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
 
                       {item.type === "service" && (
                         <div className="flex justify-end">
-                          <p className="font-semibold text-lg">
+                          {item.price !== item.adjustedPrice && (
+                            <p className="font-medium text-lg line-through text-muted-foreground mr-2">
+                              <IndianRupee className="inline h-4 w-4" />
+                              {item.price.toFixed(2)}
+                            </p>
+                          )}
+                          <p className={`font-semibold text-lg ${item.price !== item.adjustedPrice ? "text-green-600" : ""}`}>
                             <IndianRupee className="inline h-4 w-4" />
-                            {item.price}
+                            {item.adjustedPrice.toFixed(2)}
                           </p>
                         </div>
                       )}
@@ -853,4 +906,3 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     </div>
   );
 }
-
