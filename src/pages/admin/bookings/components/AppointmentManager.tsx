@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
 import { Appointment, SCREEN, Service, Package } from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
-import { useQueryClient } from "@tanstack/react-query";
 
 interface AppointmentManagerProps {
   isOpen: boolean;
@@ -36,7 +35,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     SCREEN.SERVICE_SELECTION
   );
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
 
   const { data: services } = useActiveServices(locationId);
   const { data: packages } = useActivePackages(locationId);
@@ -272,13 +270,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   const handlePaymentComplete = (appointmentId?: string) => {  
-    if (stateSelectedDate) {
-      const dateString = format(stateSelectedDate, 'yyyy-MM-dd');
-      queryClient.invalidateQueries({
-        queryKey: ['appointments', dateString, locationId]
-      });
-    }
-    
     setNewAppointmentId(appointmentId || null);
     setCurrentScreen(SCREEN.SUMMARY);
     resetState();
@@ -287,13 +278,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   const onHandleSaveAppointment = async() => {
     const appointmentId = await handleSaveAppointment();
     if(appointmentId){
-      if (stateSelectedDate) {
-        const dateString = format(stateSelectedDate, 'yyyy-MM-dd');
-        queryClient.invalidateQueries({
-          queryKey: ['appointments', dateString, locationId]
-        });
-      }
-      
       onClose();
       resetState();
     }
@@ -382,9 +366,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                 discountValue={discountValue}
                 paymentMethod={paymentMethod}
                 notes={appointmentNotes}
-                onDiscountTypeChange={(type) => setDiscountType(type as 'none' | 'percentage' | 'fixed')}
+                onDiscountTypeChange={setDiscountType}
                 onDiscountValueChange={setDiscountValue}
-                onPaymentMethodChange={(method) => setPaymentMethod(method as 'cash' | 'online')}
+                onPaymentMethodChange={setPaymentMethod}
                 onNotesChange={setAppointmentNotes}
                 onPaymentComplete={handlePaymentComplete}
                 selectedStylists={selectedStylists}
