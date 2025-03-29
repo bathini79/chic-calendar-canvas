@@ -18,7 +18,7 @@ interface SelectedItem {
   duration?: number;
 }
 
-export function useAppointmentActions() {
+export const useAppointmentActions = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
 
@@ -328,11 +328,27 @@ export function useAppointmentActions() {
     }
   };
 
+  const updateBookingStylelist = async (bookingId: string, employeeId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ employee_id: employeeId })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error("Error updating booking stylist:", error);
+      throw error;
+    }
+  };
+
   return {
     isLoading,
     selectedItems,
     fetchAppointmentDetails,
     updateAppointmentStatus,
-    processRefund
+    processRefund,
+    updateBookingStylelist
   };
-}
+};
