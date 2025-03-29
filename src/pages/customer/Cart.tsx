@@ -83,11 +83,9 @@ export default function Cart() {
       }
 
       try {
-        console.log("Loading coupon data for ID:", appliedCouponId);
         // Try from cache first (coupons array)
         const couponFromCache = coupons.find(c => c.id === appliedCouponId);
         if (couponFromCache) {
-          console.log("Found coupon in cache:", couponFromCache);
           setSelectedCoupon(couponFromCache);
           return;
         }
@@ -95,10 +93,8 @@ export default function Cart() {
         // If not in cache, try to get it from the database
         const coupon = await getCouponById(appliedCouponId);
         if (coupon) {
-          console.log("Found coupon from getCouponById:", coupon);
           setSelectedCoupon(coupon);
         } else {
-          console.log("Coupon not found, clearing selection");
           setSelectedCoupon(null);
         }
       } catch (error) {
@@ -125,7 +121,6 @@ export default function Cart() {
   };
   
   const handleCouponChange = (couponId: string) => {
-    console.log("Changing coupon to:", couponId);
     if (couponId === "none") {
       setAppliedCouponId(null);
       return;

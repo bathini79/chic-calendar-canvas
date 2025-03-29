@@ -40,13 +40,11 @@ export function useCustomerMemberships() {
     
     // Skip fetch if we already fetched for this user
     if (lastFetchedUserId === customerId && customerMemberships.length > 0) {
-      console.log("Skipping membership fetch - already loaded for user:", customerId);
       return customerMemberships;
     }
     
     setIsLoading(true);
     try {
-      console.log("Fetching memberships for customer:", customerId);
       const { data, error } = await supabase
         .from('customer_memberships')
         .select(`
@@ -69,7 +67,6 @@ export function useCustomerMemberships() {
         return isBefore(now, endDate);
       }) || [];
       
-      console.log("Fetched valid memberships:", validMemberships.length);
       setCustomerMemberships(validMemberships as CustomerMembership[]);
       setLastFetchedUserId(customerId);
       return validMemberships as CustomerMembership[];

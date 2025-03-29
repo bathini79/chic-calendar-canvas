@@ -72,8 +72,8 @@ export const getMembershipDiscount = (
     
     // Check if service/package is in the applicable list
     const isApplicable = 
-      (serviceId && mem.applicable_services && mem.applicable_services.includes(serviceId)) ||
-      (packageId && mem.applicable_packages && mem.applicable_packages.includes(packageId));
+      (serviceId && (mem.applicable_services.length == 0 ? true : mem.applicable_services && mem.applicable_services.includes(serviceId))) ||
+      (packageId && (mem.applicable_services.length == 0 ? true : mem.applicable_packages && mem.applicable_packages.includes(packageId)));
     
     // Check minimum billing amount if set
     const meetsMinBilling = !mem.min_billing_amount || 
@@ -81,7 +81,6 @@ export const getMembershipDiscount = (
       
     return isApplicable && meetsMinBilling;
   });
-  
   if (applicableMemberships.length === 0) return null;
   
   // Get the best discount
@@ -112,7 +111,6 @@ export const getMembershipDiscount = (
   });
   
   if (!bestMembership) return null;
-  
   return {
     membershipId: bestMembership.membership_id,
     membershipName: bestMembership.membership?.name,

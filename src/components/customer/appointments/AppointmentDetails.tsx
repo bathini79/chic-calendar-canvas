@@ -41,7 +41,6 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
   const appointmentDate = parseISO(appointment.start_time);
   const formattedDate = format(appointmentDate, "EEE, dd MMM, yyyy");
   const formattedTime = format(appointmentDate, "h:mm a");
-  console.log("appointment",appointment)
   // Get the full location information
   const locationName = appointment.location || "Not specified";
 

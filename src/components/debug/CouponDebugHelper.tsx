@@ -19,7 +19,6 @@ export function CouponDebugHelper() {
           .order('code');
           
         if (error) throw error;
-        console.log("All coupons:", data);
         setAllCoupons(data || []);
       } catch (error) {
         console.error("Error fetching coupons:", error);

@@ -309,12 +309,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     setMembershipDiscount(bestDiscount);
     setMembershipId(bestMembershipId);
     setMembershipName(bestMembershipName);
-    
-    console.log("Membership values set:", {
-      membershipDiscount: bestDiscount,
-      membershipId: bestMembershipId,
-      membershipName: bestMembershipName
-    });
   }, [customerMemberships, selectedServices, selectedPackages, services, packages, customizedServices]);
 
   const handleTaxChange = (taxId: string) => {
@@ -536,20 +530,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       if (!selectedCustomer) {
         toast.error("Please select a customer");
         return;
-      }
-      
-      console.log("Payment data:", {
-        taxId: appliedTaxId,
-        taxAmount,
-        couponId: selectedCouponId,
-        couponDiscount,
-        membershipId,
-        membershipName,
-        membershipDiscount,
-        total,
-        adjustedPrices
-      });
-      
+      }      
       const saveAppointmentParams = {
         appointmentId,
         appliedTaxId,

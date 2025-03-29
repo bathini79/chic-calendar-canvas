@@ -71,11 +71,6 @@ export default function BookingConfirmation() {
   const [activeMembership, setActiveMembership] = useState<any>(null);
 
   useEffect(() => {
-    console.log("BookingConfirmation - appliedCouponId:", appliedCouponId);
-    console.log("BookingConfirmation - items:", items);
-  }, [appliedCouponId, items]);
-
-  useEffect(() => {
     const fetchLocationDetails = async () => {
       if (selectedLocation) {
         const { data, error } = await supabase
@@ -137,7 +132,6 @@ export default function BookingConfirmation() {
         if (item.type === 'service' && item.service_id) {
           const servicePrice = item.selling_price || item.service?.selling_price || 0;
           const discountInfo = getApplicableMembershipDiscount(item.service_id, null, servicePrice);
-          
           if (discountInfo && discountInfo.calculatedDiscount > 0) {
             totalMembershipDiscount += discountInfo.calculatedDiscount;
             if (!bestMembership) {
@@ -166,7 +160,6 @@ export default function BookingConfirmation() {
       setMembershipDiscount(totalMembershipDiscount);
       setActiveMembership(bestMembership);
       
-      console.log("Membership discount calculated:", totalMembershipDiscount);
     } else {
       setMembershipDiscount(0);
       setActiveMembership(null);
@@ -203,17 +196,14 @@ export default function BookingConfirmation() {
   useEffect(() => {
     const loadCouponDetails = async () => {
       if (!appliedCouponId) {
-        console.log("No coupon ID applied");
         setCoupon(null);
         setCouponDiscount(0);
         return;
       }
 
-      console.log("Fetching coupon details for ID:", appliedCouponId);
       try {
         const couponData = await getCouponById(appliedCouponId);
         if (couponData) {
-          console.log("Coupon found via getCouponById:", couponData);
           processCouponData(couponData);
           return;
         }
@@ -232,7 +222,6 @@ export default function BookingConfirmation() {
         }
 
         if (data) {
-          console.log("Coupon data loaded from direct query:", data);
           processCouponData(data);
         }
       } catch (error) {
@@ -246,7 +235,6 @@ export default function BookingConfirmation() {
       setCoupon(data);
       
       if (!items || items.length === 0) {
-        console.log("Items array is empty, setting discount to 0");
         setCouponDiscount(0);
         return;
       }
@@ -258,7 +246,6 @@ export default function BookingConfirmation() {
           ? afterMembershipDiscount * (data.discount_value / 100)
           : Math.min(data.discount_value, afterMembershipDiscount);
 
-      console.log("Calculated coupon discount:", newDiscount, "from subtotal after membership discount:", afterMembershipDiscount);
       setCouponDiscount(newDiscount);
 
       if (tax) {
@@ -467,21 +454,6 @@ export default function BookingConfirmation() {
         return;
       }
       const endDateTime = addMinutes(startDateTime, totalDuration);
-
-      console.log("Creating appointment with:", {
-        subtotal,
-        membershipDiscount,
-        couponDiscount,
-        discountedSubtotal,
-        taxAmount,
-        totalPrice,
-        couponId: appliedCouponId,
-        taxId: appliedTaxId,
-        couponDetails: coupon,
-        membershipId: activeMembership?.id,
-        membershipName: activeMembership?.name
-      });
-
       const { data: appointmentData, error: appointmentError } = await supabase
         .from("appointments")
         .insert({
@@ -538,9 +510,6 @@ export default function BookingConfirmation() {
 
           const originalPrice = item.selling_price || item.service?.selling_price || 0;
           const discountedPrice = calculateItemDiscountedPrice(originalPrice, item.service_id, null);
-
-          console.log(`Service: ${item.service?.name}, Original: ${originalPrice}, Discounted: ${discountedPrice}`);
-
           const bookingPromise = supabase.from("bookings").insert({
             appointment_id: appointmentId,
             service_id: item.service_id,
@@ -583,9 +552,6 @@ export default function BookingConfirmation() {
                   : packageService.service.selling_price;
                   
               const adjustedServicePrice = servicePriceInPackage * packageDiscountRatio;
-
-              console.log(`Package Service: ${packageService.service.name}, Original: ${servicePriceInPackage}, Adjusted: ${adjustedServicePrice}`);
-
               const bookingPromise = supabase.from("bookings").insert({
                 appointment_id: appointmentId,
                 service_id: packageService.service.id,
@@ -635,9 +601,6 @@ export default function BookingConfirmation() {
 
                     const originalCustomPrice = customService.selling_price || 0;
                     const discountedCustomPrice = calculateItemDiscountedPrice(originalCustomPrice, serviceId, item.package_id);
-
-                    console.log(`Custom Service: ${customService.name}, Original: ${originalCustomPrice}, Discounted: ${discountedCustomPrice}`);
-
                     const bookingPromise = supabase.from("bookings").insert({
                       appointment_id: appointmentId,
                       service_id: serviceId,

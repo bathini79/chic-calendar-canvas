@@ -21,7 +21,6 @@ export function useCoupons() {
   const fetchCoupons = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log("Fetching coupons from database");
       const { data, error } = await supabase
         .from("coupons")
         .select("*")
@@ -33,7 +32,6 @@ export function useCoupons() {
         throw error;
       }
 
-      console.log("Coupons fetched successfully:", data);
       setCoupons(data as Coupon[] || []);
       return data;
     } catch (error: any) {
@@ -52,16 +50,13 @@ export function useCoupons() {
   const getCouponById = useCallback(
     async (id: string) => {
       try {
-        console.log("Looking for coupon with ID:", id, "in cache:", coupons);
         if (coupons.length > 0) {
           const cachedCoupon = coupons.find((coupon) => coupon.id === id);
           if (cachedCoupon) {
-            console.log("Found cached coupon:", cachedCoupon);
             return cachedCoupon;
           }
         }
 
-        console.log("Fetching coupon directly from database");
         const { data, error } = await supabase
           .from("coupons")
           .select("*")
@@ -73,7 +68,6 @@ export function useCoupons() {
           throw error;
         }
         
-        console.log("Retrieved coupon from DB:", data);
         return data as Coupon;
       } catch (error: any) {
         console.error("Error fetching coupon by ID:", error);
@@ -86,7 +80,6 @@ export function useCoupons() {
   const validateCouponCode = useCallback(
     async (code: string) => {
       try {
-        console.log("Validating coupon code:", code);
         const { data, error } = await supabase
           .from("coupons")
           .select("*")
@@ -99,7 +92,6 @@ export function useCoupons() {
           throw error;
         }
         
-        console.log("Valid coupon found:", data);
         return data as Coupon;
       } catch (error: any) {
         console.error("Error validating coupon code:", error);

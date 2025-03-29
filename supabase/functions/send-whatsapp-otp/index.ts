@@ -21,7 +21,6 @@ async function sendWhatsAppOTP(phoneNumber: string, otp: string) {
   // Make sure the phone number is in E.164 format
   const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`
   
-  console.log(`Attempting to send OTP to: ${formattedPhone} using Twilio WhatsApp`)
   
   const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
   
@@ -49,7 +48,6 @@ async function sendWhatsAppOTP(phoneNumber: string, otp: string) {
       throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || JSON.stringify(responseData)}`)
     }
     
-    console.log('Twilio message sent successfully:', responseData.sid)
     return responseData
   } catch (error) {
     console.error('Failed to send WhatsApp message:', error)
@@ -80,11 +78,9 @@ serve(async (req) => {
       throw new Error('Phone number is required')
     }
 
-    console.log(`Processing OTP request for phone: ${phoneNumber}`)
     
     // Generate OTP
     const otp = generateOTP()
-    console.log(`Generated OTP: ${otp} for phone: ${phoneNumber}`)
     
     // Store OTP in database for verification
     const supabaseClient = Deno.env.get('SUPABASE_URL') && Deno.env.get('SUPABASE_ANON_KEY')
@@ -121,7 +117,6 @@ serve(async (req) => {
           throw new Error(`Failed to store OTP: ${error.message}`)
         }
         
-        console.log(`OTP stored in database for phone: ${phoneNumber}`)
       } catch (error: any) {
         console.error('Database operation failed:', error)
         throw new Error(`Failed to store OTP: ${error.message}`)

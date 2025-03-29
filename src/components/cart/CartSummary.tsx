@@ -68,15 +68,6 @@ export function CartSummary() {
   const membershipFetchedRef = useRef(false);
   const couponsFetchedRef = useRef(false);
   
-  // Debug logging for coupon state
-  useEffect(() => {
-    console.log("CartSummary - Current coupon state:", {
-      appliedCouponId,
-      couponsLoaded: coupons.length,
-      couponDiscount
-    });
-  }, [appliedCouponId, coupons.length, couponDiscount]);
-  
   // Fetch customer memberships when the component loads (if we're not in booking confirmation)
   const fetchMemberships = useCallback(async () => {
     if (isBookingConfirmation || membershipFetchedRef.current) return;
@@ -140,9 +131,7 @@ export function CartSummary() {
         }
       }
     });
-    
-    console.log("Membership discount calculated:", totalMembershipDiscount);
-    setMembershipDiscount(totalMembershipDiscount);
+        setMembershipDiscount(totalMembershipDiscount);
     setActiveMembership(bestMembership);
     
   }, [items, customerMemberships, getApplicableMembershipDiscount]);
@@ -171,9 +160,7 @@ export function CartSummary() {
   // Load coupons
   useEffect(() => {
     if (couponsFetchedRef.current) return;
-    
-    console.log("Fetching coupons in CartSummary");
-    couponsFetchedRef.current = true;
+      couponsFetchedRef.current = true;
     fetchCoupons();
   }, [fetchCoupons]);
 
@@ -193,17 +180,13 @@ export function CartSummary() {
   useEffect(() => {
     const applyCoupon = async () => {
       if (!appliedCouponId) {
-        console.log("No coupon applied, setting discount to 0");
         setCouponDiscount(0);
         return;
       }
-      
-      console.log("Applied coupon ID:", appliedCouponId);
-      
+            
       // First try from cache
       const cachedCoupon = coupons.find(c => c.id === appliedCouponId);
       if (cachedCoupon) {
-        console.log("Found coupon in cache:", cachedCoupon);
         calculateDiscount(cachedCoupon);
         return;
       }
@@ -227,9 +210,7 @@ export function CartSummary() {
       const discount = coupon.discount_type === 'percentage' 
         ? discountableAmount * (coupon.discount_value / 100)
         : Math.min(coupon.discount_value, discountableAmount); // Don't discount more than the subtotal
-      
-      console.log("Calculated coupon discount:", discount);
-      setCouponDiscount(discount);
+            setCouponDiscount(discount);
     };
     
     applyCoupon();

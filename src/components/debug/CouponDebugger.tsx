@@ -22,7 +22,6 @@ export function CouponDebugger() {
           .order('code');
           
         if (error) throw error;
-        console.log("All coupons from debugger:", data);
         setAllCoupons(data || []);
       } catch (error) {
         console.error("Error fetching coupons in debugger:", error);

@@ -34,10 +34,7 @@ serve(async (req) => {
         autoRefreshToken: false,
         persistSession: false
       }
-    })
-    
-    console.log("Verifying OTP for phone number:", phoneNumber)
-    
+    })    
     // Verify OTP from database
     const { data, error } = await supabaseAdmin
       .from('phone_auth_codes')
@@ -89,10 +86,8 @@ serve(async (req) => {
     let newUser = false
     
     if (userError || !existingUser) {
-      console.log('New user detected')
       // Creating a new user requires a full name
       if (!fullName) {
-        console.log('New user registration requires full name')
         // Return specific error for missing name but with 200 status code
         return new Response(
           JSON.stringify({ 
@@ -105,12 +100,9 @@ serve(async (req) => {
           }
         )
       }
-
-      console.log('Creating new user with name:', fullName, 'and phone:', phoneNumber)
       
       try {
         // First create the auth user
-        console.log("Starting user creation with phone:", phoneNumber)
         const { data: newAuthUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
           phone: phoneNumber,
           phone_confirm: true,

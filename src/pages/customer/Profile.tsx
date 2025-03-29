@@ -119,7 +119,6 @@ const Profile = () => {
       if (error) {
         throw error;
       }
-      console.log("appointmentsData",appointmentsData)
       setAppointments(appointmentsData || []);
     } catch (error: any) {
       toast.error(error.message);
@@ -174,7 +173,6 @@ const Profile = () => {
 
   // Helper function to get formatted location address
   const getFormattedAddress = (locationId: string) => {
-    console.log("locationId",locationId,"  ",locations)
     if (!locationId) return "Not specified";
     
     const location = locations[locationId];

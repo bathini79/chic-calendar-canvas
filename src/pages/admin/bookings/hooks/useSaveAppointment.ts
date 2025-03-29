@@ -136,16 +136,6 @@ export default function useSaveAppointment({
         (typeof summaryParams.couponId === 'object' && summaryParams.couponId !== null ? 
           summaryParams.couponId.id || summaryParams.couponId : summaryParams.couponId) : 
         couponId;
-
-      console.log("Appointment data for saving:", {
-        total: totalPrice,
-        taxAmount: calculatedTaxAmount,
-        taxId: usedTaxId,
-        couponDiscount: calculatedCouponDiscount,
-        couponId: usedCouponId,
-        adjustedPrices: summaryParams.adjustedPrices
-      });
-
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
         currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
