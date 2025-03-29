@@ -32,8 +32,6 @@ interface CartContextType {
   setAppliedTaxId: React.Dispatch<React.SetStateAction<string | null>>;
   appliedCouponId: string | null;
   setAppliedCouponId: React.Dispatch<React.SetStateAction<string | null>>;
-  appliedMembershipId: string | null;
-  setAppliedMembershipId: React.Dispatch<React.SetStateAction<string | null>>;
   // Add missing methods
   addToCart: (serviceId?: string, packageId?: string, extraData?: any) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
@@ -51,7 +49,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
   const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null);
-  const [appliedMembershipId, setAppliedMembershipId] = useState<string | null>(null);
 
   const addItem = (item: CartItem) => {
     // Check if item already exists
@@ -172,7 +169,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setSelectedDate(null);
     setAppliedTaxId(null);
     setAppliedCouponId(null);
-    setAppliedMembershipId(null);
   };
 
   return (
@@ -194,8 +190,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setAppliedTaxId,
         appliedCouponId,
         setAppliedCouponId,
-        appliedMembershipId,
-        setAppliedMembershipId,
         // Add new methods to context
         addToCart,
         removeFromCart,

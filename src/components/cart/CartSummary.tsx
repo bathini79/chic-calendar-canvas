@@ -10,8 +10,6 @@ import { useState, useEffect } from "react";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useCoupons, Coupon } from "@/hooks/use-coupons";
-import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
-import { supabase } from "@/integrations/supabase/client";
 import { 
   Select, 
   SelectContent, 
@@ -33,19 +31,14 @@ export function CartSummary() {
     appliedTaxId,
     setAppliedTaxId,
     appliedCouponId,
-    setAppliedCouponId,
-    appliedMembershipId,
-    setAppliedMembershipId
+    setAppliedCouponId
   } = useCart();
   
   const [taxAmount, setTaxAmount] = useState(0);
   const [couponDiscount, setCouponDiscount] = useState(0);
-  const [membershipDiscount, setMembershipDiscount] = useState(0);
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
   const { taxRates, fetchTaxRates } = useTaxRates();
   const { coupons, fetchCoupons, isLoading: couponsLoading, getCouponById } = useCoupons();
-  const { customerMemberships, isLoading: membershipsLoading, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
-  const [userId, setUserId] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,40 +50,18 @@ export function CartSummary() {
 
   const subtotal = getTotalPrice();
   const totalDuration = getTotalDuration();
-  const afterDiscountSubtotal = subtotal - couponDiscount - membershipDiscount;
-  const totalPrice = afterDiscountSubtotal + taxAmount;
+  const afterCouponSubtotal = subtotal - couponDiscount;
+  const totalPrice = afterCouponSubtotal + taxAmount;
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
   
-  // Get current user
+  // Debug logging for coupon state
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUserId(session.user.id);
-      }
-    };
-    
-    fetchUser();
-  }, []);
-  
-  // Load user memberships
-  useEffect(() => {
-    if (userId) {
-      fetchCustomerMemberships(userId);
-    }
-  }, [userId, fetchCustomerMemberships]);
-  
-  // Debug logging for coupon and membership state
-  useEffect(() => {
-    console.log("CartSummary - Current state:", {
+    console.log("CartSummary - Current coupon state:", {
       appliedCouponId,
       couponsLoaded: coupons.length,
-      couponDiscount,
-      appliedMembershipId,
-      membershipsLoaded: customerMemberships.length,
-      membershipDiscount
+      couponDiscount
     });
-  }, [appliedCouponId, coupons.length, couponDiscount, appliedMembershipId, customerMemberships.length, membershipDiscount]);
+  }, [appliedCouponId, coupons.length, couponDiscount]);
   
   // Load tax data
   useEffect(() => {
@@ -120,12 +91,12 @@ export function CartSummary() {
     if (appliedTaxId && taxRates.length > 0) {
       const taxRate = taxRates.find(tax => tax.id === appliedTaxId);
       if (taxRate) {
-        setTaxAmount(afterDiscountSubtotal * (taxRate.percentage / 100));
+        setTaxAmount(afterCouponSubtotal * (taxRate.percentage / 100));
       }
     } else {
       setTaxAmount(0);
     }
-  }, [appliedTaxId, afterDiscountSubtotal, taxRates]);
+  }, [appliedTaxId, afterCouponSubtotal, taxRates]);
   
   // Calculate coupon discount
   useEffect(() => {
@@ -172,34 +143,6 @@ export function CartSummary() {
     applyCoupon();
   }, [appliedCouponId, subtotal, coupons, getCouponById]);
   
-  // Calculate membership discount
-  useEffect(() => {
-    if (!appliedMembershipId || items.length === 0) {
-      setMembershipDiscount(0);
-      return;
-    }
-    
-    let totalMembershipDiscount = 0;
-    
-    // Calculate membership discount for each item in cart
-    items.forEach(item => {
-      const serviceId = item.service_id || item.service?.id || null;
-      const packageId = item.package_id || item.package?.id || null;
-      const itemPrice = item.selling_price || item.service?.selling_price || item.package?.price || item.price || 0;
-      
-      if (serviceId || packageId) {
-        const discount = getApplicableMembershipDiscount(serviceId, packageId, itemPrice);
-        if (discount) {
-          totalMembershipDiscount += discount.calculatedDiscount;
-          console.log(`Membership discount for ${item.name}: ${discount.calculatedDiscount}`);
-        }
-      }
-    });
-    
-    console.log("Total membership discount:", totalMembershipDiscount);
-    setMembershipDiscount(totalMembershipDiscount);
-  }, [appliedMembershipId, items, getApplicableMembershipDiscount]);
-  
   // Sort items by their scheduled start time
   const sortedItems = [...items].sort((a, b) => {
     const aTime = selectedTimeSlots[a.id] || "00:00";
@@ -232,25 +175,12 @@ export function CartSummary() {
       setAppliedCouponId(couponId);
     }
   };
-  
-  const handleMembershipChange = (membershipId: string) => {
-    if (membershipId === "none") {
-      setAppliedMembershipId(null);
-    } else {
-      setAppliedMembershipId(membershipId);
-    }
-  };
 
   const getSelectedCoupon = () => {
     return coupons.find(c => c.id === appliedCouponId);
   };
-  
-  const getSelectedMembership = () => {
-    return customerMemberships.find(m => m.membership_id === appliedMembershipId);
-  };
 
   const selectedCoupon = getSelectedCoupon();
-  const selectedMembership = getSelectedMembership();
 
   return (
     <Card className="flex flex-col h-full">
@@ -327,54 +257,10 @@ export function CartSummary() {
                 <span>{formatPrice(subtotal)}</span>
               </div>
               
-              {/* Membership discount */}
-              {!membershipsLoading && customerMemberships.length > 0 && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm items-center">
-                    <span className="text-muted-foreground">Membership</span>
-                    
-                    <Select 
-                      value={appliedMembershipId || "none"} 
-                      onValueChange={handleMembershipChange}
-                      disabled={membershipsLoading}
-                    >
-                      <SelectTrigger className="h-8 w-[180px]">
-                        <SelectValue placeholder="No Membership" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Membership</SelectItem>
-                        {customerMemberships.map(membership => (
-                          <SelectItem key={membership.membership_id} value={membership.membership_id}>
-                            {membership.membership?.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {selectedMembership && membershipDiscount > 0 && (
-                    <div className="flex flex-col gap-1">
-                      <Badge variant="outline" className="w-fit">
-                        <span className="text-xs font-medium">
-                          {selectedMembership.membership?.discount_type === 'percentage' 
-                            ? `${selectedMembership.membership?.discount_value}% off` 
-                            : `${formatPrice(selectedMembership.membership?.discount_value)} off`}
-                        </span>
-                      </Badge>
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>Membership Discount</span>
-                        <span>-{formatPrice(membershipDiscount)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
               {/* Coupon selection */}
               <div className="space-y-1">
                 <div className="flex justify-between text-sm items-center">
                   <span className="text-muted-foreground">Coupon</span>
-                  
                   <Select value={appliedCouponId || "none"} onValueChange={handleCouponChange} disabled={couponsLoading}>
                     <SelectTrigger className="h-8 w-[150px]">
                       <SelectValue placeholder="No Coupon" />
@@ -400,7 +286,7 @@ export function CartSummary() {
                       </span>
                     </Badge>
                     <div className="flex justify-between text-sm text-green-600">
-                      <span>Coupon Discount</span>
+                      <span>Discount</span>
                       <span>-{formatPrice(couponDiscount)}</span>
                     </div>
                   </div>
