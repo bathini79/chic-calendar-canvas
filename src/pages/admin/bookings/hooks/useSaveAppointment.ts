@@ -47,7 +47,18 @@ const useSaveAppointment = ({
   const [isCreating, setIsCreating] = useState(false);
   const queryClient = useQueryClient();
 
-  const handleSaveAppointment = async () => {
+  const handleSaveAppointment = async (additionalParams: {
+    appliedTaxId?: string | null;
+    taxAmount?: number;
+    couponId?: string | null;
+    couponDiscount?: number;
+    couponName?: string;
+    membershipId?: string | null;
+    membershipName?: string | null;
+    membershipDiscount?: number;
+    total?: number;
+    adjustedPrices?: Record<string, number>;
+  } = {}) => {
     if (!selectedDate || !selectedCustomer) {
       toast.error("Date and customer are required");
       return null;
@@ -76,20 +87,20 @@ const useSaveAppointment = ({
       const endTime = new Date(startTime.getTime() + totalDuration * 60 * 1000);
 
       // Calculate the total price
-      const totalPrice = getTotalPrice(
+      const totalPrice = additionalParams.total || getTotalPrice(
         services,
         packages,
         discountType,
         discountValue
       );
 
-      // Get membership information from the customer if available
-      let membershipDiscount = 0;
-      let membershipId = null;
-      let membershipName = null;
+      // Get membership information from the customer if available or from params
+      let membershipDiscount = additionalParams.membershipDiscount || 0;
+      let membershipId = additionalParams.membershipId || null;
+      let membershipName = additionalParams.membershipName || null;
 
-      // Check if customer has active membership
-      if (selectedCustomer.membership) {
+      // Check if customer has active membership if not provided in additionalParams
+      if (selectedCustomer.membership && !membershipId) {
         membershipId = selectedCustomer.membership.membership_id;
         membershipName = selectedCustomer.membership.name;
         membershipDiscount = selectedCustomer.membership.discount_value || 0;
@@ -111,10 +122,15 @@ const useSaveAppointment = ({
           payment_method: paymentMethod,
           notes: notes,
           location: locationId,
-          // Adding the membership fields to the appointment
+          // Adding the membership fields from params or customer data
           membership_discount: membershipDiscount,
           membership_id: membershipId,
           membership_name: membershipName,
+          // Adding tax fields from params
+          tax_amount: additionalParams.taxAmount || 0,
+          tax_id: additionalParams.appliedTaxId || null,
+          // Adding coupon fields from params
+          coupon_id: additionalParams.couponId || null,
           // Adding transaction type for proper categorization
           transaction_type: 'sale',
           // Setting original_total_price for potential refund calculations
@@ -136,14 +152,15 @@ const useSaveAppointment = ({
         const employeeId = selectedStylists[serviceId];
         const startServiceTime = new Date(startTime); // Clone the date
 
-        const price = service.selling_price || 0;
+        // Use adjusted price if available from params
+        const price = additionalParams.adjustedPrices?.[serviceId] || service.selling_price || 0;
 
         const bookingPromise = supabase.from("bookings").insert({
           appointment_id: appointment.id,
           service_id: serviceId,
           employee_id: employeeId,
           price_paid: price,
-          original_price: service.original_price || price,
+          original_price: service.selling_price || price,
           start_time: startServiceTime.toISOString(),
           end_time: new Date(
             startServiceTime.getTime() + service.duration * 60 * 1000
@@ -202,7 +219,8 @@ const useSaveAppointment = ({
               if (!customService) continue;
               
               const customServiceEmployeeId = selectedStylists[customServiceId] || employeeId;
-              const customServicePrice = customService.selling_price || 0;
+              // Use adjusted price if available from params
+              const customServicePrice = additionalParams.adjustedPrices?.[customServiceId] || customService.selling_price || 0;
               
               const customServiceBookingPromise = supabase.from("bookings").insert({
                 appointment_id: appointment.id,
@@ -210,7 +228,7 @@ const useSaveAppointment = ({
                 package_id: packageId,
                 employee_id: customServiceEmployeeId,
                 price_paid: customServicePrice,
-                original_price: customService.original_price || customServicePrice,
+                original_price: customService.selling_price || customServicePrice,
               });
               
               bookingPromises.push(customServiceBookingPromise);

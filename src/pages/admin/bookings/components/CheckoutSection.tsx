@@ -44,6 +44,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { LoaderCircle } from "lucide-react";
+
 interface CheckoutSectionProps {
   appointmentId?: string;
   selectedCustomer: Customer | null;
@@ -514,12 +515,20 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         return;
       }  
       setLoadPayment(true)    
+      
+      // Get coupon name if available
+      let couponName = null;
+      if (selectedCoupon) {
+        couponName = selectedCoupon.code;
+      }
+      
       const saveAppointmentParams = {
         appointmentId,
         appliedTaxId,
         taxAmount,
         couponId: selectedCouponId,
         couponDiscount,
+        couponName,
         membershipId,
         membershipName,
         membershipDiscount,
