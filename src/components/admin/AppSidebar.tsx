@@ -118,11 +118,11 @@ export function AppSidebar() {
       )}
     >
       <div className="flex h-14 items-center px-3 border-b justify-between">
-        <Link to="/admin" className={cn("flex items-center flex-1", !open && "justify-center")}>
+        <Link to="/admin" className={cn("flex items-center justify-center flex-1", !open && "justify-center")}>
           {businessDetails.logo_url ? (
             <img 
               src={businessDetails.logo_url} 
-              alt={businessDetails.name || "Salon Logo"} 
+              alt="Salon Logo" 
               className="h-8 w-8 rounded" 
             />
           ) : (
