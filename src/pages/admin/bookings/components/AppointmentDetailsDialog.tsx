@@ -80,6 +80,29 @@ const statusMessages = {
   }
 };
 
+// Get status color for background styling
+const getStatusColor = (status: AppointmentStatus) => {
+  switch (status) {
+    case 'completed':
+      return 'bg-green-50';
+    case 'canceled':
+    case 'noshow':
+    case 'voided':
+    case 'refunded':
+    case 'partially_refunded':
+      return 'bg-red-50';
+    case 'confirmed':
+      return 'bg-blue-50';
+    case 'inprogress':
+      return 'bg-yellow-50';
+    case 'booked':
+      return 'bg-blue-50';
+    case 'pending':
+    default:
+      return 'bg-gray-50';
+  }
+};
+
 export function AppointmentDetailsDialog({
   appointment,
   open,
@@ -142,27 +165,11 @@ export function AppointmentDetailsDialog({
     ? getInitials(appointment.customer.full_name)
     : '?';
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-500';
-      case 'canceled':
-      case 'noshow':
-      case 'voided':
-      case 'refunded':
-      case 'partially_refunded':
-        return 'bg-red-500';
-      case 'confirmed':
-        return 'bg-blue-500';
-      case 'inprogress':
-        return 'bg-yellow-500';
-        case 'booked':
-        return 'bg-yellow-500';
-      default:
-        return 'bg-gray-500';
-    }
-  };
+  const showCheckoutButton = ['inprogress', 'confirmed', 'pending'].includes(appointment.status);
 
+  const selectedMessage = selectedStatus ? statusMessages[selectedStatus as keyof typeof statusMessages] : null;
+
+  // Group bookings by package for better organization
   const groupedBookings = appointment.bookings.reduce((groups, booking) => {
     if (booking.package_id) {
       if (!groups.packages[booking.package_id]) {
@@ -195,16 +202,12 @@ export function AppointmentDetailsDialog({
     services: [] as typeof appointment.bookings 
   });
 
-  const showCheckoutButton = ['inprogress', 'confirmed', 'pending'].includes(appointment.status);
-
-  const selectedMessage = selectedStatus ? statusMessages[selectedStatus as keyof typeof statusMessages] : null;
-
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-          <SheetHeader className="border-b pb-4 mb-4">
-            <div className="flex items-center justify-between">
+          <SheetHeader className={`pb-4 mb-4 ${getStatusColor(appointment.status as AppointmentStatus)}`}>
+            <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5 text-gray-500" />
                 <div>
@@ -295,9 +298,9 @@ export function AppointmentDetailsDialog({
             </div>
           </SheetHeader>
 
-          <div className="space-y-6">
+          <div className="space-y-6 px-4">
             <div className="flex items-center gap-4">
-              <Avatar className={`h-16 w-16 ${getStatusColor(appointment.status)} text-white text-xl`}>
+              <Avatar className={`h-16 w-16 bg-gray-500 text-white text-xl`}>
                 <AvatarFallback>{customerInitials}</AvatarFallback>
               </Avatar>
               <div>
@@ -386,12 +389,6 @@ export function AppointmentDetailsDialog({
                               {booking.service.duration}min
                             </span>
                           </div>
-                          {/* {booking.employee && (
-                            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                              <User className="h-4 w-4" />
-                              <span>{booking.employee.name}</span>
-                            </div>
-                          )} */}
                         </div>
                         <span className="font-medium">
                           ₹{booking.price_paid}
