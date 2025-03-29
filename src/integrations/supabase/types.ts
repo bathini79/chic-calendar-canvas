@@ -19,6 +19,9 @@ export type Database = {
           end_time: string
           id: string
           location: string | null
+          membership_discount: number | null
+          membership_id: string | null
+          membership_name: string | null
           notes: string | null
           number_of_bookings: number | null
           original_appointment_id: string | null
@@ -45,6 +48,9 @@ export type Database = {
           end_time: string
           id?: string
           location?: string | null
+          membership_discount?: number | null
+          membership_id?: string | null
+          membership_name?: string | null
           notes?: string | null
           number_of_bookings?: number | null
           original_appointment_id?: string | null
@@ -71,6 +77,9 @@ export type Database = {
           end_time?: string
           id?: string
           location?: string | null
+          membership_discount?: number | null
+          membership_id?: string | null
+          membership_name?: string | null
           notes?: string | null
           number_of_bookings?: number | null
           original_appointment_id?: string | null

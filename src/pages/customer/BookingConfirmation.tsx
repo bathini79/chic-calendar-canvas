@@ -1,4 +1,3 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -109,7 +108,6 @@ export default function BookingConfirmation() {
     fetchLocationTaxSettings,
   ]);
 
-  // Fetch customer memberships when the component loads
   useEffect(() => {
     const loadMemberships = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -121,13 +119,11 @@ export default function BookingConfirmation() {
     loadMemberships();
   }, [fetchCustomerMemberships]);
 
-  // Calculate membership discounts for cart items
   useEffect(() => {
     if (items && items.length > 0 && customerMemberships.length > 0) {
       let totalMembershipDiscount = 0;
       let bestMembership = null;
       
-      // Process each cart item to find applicable membership discounts
       items.forEach(item => {
         if (item.type === 'service' && item.service_id) {
           const servicePrice = item.selling_price || item.service?.selling_price || 0;
@@ -364,7 +360,6 @@ export default function BookingConfirmation() {
       return itemOriginalPrice;
     }
     
-    // Calculate membership discount for this specific item
     let itemMembershipDiscount = 0;
     if ((serviceId || packageId) && membershipDiscount > 0) {
       const discountInfo = getApplicableMembershipDiscount(
@@ -378,10 +373,8 @@ export default function BookingConfirmation() {
       }
     }
     
-    // Apply membership discount first
     const afterMembershipPrice = Math.max(0, itemOriginalPrice - itemMembershipDiscount);
     
-    // Then apply coupon discount proportionally
     if (couponDiscount <= 0 || afterMembershipDiscount <= 0) {
       return afterMembershipPrice;
     }
