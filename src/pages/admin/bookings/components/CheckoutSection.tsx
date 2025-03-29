@@ -136,6 +136,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     },
   });
 
+  useEffect(() => {
+    if (!paymentMethodsLoading && paymentMethods.length > 0 && !paymentMethod) {
+      const defaultMethod = paymentMethods.find(m => m.is_default)?.name || paymentMethods[0].name;
+      onPaymentMethodChange(defaultMethod as 'cash' | 'online');
+    }
+  }, [paymentMethods, paymentMethodsLoading, paymentMethod, onPaymentMethodChange]);
+
   const { data: customerMemberships = [] } = useQuery({
     queryKey: ['customer-memberships', selectedCustomer?.id],
     queryFn: async () => {
@@ -853,4 +860,3 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     </div>
   );
 }
-
