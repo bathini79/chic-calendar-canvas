@@ -25,7 +25,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Service, Package, Customer, AppointmentStatus } from "../types";
+import type { Service, Package, Customer, AppointmentStatus, PaymentMethod, DiscountType } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -64,13 +64,13 @@ interface CheckoutSectionProps {
   selectedPackages: string[];
   services: Service[];
   packages: Package[];
-  discountType: 'none' | 'percentage' | 'fixed';
+  discountType: DiscountType;
   discountValue: number;
-  paymentMethod: 'cash' | 'online';
+  paymentMethod: PaymentMethod;
   notes: string;
-  onDiscountTypeChange: (type: 'none' | 'percentage' | 'fixed') => void;
+  onDiscountTypeChange: (type: DiscountType) => void;
   onDiscountValueChange: (value: number) => void;
-  onPaymentMethodChange: (method: 'cash' | 'online') => void;
+  onPaymentMethodChange: (method: PaymentMethod) => void;
   onNotesChange: (notes: string) => void;
   onPaymentComplete: (appointmentId?: string) => void;
   selectedStylists: Record<string, string>;
@@ -567,8 +567,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     } catch (error: any) {
       console.error("Error during checkout:", error);
       toast.error(`Error: ${error.message}`);
-    }finally{
-      setLoadPayment(false)
+    } finally {
+      setLoadPayment(false);
     }
   };
 
@@ -695,7 +695,38 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                               {item.price}
                             </p>
                           )}
-                           {item.type === "package" && item.services && item.services.length > 0 && (
+                          {item.type === "service" && (
+                            <div className="flex justify-end">
+                              {item.price !== item.adjustedPrice && (
+                                <p className="font-medium text-lg line-through text-muted-foreground mr-2">
+                                  <IndianRupee className="inline h-4 w-4" />
+                                  {item.price.toFixed(2)}
+                                </p>
+                              )}
+                              <p className={`font-semibold text-lg ${item.price !== item.adjustedPrice ? "text-green-600" : ""}`}>
+                                <IndianRupee className="inline h-4 w-4" />
+                                {item.adjustedPrice.toFixed(2)}
+                              </p>
+                            </div>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              if (item.type === 'service') {
+                                onRemoveService(item.id);
+                              } else {
+                                onRemovePackage(item.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {item.type === "package" && item.services && item.services.length > 0 && (
                         <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
                           {item.services.map(service => (
                             <div key={service.id} className="flex items-center justify-between py-1">
@@ -734,39 +765,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           ))}
                         </div>
                       )}
-
-                      {item.type === "service" && (
-                        <div className="flex justify-end">
-                          {item.price !== item.adjustedPrice && (
-                            <p className="font-medium text-lg line-through text-muted-foreground mr-2">
-                              <IndianRupee className="inline h-4 w-4" />
-                              {item.price.toFixed(2)}
-                            </p>
-                          )}
-                          <p className={`font-semibold text-lg ${item.price !== item.adjustedPrice ? "text-green-600" : ""}`}>
-                            <IndianRupee className="inline h-4 w-4" />
-                            {item.adjustedPrice.toFixed(2)}
-                          </p>
-                        </div>
-                      )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => {
-                              if (item.type === 'service') {
-                                onRemoveService(item.id);
-                              } else {
-                                onRemovePackage(item.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                     
                     </div>
                   )
                 ))}
@@ -866,7 +864,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               <h4 className="text-sm font-medium mb-2">Payment Method</h4>
               <Select 
                 value={paymentMethod} 
-                onValueChange={(value) => onPaymentMethodChange(value as 'cash' | 'online')} 
+                onValueChange={(value) => onPaymentMethodChange(value as PaymentMethod)} 
                 defaultValue="cash"
               >
                 <SelectTrigger>
@@ -898,12 +896,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 onClick={handleCheckout}
                 disabled={selectedItems.length === 0}
               >
-                { loadPayment ? <LoaderCircle
-                  className="-ms-1 me-2 animate-spin"
-                  size={16}
-                  strokeWidth={2}
-                  aria-hidden="true"
-                /> :  null}
+                {loadPayment ? (
+                  <LoaderCircle
+                    className="-ms-1 me-2 animate-spin"
+                    size={16}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                ) : null}
                 Complete Payment
               </Button>
               <Popover>
@@ -925,3 +925,5 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">No Discount</SelectItem>
+                          <SelectItem value="percentage">Percentage</SelectItem>
+                          <SelectItem value

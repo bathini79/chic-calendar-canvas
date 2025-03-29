@@ -1,3 +1,4 @@
+
 export type AppointmentStatus = 
   | 'pending' 
   | 'confirmed' 
@@ -22,9 +23,9 @@ export type Appointment = {
   notes: string | null;
   total_price: number;
   original_total_price?: number;
-  discount_type: 'none' | 'percentage' | 'fixed';
+  discount_type: DiscountType;
   discount_value: number;
-  payment_method: string;
+  payment_method: PaymentMethod;
   tax_amount: number;
   membership_discount: number;
   membership_id: string | null;
@@ -163,7 +164,7 @@ export type SummaryViewProps = {
     price: number;
     type: string;
   }>;
-  paymentMethod?: 'cash' | 'online' | 'card';
+  paymentMethod?: PaymentMethod;
   onAddAnother?: () => void;
   receiptNumber?: string;
   taxAmount?: number;
