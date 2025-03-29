@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -918,7 +919,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     <div className="flex gap-4">
                       <Select
                         value={discountType}
-                        onValueChange={onDiscountTypeChange}
+                        onValueChange={(value) => onDiscountTypeChange(value as DiscountType)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Discount type" />
@@ -926,4 +927,38 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                         <SelectContent>
                           <SelectItem value="none">No Discount</SelectItem>
                           <SelectItem value="percentage">Percentage</SelectItem>
-                          <SelectItem value
+                          <SelectItem value="fixed">Fixed Amount</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {discountType !== "none" && (
+                        <div className="flex-1">
+                          <Input
+                            type="number"
+                            value={discountValue}
+                            onChange={(e) => onDiscountValueChange(Number(e.target.value))}
+                            min="0"
+                            step={discountType === "percentage" ? "1" : "100"}
+                            placeholder={discountType === "percentage" ? "%" : "₹"}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <h3 className="font-semibold">Notes</h3>
+                    <Textarea
+                      value={notes}
+                      onChange={(e) => onNotesChange(e.target.value)}
+                      placeholder="Add notes about this appointment"
+                      className="min-h-20"
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
