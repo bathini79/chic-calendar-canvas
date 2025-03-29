@@ -63,7 +63,6 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     const offsetY = e.clientY - rect.top;
     let clickedTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
     clickedTime = Math.round(clickedTime * 4) / 4;
-
     // Call the setClickedCell function with the correct data
     setClickedCell({
       employeeId: empId,
@@ -211,7 +210,6 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
               minWidth: "150px",
               height: TOTAL_HOURS * PIXELS_PER_HOUR,
             }}
-            onClick={(e) => handleColumnClick(e, emp.id)}
           >
             {/* Time slot backgrounds with hover effect */}
             {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => {
@@ -227,6 +225,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
                   }}
                   onMouseEnter={() => setHoveredTimeSlot(`${emp.id}-${START_HOUR + idx/4}`)}
                   onMouseLeave={() => setHoveredTimeSlot(null)}
+                  onClick={(e) => handleColumnClick(e, emp.id)}
                 />
               );
             })}
