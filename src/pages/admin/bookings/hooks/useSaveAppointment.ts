@@ -83,6 +83,18 @@ const useSaveAppointment = ({
         discountValue
       );
 
+      // Get membership information from the customer if available
+      let membershipDiscount = 0;
+      let membershipId = null;
+      let membershipName = null;
+
+      // Check if customer has active membership
+      if (selectedCustomer.membership) {
+        membershipId = selectedCustomer.membership.membership_id;
+        membershipName = selectedCustomer.membership.name;
+        membershipDiscount = selectedCustomer.membership.discount_value || 0;
+      }
+
       // Create the appointment in the database
       const { data: appointment, error: appointmentError } = await supabase
         .from("appointments")
@@ -98,7 +110,15 @@ const useSaveAppointment = ({
           discount_value: discountValue,
           payment_method: paymentMethod,
           notes: notes,
-          location: locationId
+          location: locationId,
+          // Adding the membership fields to the appointment
+          membership_discount: membershipDiscount,
+          membership_id: membershipId,
+          membership_name: membershipName,
+          // Adding transaction type for proper categorization
+          transaction_type: 'sale',
+          // Setting original_total_price for potential refund calculations
+          original_total_price: totalPrice
         })
         .select()
         .single();

@@ -137,7 +137,6 @@ export const calculatePackagePrice = (
   return total;
 };
 
-// Get the price of a service within a package context
 export const getServicePriceInPackage = (
   serviceId: string,
   packageId: string | null,
@@ -208,7 +207,6 @@ export const calculatePackageDuration = (
   return duration;
 };
 
-// New function to calculate adjusted price after all discounts
 export const calculateAdjustedPrice = (
   originalPrice: number,
   totalPrice: number,
@@ -221,7 +219,6 @@ export const calculateAdjustedPrice = (
   return originalPrice * discountRatio;
 };
 
-// Calculate service prices adjusted for all discounts (membership, coupon, manual discount)
 export const getAdjustedServicePrices = (
   selectedServices: string[],
   selectedPackages: string[],

@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -68,6 +69,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [refundedBy, setRefundedBy] = React.useState('');
   const [employees, setEmployees] = React.useState<Array<{ id: string; name: string }>>([]);
   const [selectAll, setSelectAll] = React.useState(false);
+  const [locations, setLocations] = useState<{id: string; name: string}[]>([]);
   const { fetchAppointmentDetails, updateAppointmentStatus, processRefund } = useAppointmentActions();
   const { appointment } = useAppointmentDetails(appointmentId);
 
@@ -76,6 +78,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       loadAppointmentDetails();
     }
     fetchEmployees();
+    fetchLocations();
   }, [appointmentId]);
 
   const loadAppointmentDetails = async () => {
@@ -84,6 +87,20 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     const details = await fetchAppointmentDetails(appointmentId);
     if (details) {
       setTransactionDetails(details);
+    }
+  };
+
+  const fetchLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('is_active', true);
+
+      if (error) throw error;
+      setLocations(data || []);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
     }
   };
 
@@ -99,6 +116,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
+  };
+
+  const getLocationNameById = (locationId?: string | null) => {
+    if (!locationId) return 'Unknown Location';
+    const location = locations.find(loc => loc.id === locationId);
+    return location ? location.name : locationId;
   };
 
   const renderNewReceipt = () => {
@@ -379,6 +402,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           {allTransactions.map((transaction) => {
             const isRefund = transaction.transaction_type === 'refund';
             const groupedBookings = getGroupedBookings(transaction);
+            const locationName = getLocationNameById(transaction.location);
             
             return (
               <Card key={transaction.id} className={`bg-white h-full ${isRefund ? 'border-red-200' : ''}`}>
@@ -404,10 +428,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                         <Clock className="h-4 w-4" />
                         {format(new Date(transaction.created_at), 'EEE dd MMM yyyy, h:mm a')}
                       </div>
-                      {transaction.location && (
+                      {locationName && (
                         <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                           <MapPin className="h-4 w-4" />
-                          {transaction.location}
+                          {locationName}
                         </div>
                       )}
                     </div>
