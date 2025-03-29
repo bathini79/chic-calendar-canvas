@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -55,8 +54,6 @@ export default function AdminBookings() {
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  // Add a data version to force TimeSlots rerender
-  const [dataVersion, setDataVersion] = useState(0);
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -189,11 +186,11 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(false);
     setSelectedAppointment(null);
     
-    // Refetch appointments when closing the appointment form
-    refetchAppointments();
-    
-    // Increment data version to force TimeSlots component to rerender
-    setDataVersion(prev => prev + 1);
+    if (currentDate) {
+      queryClient.invalidateQueries({ 
+        queryKey: ['appointments', format(currentDate, 'yyyy-MM-dd'), selectedLocationId] 
+      });
+    }
   };
 
   const handleCellClick = (cell: { employeeId: string; time: number; x: number; y: number; date: Date }) => {
@@ -218,14 +215,6 @@ export default function AdminBookings() {
     setAppointmentTime(format(startDate, 'HH:mm'));
     
     setIsAddAppointmentOpen(true);
-  };
-
-  const handleAppointmentSaved = () => {
-    // Refetch appointments after an appointment is saved
-    refetchAppointments();
-    
-    // Increment data version to force TimeSlots component to rerender
-    setDataVersion(prev => prev + 1);
   };
 
   return (
@@ -280,7 +269,6 @@ export default function AdminBookings() {
           onNext={goNext}
         />
         <TimeSlots
-          key={`timeslots-${dataVersion}`} // Add key prop to force rerender
           employees={employees}
           formatTime={formatTime}
           TOTAL_HOURS={TOTAL_HOURS}
@@ -333,7 +321,9 @@ export default function AdminBookings() {
             employees={employees}
             existingAppointment={selectedAppointment}
             locationId={selectedLocationId}
-            onAppointmentSaved={handleAppointmentSaved}
+            onAppointmentSaved={() => {
+              refetchAppointments();
+            }}
           />
         )}
 
