@@ -48,7 +48,6 @@ export function CartSummary() {
 
   const taxRatesLoaded = useRef(false);
   const locationTaxSettingsLoaded = useRef(false);
-  const membershipCalculated = useRef(false);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -66,17 +65,19 @@ export function CartSummary() {
   const totalPrice = afterCouponSubtotal + taxAmount;
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
   
-  // Debug logging for membership state
+  // Debug logging for coupon state
   useEffect(() => {
-    console.log("CartSummary - Current membership state:", {
-      membershipDiscount,
-      activeMembership,
-      customerMemberships: customerMemberships.length
+    console.log("CartSummary - Current coupon state:", {
+      appliedCouponId,
+      couponsLoaded: coupons.length,
+      couponDiscount
     });
-  }, [membershipDiscount, activeMembership, customerMemberships.length]);
+  }, [appliedCouponId, coupons.length, couponDiscount]);
   
-  // Fetch customer memberships when the component loads (if we're in booking confirmation)
+  // Fetch customer memberships when the component loads (if we're not in booking confirmation)
   const fetchMemberships = useCallback(async () => {
+    if (isBookingConfirmation) return; // Skip if we're on booking confirmation page
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -85,26 +86,18 @@ export function CartSummary() {
     } catch (error) {
       console.error("Error fetching memberships:", error);
     }
-  }, [fetchCustomerMemberships]);
+  }, [fetchCustomerMemberships, isBookingConfirmation]);
 
   useEffect(() => {
-    if (isBookingConfirmation) {
-      // Only fetch if we haven't calculated membership discount yet
-      if (!membershipCalculated.current) {
-        fetchMemberships();
-      }
-    }
-  }, [fetchMemberships, isBookingConfirmation]);
+    fetchMemberships();
+  }, [fetchMemberships]);
 
   // Calculate membership discounts for cart items with protection against infinite loops
   useEffect(() => {
-    // Skip recalculation if data isn't available yet or if we're not on the booking confirmation page
+    // Skip recalculation if data isn't available yet
     if (!items || items.length === 0 || customerMemberships.length === 0) {
-      return;
-    }
-    
-    // Skip if we've already calculated the membership discount (prevents infinite loops)
-    if (membershipCalculated.current && membershipDiscount > 0) {
+      setMembershipDiscount(0);
+      setActiveMembership(null);
       return;
     }
     
@@ -145,13 +138,10 @@ export function CartSummary() {
     });
     
     console.log("Membership discount calculated:", totalMembershipDiscount);
-    if (totalMembershipDiscount > 0) {
-      setMembershipDiscount(totalMembershipDiscount);
-      setActiveMembership(bestMembership);
-      membershipCalculated.current = true;
-    }
+    setMembershipDiscount(totalMembershipDiscount);
+    setActiveMembership(bestMembership);
     
-  }, [items, customerMemberships, getApplicableMembershipDiscount, membershipDiscount]);
+  }, [items, customerMemberships, getApplicableMembershipDiscount]);
   
   // Load tax data only once or when location changes
   useEffect(() => {
@@ -174,7 +164,7 @@ export function CartSummary() {
     };
     
     loadTaxData();
-  }, [selectedLocation, fetchTaxRates, fetchLocationTaxSettings, setAppliedTaxId]);
+  }, [selectedLocation, fetchTaxRates, fetchLocationTaxSettings]);
 
   // Reset the locationTaxSettingsLoaded ref when location changes
   useEffect(() => {
@@ -183,11 +173,9 @@ export function CartSummary() {
 
   // Load coupons
   useEffect(() => {
-    if (!coupons.length) {
-      console.log("Fetching coupons in CartSummary");
-      fetchCoupons();
-    }
-  }, [fetchCoupons, coupons.length]);
+    console.log("Fetching coupons in CartSummary");
+    fetchCoupons();
+  }, [fetchCoupons]);
 
   // Calculate tax amount whenever appliedTaxId or subtotal changes
   useEffect(() => {

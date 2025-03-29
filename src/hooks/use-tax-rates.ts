@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -16,7 +16,6 @@ export function useTaxRates() {
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const fetchInProgress = useRef(false);
 
   const fetchTaxRates = useCallback(async () => {
     // If we've already loaded tax rates, don't fetch again
@@ -24,13 +23,6 @@ export function useTaxRates() {
       return taxRates;
     }
     
-    // Skip if a fetch is already in progress
-    if (fetchInProgress.current) {
-      console.log("Skipping tax rates fetch - already in progress");
-      return taxRates;
-    }
-    
-    fetchInProgress.current = true;
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -51,13 +43,12 @@ export function useTaxRates() {
       return [];
     } finally {
       setIsLoading(false);
-      fetchInProgress.current = false;
     }
   }, [taxRates, isInitialized]);
 
   // Load tax rates on first mount
   useEffect(() => {
-    if (!isInitialized && !fetchInProgress.current) {
+    if (!isInitialized) {
       fetchTaxRates();
     }
   }, [fetchTaxRates, isInitialized]);
