@@ -1,7 +1,8 @@
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, UseQueryResult } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, format } from 'date-fns';
+import { Appointment } from "../types";
 
 export function useAppointmentsByDate(date: Date, locationId?: string) {
   return useQuery({
@@ -39,5 +40,7 @@ export function useAppointmentsByDate(date: Date, locationId?: string) {
       
       return data || [];
     },
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+    refetchOnWindowFocus: true,
   });
 }

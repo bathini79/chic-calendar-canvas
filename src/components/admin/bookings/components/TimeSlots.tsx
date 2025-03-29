@@ -6,7 +6,7 @@ import {
   hourLabels,
 } from "@/pages/admin/bookings/utils/timeUtils";
 import { Flag } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Appointment, Booking, Employee } from "@/pages/admin/bookings/types";
 
 interface TimeSlotsProps {
@@ -56,6 +56,14 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
 }) => {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
   const [hoveredTimeSlot, setHoveredTimeSlot] = useState<string | null>(null);
+
+  // Add a data version key to force rerender when appointments change
+  const [dataVersion, setDataVersion] = useState(0);
+
+  // Update dataVersion when appointments change to force rerender
+  useEffect(() => {
+    setDataVersion(prev => prev + 1);
+  }, [appointments]);
 
   const handleColumnClick = (e: React.MouseEvent, empId: string) => {
     if (e.target !== e.currentTarget) return;
@@ -120,7 +128,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
         const duration = booking.service?.duration || booking.package?.duration || 60;
         const startTime = new Date(booking.start_time || appointment.start_time);
         const startHour = startTime.getHours() + startTime.getMinutes() / 60;
-        const cellKey = `${employeeId}-${timeSlotKey}-${index}`;
+        const cellKey = `${employeeId}-${timeSlotKey}-${index}-${dataVersion}`;
         const isHovered = hoveredCell === cellKey;
         const isTimeSlotHovered = hoveredTimeSlot === `${employeeId}-${Math.floor(startHour * 4) / 4}`;
 
@@ -134,7 +142,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
         
         return (
           <div
-            key={`${booking.id}-${index}`}
+            key={`${booking.id}-${index}-${dataVersion}`}
             className={`absolute rounded border ${statusColor} cursor-pointer z-10 overflow-hidden transition-colors ${isHovered ? 'ring-2 ring-primary' : ''} ${isTimeSlotHovered ? 'opacity-90 shadow-md' : ''}`}
             style={{
               top: `${topPositionPx + topOffset}px`,
@@ -204,7 +212,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
 
         {employees.map((emp: Employee) => (
           <div
-            key={emp.id}
+            key={`${emp.id}-${dataVersion}`}
             className="flex-1 border-r relative"
             style={{
               minWidth: "150px",
@@ -218,7 +226,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
               return (
                 <div
                   key={idx}
-                  className={`absolute left-0 right-0 ${idx % 4 === 0 ? 'border-b' : 'border-b border-gray-100'} transition-colors duration-150 ${isHovered ? 'bg-blue-200' : ''}`}
+                  className={`absolute left-0 right-0 ${idx % 4 === 0 ? 'border-b' : 'border-b border-gray-100'} transition-colors duration-150 ${isHovered ? 'bg-blue-100' : ''}`}
                   style={{ 
                     top: idx * 15, 
                     height: '15px' 

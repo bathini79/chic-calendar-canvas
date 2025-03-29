@@ -21,6 +21,7 @@ interface AppointmentManagerProps {
   employees: any[];
   existingAppointment?: Appointment | null;
   locationId?: string;
+  onAppointmentSaved?: () => void;
 }
 export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   isOpen,
@@ -29,7 +30,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   selectedTime,
   employees,
   existingAppointment,
-  locationId
+  locationId,
+  onAppointmentSaved
 }) => {
   const [currentScreen, setCurrentScreen] = useState(
     SCREEN.SERVICE_SELECTION
@@ -272,12 +274,20 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   const handlePaymentComplete = (appointmentId?: string) => {  
     setNewAppointmentId(appointmentId || null);
     setCurrentScreen(SCREEN.SUMMARY);
+    
+    if (onAppointmentSaved) {
+      onAppointmentSaved();
+    }
+    
     resetState();
   };
 
   const onHandleSaveAppointment = async() => {
     const appointmentId = await handleSaveAppointment();
     if(appointmentId){
+      if (onAppointmentSaved) {
+        onAppointmentSaved();
+      }
       onClose();
       resetState();
     }

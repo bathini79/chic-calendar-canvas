@@ -46,6 +46,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -525,8 +526,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     adjustedPrices
   ]);
 
-  const handlePayment = async () => {
+  const queryClient = useQueryClient();
+
+  const handleCheckout = async () => {
     try {
+      setIsProcessing(true);
+
       if (!selectedCustomer) {
         toast.error("Please select a customer");
         return;
@@ -552,9 +557,17 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
 
       toast.success("Payment completed successfully");
       onPaymentComplete(savedAppointmentId);
+
+      // Invalidate query cache to trigger TimeSlots rerender with latest data
+      if (selectedDate) {
+        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+        queryClient.invalidateQueries({ queryKey: ['appointments', formattedDate, locationId] });
+      }
     } catch (error: any) {
-      console.error("Error completing payment:", error);
-      toast.error(error.message || "Failed to complete payment");
+      console.error("Error during checkout:", error);
+      toast.error(`Error: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -825,7 +838,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               <Button 
                 className="flex-1" 
                 size="lg"
-                onClick={handlePayment}
+                onClick={handleCheckout}
                 disabled={selectedItems.length === 0}
               >
                 Complete Payment

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -20,7 +19,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Appointment, Employee } from "./bookings/types";
 import {
   DropdownMenu,
@@ -39,6 +38,7 @@ const initialStats = [
 ];
 
 export default function AdminBookings() {
+  const queryClient = useQueryClient();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stats] = useState(initialStats);
   const [clickedCell, setClickedCell] = useState<{
@@ -57,7 +57,8 @@ export default function AdminBookings() {
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
-  const { data: appointmentsData = [] } = useAppointmentsByDate(currentDate, selectedLocationId);
+    
+  const { data: appointmentsData = [], refetch: refetchAppointments } = useAppointmentsByDate(currentDate, selectedLocationId);
   const appointments = appointmentsData as unknown as Appointment[];
   
   const { data: locations = [] } = useQuery({
@@ -74,7 +75,6 @@ export default function AdminBookings() {
     },
   });
 
-  // Query to get business details
   const { data: businessDetails } = useQuery({
     queryKey: ['businessDetails'],
     queryFn: async () => {
@@ -125,7 +125,6 @@ export default function AdminBookings() {
           is_active: true
         }));
 
-        // Add default employee for unassigned bookings
         const defaultEmployeeName = `${businessDetails?.name || 'Salon'} Employee`;
         const defaultEmployee: Employee = {
           id: 'unassigned',
@@ -186,12 +185,17 @@ export default function AdminBookings() {
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
     setSelectedAppointment(null);
+    
+    if (currentDate) {
+      queryClient.invalidateQueries({ 
+        queryKey: ['appointments', format(currentDate, 'yyyy-MM-dd'), selectedLocationId] 
+      });
+    }
   };
 
   const handleCellClick = (cell: { employeeId: string; time: number; x: number; y: number; date: Date }) => {
     setClickedCell(cell);
     
-    // Automatically open the add appointment dialog
     const hours = Math.floor(cell.time);
     const minutes = Math.round((cell.time - hours) * 60);
     
@@ -201,6 +205,11 @@ export default function AdminBookings() {
     
     setAppointmentTime(timeString);
     setAppointmentDate(cell.date || currentDate);
+    
+    setTimeout(() => {
+      setIsAddAppointmentOpen(true);
+      setClickedCell(null);
+    }, 10);
   };
 
   const handleCheckoutFromAppointment = (appointment: Appointment) => {
@@ -317,6 +326,9 @@ export default function AdminBookings() {
             employees={employees}
             existingAppointment={selectedAppointment}
             locationId={selectedLocationId}
+            onAppointmentSaved={() => {
+              refetchAppointments();
+            }}
           />
         )}
 

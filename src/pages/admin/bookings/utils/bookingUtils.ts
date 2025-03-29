@@ -98,6 +98,13 @@ export const getAppointmentStatusColor = (status: string) => {
       return "bg-green-100 hover:bg-green-200 border-green-300";
     case "canceled":
       return "bg-red-100 hover:bg-red-200 border-red-300";
+    case "noshow":
+    case "no-show":
+      return "bg-red-100 hover:bg-red-200 border-red-300 text-red-700";
+    case "completed":
+      return "bg-blue-100 hover:bg-blue-200 border-blue-300";
+    case "inprogress":
+      return "bg-yellow-100 hover:bg-yellow-200 border-yellow-300";
     default:
       return "bg-purple-100 hover:bg-purple-200 border-purple-300";
   }
@@ -290,4 +297,24 @@ export const getAdjustedServicePrices = (
   });
   
   return result;
+};
+
+export const getPriceWithDiscount = (
+  originalPrice: number,
+  discountType: 'none' | 'percentage' | 'fixed',
+  discountValue: number
+): number => {
+  if (discountType === 'none' || !discountValue) {
+    return originalPrice;
+  }
+  
+  if (discountType === 'percentage') {
+    return originalPrice * (1 - (discountValue / 100));
+  }
+  
+  if (discountType === 'fixed') {
+    return Math.max(0, originalPrice - discountValue);
+  }
+  
+  return originalPrice;
 };
