@@ -31,11 +31,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   employees,
   existingAppointment,
   locationId,
-  onAppointmentSaved
+  onAppointmentSaved,
 }) => {
-  const [currentScreen, setCurrentScreen] = useState(
-    SCREEN.SERVICE_SELECTION
-  );
+  const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
 
   const { data: services } = useActiveServices(locationId);
@@ -72,7 +70,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     if (selectedDate) {
       setSelectedDate(selectedDate);
     }
-    
+
     if (selectedTime) {
       setSelectedTime(selectedTime);
     }
@@ -90,7 +88,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     const customizedServicesMap: Record<string, string[]> = {};
 
     const packageIdsSet = new Set<string>();
-    appointment.bookings.forEach(booking => {
+    appointment.bookings.forEach((booking) => {
       if (booking.package_id) {
         packageIdsSet.add(booking.package_id);
         if (booking.employee_id) {
@@ -100,29 +98,31 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     });
 
     const packageIds = Array.from(packageIdsSet);
-    packageIds.forEach(pkgId => {
+    packageIds.forEach((pkgId) => {
       packages.push(pkgId);
     });
 
-    appointment.bookings.forEach(booking => {
+    appointment.bookings.forEach((booking) => {
       if (booking.service_id) {
         if (booking.package_id) {
           const basePackage = packageIds.includes(booking.package_id);
           if (basePackage) {
-            const pkgDetails = appointment.bookings.find(b => 
-              b.package && b.package.id === booking.package_id
+            const pkgDetails = appointment.bookings.find(
+              (b) => b.package && b.package.id === booking.package_id
             )?.package;
 
             if (pkgDetails) {
               const isBaseService = pkgDetails?.package_services?.some(
-                ps => ps.service.id === booking.service_id
+                (ps) => ps.service.id === booking.service_id
               );
 
               if (!isBaseService) {
                 if (!customizedServicesMap[booking.package_id]) {
                   customizedServicesMap[booking.package_id] = [];
                 }
-                customizedServicesMap[booking.package_id].push(booking.service_id);
+                customizedServicesMap[booking.package_id].push(
+                  booking.service_id
+                );
               }
             }
           }
@@ -144,21 +144,22 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setSelectedPackages(packages);
     setSelectedStylists(stylists);
     setCustomizedServices(customizedServicesMap);
-    setPaymentMethod(appointment.payment_method as 'cash' | 'online' || 'cash');
-    setDiscountType(appointment.discount_type as 'none' | 'percentage' | 'fixed' || 'none');
+    setPaymentMethod(
+      (appointment.payment_method as "cash" | "online") || "cash"
+    );
+    setDiscountType(
+      (appointment.discount_type as "none" | "percentage" | "fixed") || "none"
+    );
     setDiscountValue(appointment.discount_value || 0);
-    setAppointmentNotes(appointment.notes || '');
+    setAppointmentNotes(appointment.notes || "");
     setSelectedCustomer(appointment.customer || null);
-    
+
     const startDate = new Date(appointment.start_time);
     setSelectedDate(startDate);
-    setSelectedTime(format(startDate, 'HH:mm'));
+    setSelectedTime(format(startDate, "HH:mm"));
   };
 
-  const calculateTotalDuration = (
-    services: any[],
-    packages: any[]
-  ): number => {
+  const calculateTotalDuration = (services: any[], packages: any[]): number => {
     return getTotalDuration(
       selectedServices,
       selectedPackages,
@@ -200,7 +201,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     notes: appointmentNotes,
     customizedServices,
     currentScreen,
-    locationId
+    locationId,
   });
 
   const handleProceedToCheckout = async () => {
@@ -222,7 +223,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         : [...prev, serviceId]
     );
   };
-  
+
   const handleCustomServiceToggle = (packageId: string, serviceId: string) => {
     const pkg = packages?.find((p) => p.id === packageId);
     if (!pkg) return;
@@ -237,7 +238,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       };
     });
   };
-  
+
   const handlePackageSelect = (packageId: string) => {
     setSelectedPackages((prev) =>
       prev.includes(packageId)
@@ -254,14 +255,14 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   const handleRemoveService = (serviceId: string) => {
-    setSelectedServices(prev => prev.filter(id => id !== serviceId));
+    setSelectedServices((prev) => prev.filter((id) => id !== serviceId));
     const updatedStylists = { ...selectedStylists };
     delete updatedStylists[serviceId];
     setSelectedStylists(updatedStylists);
   };
 
   const handleRemovePackage = (packageId: string) => {
-    setSelectedPackages(prev => prev.filter(id => id !== packageId));
+    setSelectedPackages((prev) => prev.filter((id) => id !== packageId));
     const updatedStylists = { ...selectedStylists };
     delete updatedStylists[packageId];
     setSelectedStylists(updatedStylists);
@@ -271,20 +272,20 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
-  const handlePaymentComplete = (appointmentId?: string) => {  
+  const handlePaymentComplete = (appointmentId?: string) => {
     setNewAppointmentId(appointmentId || null);
     setCurrentScreen(SCREEN.SUMMARY);
-    
+
     if (onAppointmentSaved) {
       onAppointmentSaved();
     }
-    
+
     resetState();
   };
 
-  const onHandleSaveAppointment = async() => {
+  const onHandleSaveAppointment = async () => {
     const appointmentId = await handleSaveAppointment();
-    if(appointmentId){
+    if (appointmentId) {
       if (onAppointmentSaved) {
         onAppointmentSaved();
       }
@@ -300,25 +301,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       }`}
     >
       <div className="flex flex-col h-full">
-        <div className="p-6 border-b flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">
-              {existingAppointment ? "Edit Appointment" : "New Appointment"}
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-          </div>
-          {stateSelectedDate && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {format(stateSelectedDate, "MMMM d, yyyy")} at {stateSelectedTime}
-            </p>
-          )}
-        </div>
-
         <div className="flex flex-1 min-h-0">
           <div className="w-[30%] border-r">
             <SelectCustomer
@@ -329,40 +311,68 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
           </div>
 
           <div className="w-[70%] flex flex-col h-full">
-            {currentScreen === SCREEN.SERVICE_SELECTION && (
-              <div className="flex flex-col h-full">
-                <div className="p-6 flex-shrink-0">
-                  <h3 className="text-lg font-semibold">Select Services</h3>
-                </div>
+            <div className="p-6 border-b flex-shrink-0">
+              <div className="flex items-center justify-between">
+              <div className="flex items-start flex-col">
+  {/* Date Section */}
+  {stateSelectedDate && (
+    <div className="text-xl font-bold flex items-center gap-1">
+      {format(stateSelectedDate, "EEE d MMM")} {/* Example: Mon 31 Mar */}
+    </div>
+  )}
 
-                <div className="flex-1 overflow-y-auto px-6">
-                  <ServiceSelector
-                    onServiceSelect={handleServiceSelect}
-                    onPackageSelect={handlePackageSelect}
-                    onStylistSelect={handleStylistSelect}
-                    selectedServices={selectedServices}
-                    selectedPackages={selectedPackages}
-                    selectedStylists={selectedStylists}
-                    stylists={employees}
-                    onCustomPackage={handleCustomServiceToggle}
-                    customizedServices={customizedServices}
-                    locationId={locationId}
-                  />
-                </div>
+  {/* Time and Repeat Info */}
+  <p className="text-sm text-muted-foreground">
+    {stateSelectedTime} 
+  </p>
+</div>
 
-                <div className="p-6 border-t mt-auto flex justify-end gap-4">
-                  <Button variant="outline" onClick={onHandleSaveAppointment}>
-                    Save Appointment
-                  </Button>
-                  <Button
-                    className="bg-black text-white"
-                    onClick={handleProceedToCheckout}
-                  >
-                    Checkout
-                  </Button>
-                </div>
+
+                {/* Close Button */}
+                <button
+                  onClick={onClose}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
               </div>
-            )}
+            </div>
+
+            {/* Enclosing the service selection properly */}
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 flex-shrink-0">
+                <h3 className="text-lg font-semibold">Select Services</h3>
+              </div>
+
+              {/* Ensuring scroll works correctly without affecting footer */}
+              <div className="flex-1 overflow-y-auto px-6 min-h-0">
+                <ServiceSelector
+                  onServiceSelect={handleServiceSelect}
+                  onPackageSelect={handlePackageSelect}
+                  onStylistSelect={handleStylistSelect}
+                  selectedServices={selectedServices}
+                  selectedPackages={selectedPackages}
+                  selectedStylists={selectedStylists}
+                  stylists={employees}
+                  onCustomPackage={handleCustomServiceToggle}
+                  customizedServices={customizedServices}
+                  locationId={locationId}
+                />
+              </div>
+
+              {/* Ensuring footer stays visible */}
+              <div className="p-6 border-t flex-shrink-0 flex justify-end gap-4 bg-white">
+                <Button variant="outline" onClick={onHandleSaveAppointment}>
+                  Save Appointment
+                </Button>
+                <Button
+                  className="bg-black text-white"
+                  onClick={handleProceedToCheckout}
+                >
+                  Checkout
+                </Button>
+              </div>
+            </div>
 
             {currentScreen === SCREEN.CHECKOUT && (
               <CheckoutSection
@@ -382,7 +392,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                 onNotesChange={setAppointmentNotes}
                 onPaymentComplete={handlePaymentComplete}
                 selectedStylists={selectedStylists}
-                selectedTimeSlots={{ [newAppointmentId || '']: stateSelectedTime }}
+                selectedTimeSlots={{
+                  [newAppointmentId || ""]: stateSelectedTime,
+                }}
                 onSaveAppointment={handleSaveAppointment}
                 onRemoveService={handleRemoveService}
                 onRemovePackage={handleRemovePackage}
@@ -398,9 +410,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                 <h3 className="text-xl font-semibold mb-6">
                   Appointment Summary
                 </h3>
-                <SummaryView
-                  appointmentId={newAppointmentId}
-                />
+                <SummaryView appointmentId={newAppointmentId} />
                 <div className="mt-6 flex justify-end">
                   <Button
                     onClick={() => {
