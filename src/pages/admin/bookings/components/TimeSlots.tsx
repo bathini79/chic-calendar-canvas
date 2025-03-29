@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { format } from "date-fns";
 import { Appointment } from "../../bookings/types";
 
@@ -34,7 +34,7 @@ export default function TimeSlots({
   setSelectedAppointment,
   setClickedCell,
 }: TimeSlotsProps) {
-  const [hoveredTimeSlot, setHoveredTimeSlot] = React.useState<string | null>(null);
+  const [hoveredTimeSlot, setHoveredTimeSlot] = useState<string | null>(null);
 
   const handleColumnClick = (employeeId: string, time: number, x: number, y: number) => {
     const cellDate = new Date(currentDate);
