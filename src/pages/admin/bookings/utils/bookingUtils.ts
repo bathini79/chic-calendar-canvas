@@ -103,6 +103,20 @@ export const getAppointmentStatusColor = (status: string) => {
   }
 };
 
+export const getPriceWithDiscount = (
+  price: number,
+  discountType: string,
+  discountValue: number
+) => {
+  if (discountType === 'percentage') {
+    return price * (1 - (discountValue / 100));
+  }
+  if (discountType === 'fixed') {
+    return Math.max(0, price - discountValue);
+  }
+  return price; // For 'none' or any other type
+};
+
 export const calculatePackagePrice = (
   pkg: Package,
   customizedServices: string[],
@@ -130,7 +144,6 @@ export const calculatePackagePrice = (
   return total;
 };
 
-// Get the price of a service within a package context
 export const getServicePriceInPackage = (
   serviceId: string,
   packageId: string | null,
@@ -201,7 +214,6 @@ export const calculatePackageDuration = (
   return duration;
 };
 
-// New function to calculate adjusted price after all discounts
 export const calculateAdjustedPrice = (
   originalPrice: number,
   totalPrice: number,
@@ -214,7 +226,6 @@ export const calculateAdjustedPrice = (
   return originalPrice * discountRatio;
 };
 
-// Calculate service prices adjusted for all discounts (membership, coupon, manual discount)
 export const getAdjustedServicePrices = (
   selectedServices: string[],
   selectedPackages: string[],

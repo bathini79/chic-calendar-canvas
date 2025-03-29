@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -273,7 +272,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   const handlePaymentComplete = (appointmentId?: string) => {  
-    // Invalidate appointments query to force refresh of TimeSlots
     if (stateSelectedDate) {
       const dateString = format(stateSelectedDate, 'yyyy-MM-dd');
       queryClient.invalidateQueries({
@@ -289,7 +287,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   const onHandleSaveAppointment = async() => {
     const appointmentId = await handleSaveAppointment();
     if(appointmentId){
-      // Invalidate appointments query to force refresh of TimeSlots
       if (stateSelectedDate) {
         const dateString = format(stateSelectedDate, 'yyyy-MM-dd');
         queryClient.invalidateQueries({
@@ -385,9 +382,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                 discountValue={discountValue}
                 paymentMethod={paymentMethod}
                 notes={appointmentNotes}
-                onDiscountTypeChange={setDiscountType}
+                onDiscountTypeChange={(type) => setDiscountType(type as 'none' | 'percentage' | 'fixed')}
                 onDiscountValueChange={setDiscountValue}
-                onPaymentMethodChange={setPaymentMethod}
+                onPaymentMethodChange={(method) => setPaymentMethod(method as 'cash' | 'online')}
                 onNotesChange={setAppointmentNotes}
                 onPaymentComplete={handlePaymentComplete}
                 selectedStylists={selectedStylists}
