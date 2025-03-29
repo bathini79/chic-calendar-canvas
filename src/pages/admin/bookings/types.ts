@@ -1,16 +1,17 @@
-
 export type AppointmentStatus = 
   | 'pending' 
   | 'confirmed' 
   | 'canceled' 
   | 'completed' 
-  | 'no-show' 
   | 'noshow' 
   | 'inprogress'
   | 'voided'
   | 'refunded'
   | 'partially_refunded'
   | 'booked';
+
+export type DiscountType = 'none' | 'percentage' | 'fixed';
+export type PaymentMethod = 'cash' | 'online' | 'card' | 'upi';
 
 export type Appointment = {
   id: string;
@@ -35,11 +36,14 @@ export type Appointment = {
   transaction_type?: string;
   original_appointment_id?: string;
   coupon_id?: string | null;
+  coupon_name?: string | null;
+  coupon_amount?: number | null;
   refund_reason?: string;
   refund_notes?: string;
   refunded_by?: string;
   customer: any;
   bookings: any[];
+  tax?: any;
 };
 
 export type Service = {

@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -48,8 +49,9 @@ export const useAppointmentActions = () => {
       // Cast the data to match our expected types
       const typedAppointment = {
         ...appointment,
-        discount_type: appointment.discount_type as Appointment['discount_type']
-      } as Appointment;
+        discount_type: appointment.discount_type as Appointment['discount_type'],
+        location_id: appointment.location,
+      } as unknown as Appointment;
 
       // If this is a refund, get the original sale
       if (typedAppointment.transaction_type === 'refund') {
@@ -73,8 +75,9 @@ export const useAppointmentActions = () => {
         // Cast the original sale data
         const typedOriginalSale = {
           ...originalSale,
-          discount_type: originalSale.discount_type as Appointment['discount_type']
-        } as Appointment;
+          discount_type: originalSale.discount_type as Appointment['discount_type'],
+          location_id: originalSale.location,
+        } as unknown as Appointment;
 
         // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
@@ -97,8 +100,9 @@ export const useAppointmentActions = () => {
         // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
-          discount_type: refund.discount_type as Appointment['discount_type']
-        })) as Appointment[];
+          discount_type: refund.discount_type as Appointment['discount_type'],
+          location_id: refund.location,
+        })) as unknown as Appointment[];
 
         // Create TransactionDetails with all required properties
         return {
@@ -106,8 +110,7 @@ export const useAppointmentActions = () => {
           amount: typedOriginalSale.total_price,
           status: typedOriginalSale.status,
           payment_method: typedOriginalSale.payment_method,
-          created_at: typedOriginalSale.created_at,
-          tax: appointment.tax,
+          created_at: typedOriginalSale.created_at || '',
           originalSale: typedOriginalSale,
           refunds: typedRefunds || []
         };
@@ -133,8 +136,9 @@ export const useAppointmentActions = () => {
         // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
-          discount_type: refund.discount_type as Appointment['discount_type']
-        })) as Appointment[];
+          discount_type: refund.discount_type as Appointment['discount_type'],
+          location_id: refund.location,
+        })) as unknown as Appointment[];
 
         // Create TransactionDetails with all required properties
         return {
@@ -142,8 +146,7 @@ export const useAppointmentActions = () => {
           amount: typedAppointment.total_price,
           status: typedAppointment.status,
           payment_method: typedAppointment.payment_method,
-          created_at: typedAppointment.created_at,
-          tax: appointment.tax,
+          created_at: typedAppointment.created_at || '',
           originalSale: typedAppointment,
           refunds: typedRefunds || []
         };
@@ -202,7 +205,8 @@ export const useAppointmentActions = () => {
           refund_notes: refundData.notes,
           total_price: 0, // Will be updated after processing bookings
           start_time: originalAppointment.start_time,
-          end_time: originalAppointment.end_time
+          end_time: originalAppointment.end_time,
+          location: originalAppointment.location
         })
         .select()
         .single();
@@ -283,11 +287,14 @@ export const useAppointmentActions = () => {
     try {
       setIsLoading(true);
 
+      // Convert the "no-show" to "noshow" for database compatibility
+      const dbStatus = status === "no-show" ? "noshow" : status;
+
       // First update the appointment status
       const { error: appointmentError } = await supabase
         .from('appointments')
         .update({ 
-          status,
+          status: dbStatus,
           updated_at: new Date().toISOString()
         })
         .eq('id', appointmentId);
@@ -298,7 +305,7 @@ export const useAppointmentActions = () => {
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({ 
-          status,
+          status: dbStatus,
           updated_at: new Date().toISOString()
         })
         .in('id', bookingIds);
@@ -307,10 +314,11 @@ export const useAppointmentActions = () => {
 
       let message = '';
       switch (status) {
-        case 'canceled':
+        case "canceled":
           message = 'Appointment canceled successfully';
           break;
-        case 'noshow':
+        case "noshow":
+        case "no-show":
           message = 'Appointment marked as no-show';
           break;
         default:

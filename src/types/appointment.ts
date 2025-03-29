@@ -28,6 +28,8 @@ export interface Appointment {
   created_at?: string;
   updated_at?: string;
   coupon_id?: string | null;
+  coupon_name?: string | null;
+  coupon_amount?: number | null;
   original_appointment_id?: string | null;
   refunded_by?: string | null;
   original_total_price?: number | null;

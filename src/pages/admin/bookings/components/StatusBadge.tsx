@@ -1,112 +1,60 @@
 
-import React from 'react';
+import React from "react";
 import { Badge } from "@/components/ui/badge";
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Ban, 
-  RotateCcw,
-  CalendarCheck
-} from "lucide-react";
-import type { AppointmentStatus } from '@/types/appointment';
+import { AppointmentStatus } from "../types";
 
 interface StatusBadgeProps {
-  status: AppointmentStatus;
-  className?: string;
+  status: AppointmentStatus | string;
+  size?: "default" | "sm" | "lg";
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) => {
-  const getStatusConfig = () => {
-    switch (status) {
-      // Completed statuses - green
-      case 'completed':
-        return {
-          label: 'Completed',
-          icon: <CheckCircle className="h-3 w-3 mr-1" />,
-          variant: 'success' as const
-        };
-      
-      // Active/Positive statuses - primary color (blue/purple)
-      case 'confirmed':
-        return {
-          label: 'Confirmed',
-          icon: <CalendarCheck className="h-3 w-3 mr-1" />,
-          variant: 'info' as const
-        };
-      case 'booked':
-        return {
-          label: 'Booked',
-          icon: <CalendarCheck className="h-3 w-3 mr-1" />,
-          variant: 'info2' as const
-        };
-      
-      // In-progress statuses - amber/warning
-      case 'inprogress':
-      case 'pending':
-        return {
-          label: status === 'inprogress' ? 'In Progress' : 'Pending',
-          icon: <Clock className="h-3 w-3 mr-1" />,
-          variant: 'warning' as const
-        };
-      
-      // Canceled statuses - red
-      case 'canceled':
-        return {
-          label: 'Canceled',
-          icon: <XCircle className="h-3 w-3 mr-1" />,
-          variant: 'destructive' as const
-        };
-      
-      // Administrative cancellations - red with different icon
-      case 'voided':
-        return {
-          label: 'Voided',
-          icon: <Ban className="h-3 w-3 mr-1" />,
-          variant: 'destructive' as const
-        };
-      
-      // Refund statuses - purple/info
-      case 'refunded':
-        return {
-          label: 'Refunded',
-          icon: <RotateCcw className="h-3 w-3 mr-1" />,
-          variant: 'info' as const
-        };
-      case 'partially_refunded':
-        return {
-          label: 'Partially Refunded',
-          icon: <RotateCcw className="h-3 w-3 mr-1" />,
-          variant: 'info' as const
-        };
-      
-      // No-show cases - gray/outline
-      case 'noshow':
-        return {
-          label: 'No Show',
-          icon: <Ban className="h-3 w-3 mr-1" />,
-          variant: 'outline' as const
-        };
-      
-      // Default case
-      default:
-        return {
-          label: status || 'Pending',
-          icon: <Clock className="h-3 w-3 mr-1" />,
-          variant: 'outline' as const
-        };
-    }
-  };
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = "default" }) => {
+  // Get variant and text based on status
+  let variant: "default" | "destructive" | "outline" | "secondary" | "success";
+  let text: string;
 
-  const { label, icon, variant } = getStatusConfig();
+  switch (status) {
+    case "pending":
+      variant = "secondary";
+      text = "Pending";
+      break;
+    case "confirmed":
+      variant = "default";
+      text = "Confirmed";
+      break;
+    case "completed":
+      variant = "success";
+      text = "Completed";
+      break;
+    case "canceled":
+      variant = "destructive";
+      text = "Canceled";
+      break;
+    case "noshow":
+    case "no-show":
+      variant = "destructive";
+      text = "No-show";
+      break;
+    case "inprogress":
+      variant = "secondary";
+      text = "In Progress";
+      break;
+    case "refunded":
+      variant = "outline";
+      text = "Refunded";
+      break;
+    case "partially_refunded":
+      variant = "outline";
+      text = "Partially Refunded";
+      break;
+    case "voided":
+      variant = "outline";
+      text = "Voided";
+      break;
+    default:
+      variant = "outline";
+      text = status.charAt(0).toUpperCase() + status.slice(1);
+  }
 
-  return (
-    <Badge
-      variant={variant}
-      className={`flex items-center text-xs ${className}`}
-    >
-      {icon}
-      {label}
-    </Badge>
-  );
+  return <Badge variant={variant} size={size}>{text}</Badge>;
 };

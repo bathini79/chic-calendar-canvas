@@ -99,22 +99,20 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
               <div className="flex items-center gap-3 w-full">
                 <Avatar className="bg-primary/10">
                   <AvatarFallback>
-                    {customer.full_name?.charAt(0).toUpperCase() || '?'}
+                    {customer.full_name?.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <div className="font-medium flex items-center gap-2">
+                  <p className="font-medium flex items-center gap-1">
                     {customer.full_name}
                     {customersWithMemberships.has(customer.id) && (
-                      <Badge variant="info" className="flex items-center gap-1 ml-1">
+                      <Badge variant="secondary" className="flex items-center gap-1 ml-1">
                         <Award className="h-3 w-3" />
                         <span>Member</span>
                       </Badge>
                     )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {customer.email}
-                  </div>
+                  </p>
+                  <p className="text-sm text-muted-foreground">{customer.email}</p>
                 </div>
               </div>
             </Button>
