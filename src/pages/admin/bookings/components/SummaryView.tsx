@@ -512,9 +512,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                     </div>
                     {!isRefund && (
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" className="bg-black text-white" onClick={handleRebook}>
-                          Rebook
-                        </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -529,19 +526,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                             <DropdownMenuItem onSelect={() => setShowEditSaleDialog(true)}>
                               <PencilLine className="mr-2 h-4 w-4" />
                               Edit sale details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setShowAddNoteDialog(true)}>
-                              <FileText className="mr-2 h-4 w-4" />
-                              Add a note
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <Mail className="mr-2 h-4 w-4" />
-                              Email
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Printer className="mr-2 h-4 w-4" />
-                              Print
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Download className="mr-2 h-4 w-4" />
