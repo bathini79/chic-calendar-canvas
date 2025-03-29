@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { isAfter, isBefore, parseISO } from "date-fns";
@@ -30,15 +30,23 @@ export type CustomerMembership = {
 export function useCustomerMemberships() {
   const [customerMemberships, setCustomerMemberships] = useState<CustomerMembership[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastFetchedUserId, setLastFetchedUserId] = useState<string | null>(null);
 
-  const fetchCustomerMemberships = async (customerId: string) => {
+  const fetchCustomerMemberships = useCallback(async (customerId: string) => {
     if (!customerId) {
       setCustomerMemberships([]);
       return [];
     }
     
+    // Skip fetch if we already fetched for this user
+    if (lastFetchedUserId === customerId && customerMemberships.length > 0) {
+      console.log("Skipping membership fetch - already loaded for user:", customerId);
+      return customerMemberships;
+    }
+    
     setIsLoading(true);
     try {
+      console.log("Fetching memberships for customer:", customerId);
       const { data, error } = await supabase
         .from('customer_memberships')
         .select(`
@@ -61,7 +69,9 @@ export function useCustomerMemberships() {
         return isBefore(now, endDate);
       }) || [];
       
+      console.log("Fetched valid memberships:", validMemberships.length);
       setCustomerMemberships(validMemberships as CustomerMembership[]);
+      setLastFetchedUserId(customerId);
       return validMemberships as CustomerMembership[];
     } catch (error: any) {
       console.error("Error fetching customer memberships:", error);
@@ -70,17 +80,18 @@ export function useCustomerMemberships() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [customerMemberships, lastFetchedUserId]);
 
-  const getApplicableMembershipDiscount = (
+  const getApplicableMembershipDiscount = useCallback((
     serviceId: string | null, 
     packageId: string | null, 
     amount: number
   ) => {
     if (!serviceId && !packageId) return null;
+    if (!customerMemberships || customerMemberships.length === 0) return null;
     
     return getMembershipDiscount(serviceId, packageId, amount, customerMemberships);
-  };
+  }, [customerMemberships]);
 
   return {
     customerMemberships,

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { useNavigate, useLocation } from "react-router-dom";
 import { format, addMinutes } from "date-fns";
 import { formatPrice } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useCoupons, Coupon } from "@/hooks/use-coupons";
@@ -72,67 +72,73 @@ export function CartSummary() {
   }, [appliedCouponId, coupons.length, couponDiscount]);
   
   // Fetch customer memberships when the component loads (if we're not in booking confirmation)
-  useEffect(() => {
-    const loadMemberships = async () => {
-      if (isBookingConfirmation) return; // Skip if we're on booking confirmation page
-      
+  const fetchMemberships = useCallback(async () => {
+    if (isBookingConfirmation) return; // Skip if we're on booking confirmation page
+    
+    try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         await fetchCustomerMemberships(session.user.id);
       }
-    };
-    
-    loadMemberships();
+    } catch (error) {
+      console.error("Error fetching memberships:", error);
+    }
   }, [fetchCustomerMemberships, isBookingConfirmation]);
 
-  // Calculate membership discounts for cart items
   useEffect(() => {
-    if (isBookingConfirmation) return; // Skip if we're on booking confirmation page
-    
-    if (items && items.length > 0 && customerMemberships.length > 0) {
-      let totalMembershipDiscount = 0;
-      let bestMembership = null;
-      
-      // Process each cart item to find applicable membership discounts
-      items.forEach(item => {
-        if (item.type === 'service' && item.service_id) {
-          const servicePrice = item.selling_price || item.service?.selling_price || 0;
-          const discountInfo = getApplicableMembershipDiscount(item.service_id, null, servicePrice);
-          
-          if (discountInfo && discountInfo.calculatedDiscount > 0) {
-            totalMembershipDiscount += discountInfo.calculatedDiscount;
-            if (!bestMembership) {
-              bestMembership = {
-                id: discountInfo.membershipId,
-                name: discountInfo.membershipName,
-              };
-            }
-          }
-        } else if (item.type === 'package' && item.package_id) {
-          const packagePrice = item.selling_price || item.package?.price || 0;
-          const discountInfo = getApplicableMembershipDiscount(null, item.package_id, packagePrice);
-          
-          if (discountInfo && discountInfo.calculatedDiscount > 0) {
-            totalMembershipDiscount += discountInfo.calculatedDiscount;
-            if (!bestMembership) {
-              bestMembership = {
-                id: discountInfo.membershipId,
-                name: discountInfo.membershipName,
-              };
-            }
-          }
-        }
-      });
-      
-      setMembershipDiscount(totalMembershipDiscount);
-      setActiveMembership(bestMembership);
-      
-      console.log("Membership discount calculated:", totalMembershipDiscount);
-    } else {
+    fetchMemberships();
+  }, [fetchMemberships]);
+
+  // Calculate membership discounts for cart items with protection against infinite loops
+  useEffect(() => {
+    // Skip recalculation if data isn't available yet
+    if (!items || items.length === 0 || customerMemberships.length === 0) {
       setMembershipDiscount(0);
       setActiveMembership(null);
+      return;
     }
-  }, [items, customerMemberships, getApplicableMembershipDiscount, isBookingConfirmation]);
+    
+    let totalMembershipDiscount = 0;
+    let bestMembership = null;
+    
+    // Process each cart item to find applicable membership discounts
+    items.forEach(item => {
+      if (item.type === 'service' && item.service_id) {
+        const servicePrice = item.selling_price || item.service?.selling_price || 0;
+        const discountInfo = getApplicableMembershipDiscount(item.service_id, null, servicePrice);
+        
+        if (discountInfo && discountInfo.calculatedDiscount > 0) {
+          totalMembershipDiscount += discountInfo.calculatedDiscount;
+          if (!bestMembership || discountInfo.calculatedDiscount > (bestMembership.discount || 0)) {
+            bestMembership = {
+              id: discountInfo.membershipId,
+              name: discountInfo.membershipName,
+              discount: discountInfo.calculatedDiscount
+            };
+          }
+        }
+      } else if (item.type === 'package' && item.package_id) {
+        const packagePrice = item.selling_price || item.package?.price || 0;
+        const discountInfo = getApplicableMembershipDiscount(null, item.package_id, packagePrice);
+        
+        if (discountInfo && discountInfo.calculatedDiscount > 0) {
+          totalMembershipDiscount += discountInfo.calculatedDiscount;
+          if (!bestMembership || discountInfo.calculatedDiscount > (bestMembership.discount || 0)) {
+            bestMembership = {
+              id: discountInfo.membershipId,
+              name: discountInfo.membershipName,
+              discount: discountInfo.calculatedDiscount
+            };
+          }
+        }
+      }
+    });
+    
+    console.log("Membership discount calculated:", totalMembershipDiscount);
+    setMembershipDiscount(totalMembershipDiscount);
+    setActiveMembership(bestMembership);
+    
+  }, [items, customerMemberships, getApplicableMembershipDiscount]);
   
   // Load tax data
   useEffect(() => {
@@ -149,7 +155,7 @@ export function CartSummary() {
     };
     
     loadTaxData();
-  }, [selectedLocation, appliedTaxId]);
+  }, [selectedLocation, appliedTaxId, fetchTaxRates, fetchLocationTaxSettings]);
 
   // Load coupons
   useEffect(() => {
