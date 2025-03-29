@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -55,7 +55,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   taxAmount,
   subTotal,
   membershipName,
-  membershipDiscount
+  membershipDiscount,
+  children
 }) => {
   const [showVoidDialog, setShowVoidDialog] = React.useState(false);
   const [showRefundDialog, setShowRefundDialog] = React.useState(false);
@@ -68,6 +69,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [refundedBy, setRefundedBy] = React.useState('');
   const [employees, setEmployees] = React.useState<Array<{ id: string; name: string }>>([]);
   const [selectAll, setSelectAll] = React.useState(false);
+  const [locations, setLocations] = React.useState<{ [key: string]: string }>({});
+  
   const { fetchAppointmentDetails, updateAppointmentStatus, processRefund } = useAppointmentActions();
   const { appointment } = useAppointmentDetails(appointmentId);
 
@@ -76,6 +79,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       loadAppointmentDetails();
     }
     fetchEmployees();
+    fetchLocations();
   }, [appointmentId]);
 
   const loadAppointmentDetails = async () => {
@@ -99,6 +103,30 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
+  };
+  
+  const fetchLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name');
+        
+      if (error) throw error;
+      
+      const locationMap = (data || []).reduce((acc, location) => {
+        acc[location.id] = location.name;
+        return acc;
+      }, {} as { [key: string]: string });
+      
+      setLocations(locationMap);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+    }
+  };
+
+  const getLocationName = (locationId?: string): string => {
+    if (!locationId) return 'No location';
+    return locations[locationId] || 'Unknown location';
   };
 
   const renderNewReceipt = () => {
@@ -379,6 +407,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           {allTransactions.map((transaction) => {
             const isRefund = transaction.transaction_type === 'refund';
             const groupedBookings = getGroupedBookings(transaction);
+            const locationName = getLocationName(transaction.location);
             
             return (
               <Card key={transaction.id} className={`bg-white h-full ${isRefund ? 'border-red-200' : ''}`}>
@@ -404,10 +433,10 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                         <Clock className="h-4 w-4" />
                         {format(new Date(transaction.created_at), 'EEE dd MMM yyyy, h:mm a')}
                       </div>
-                      {transaction.location && (
+                      {locationName && (
                         <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                           <MapPin className="h-4 w-4" />
-                          {transaction.location}
+                          {locationName}
                         </div>
                       )}
                     </div>
@@ -461,14 +490,14 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                       </div>
                     )}
                   </div>
-  
+                  
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <h4 className="text-base font-semibold">
                       {transaction.customer?.full_name || 'No name provided'}
                     </h4>
                     <p className="text-gray-600">{transaction.customer?.email || 'No email provided'}</p>
                   </div>
-  
+                  
                   <div className="overflow-y-auto">
                     <h4 className="font-medium mb-4">{isRefund ? 'Refunded Items' : 'Items'}</h4>
                     
@@ -590,7 +619,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             );
           })}
         </div>
-  
+        
         <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
           <DialogContent>
             <DialogHeader>
