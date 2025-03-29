@@ -37,13 +37,6 @@ export function StatsPanel({
     <div className="space-y-4 overflow-hidden">
       {chartData.length > 0 ? (
         <Card className="shadow-sm overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="text-lg">Upcoming appointments</CardTitle>
-              <CardDescription>Next 7 days</CardDescription>
-            </div>
-            <MoreHorizontal className="h-5 w-5 text-gray-400" />
-          </CardHeader>
           <CardContent className="overflow-y-auto max-h-[550px]">
             {chartData.length > 0 ? (
               <>

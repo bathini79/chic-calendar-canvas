@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle ,CardDescription} from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { addDays, format, parseISO } from "date-fns";
 import { LocationSelector } from './LocationSelector';
@@ -63,6 +63,9 @@ export const UpcomingAppointments = ({ locations, upcomingAppointmentsLocationId
     <Card className="shadow-sm h-full overflow-hidden">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-2 sm:space-y-0">
         <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
+        <div>
+              <CardDescription>Next 7 days</CardDescription>
+            </div>
         <div className="w-full sm:w-auto">
           <LocationSelector 
             value={upcomingAppointmentsLocationId} 
