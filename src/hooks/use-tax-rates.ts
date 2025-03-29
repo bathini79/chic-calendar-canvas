@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -7,55 +7,97 @@ export type TaxRate = {
   id: string;
   name: string;
   percentage: number;
-  is_default: boolean;
-  created_at: string;
-  updated_at: string;
+  is_default?: boolean;
 };
 
 export function useTaxRates() {
-  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
 
-  const fetchTaxRates = useCallback(async () => {
-    // If we've already loaded tax rates, don't fetch again
-    if (isInitialized && taxRates.length > 0) {
-      return taxRates;
-    }
-    
-    setIsLoading(true);
+  async function fetchTaxRates() {
     try {
+      setIsLoading(true);
       const { data, error } = await supabase
-        .from('tax_rates')
-        .select('*')
-        .order('name');
+        .from("tax_rates")
+        .select("*")
+        .order("name");
 
-      if (error) {
-        throw error;
-      }
-
-      setTaxRates(data);
-      setIsInitialized(true);
+      if (error) throw error;
+      setTaxRates(data || []);
       return data;
     } catch (error: any) {
-      console.error("Error fetching tax rates:", error);
-      toast.error(`Failed to load tax rates: ${error.message}`);
+      toast.error(`Error fetching tax rates: ${error.message}`);
       return [];
     } finally {
       setIsLoading(false);
     }
-  }, [taxRates, isInitialized]);
+  }
 
-  // Load tax rates on first mount
-  useEffect(() => {
-    if (!isInitialized) {
-      fetchTaxRates();
+  async function createTaxRate(taxRate: Omit<TaxRate, 'id'>) {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from("tax_rates")
+        .insert(taxRate)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      await fetchTaxRates();
+      toast.success("Tax rate created successfully");
+      return data;
+    } catch (error: any) {
+      toast.error(`Error creating tax rate: ${error.message}`);
+      return null;
+    } finally {
+      setIsLoading(false);
     }
-  }, [fetchTaxRates, isInitialized]);
+  }
 
-  return {
-    taxRates,
-    isLoading,
-    fetchTaxRates
-  };
+  async function updateTaxRate(id: string, taxRate: Partial<TaxRate>) {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from("tax_rates")
+        .update(taxRate)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      await fetchTaxRates();
+      toast.success("Tax rate updated successfully");
+      return data;
+    } catch (error: any) {
+      toast.error(`Error updating tax rate: ${error.message}`);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function deleteTaxRate(id: string) {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from("tax_rates")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      
+      await fetchTaxRates();
+      toast.success("Tax rate deleted successfully");
+      return true;
+    } catch (error: any) {
+      toast.error(`Error deleting tax rate: ${error.message}`);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return { taxRates, fetchTaxRates, isLoading, createTaxRate, updateTaxRate, deleteTaxRate };
 }

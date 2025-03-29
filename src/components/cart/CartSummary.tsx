@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { useNavigate, useLocation } from "react-router-dom";
 import { format, addMinutes } from "date-fns";
 import { formatPrice } from "@/lib/utils";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useCoupons, Coupon } from "@/hooks/use-coupons";
@@ -42,12 +42,9 @@ export function CartSummary() {
   const [membershipDiscount, setMembershipDiscount] = useState(0);
   const [activeMembership, setActiveMembership] = useState<any>(null);
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
-  const { taxRates, fetchTaxRates, isLoading: taxRatesLoading } = useTaxRates();
+  const { taxRates, fetchTaxRates } = useTaxRates();
   const { coupons, fetchCoupons, isLoading: couponsLoading, getCouponById } = useCoupons();
   const { customerMemberships, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
-
-  const taxRatesLoaded = useRef(false);
-  const locationTaxSettingsLoaded = useRef(false);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -143,33 +140,22 @@ export function CartSummary() {
     
   }, [items, customerMemberships, getApplicableMembershipDiscount]);
   
-  // Load tax data only once or when location changes
+  // Load tax data
   useEffect(() => {
     const loadTaxData = async () => {
-      // Only fetch tax rates once
-      if (!taxRatesLoaded.current) {
-        await fetchTaxRates();
-        taxRatesLoaded.current = true;
-      }
+      await fetchTaxRates();
       
-      // Only fetch location tax settings when location changes
-      if (selectedLocation && !locationTaxSettingsLoaded.current) {
+      if (selectedLocation && !appliedTaxId) {
         const settings = await fetchLocationTaxSettings(selectedLocation);
         
         if (settings && settings.service_tax_id) {
           setAppliedTaxId(settings.service_tax_id);
         }
-        locationTaxSettingsLoaded.current = true;
       }
     };
     
     loadTaxData();
-  }, [selectedLocation, fetchTaxRates, fetchLocationTaxSettings]);
-
-  // Reset the locationTaxSettingsLoaded ref when location changes
-  useEffect(() => {
-    locationTaxSettingsLoaded.current = false;
-  }, [selectedLocation]);
+  }, [selectedLocation, appliedTaxId, fetchTaxRates, fetchLocationTaxSettings]);
 
   // Load coupons
   useEffect(() => {
