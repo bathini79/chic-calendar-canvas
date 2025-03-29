@@ -64,11 +64,12 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     let clickedTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
     clickedTime = Math.round(clickedTime * 4) / 4;
 
+    // Call the setClickedCell function with the correct data
     setClickedCell({
       employeeId: empId,
       time: clickedTime,
-      x: e.pageX,
-      y: e.pageY,
+      x: e.clientX, // Use clientX instead of pageX for consistent positioning
+      y: e.clientY, // Use clientY instead of pageY for consistent positioning
       date: currentDate,
     });
   };
@@ -219,7 +220,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
               return (
                 <div
                   key={idx}
-                  className={`absolute left-0 right-0 ${idx % 4 === 0 ? 'border-b' : 'border-b border-gray-100'} transition-colors duration-150 ${isHovered ? 'bg-blue-100' : ''}`}
+                  className={`absolute left-0 right-0 ${idx % 4 === 0 ? 'border-b' : 'border-b border-gray-100'} transition-colors duration-150 ${isHovered ? 'bg-blue-200' : ''}`}
                   style={{ 
                     top: idx * 15, 
                     height: '15px' 

@@ -7,7 +7,7 @@ import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
 import { MapPin, Calendar as CalendarIcon, Plus, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
-import { formatTime, hourLabels, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
+import { formatTime, hourLabels as timeUtilsHourLabels, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
@@ -189,7 +189,20 @@ export default function AdminBookings() {
   };
 
   const handleCellClick = (cell: { employeeId: string; time: number; x: number; y: number; date: Date }) => {
+    console.log("Cell clicked:", cell);
     setClickedCell(cell);
+    
+    // Automatically open the add appointment dialog
+    const hours = Math.floor(cell.time);
+    const minutes = Math.round((cell.time - hours) * 60);
+    
+    const timeString = `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}`;
+    
+    setAppointmentTime(timeString);
+    setAppointmentDate(cell.date || currentDate);
+    setIsAddAppointmentOpen(true);
   };
 
   const handleCheckoutFromAppointment = (appointment: Appointment) => {
@@ -263,7 +276,7 @@ export default function AdminBookings() {
           appointments={appointments}
           setSelectedAppointment={setSelectedAppointment}
           setClickedCell={handleCellClick}
-          hourLabels={hourLabels}
+          hourLabels={timeUtilsHourLabels}
           PIXELS_PER_HOUR={60}
           handleColumnClick={() => {}}
           renderAppointmentBlock={() => null}
