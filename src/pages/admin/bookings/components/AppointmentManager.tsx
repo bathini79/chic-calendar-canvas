@@ -10,8 +10,9 @@ import { useActivePackages } from "../hooks/useActivePackages";
 import useSaveAppointment from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
-import { Appointment, SCREEN, Service, Package } from "../types";
+import { Appointment, SCREEN, Service, Package, PaymentMethod } from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
+import { formatTime, formatTimeString } from "../utils/timeUtils";
 
 interface AppointmentManagerProps {
   isOpen: boolean;
@@ -145,7 +146,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setSelectedStylists(stylists);
     setCustomizedServices(customizedServicesMap);
     setPaymentMethod(
-      (appointment.payment_method as "cash" | "online") || "cash"
+      (appointment.payment_method as PaymentMethod) || "cash"
     );
     setDiscountType(
       (appointment.discount_type as "none" | "percentage" | "fixed") || "none"
@@ -294,6 +295,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
+  const displayTime = stateSelectedTime ? formatTimeString(stateSelectedTime) : "";
+
   return (
     <div
       className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
@@ -313,22 +316,16 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
           <div className="w-[70%] flex flex-col h-full">
             <div className="p-6 border-b flex-shrink-0">
               <div className="flex items-center justify-between">
-              <div className="flex items-start flex-col">
-  {/* Date Section */}
-  {stateSelectedDate && (
-    <div className="text-xl font-bold flex items-center gap-1">
-      {format(stateSelectedDate, "EEE d MMM")} {/* Example: Mon 31 Mar */}
-    </div>
-  )}
-
-  {/* Time and Repeat Info */}
-  <p className="text-sm text-muted-foreground">
-    {stateSelectedTime} 
-  </p>
-</div>
-
-
-                {/* Close Button */}
+                <div className="flex items-start flex-col">
+                  {stateSelectedDate && (
+                    <div className="text-2xl font-bold">
+                      {format(stateSelectedDate, "EEE d MMM")}
+                    </div>
+                  )}
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {displayTime}
+                  </p>
+                </div>
                 <button
                   onClick={onClose}
                   className="text-gray-500 hover:text-gray-700"
@@ -338,13 +335,11 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
               </div>
             </div>
 
-            {/* Enclosing the service selection properly */}
             <div className="flex flex-col flex-1 min-h-0">
               <div className="p-6 flex-shrink-0">
                 <h3 className="text-lg font-semibold">Select Services</h3>
               </div>
 
-              {/* Ensuring scroll works correctly without affecting footer */}
               <div className="flex-1 overflow-y-auto px-6 min-h-0">
                 <ServiceSelector
                   onServiceSelect={handleServiceSelect}
@@ -360,7 +355,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                 />
               </div>
 
-              {/* Ensuring footer stays visible */}
               <div className="p-6 border-t flex-shrink-0 flex justify-end gap-4 bg-white">
                 <Button variant="outline" onClick={onHandleSaveAppointment}>
                   Save Appointment

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -6,7 +7,7 @@ import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
 import { MapPin, Calendar as CalendarIcon, Plus, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
-import { formatTime, hourLabels as timeUtilsHourLabels, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
+import { formatTime, formatTimeString, hourLabels as timeUtilsHourLabels, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
@@ -122,7 +123,8 @@ export default function AdminBookings() {
             .split(" ")
             .map((n) => n[0])
             .join(""),
-          is_active: true
+          is_active: true,
+          photo_url: employee.photo_url || null // Add missing property
         }));
 
         const defaultEmployeeName = `${businessDetails?.name || 'Salon'} Employee`;
@@ -136,7 +138,8 @@ export default function AdminBookings() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           phone: '',
-          is_active: true
+          is_active: true,
+          photo_url: null // Add missing property
         };
         
         employeeList = [defaultEmployee, ...employeeList];

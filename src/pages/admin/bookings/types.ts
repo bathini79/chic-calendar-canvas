@@ -1,4 +1,3 @@
-
 export type AppointmentStatus = 
   | 'pending' 
   | 'confirmed' 
@@ -164,7 +163,7 @@ export type SummaryViewProps = {
     price: number;
     type: string;
   }>;
-  paymentMethod?: 'cash' | 'card' | 'online';
+  paymentMethod?: 'cash' | 'online' | 'card';
   onAddAnother?: () => void;
   receiptNumber?: string;
   taxAmount?: number;
@@ -173,3 +172,6 @@ export type SummaryViewProps = {
   membershipDiscount?: number;
   children?: React.ReactNode;
 };
+
+export type PaymentMethod = "cash" | "online" | "card";
+export type DiscountType = "none" | "percentage" | "fixed";

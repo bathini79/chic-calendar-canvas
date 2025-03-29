@@ -1,3 +1,4 @@
+
 import { getAppointmentStatusColor } from "@/pages/admin/bookings/utils/bookingUtils";
 import {
   START_HOUR,
@@ -129,7 +130,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
 
           // Calculate booking display properties
           const isNoShow =
-            appointment.status === "no-show" || appointment.status === "noshow";
+            appointment.status === "noshow"; // Fixed to match the actual enum value
           const statusColor = isNoShow
             ? "bg-red-100 border-red-300 text-red-700"
             : getAppointmentStatusColor(appointment.status);
@@ -260,7 +261,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
                   className={`absolute left-0 right-0 ${
                     idx % 4 === 0 ? "border-b" : "border-b border-gray-100"
                   } transition-colors duration-150 ${
-                    isHovered ? "bg-blue-100" : ""
+                    isHovered ? "bg-blue-50" : ""
                   }`}
                   style={{
                     top: idx * 15,
