@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -15,6 +15,7 @@ type LocationTaxSettings = {
 export function useLocationTaxSettings() {
   const [isLoading, setIsLoading] = useState(false);
   const [locationSettings, setLocationSettings] = useState<Record<string, LocationTaxSettings | null>>({});
+  const fetchInProgress = useRef<Record<string, boolean>>({});
 
   const fetchLocationTaxSettings = useCallback(async (locationId: string) => {
     // If we've already fetched settings for this location, return from cache
@@ -22,6 +23,13 @@ export function useLocationTaxSettings() {
       return locationSettings[locationId];
     }
 
+    // Skip if a fetch is already in progress for this location
+    if (fetchInProgress.current[locationId]) {
+      console.log("Skipping location tax settings fetch - already in progress for location:", locationId);
+      return null;
+    }
+
+    fetchInProgress.current[locationId] = true;
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -47,6 +55,7 @@ export function useLocationTaxSettings() {
       return null;
     } finally {
       setIsLoading(false);
+      fetchInProgress.current[locationId] = false;
     }
   }, [locationSettings]);
 

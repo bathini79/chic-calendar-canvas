@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { isAfter, isBefore, parseISO } from "date-fns";
@@ -31,6 +31,7 @@ export function useCustomerMemberships() {
   const [customerMemberships, setCustomerMemberships] = useState<CustomerMembership[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastFetchedUserId, setLastFetchedUserId] = useState<string | null>(null);
+  const fetchInProgress = useRef(false);
 
   const fetchCustomerMemberships = useCallback(async (customerId: string) => {
     if (!customerId) {
@@ -44,6 +45,13 @@ export function useCustomerMemberships() {
       return customerMemberships;
     }
     
+    // Skip if a fetch is already in progress
+    if (fetchInProgress.current) {
+      console.log("Skipping membership fetch - already in progress for user:", customerId);
+      return customerMemberships;
+    }
+    
+    fetchInProgress.current = true;
     setIsLoading(true);
     try {
       console.log("Fetching memberships for customer:", customerId);
@@ -79,6 +87,7 @@ export function useCustomerMemberships() {
       return [];
     } finally {
       setIsLoading(false);
+      fetchInProgress.current = false;
     }
   }, [customerMemberships, lastFetchedUserId]);
 
