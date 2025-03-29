@@ -23,6 +23,7 @@ interface AppointmentManagerProps {
   locationId?: string;
   onAppointmentSaved?: () => void;
 }
+
 export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   isOpen,
   onClose,
@@ -303,7 +304,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         <div className="p-6 border-b flex-shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold">
-              {existingAppointment ? "Edit Appointment" : "New Appointment"}
+              {existingAppointment ? "Edit Appointment" : ""}
             </h2>
             <button
               onClick={onClose}
@@ -395,22 +396,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
             {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
               <div className="p-6">
-                <h3 className="text-xl font-semibold mb-6">
-                  Appointment Summary
-                </h3>
                 <SummaryView
                   appointmentId={newAppointmentId}
                 />
-                <div className="mt-6 flex justify-end">
-                  <Button
-                    onClick={() => {
-                      setCurrentScreen(SCREEN.SERVICE_SELECTION);
-                      setNewAppointmentId(null);
-                    }}
-                  >
-                    Create New Appointment
-                  </Button>
-                </div>
               </div>
             )}
           </div>
