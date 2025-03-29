@@ -57,7 +57,7 @@ export default function AdminBookings() {
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
-  const { data: appointmentsData = [] } = useAppointmentsByDate(currentDate, selectedLocationId);
+  const { data: appointmentsData = [], refetch: refetchAppointments } = useAppointmentsByDate(currentDate, selectedLocationId);
   const appointments = appointmentsData as unknown as Appointment[];
   
   const { data: locations = [] } = useQuery({
@@ -186,6 +186,8 @@ export default function AdminBookings() {
   const closeAddAppointment = () => {
     setIsAddAppointmentOpen(false);
     setSelectedAppointment(null);
+    // Refetch appointments when the dialog is closed
+    refetchAppointments();
   };
 
   const handleCellClick = (cell: { employeeId: string; time: number; x: number; y: number; date: Date }) => {
@@ -201,6 +203,8 @@ export default function AdminBookings() {
     
     setAppointmentTime(timeString);
     setAppointmentDate(cell.date || currentDate);
+    // Directly open the appointment dialog
+    openAddAppointment();
   };
 
   const handleCheckoutFromAppointment = (appointment: Appointment) => {
@@ -286,27 +290,6 @@ export default function AdminBookings() {
           onOpenChange={() => setSelectedAppointment(null)}
           onCheckout={handleCheckoutFromAppointment}
         />
-
-        {clickedCell && (
-          <div
-            className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
-            style={{
-              left: clickedCell.x,
-              top: clickedCell.y,
-            }}
-          >
-            <div className="bg-black px-4 py-2 text-sm font-medium text-white">
-              {formatTime(clickedCell.time)}
-            </div>
-            <div
-              className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={()=>openAddAppointment()}
-            >
-              <CalendarIcon className="h-4 w-4 text-gray-600" />
-              <span className="text-gray-700">Add Appointment</span>
-            </div>
-          </div>
-        )}
 
         {isAddAppointmentOpen && appointmentDate && (
           <AppointmentManager

@@ -6,7 +6,7 @@ import {
   hourLabels,
 } from "@/pages/admin/bookings/utils/timeUtils";
 import { Flag } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Appointment, Booking, Employee } from "@/pages/admin/bookings/types";
 
 interface TimeSlotsProps {
@@ -56,6 +56,14 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
 }) => {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
   const [hoveredTimeSlot, setHoveredTimeSlot] = useState<string | null>(null);
+  
+  // Add a state to track when appointments change
+  const [appointmentsKey, setAppointmentsKey] = useState(0);
+  
+  // Update the appointments key when appointments change
+  useEffect(() => {
+    setAppointmentsKey(prevKey => prevKey + 1);
+  }, [appointments]);
 
   const handleColumnClick = (e: React.MouseEvent, empId: string) => {
     if (e.target !== e.currentTarget) return;
@@ -134,7 +142,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
         
         return (
           <div
-            key={`${booking.id}-${index}`}
+            key={`${booking.id}-${index}-${appointmentsKey}`} // Add appointmentsKey to force re-render
             className={`absolute rounded border ${statusColor} cursor-pointer z-10 overflow-hidden transition-colors ${isHovered ? 'ring-2 ring-primary' : ''} ${isTimeSlotHovered ? 'opacity-90 shadow-md' : ''}`}
             style={{
               top: `${topPositionPx + topOffset}px`,
@@ -218,7 +226,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
               return (
                 <div
                   key={idx}
-                  className={`absolute left-0 right-0 ${idx % 4 === 0 ? 'border-b' : 'border-b border-gray-100'} transition-colors duration-150 ${isHovered ? 'bg-blue-200' : ''}`}
+                  className={`absolute left-0 right-0 ${idx % 4 === 0 ? 'border-b' : 'border-b border-gray-100'} transition-colors duration-150 ${isHovered ? 'bg-blue-300' : ''}`}
                   style={{ 
                     top: idx * 15, 
                     height: '15px' 
