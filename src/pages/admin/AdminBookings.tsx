@@ -122,6 +122,7 @@ export default function AdminBookings() {
             .split(" ")
             .map((n) => n[0])
             .join(""),
+          is_active: true
         }));
 
         // Add default employee for unassigned bookings
@@ -262,7 +263,7 @@ export default function AdminBookings() {
           appointments={appointments}
           setSelectedAppointment={setSelectedAppointment}
           setClickedCell={handleCellClick}
-          hourLabels={[]}
+          hourLabels={hourLabels}
           PIXELS_PER_HOUR={60}
           handleColumnClick={() => {}}
           renderAppointmentBlock={() => null}

@@ -67,8 +67,8 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     setClickedCell({
       employeeId: empId,
       time: clickedTime,
-      x: e.pageX + 10,
-      y: e.pageY - 20,
+      x: e.pageX,
+      y: e.pageY,
       date: currentDate,
     });
   };
@@ -219,7 +219,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
               return (
                 <div
                   key={idx}
-                  className={`absolute left-0 right-0 ${idx % 4 === 0 ? 'border-b' : 'border-b border-gray-100'} transition-colors duration-150 ${isHovered ? 'bg-blue-50' : ''}`}
+                  className={`absolute left-0 right-0 ${idx % 4 === 0 ? 'border-b' : 'border-b border-gray-100'} transition-colors duration-150 ${isHovered ? 'bg-blue-100' : ''}`}
                   style={{ 
                     top: idx * 15, 
                     height: '15px' 
