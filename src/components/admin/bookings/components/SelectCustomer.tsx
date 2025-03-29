@@ -84,7 +84,7 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
               <h3 className="font-medium text-base flex items-center gap-2">
                 {selectedCustomer.full_name}
                 {customersWithMemberships.has(selectedCustomer.id) && (
-                  <Badge variant="secondary" className="flex items-center gap-1 ml-1">
+                  <Badge variant="info" className="flex items-center gap-1 ml-1">
                     <Award className="h-3 w-3" />
                     <span>Member</span>
                   </Badge>

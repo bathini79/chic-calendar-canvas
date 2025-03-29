@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,7 +18,7 @@ interface SelectedItem {
   duration?: number;
 }
 
-export const useAppointmentActions = () => {
+export function useAppointmentActions() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
 
@@ -49,9 +48,8 @@ export const useAppointmentActions = () => {
       // Cast the data to match our expected types
       const typedAppointment = {
         ...appointment,
-        discount_type: appointment.discount_type as Appointment['discount_type'],
-        location_id: appointment.location,
-      } as unknown as Appointment;
+        discount_type: appointment.discount_type as Appointment['discount_type']
+      } as Appointment;
 
       // If this is a refund, get the original sale
       if (typedAppointment.transaction_type === 'refund') {
@@ -75,9 +73,8 @@ export const useAppointmentActions = () => {
         // Cast the original sale data
         const typedOriginalSale = {
           ...originalSale,
-          discount_type: originalSale.discount_type as Appointment['discount_type'],
-          location_id: originalSale.location,
-        } as unknown as Appointment;
+          discount_type: originalSale.discount_type as Appointment['discount_type']
+        } as Appointment;
 
         // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
@@ -100,9 +97,8 @@ export const useAppointmentActions = () => {
         // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
-          discount_type: refund.discount_type as Appointment['discount_type'],
-          location_id: refund.location,
-        })) as unknown as Appointment[];
+          discount_type: refund.discount_type as Appointment['discount_type']
+        })) as Appointment[];
 
         // Create TransactionDetails with all required properties
         return {
@@ -110,7 +106,8 @@ export const useAppointmentActions = () => {
           amount: typedOriginalSale.total_price,
           status: typedOriginalSale.status,
           payment_method: typedOriginalSale.payment_method,
-          created_at: typedOriginalSale.created_at || '',
+          created_at: typedOriginalSale.created_at,
+          tax: appointment.tax,
           originalSale: typedOriginalSale,
           refunds: typedRefunds || []
         };
@@ -136,9 +133,8 @@ export const useAppointmentActions = () => {
         // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
-          discount_type: refund.discount_type as Appointment['discount_type'],
-          location_id: refund.location,
-        })) as unknown as Appointment[];
+          discount_type: refund.discount_type as Appointment['discount_type']
+        })) as Appointment[];
 
         // Create TransactionDetails with all required properties
         return {
@@ -146,7 +142,8 @@ export const useAppointmentActions = () => {
           amount: typedAppointment.total_price,
           status: typedAppointment.status,
           payment_method: typedAppointment.payment_method,
-          created_at: typedAppointment.created_at || '',
+          created_at: typedAppointment.created_at,
+          tax: appointment.tax,
           originalSale: typedAppointment,
           refunds: typedRefunds || []
         };
@@ -205,8 +202,7 @@ export const useAppointmentActions = () => {
           refund_notes: refundData.notes,
           total_price: 0, // Will be updated after processing bookings
           start_time: originalAppointment.start_time,
-          end_time: originalAppointment.end_time,
-          location: originalAppointment.location
+          end_time: originalAppointment.end_time
         })
         .select()
         .single();
@@ -287,14 +283,11 @@ export const useAppointmentActions = () => {
     try {
       setIsLoading(true);
 
-      // Convert the "no-show" to "noshow" for database compatibility
-      const dbStatus = status === "no-show" ? "noshow" : status;
-
       // First update the appointment status
       const { error: appointmentError } = await supabase
         .from('appointments')
         .update({ 
-          status: dbStatus,
+          status,
           updated_at: new Date().toISOString()
         })
         .eq('id', appointmentId);
@@ -305,7 +298,7 @@ export const useAppointmentActions = () => {
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({ 
-          status: dbStatus,
+          status,
           updated_at: new Date().toISOString()
         })
         .in('id', bookingIds);
@@ -314,11 +307,10 @@ export const useAppointmentActions = () => {
 
       let message = '';
       switch (status) {
-        case "canceled":
+        case 'canceled':
           message = 'Appointment canceled successfully';
           break;
-        case "noshow":
-        case "no-show":
+        case 'noshow':
           message = 'Appointment marked as no-show';
           break;
         default:
@@ -336,27 +328,11 @@ export const useAppointmentActions = () => {
     }
   };
 
-  const updateBookingStylelist = async (bookingId: string, employeeId: string) => {
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ employee_id: employeeId })
-        .eq('id', bookingId);
-
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error("Error updating booking stylist:", error);
-      throw error;
-    }
-  };
-
   return {
     isLoading,
     selectedItems,
     fetchAppointmentDetails,
     updateAppointmentStatus,
-    processRefund,
-    updateBookingStylelist
+    processRefund
   };
-};
+}

@@ -347,68 +347,68 @@ export function CartSummary() {
                 </div>
               )}
               
-              {/* Reorganized layout for Tax and Coupon */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm items-center">
-                    <span className="text-muted-foreground">Tax</span>
-                    <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
-                      <SelectTrigger className="h-8 w-full">
-                        <SelectValue placeholder="No Tax" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Tax</SelectItem>
-                        {taxRates.map(tax => (
-                          <SelectItem key={tax.id} value={tax.id}>
-                            {tax.name} ({tax.percentage}%)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {appliedTaxId && taxAmount > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span></span>
-                      <span>{formatPrice(taxAmount)}</span>
-                    </div>
-                  )}
+              {/* Coupon selection */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm items-center">
+                  <span className="text-muted-foreground">Coupon</span>
+                  <Select value={appliedCouponId || "none"} onValueChange={handleCouponChange} disabled={couponsLoading}>
+                    <SelectTrigger className="h-8 w-[150px]">
+                      <SelectValue placeholder="No Coupon" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Coupon</SelectItem>
+                      {coupons.map(coupon => (
+                        <SelectItem key={coupon.id} value={coupon.id}>
+                          {coupon.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm items-center">
-                    <span className="text-muted-foreground">Coupon</span>
-                    <Select value={appliedCouponId || "none"} onValueChange={handleCouponChange} disabled={couponsLoading}>
-                      <SelectTrigger className="h-8 w-full">
-                        <SelectValue placeholder="No Coupon" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Coupon</SelectItem>
-                        {coupons.map(coupon => (
-                          <SelectItem key={coupon.id} value={coupon.id}>
-                            {coupon.code}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {selectedCoupon && (
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <Badge variant="outline" className="w-fit">
-                          <span className="text-xs font-medium">
-                            {selectedCoupon.discount_type === 'percentage' 
-                              ? `${selectedCoupon.discount_value}% off` 
-                              : `${formatPrice(selectedCoupon.discount_value)} off`}
-                          </span>
-                        </Badge>
-                        <span className="text-green-600 text-sm">-{formatPrice(couponDiscount)}</span>
-                      </div>
+                {selectedCoupon && (
+                  <div className="flex flex-col gap-1">
+                    <Badge variant="outline" className="w-fit">
+                      <span className="text-xs font-medium">
+                        {selectedCoupon.discount_type === 'percentage' 
+                          ? `${selectedCoupon.discount_value}% off` 
+                          : `${formatPrice(selectedCoupon.discount_value)} off`}
+                      </span>
+                    </Badge>
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Discount</span>
+                      <span>-{formatPrice(couponDiscount)}</span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
+              
+              {/* Tax selection */}
+              <div className="flex justify-between text-sm items-center">
+                <span className="text-muted-foreground">Tax</span>
+                <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
+                  <SelectTrigger className="h-8 w-[150px]">
+                    <SelectValue placeholder="No Tax" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Tax</SelectItem>
+                    {taxRates.map(tax => (
+                      <SelectItem key={tax.id} value={tax.id}>
+                        {tax.name} ({tax.percentage}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {appliedTaxId && taxAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Tax Amount
+                  </span>
+                  <span>{formatPrice(taxAmount)}</span>
+                </div>
+              )}
             </>
           )}
           

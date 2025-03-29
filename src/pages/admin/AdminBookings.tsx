@@ -116,21 +116,17 @@ export default function AdminBookings() {
         
         if (error) throw error;
         
-        let employeeList = data.map((employee) => {
-          const { employee_locations, ...employeeData } = employee;
-          
-          return {
-            ...employeeData,
-            avatar: employee.name
-              .split(" ")
-              .map((n) => n[0])
-              .join(""),
-            is_active: true
-          };
-        });
+        let employeeList = data.map((employee) => ({
+          ...employee,
+          avatar: employee.name
+            .split(" ")
+            .map((n) => n[0])
+            .join(""),
+          is_active: true
+        }));
 
         const defaultEmployeeName = `${businessDetails?.name || 'Salon'} Employee`;
-        const defaultEmployee = {
+        const defaultEmployee: Employee = {
           id: 'unassigned',
           name: defaultEmployeeName,
           avatar: defaultEmployeeName.split(" ").map(n => n[0]).join(""),

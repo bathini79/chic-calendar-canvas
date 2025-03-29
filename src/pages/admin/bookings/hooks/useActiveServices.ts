@@ -45,9 +45,9 @@ export const useActiveServices = (locationId?: string) => {
         const typedServices = data.map((service) => ({
           ...service,
           is_active: service.status === 'active',
-          cost_price: service.original_price || service.selling_price * 0.5, // Use original_price as cost_price
+          cost_price: service.cost_price || service.selling_price * 0.5, // Default cost price if not present
           category: service.services_categories?.[0]?.category
-        } as unknown as Service));
+        } as Service));
 
         return typedServices;
       } catch (error) {
