@@ -1,145 +1,177 @@
+export type AppointmentStatus = 
+  | 'pending' 
+  | 'confirmed' 
+  | 'canceled' 
+  | 'completed' 
+  | 'no-show' 
+  | 'noshow' 
+  | 'inprogress'
+  | 'voided'
+  | 'refunded'
+  | 'partially_refunded'
+  | 'booked';
 
-import { AppointmentStatus } from '@/types/appointment';
+export type Appointment = {
+  id: string;
+  customer_id: string;
+  location_id: string | null;
+  location?: string | null;
+  start_time: string;
+  end_time: string;
+  status: AppointmentStatus;
+  notes: string | null;
+  total_price: number;
+  original_total_price?: number;
+  discount_type: 'none' | 'percentage' | 'fixed';
+  discount_value: number;
+  payment_method: string;
+  tax_amount: number;
+  membership_discount: number;
+  membership_id: string | null;
+  membership_name: string | null;
+  created_at?: string;
+  updated_at?: string;
+  transaction_type?: string;
+  original_appointment_id?: string;
+  coupon_id?: string | null;
+  refund_reason?: string;
+  refund_notes?: string;
+  refunded_by?: string;
+  customer: any;
+  bookings: any[];
+};
 
-export type { AppointmentStatus };
-
-export type PaymentMethod = "cash" | "card" | "online" | "wallet" | "bank_transfer";
-
-export interface Service {
+export type Service = {
   id: string;
   name: string;
-  description?: string;
-  selling_price: number;
-  original_price: number;
+  description: string;
   duration: number;
-  status?: 'active' | 'inactive' | 'archived';
-  image_urls?: string[];
-  category_id?: string;
-  gender?: string;
-}
-
-export interface ServiceCategory {
-  id: string;
-  service_id?: string;
-  category_id?: string;
+  selling_price: number;
+  cost_price: number;
+  category_id: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
   category?: {
     id: string;
     name: string;
   };
-}
+};
 
-export interface PackageService {
-  id: string;
-  package_id: string;
-  service_id: string;
-  package_selling_price: number;
-  service: Service;
-}
-
-export interface Package {
+export type Package = {
   id: string;
   name: string;
-  description?: string;
+  description: string;
   price: number;
-  duration?: number;
-  status?: 'active' | 'inactive' | 'archived';
-  discount_type?: string;
-  discount_value?: number;
-  image_urls?: string[];
-  categories?: string[];
-  is_customizable?: boolean;
-  customizable_services?: string[];
-  is_active?: boolean;
-  package_services: PackageService[];
-}
+  duration: number;
+  is_active: boolean;
+  is_customizable: boolean;
+  created_at: string;
+  updated_at: string;
+  package_services: Array<{
+    id: string;
+    package_id: string;
+    service_id: string;
+    package_selling_price: number | null;
+    service: Service;
+  }>;
+};
 
-export interface Employee {
+export type Customer = {
+  id: string;
+  email: string;
+  phone?: string;
+  phone_number?: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+  admin_created?: boolean;
+  phone_verified?: boolean;
+  role?: string;
+};
+
+export type Employee = {
   id: string;
   name: string;
   email: string;
-  phone?: string;
-  employment_type: 'stylist' | 'operations';
-  status: 'active' | 'inactive';
+  phone: string;
+  employment_type: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
   avatar?: string;
-  is_active?: boolean;
-  photo_url: string | null;
-}
+  photo_url?: string;
+  status?: string;
+};
 
-export interface Customer {
-  id: string;
-  full_name?: string;
-  email?: string;
-  phone_number?: string;
-}
-
-export interface Booking {
+export type Booking = {
   id: string;
   appointment_id: string;
-  service_id?: string;
-  package_id?: string;
-  employee_id?: string;
-  start_time?: string;
-  end_time?: string;
-  price_paid: number;
-  original_price?: number;
-  status?: string;
-  created_at?: string;
-  updated_at?: string;
-  service?: Service;
-  package?: Package;
-  employee?: Employee;
-}
-
-export interface Appointment {
-  id: string;
-  customer_id: string;
-  customer?: Customer;
-  status: AppointmentStatus;
+  service_id: string | null;
+  package_id: string | null;
+  employee_id: string | null;
   start_time: string;
   end_time: string;
-  total_price: number;
-  total_duration?: number;
-  notes?: string;
-  payment_method?: PaymentMethod;
-  discount_type?: 'none' | 'percentage' | 'fixed';
-  discount_value?: number;
-  tax_amount?: number;
-  tax_id?: string | null;
-  transaction_type?: 'sale' | 'refund';
-  location?: string;
-  location_id?: string;
-  bookings: Booking[];
+  status: 'pending' | 'confirmed' | 'canceled' | 'completed' | 'no-show' | 'noshow' | 'refunded';
+  price: number;
+  price_paid?: number;
+  original_price?: number;
+  created_at: string;
+  updated_at: string;
+  service?: Service | null;
+  package?: Package | null;
+  employee?: Employee | null;
+};
+
+export enum SCREEN {
+  SERVICE_SELECTION = "service_selection",
+  CHECKOUT = "checkout",
+  SUMMARY = "summary"
 }
 
-// For fixed appointments on the calendar
-export interface AppointmentBlock {
-  id: string;
-  employeeId: string;
-  startTime: number;
-  endTime: number;
-  appointment: Appointment;
-}
-
-export interface RefundData {
+export type RefundData = {
   reason: string;
   notes: string;
   refundedBy: string;
-}
+};
 
-export interface TransactionDetails {
+export type TransactionDetails = {
   id: string;
   amount: number;
   status: string;
-  payment_method?: string;
+  payment_method: string;
   created_at: string;
   originalSale: Appointment;
   refunds: Appointment[];
-}
+};
 
-export enum SCREEN {
-  SERVICE_SELECTION,
-  CHECKOUT,
-  SUMMARY,
-}
+export type SummaryViewProps = {
+  appointmentId?: string;
+  customer?: {
+    id: string;
+    full_name: string;
+    email: string;
+    phone_number?: string;
+  };
+  totalPrice?: number;
+  items?: Array<{
+    id: string;
+    name: string;
+    price: number;
+    type: string;
+  }>;
+  paymentMethod?: 'cash' | 'online' | 'card';
+  onAddAnother?: () => void;
+  receiptNumber?: string;
+  taxAmount?: number;
+  subTotal?: number;
+  membershipName?: string;
+  membershipDiscount?: number;
+  children?: React.ReactNode;
+};
+
+export type PaymentMethod = "cash" | "online" | "card";
+export type DiscountType = "none" | "percentage" | "fixed";
