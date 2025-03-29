@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Card, 
@@ -26,6 +27,7 @@ import { FinancialDashboard } from "@/components/admin/reports/FinancialDashboar
 import { FinancialSummary } from "@/components/admin/reports/FinancialSummary";
 import { CustomerList } from "@/components/admin/reports/CustomerList";
 import { CustomerRetentionDashboard } from "@/components/admin/reports/CustomerRetentionDashboard";
+import { SalesPerformance } from "@/components/admin/reports/SalesPerformance";
 
 const reportCategories = [
   {
@@ -176,6 +178,14 @@ export default function Reports() {
       );
     }
     
+    if (expandedReport === "service-popularity") {
+      return (
+        <div className="space-y-4">
+          <SalesPerformance onBack={() => setExpandedReport(null)} />
+        </div>
+      );
+    }
+    
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredReports.map(report => (
@@ -261,18 +271,18 @@ export default function Reports() {
                     
                     <Card 
                       className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => handleReportClick("retention-rate")}
+                      onClick={() => handleReportClick("service-popularity")}
                     >
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Heart className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">Customer Retention</p>
+                            <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Sales Performance</p>
                           </div>
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <CardTitle className="text-xl">Retention Rate</CardTitle>
-                        <CardDescription>Customer return and loyalty metrics</CardDescription>
+                        <CardTitle className="text-xl">Service Popularity</CardTitle>
+                        <CardDescription>Most popular services and revenue analysis</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="h-40 flex items-center justify-center bg-muted/30 rounded-md">
