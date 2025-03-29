@@ -55,6 +55,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
   currentDate,
 }) => {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+  const [hoveredTimeSlot, setHoveredTimeSlot] = useState<string | null>(null);
 
   const handleColumnClick = (e: React.MouseEvent, empId: string) => {
     if (e.target !== e.currentTarget) return;
@@ -78,7 +79,13 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     
     appointments.forEach(appointment => {
       appointment.bookings.forEach(booking => {
-        if (booking.employee?.id !== employeeId) return;
+        // Check if this booking should be shown for the current employee
+        // Either it's assigned to this employee OR it's unassigned and we're on the default employee
+        const isForThisEmployee = 
+          (booking.employee?.id === employeeId) || 
+          ((!booking.employee_id || booking.employee_id === null) && employeeId === 'unassigned');
+        
+        if (!isForThisEmployee) return;
         if (appointment.status === 'canceled' || appointment.status === 'voided' || !booking.id) return;
         
         const startTime = new Date(booking.start_time || appointment.start_time);
@@ -115,22 +122,26 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
         const startHour = startTime.getHours() + startTime.getMinutes() / 60;
         const cellKey = `${employeeId}-${timeSlotKey}-${index}`;
         const isHovered = hoveredCell === cellKey;
+        const isTimeSlotHovered = hoveredTimeSlot === `${employeeId}-${Math.floor(startHour * 4) / 4}`;
 
         // Position calculations for multiple bookings in the same slot
         const topPositionPx = (startHour - START_HOUR) * PIXELS_PER_HOUR;
         const heightPx = (duration / 60) * PIXELS_PER_HOUR;
-        const widthPercent = 100 / totalBookingsInSlot;
-        const leftPercent = index * widthPercent;
+        
+        // Stack bookings vertically instead of horizontally
+        const heightPerBooking = heightPx / totalBookingsInSlot;
+        const topOffset = index * heightPerBooking;
         
         return (
           <div
             key={`${booking.id}-${index}`}
-            className={`absolute rounded border ${statusColor} cursor-pointer z-10 overflow-hidden transition-colors ${isHovered ? 'ring-2 ring-primary' : ''}`}
+            className={`absolute rounded border ${statusColor} cursor-pointer z-10 overflow-hidden transition-colors ${isHovered ? 'ring-2 ring-primary' : ''} ${isTimeSlotHovered ? 'opacity-90 shadow-md' : ''}`}
             style={{
-              top: `${topPositionPx}px`,
-              height: `${heightPx}px`,
-              left: `${leftPercent}%`,
-              width: `${widthPercent}%`,
+              top: `${topPositionPx + topOffset}px`,
+              height: `${heightPerBooking}px`,
+              left: '0',
+              right: '0',
+              width: '100%',
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -201,13 +212,23 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
             }}
             onClick={(e) => handleColumnClick(e, emp.id)}
           >
-            {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="absolute left-0 right-0 border-b"
-                style={{ top: idx * 15 }}
-              />
-            ))}
+            {/* Time slot backgrounds with hover effect */}
+            {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => {
+              const hourKey = (START_HOUR + idx/4).toFixed(2);
+              const isHovered = hoveredTimeSlot === `${emp.id}-${START_HOUR + idx/4}`;
+              return (
+                <div
+                  key={idx}
+                  className={`absolute left-0 right-0 ${idx % 4 === 0 ? 'border-b' : 'border-b border-gray-100'} transition-colors duration-150 ${isHovered ? 'bg-blue-50' : ''}`}
+                  style={{ 
+                    top: idx * 15, 
+                    height: '15px' 
+                  }}
+                  onMouseEnter={() => setHoveredTimeSlot(`${emp.id}-${START_HOUR + idx/4}`)}
+                  onMouseLeave={() => setHoveredTimeSlot(null)}
+                />
+              );
+            })}
 
             {nowPosition !== null && isSameDay(currentDate, new Date()) && (
               <div

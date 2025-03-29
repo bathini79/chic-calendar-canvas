@@ -134,7 +134,9 @@ export default function AdminBookings() {
           employment_type: 'stylist',
           status: 'active',
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          phone: '',
+          is_active: true
         };
         
         employeeList = [defaultEmployee, ...employeeList];
