@@ -7,7 +7,7 @@ import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
 import { MapPin, Calendar as CalendarIcon, Plus, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
-import { formatTime, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
+import { formatTime, hourLabels, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
