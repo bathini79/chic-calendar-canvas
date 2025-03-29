@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,10 +19,13 @@ import {
   Plus,
   ArrowLeft,
   Trash2,
-  Award
+  Award,
+  X,
+  Check,
+  XCircle
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Service, Package, Customer } from "../types";
+import type { Service, Package, Customer, AppointmentStatus } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -37,13 +41,15 @@ import {
   getTotalDuration, 
   getFinalPrice, 
   calculatePackagePrice,
-  getAdjustedServicePrices
+  getAdjustedServicePrices,
+  getAppointmentStatusColor
 } from "../utils/bookingUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { LoaderCircle } from "lucide-react";
+import { StatusBadge } from "./StatusBadge";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -70,6 +76,11 @@ interface CheckoutSectionProps {
   isExistingAppointment?: boolean;
   customizedServices?: Record<string, string[]>;
   locationId?: string;
+  // Additional props for existing appointments
+  appointmentStatus?: AppointmentStatus;
+  onCancelAppointment?: () => void;
+  onMarkAsNoShow?: () => void;
+  onMarkAsCompleted?: () => void;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -96,7 +107,11 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onBackToServices,
   isExistingAppointment,
   customizedServices = {},
-  locationId
+  locationId,
+  appointmentStatus,
+  onCancelAppointment,
+  onMarkAsNoShow,
+  onMarkAsCompleted
 }) => {
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -557,15 +572,33 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       <Card className="h-full">
         <CardContent className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold">Checkout Summary</h2>
-            <Button
-              variant="outline"
-              onClick={onBackToServices}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add Service
-            </Button>
+            <div className="flex items-center space-x-2">
+              <h2 className="text-xl font-semibold">Checkout Summary</h2>
+              {appointmentStatus && (
+                <StatusBadge status={appointmentStatus} className="ml-2" />
+              )}
+            </div>
+            <div className="flex gap-2">
+              {isExistingAppointment && onCancelAppointment && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={onCancelAppointment}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel Appointment
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={onBackToServices}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Service
+              </Button>
+            </div>
           </div>
 
           <div className="flex-1 space-y-6 overflow-hidden flex flex-col">
@@ -816,6 +849,34 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             </div>
 
             <div className="flex gap-2">
+              {isExistingAppointment && (
+                <div className="flex gap-2 mr-auto">
+                  {onMarkAsNoShow && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={onMarkAsNoShow} 
+                      className="text-amber-600"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      No Show
+                    </Button>
+                  )}
+                  
+                  {onMarkAsCompleted && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={onMarkAsCompleted} 
+                      className="text-green-600"
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      Mark Complete
+                    </Button>
+                  )}
+                </div>
+              )}
+
               <Button 
                 className="flex-1" 
                 size="lg"
@@ -823,11 +884,11 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 disabled={selectedItems.length === 0}
               >
                 { loadPayment ? <LoaderCircle
-        className="-ms-1 me-2 animate-spin"
-        size={16}
-        strokeWidth={2}
-        aria-hidden="true"
-      /> :  null}
+                  className="-ms-1 me-2 animate-spin"
+                  size={16}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                /> :  null}
                 Complete Payment
               </Button>
               <Popover>

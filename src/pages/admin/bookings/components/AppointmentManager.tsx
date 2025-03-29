@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
 import { Appointment, SCREEN, Service, Package, PaymentMethod } from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 import { formatTime, formatTimeString } from "../utils/timeUtils";
+import { useAppointmentActions } from "../hooks/useAppointmentActions";
+import { useAppointmentDetails } from "../hooks/useAppointmentDetails";
 
 interface AppointmentManagerProps {
   isOpen: boolean;
@@ -24,6 +27,7 @@ interface AppointmentManagerProps {
   locationId?: string;
   onAppointmentSaved?: () => void;
 }
+
 export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   isOpen,
   onClose,
@@ -36,6 +40,12 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 }) => {
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
+  
+  const { appointment, refetch: refetchAppointment } = useAppointmentDetails(
+    existingAppointment?.id
+  );
+  
+  const { cancelAppointment, markAppointmentAs } = useAppointmentActions();
 
   const { data: services } = useActiveServices(locationId);
   const { data: packages } = useActivePackages(locationId);
@@ -295,6 +305,38 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
+  const handleCancelAppointment = async () => {
+    if (existingAppointment?.id) {
+      try {
+        await cancelAppointment(existingAppointment.id);
+        toast.success("Appointment canceled successfully");
+        onClose();
+        if (onAppointmentSaved) {
+          onAppointmentSaved();
+        }
+      } catch (error) {
+        console.error("Error canceling appointment:", error);
+        toast.error("Failed to cancel appointment");
+      }
+    }
+  };
+
+  const handleMarkAs = async (status: "noshow" | "completed") => {
+    if (existingAppointment?.id) {
+      try {
+        await markAppointmentAs(existingAppointment.id, status);
+        toast.success(`Appointment marked as ${status}`);
+        onClose();
+        if (onAppointmentSaved) {
+          onAppointmentSaved();
+        }
+      } catch (error) {
+        console.error(`Error marking appointment as ${status}:`, error);
+        toast.error(`Failed to mark appointment as ${status}`);
+      }
+    }
+  };
+
   const displayTime = stateSelectedTime ? formatTimeString(stateSelectedTime) : "";
 
   return (
@@ -336,90 +378,99 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
             </div>
 
             <div className="flex flex-col flex-1 min-h-0">
-              <div className="p-6 flex-shrink-0">
-                <h3 className="text-lg font-semibold">Select Services</h3>
-              </div>
+              {currentScreen === SCREEN.SERVICE_SELECTION && (
+                <>
+                  <div className="p-6 flex-shrink-0">
+                    <h3 className="text-lg font-semibold">Select Services</h3>
+                  </div>
 
-              <div className="flex-1 overflow-y-auto px-6 min-h-0">
-                <ServiceSelector
-                  onServiceSelect={handleServiceSelect}
-                  onPackageSelect={handlePackageSelect}
-                  onStylistSelect={handleStylistSelect}
+                  <div className="flex-1 overflow-y-auto px-6 min-h-0">
+                    <ServiceSelector
+                      onServiceSelect={handleServiceSelect}
+                      onPackageSelect={handlePackageSelect}
+                      onStylistSelect={handleStylistSelect}
+                      selectedServices={selectedServices}
+                      selectedPackages={selectedPackages}
+                      selectedStylists={selectedStylists}
+                      stylists={employees}
+                      onCustomPackage={handleCustomServiceToggle}
+                      customizedServices={customizedServices}
+                      locationId={locationId}
+                    />
+                  </div>
+
+                  <div className="p-6 border-t flex-shrink-0 flex justify-end gap-4 bg-white">
+                    <Button variant="outline" onClick={onHandleSaveAppointment}>
+                      Save Appointment
+                    </Button>
+                    <Button
+                      className="bg-black text-white"
+                      onClick={handleProceedToCheckout}
+                    >
+                      Checkout
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {currentScreen === SCREEN.CHECKOUT && (
+                <CheckoutSection
+                  appointmentId={newAppointmentId || existingAppointment?.id || ""}
+                  selectedCustomer={selectedCustomer}
                   selectedServices={selectedServices}
                   selectedPackages={selectedPackages}
+                  services={services || []}
+                  packages={packages || []}
+                  discountType={discountType}
+                  discountValue={discountValue}
+                  paymentMethod={paymentMethod}
+                  notes={appointmentNotes}
+                  onDiscountTypeChange={setDiscountType}
+                  onDiscountValueChange={setDiscountValue}
+                  onPaymentMethodChange={setPaymentMethod}
+                  onNotesChange={setAppointmentNotes}
+                  onPaymentComplete={handlePaymentComplete}
                   selectedStylists={selectedStylists}
-                  stylists={employees}
-                  onCustomPackage={handleCustomServiceToggle}
+                  selectedTimeSlots={{
+                    [newAppointmentId || existingAppointment?.id || ""]: stateSelectedTime,
+                  }}
+                  onSaveAppointment={handleSaveAppointment}
+                  onRemoveService={handleRemoveService}
+                  onRemovePackage={handleRemovePackage}
+                  onBackToServices={handleBackToServices}
                   customizedServices={customizedServices}
+                  isExistingAppointment={!!existingAppointment}
                   locationId={locationId}
+                  // Additional props for existing appointments
+                  onCancelAppointment={existingAppointment ? handleCancelAppointment : undefined}
+                  onMarkAsNoShow={existingAppointment ? () => handleMarkAs("noshow") : undefined}
+                  onMarkAsCompleted={existingAppointment ? () => handleMarkAs("completed") : undefined}
+                  appointmentStatus={existingAppointment?.status}
                 />
-              </div>
+              )}
 
-              <div className="p-6 border-t flex-shrink-0 flex justify-end gap-4 bg-white">
-                <Button variant="outline" onClick={onHandleSaveAppointment}>
-                  Save Appointment
-                </Button>
-                <Button
-                  className="bg-black text-white"
-                  onClick={handleProceedToCheckout}
-                >
-                  Checkout
-                </Button>
-              </div>
-            </div>
-
-            {currentScreen === SCREEN.CHECKOUT && (
-              <CheckoutSection
-                appointmentId={newAppointmentId || ""}
-                selectedCustomer={selectedCustomer}
-                selectedServices={selectedServices}
-                selectedPackages={selectedPackages}
-                services={services || []}
-                packages={packages || []}
-                discountType={discountType}
-                discountValue={discountValue}
-                paymentMethod={paymentMethod}
-                notes={appointmentNotes}
-                onDiscountTypeChange={setDiscountType}
-                onDiscountValueChange={setDiscountValue}
-                onPaymentMethodChange={setPaymentMethod}
-                onNotesChange={setAppointmentNotes}
-                onPaymentComplete={handlePaymentComplete}
-                selectedStylists={selectedStylists}
-                selectedTimeSlots={{
-                  [newAppointmentId || ""]: stateSelectedTime,
-                }}
-                onSaveAppointment={handleSaveAppointment}
-                onRemoveService={handleRemoveService}
-                onRemovePackage={handleRemovePackage}
-                onBackToServices={handleBackToServices}
-                customizedServices={customizedServices}
-                isExistingAppointment={!!existingAppointment}
-                locationId={locationId}
-              />
-            )}
-
-            {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
-              <div className="p-6">
-                <h3 className="text-xl font-semibold mb-6">
-                  Appointment Summary
-                </h3>
-                <SummaryView appointmentId={newAppointmentId} />
-                <div className="mt-6 flex justify-end">
-                  <Button
-                    onClick={() => {
-                      setCurrentScreen(SCREEN.SERVICE_SELECTION);
-                      setNewAppointmentId(null);
-                    }}
-                  >
-                    Create New Appointment
-                  </Button>
+              {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold mb-6">
+                    Appointment Summary
+                  </h3>
+                  <SummaryView appointmentId={newAppointmentId} />
+                  <div className="mt-6 flex justify-end">
+                    <Button
+                      onClick={() => {
+                        setCurrentScreen(SCREEN.SERVICE_SELECTION);
+                        setNewAppointmentId(null);
+                      }}
+                    >
+                      Create New Appointment
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
-};
+}

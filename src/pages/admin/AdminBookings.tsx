@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -11,7 +12,6 @@ import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
 import { AppointmentManager } from "./bookings/components/AppointmentManager";
-import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
 import { 
   Select, 
   SelectContent, 
@@ -213,7 +213,7 @@ export default function AdminBookings() {
     setAppointmentDate(cell.date || currentDate);
   };
 
-  const handleCheckoutFromAppointment = (appointment: Appointment) => {
+  const handleAppointmentClick = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
     
     const startDate = new Date(appointment.start_time);
@@ -282,7 +282,7 @@ export default function AdminBookings() {
           nowPosition={nowPosition}
           isSameDay={isSameDay}
           appointments={appointments}
-          setSelectedAppointment={setSelectedAppointment}
+          setSelectedAppointment={handleAppointmentClick}
           setClickedCell={handleCellClick}
           hourLabels={timeUtilsHourLabels}
           PIXELS_PER_HOUR={60}
@@ -290,13 +290,6 @@ export default function AdminBookings() {
           renderAppointmentBlock={() => null}
         />
         
-        <AppointmentDetailsDialog
-          appointment={selectedAppointment}
-          open={!!selectedAppointment && !isAddAppointmentOpen}
-          onOpenChange={() => setSelectedAppointment(null)}
-          onCheckout={handleCheckoutFromAppointment}
-        />
-
         {clickedCell && (
           <div
             className="fixed z-50 w-48 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
