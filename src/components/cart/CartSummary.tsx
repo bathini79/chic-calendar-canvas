@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useCoupons, Coupon } from "@/hooks/use-coupons";
+import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 import { 
   Select, 
   SelectContent, 
@@ -18,6 +19,8 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { Award } from "lucide-react";
 
 export function CartSummary() {
   const { 
@@ -36,21 +39,26 @@ export function CartSummary() {
   
   const [taxAmount, setTaxAmount] = useState(0);
   const [couponDiscount, setCouponDiscount] = useState(0);
+  const [membershipDiscount, setMembershipDiscount] = useState(0);
+  const [activeMembership, setActiveMembership] = useState<any>(null);
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
   const { taxRates, fetchTaxRates } = useTaxRates();
   const { coupons, fetchCoupons, isLoading: couponsLoading, getCouponById } = useCoupons();
+  const { customerMemberships, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
   
   const navigate = useNavigate();
   const location = useLocation();
   const isSchedulingPage = location.pathname === '/schedule';
   const isServicesPage = location.pathname === '/services';
+  const isBookingConfirmation = location.pathname === '/booking-confirmation';
   
   // Only show tax and coupons on booking-confirmation or other pages, not on services or schedule
   const shouldShowTaxAndCoupon = !isServicesPage && !isSchedulingPage;
 
   const subtotal = getTotalPrice();
   const totalDuration = getTotalDuration();
-  const afterCouponSubtotal = subtotal - couponDiscount;
+  const afterMembershipDiscount = subtotal - membershipDiscount;
+  const afterCouponSubtotal = afterMembershipDiscount - couponDiscount;
   const totalPrice = afterCouponSubtotal + taxAmount;
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
   
@@ -62,6 +70,69 @@ export function CartSummary() {
       couponDiscount
     });
   }, [appliedCouponId, coupons.length, couponDiscount]);
+  
+  // Fetch customer memberships when the component loads (if we're not in booking confirmation)
+  useEffect(() => {
+    const loadMemberships = async () => {
+      if (isBookingConfirmation) return; // Skip if we're on booking confirmation page
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await fetchCustomerMemberships(session.user.id);
+      }
+    };
+    
+    loadMemberships();
+  }, [fetchCustomerMemberships, isBookingConfirmation]);
+
+  // Calculate membership discounts for cart items
+  useEffect(() => {
+    if (isBookingConfirmation) return; // Skip if we're on booking confirmation page
+    
+    if (items && items.length > 0 && customerMemberships.length > 0) {
+      let totalMembershipDiscount = 0;
+      let bestMembership = null;
+      
+      // Process each cart item to find applicable membership discounts
+      items.forEach(item => {
+        if (item.type === 'service' && item.service_id) {
+          const servicePrice = item.selling_price || item.service?.selling_price || 0;
+          const discountInfo = getApplicableMembershipDiscount(item.service_id, null, servicePrice);
+          
+          if (discountInfo && discountInfo.calculatedDiscount > 0) {
+            totalMembershipDiscount += discountInfo.calculatedDiscount;
+            if (!bestMembership) {
+              bestMembership = {
+                id: discountInfo.membershipId,
+                name: discountInfo.membershipName,
+              };
+            }
+          }
+        } else if (item.type === 'package' && item.package_id) {
+          const packagePrice = item.selling_price || item.package?.price || 0;
+          const discountInfo = getApplicableMembershipDiscount(null, item.package_id, packagePrice);
+          
+          if (discountInfo && discountInfo.calculatedDiscount > 0) {
+            totalMembershipDiscount += discountInfo.calculatedDiscount;
+            if (!bestMembership) {
+              bestMembership = {
+                id: discountInfo.membershipId,
+                name: discountInfo.membershipName,
+              };
+            }
+          }
+        }
+      });
+      
+      setMembershipDiscount(totalMembershipDiscount);
+      setActiveMembership(bestMembership);
+      
+      console.log("Membership discount calculated:", totalMembershipDiscount);
+    } else {
+      setMembershipDiscount(0);
+      setActiveMembership(null);
+    }
+  }, [items, customerMemberships, getApplicableMembershipDiscount, isBookingConfirmation]);
   
   // Load tax data
   useEffect(() => {
@@ -132,16 +203,17 @@ export function CartSummary() {
     };
     
     const calculateDiscount = (coupon: Coupon) => {
+      const discountableAmount = subtotal - membershipDiscount;
       const discount = coupon.discount_type === 'percentage' 
-        ? subtotal * (coupon.discount_value / 100)
-        : Math.min(coupon.discount_value, subtotal); // Don't discount more than the subtotal
+        ? discountableAmount * (coupon.discount_value / 100)
+        : Math.min(coupon.discount_value, discountableAmount); // Don't discount more than the subtotal
       
       console.log("Calculated coupon discount:", discount);
       setCouponDiscount(discount);
     };
     
     applyCoupon();
-  }, [appliedCouponId, subtotal, coupons, getCouponById]);
+  }, [appliedCouponId, subtotal, coupons, getCouponById, membershipDiscount]);
   
   // Sort items by their scheduled start time
   const sortedItems = [...items].sort((a, b) => {
@@ -256,6 +328,16 @@ export function CartSummary() {
                 <span className="text-muted-foreground">Subtotal</span>
                 <span>{formatPrice(subtotal)}</span>
               </div>
+              
+              {activeMembership && membershipDiscount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span className="flex items-center gap-1">
+                    <Award className="h-4 w-4" />
+                    Membership ({activeMembership.name})
+                  </span>
+                  <span>-{formatPrice(membershipDiscount)}</span>
+                </div>
+              )}
               
               {/* Coupon selection */}
               <div className="space-y-1">

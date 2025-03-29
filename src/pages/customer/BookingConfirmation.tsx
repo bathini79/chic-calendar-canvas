@@ -1,3 +1,4 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,9 +15,10 @@ import {
   Search,
   X,
   Check,
+  Award,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
 import confetti from "canvas-confetti";
+import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 
 export default function BookingConfirmation() {
   const {
@@ -63,6 +66,9 @@ export default function BookingConfirmation() {
   const [openCouponPopover, setOpenCouponPopover] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const confettiRef = useRef<ConfettiRef>(null);
+  const { customerMemberships, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
+  const [membershipDiscount, setMembershipDiscount] = useState(0);
+  const [activeMembership, setActiveMembership] = useState<any>(null);
 
   useEffect(() => {
     console.log("BookingConfirmation - appliedCouponId:", appliedCouponId);
@@ -108,6 +114,65 @@ export default function BookingConfirmation() {
     fetchLocationTaxSettings,
   ]);
 
+  // Fetch customer memberships when the component loads
+  useEffect(() => {
+    const loadMemberships = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await fetchCustomerMemberships(session.user.id);
+      }
+    };
+    
+    loadMemberships();
+  }, [fetchCustomerMemberships]);
+
+  // Calculate membership discounts for cart items
+  useEffect(() => {
+    if (items && items.length > 0 && customerMemberships.length > 0) {
+      let totalMembershipDiscount = 0;
+      let bestMembership = null;
+      
+      // Process each cart item to find applicable membership discounts
+      items.forEach(item => {
+        if (item.type === 'service' && item.service_id) {
+          const servicePrice = item.selling_price || item.service?.selling_price || 0;
+          const discountInfo = getApplicableMembershipDiscount(item.service_id, null, servicePrice);
+          
+          if (discountInfo && discountInfo.calculatedDiscount > 0) {
+            totalMembershipDiscount += discountInfo.calculatedDiscount;
+            if (!bestMembership) {
+              bestMembership = {
+                id: discountInfo.membershipId,
+                name: discountInfo.membershipName,
+              };
+            }
+          }
+        } else if (item.type === 'package' && item.package_id) {
+          const packagePrice = item.selling_price || item.package?.price || 0;
+          const discountInfo = getApplicableMembershipDiscount(null, item.package_id, packagePrice);
+          
+          if (discountInfo && discountInfo.calculatedDiscount > 0) {
+            totalMembershipDiscount += discountInfo.calculatedDiscount;
+            if (!bestMembership) {
+              bestMembership = {
+                id: discountInfo.membershipId,
+                name: discountInfo.membershipName,
+              };
+            }
+          }
+        }
+      });
+      
+      setMembershipDiscount(totalMembershipDiscount);
+      setActiveMembership(bestMembership);
+      
+      console.log("Membership discount calculated:", totalMembershipDiscount);
+    } else {
+      setMembershipDiscount(0);
+      setActiveMembership(null);
+    }
+  }, [items, customerMemberships, getApplicableMembershipDiscount]);
+
   useEffect(() => {
     const loadTaxDetails = async () => {
       if (!appliedTaxId) {
@@ -122,8 +187,8 @@ export default function BookingConfirmation() {
             setTax(taxData);
 
             const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
-            const afterCoupon = subtotal - couponDiscount;
-            const newTaxAmount = afterCoupon * (taxData.percentage / 100);
+            const afterCouponAndMembership = subtotal - couponDiscount - membershipDiscount;
+            const newTaxAmount = afterCouponAndMembership * (taxData.percentage / 100);
             setTaxAmount(newTaxAmount);
           }
         } catch (error) {
@@ -133,7 +198,7 @@ export default function BookingConfirmation() {
     };
 
     loadTaxDetails();
-  }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails, items, tax]);
+  }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails, items, tax, membershipDiscount]);
 
   useEffect(() => {
     const loadCouponDetails = async () => {
@@ -187,23 +252,24 @@ export default function BookingConfirmation() {
       }
       
       const subtotal = getTotalPrice();
+      const afterMembershipDiscount = subtotal - membershipDiscount;
       const newDiscount =
         data.discount_type === "percentage"
-          ? subtotal * (data.discount_value / 100)
-          : Math.min(data.discount_value, subtotal);
+          ? afterMembershipDiscount * (data.discount_value / 100)
+          : Math.min(data.discount_value, afterMembershipDiscount);
 
-      console.log("Calculated coupon discount:", newDiscount, "from subtotal:", subtotal);
+      console.log("Calculated coupon discount:", newDiscount, "from subtotal after membership discount:", afterMembershipDiscount);
       setCouponDiscount(newDiscount);
 
       if (tax) {
-        const afterCoupon = subtotal - newDiscount;
-        const newTaxAmount = afterCoupon * (tax.percentage / 100);
+        const afterAllDiscounts = subtotal - membershipDiscount - newDiscount;
+        const newTaxAmount = afterAllDiscounts * (tax.percentage / 100);
         setTaxAmount(newTaxAmount);
       }
     };
 
     loadCouponDetails();
-  }, [appliedCouponId, getTotalPrice, tax, getCouponById, items]);
+  }, [appliedCouponId, getTotalPrice, tax, getCouponById, items, membershipDiscount]);
 
   useEffect(() => {
     if (!selectedDate || !items || items.length === 0 || Object.keys(selectedTimeSlots).length === 0) {
@@ -302,17 +368,41 @@ export default function BookingConfirmation() {
   );
 
   const subtotal = getTotalPrice();
-  const discountedSubtotal = subtotal - couponDiscount;
+  const afterMembershipDiscount = subtotal - membershipDiscount;
+  const discountedSubtotal = afterMembershipDiscount - couponDiscount;
   const totalPrice = discountedSubtotal + taxAmount;
 
-  const calculateItemDiscountedPrice = (itemOriginalPrice: number) => {
-    if (couponDiscount <= 0 || subtotal <= 0) {
+  const calculateItemDiscountedPrice = (itemOriginalPrice: number, serviceId: string | undefined, packageId: string | undefined) => {
+    if ((membershipDiscount <= 0 && couponDiscount <= 0) || subtotal <= 0) {
       return itemOriginalPrice;
     }
     
-    const priceRatio = itemOriginalPrice / subtotal;
-    const itemDiscountAmount = couponDiscount * priceRatio;
-    return Math.max(0, itemOriginalPrice - itemDiscountAmount);
+    // Calculate membership discount for this specific item
+    let itemMembershipDiscount = 0;
+    if ((serviceId || packageId) && membershipDiscount > 0) {
+      const discountInfo = getApplicableMembershipDiscount(
+        serviceId || null, 
+        packageId || null, 
+        itemOriginalPrice
+      );
+      
+      if (discountInfo) {
+        itemMembershipDiscount = discountInfo.calculatedDiscount;
+      }
+    }
+    
+    // Apply membership discount first
+    const afterMembershipPrice = Math.max(0, itemOriginalPrice - itemMembershipDiscount);
+    
+    // Then apply coupon discount proportionally
+    if (couponDiscount <= 0 || afterMembershipDiscount <= 0) {
+      return afterMembershipPrice;
+    }
+    
+    const priceRatio = afterMembershipPrice / afterMembershipDiscount;
+    const itemCouponDiscount = couponDiscount * priceRatio;
+    
+    return Math.max(0, afterMembershipPrice - itemCouponDiscount);
   };
 
   const handleCouponSelect = async (couponId: string) => {
@@ -380,6 +470,7 @@ export default function BookingConfirmation() {
 
       console.log("Creating appointment with:", {
         subtotal,
+        membershipDiscount,
         couponDiscount,
         discountedSubtotal,
         taxAmount,
@@ -387,6 +478,8 @@ export default function BookingConfirmation() {
         couponId: appliedCouponId,
         taxId: appliedTaxId,
         couponDetails: coupon,
+        membershipId: activeMembership?.id,
+        membershipName: activeMembership?.name
       });
 
       const { data: appointmentData, error: appointmentError } = await supabase
@@ -406,6 +499,9 @@ export default function BookingConfirmation() {
           discount_type: coupon?.discount_type || null,
           discount_value: coupon?.discount_value || 0,
           location: selectedLocation,
+          membership_id: activeMembership?.id || null,
+          membership_name: activeMembership?.name || null,
+          membership_discount: membershipDiscount || 0
         })
         .select();
 
@@ -441,7 +537,7 @@ export default function BookingConfirmation() {
           const itemEndTime = addMinutes(currentStartTime, itemDuration);
 
           const originalPrice = item.selling_price || item.service?.selling_price || 0;
-          const discountedPrice = calculateItemDiscountedPrice(originalPrice);
+          const discountedPrice = calculateItemDiscountedPrice(originalPrice, item.service_id, null);
 
           console.log(`Service: ${item.service?.name}, Original: ${originalPrice}, Discounted: ${discountedPrice}`);
 
@@ -463,7 +559,7 @@ export default function BookingConfirmation() {
             item.package.package_services.length > 0
           ) {
             const packageTotalPrice = item.selling_price || item.package?.price || 0;
-            const discountedPackagePrice = calculateItemDiscountedPrice(packageTotalPrice);
+            const discountedPackagePrice = calculateItemDiscountedPrice(packageTotalPrice, null, item.package_id);
             const packageDiscountRatio = packageTotalPrice > 0 
               ? discountedPackagePrice / packageTotalPrice 
               : 1;
@@ -538,7 +634,7 @@ export default function BookingConfirmation() {
                         : null;
 
                     const originalCustomPrice = customService.selling_price || 0;
-                    const discountedCustomPrice = calculateItemDiscountedPrice(originalCustomPrice);
+                    const discountedCustomPrice = calculateItemDiscountedPrice(originalCustomPrice, serviceId, item.package_id);
 
                     console.log(`Custom Service: ${customService.name}, Original: ${originalCustomPrice}, Discounted: ${discountedCustomPrice}`);
 
@@ -671,7 +767,11 @@ export default function BookingConfirmation() {
               const originalPrice = item.selling_price || 
                 item.service?.selling_price || 
                 item.package?.price || 0;
-              const discountedPrice = calculateItemDiscountedPrice(originalPrice);
+              const discountedPrice = calculateItemDiscountedPrice(
+                originalPrice, 
+                item.service_id, 
+                item.package_id
+              );
               const hasDiscount = discountedPrice < originalPrice;
 
               return (
@@ -732,6 +832,16 @@ export default function BookingConfirmation() {
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>₹{subtotal.toFixed(2)}</span>
                 </div>
+                
+                {activeMembership && membershipDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span className="flex items-center gap-1">
+                      <Award className="h-4 w-4" />
+                      Membership ({activeMembership.name})
+                    </span>
+                    <span>-₹{membershipDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
