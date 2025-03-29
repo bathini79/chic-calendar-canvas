@@ -637,31 +637,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center">
                           {item.type === "package" && (
                             <p className="font-semibold text-lg">
                               <IndianRupee className="inline h-4 w-4" />
                               {item.price}
                             </p>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => {
-                              if (item.type === 'service') {
-                                onRemoveService(item.id);
-                              } else {
-                                onRemovePackage(item.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {item.type === "package" && item.services && item.services.length > 0 && (
+                           {item.type === "package" && item.services && item.services.length > 0 && (
                         <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
                           {item.services.map(service => (
                             <div key={service.id} className="flex items-center justify-between py-1">
@@ -715,6 +698,24 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           </p>
                         </div>
                       )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              if (item.type === 'service') {
+                                onRemoveService(item.id);
+                              } else {
+                                onRemovePackage(item.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                     
                     </div>
                   )
                 ))}
