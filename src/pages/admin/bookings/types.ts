@@ -1,11 +1,9 @@
-
 export type AppointmentStatus = 
   | 'pending' 
   | 'confirmed' 
   | 'canceled' 
   | 'completed' 
-  | 'no-show' 
-  | 'noshow' 
+  | 'noshow'
   | 'inprogress'
   | 'voided'
   | 'refunded'
