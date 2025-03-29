@@ -69,12 +69,19 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     if (e.target !== e.currentTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
-    let clickedTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
-    clickedTime = Math.round(clickedTime * 4) / 4;
+    
+    // Calculate the time based on the pixel position
+    // This converts the Y-coordinate to hours since START_HOUR
+    const clickedTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
+    
+    // Round to the nearest 15 minutes (0.25 hours)
+    // Math.round(x * 4) / 4 rounds to the nearest 0.25
+    const roundedTime = Math.round(clickedTime * 4) / 4;
+    
     // Call the setClickedCell function with the correct data
     setClickedCell({
       employeeId: empId,
-      time: clickedTime,
+      time: roundedTime,
       x: e.clientX, // Use clientX instead of pageX for consistent positioning
       y: e.clientY, // Use clientY instead of pageY for consistent positioning
       date: currentDate,

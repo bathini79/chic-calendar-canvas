@@ -157,9 +157,11 @@ export default function AdminBookings() {
 
   const openAddAppointment = () => {
     if (clickedCell) {
+      // Extract hours and minutes from the time value
       const hours = Math.floor(clickedCell.time);
       const minutes = Math.round((clickedCell.time - hours) * 60);
       
+      // Format as HH:MM
       const timeString = `${hours.toString().padStart(2, "0")}:${minutes
         .toString()
         .padStart(2, "0")}`;
@@ -199,9 +201,11 @@ export default function AdminBookings() {
   const handleCellClick = (cell: { employeeId: string; time: number; x: number; y: number; date: Date }) => {
     setClickedCell(cell);
     
+    // Extract hours and minutes from the time value
     const hours = Math.floor(cell.time);
     const minutes = Math.round((cell.time - hours) * 60);
     
+    // Format as HH:MM
     const timeString = `${hours.toString().padStart(2, "0")}:${minutes
       .toString()
       .padStart(2, "0")}`;
