@@ -119,16 +119,20 @@ export function AppSidebar() {
     >
       <div className="flex h-14 items-center px-3 border-b justify-between">
         <Link to="/admin" className={cn("flex items-center flex-1", !open && "justify-center")}>
-          {businessDetails.logo_url ? (
-            <img 
-              src={businessDetails.logo_url} 
-              alt={businessDetails.name || "Salon Logo"} 
-              className="h-8 w-8 rounded" 
-            />
-          ) : (
-            <CreditCard className="h-8 w-8" />
-          )}
-          {open && businessDetails.name && (
+          <div className="flex items-center justify-center">
+            {isLoading ? (
+              <Skeleton className="h-8 w-8 rounded" />
+            ) : businessDetails.logo_url ? (
+              <img 
+                src={businessDetails.logo_url} 
+                alt="Salon Logo"
+                className="h-8 w-8 rounded" 
+              />
+            ) : (
+              <CreditCard className="h-8 w-8" />
+            )}
+          </div>
+          {open && (
             <span className={cn("ml-2 text-lg font-semibold transition-opacity overflow-hidden text-ellipsis whitespace-nowrap", 
               open ? "opacity-100 max-w-[160px]" : "opacity-0 max-w-0"
             )}>

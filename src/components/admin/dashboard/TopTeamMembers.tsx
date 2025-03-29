@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,9 +65,14 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
         <CardTitle className="text-lg">Top Team Members</CardTitle>
-        <LocationSelector value={topStylistsLocationId} onChange={setTopStylistsLocationId} locations={locations} />
+        <LocationSelector 
+          value={topStylistsLocationId} 
+          onChange={setTopStylistsLocationId} 
+          locations={locations} 
+          className="w-[150px]"
+        />
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

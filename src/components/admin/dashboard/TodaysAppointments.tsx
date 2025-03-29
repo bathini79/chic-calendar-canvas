@@ -36,7 +36,6 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
       <CardContent>
         <div className="mb-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <h2 className="text-xl sm:text-2xl font-bold">Today's Schedule</h2>
             <div className="flex flex-wrap gap-1">
               <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Booked: {appointments.filter(a => a.status === 'booked').length}</span>
               <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Confirmed: {appointments.filter(a => a.status === 'confirmed').length}</span>
@@ -48,7 +47,7 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
           {isLoading ? (
             <div className="flex justify-center items-center h-40"><p>Loading appointments...</p></div>
           ) : appointments.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {appointments.map(appointment => {
                 const mainBooking = appointment.bookings?.[0];
                 const serviceName = mainBooking?.service?.name || mainBooking?.package?.name || "Appointment";
@@ -57,8 +56,9 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
                 return (
                   <div 
                     key={appointment.id} 
-                    className="flex items-start hover:bg-gray-50 p-2 rounded cursor-pointer transition-colors"
+                    className="flex items-start hover:bg-gray-50 p-3 rounded cursor-pointer transition-colors border-b border-gray-100 last:border-0 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
                     onClick={() => onAppointmentClick(appointment)}
+                    tabIndex={0}
                   >
                     <div className="mr-4 text-center flex-shrink-0">
                       <div className="font-bold">{format(new Date(appointment.start_time), "HH:mm")}</div>
