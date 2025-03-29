@@ -133,23 +133,28 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
         const isTimeSlotHovered = hoveredTimeSlot === `${employeeId}-${Math.floor(startHour * 4) / 4}`;
 
         // Position calculations for multiple bookings in the same slot
-        const topPositionPx = (startHour - START_HOUR) * PIXELS_PER_HOUR;
-        const heightPx = (duration / 60) * PIXELS_PER_HOUR;
+        // Add a small offset to ensure visibility within the cell boundaries
+        const topPositionPx = Math.max(0, (startHour - START_HOUR) * PIXELS_PER_HOUR);
+        const heightPx = Math.max(30, (duration / 60) * PIXELS_PER_HOUR); // Ensure minimum height
         
-        // Stack bookings vertically instead of horizontally
-        const heightPerBooking = heightPx / totalBookingsInSlot;
-        const topOffset = index * heightPerBooking;
+        // Arrange bookings horizontally in columns
+        const widthPerBooking = 100 / totalBookingsInSlot;
+        const leftOffset = index * widthPerBooking;
+        
+        // Add a small gap between columns for better visual separation
+        const gapSize = 1; // 1% gap
+        const adjustedWidth = widthPerBooking - gapSize;
         
         return (
           <div
             key={`${booking.id}-${index}-${dataVersion}`}
             className={`absolute rounded border ${statusColor} cursor-pointer z-10 overflow-hidden transition-colors ${isHovered ? 'ring-2 ring-primary' : ''} ${isTimeSlotHovered ? 'opacity-90 shadow-md' : ''}`}
             style={{
-              top: `${topPositionPx + topOffset}px`,
-              height: `${heightPerBooking}px`,
-              left: '0',
-              right: '0',
-              width: '100%',
+              top: `${topPositionPx}px`,
+              height: `${heightPx}px`,
+              left: `${leftOffset + (gapSize/2)}%`,
+              width: `${adjustedWidth}%`,
+              zIndex: 10 + index, // Higher index items appear in front
             }}
             onClick={(e) => {
               e.stopPropagation();

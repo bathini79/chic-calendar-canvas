@@ -32,22 +32,18 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { format } from 'date-fns';
 import { 
   getTotalPrice, 
   getTotalDuration, 
   getFinalPrice, 
-  getServicePriceInPackage,
   calculatePackagePrice,
   getAdjustedServicePrices
 } from "../utils/bookingUtils";
-import { getMembershipDiscount } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
-import { useQueryClient } from "@tanstack/react-query";
-
+import { LoaderCircle } from "lucide-react";
 interface CheckoutSectionProps {
   appointmentId?: string;
   selectedCustomer: Customer | null;
@@ -123,6 +119,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [membershipDiscount, setMembershipDiscount] = useState<number>(0);
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [membershipName, setMembershipName] = useState<string | null>(null);
+  const [loadPayment,setLoadPayment] = useState(false)
   
   const { data: paymentMethods = [], isLoading: paymentMethodsLoading } = useQuery({
     queryKey: ['payment-methods'],
@@ -337,28 +334,11 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     return `${minutes}m`;
   };
 
-  const formatTimeSlot = (timeString: string) => {
-    try {
-      const baseDate = new Date();
-      const [hours, minutes] = timeString.split(':').map(Number);
-      baseDate.setHours(hours, minutes);
-      return format(baseDate, 'hh:mm a');
-    } catch (error) {
-      console.error('Error formatting time:', error);
-      return timeString;
-    }
-  };
-
   const getStylistName = (stylistId: string) => {
     if (!employees || !stylistId) return null;
     const stylist = employees.find(emp => emp.id === stylistId);
     return stylist ? stylist.name : null;
   };
-
-  const totalDuration = useMemo(() => 
-    getTotalDuration(selectedServices, selectedPackages, services, packages, customizedServices),
-    [selectedServices, selectedPackages, services, packages, customizedServices]
-  );
 
   const taxAmount = useMemo(() => {
     const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
@@ -526,16 +506,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     adjustedPrices
   ]);
 
-  const queryClient = useQueryClient();
 
   const handleCheckout = async () => {
     try {
-      setIsProcessing(true);
-
       if (!selectedCustomer) {
         toast.error("Please select a customer");
         return;
-      }      
+      }  
+      setLoadPayment(true)    
       const saveAppointmentParams = {
         appointmentId,
         appliedTaxId,
@@ -557,17 +535,11 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
 
       toast.success("Payment completed successfully");
       onPaymentComplete(savedAppointmentId);
-
-      // Invalidate query cache to trigger TimeSlots rerender with latest data
-      if (selectedDate) {
-        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-        queryClient.invalidateQueries({ queryKey: ['appointments', formattedDate, locationId] });
-      }
     } catch (error: any) {
       console.error("Error during checkout:", error);
       toast.error(`Error: ${error.message}`);
-    } finally {
-      setIsProcessing(false);
+    }finally{
+      setLoadPayment(false)
     }
   };
 
@@ -841,6 +813,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 onClick={handleCheckout}
                 disabled={selectedItems.length === 0}
               >
+                { loadPayment ? <LoaderCircle
+        className="-ms-1 me-2 animate-spin"
+        size={16}
+        strokeWidth={2}
+        aria-hidden="true"
+      /> :  null}
                 Complete Payment
               </Button>
               <Popover>
