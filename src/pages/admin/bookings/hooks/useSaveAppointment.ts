@@ -121,10 +121,22 @@ export default function useSaveAppointment({
         summaryParams.couponDiscount : 
         couponDiscount;
         
+      const membershipId = summaryParams.membershipId !== undefined ? 
+        summaryParams.membershipId : 
+        null;
+      
+      const membershipName = summaryParams.membershipName !== undefined ? 
+        summaryParams.membershipName : 
+        null;
+      
+      const membershipDiscount = summaryParams.membershipDiscount !== undefined ? 
+        summaryParams.membershipDiscount : 
+        0;
+        
       // Use provided summary total price or calculate it
       const totalPrice = summaryParams.total !== undefined ? 
         summaryParams.total : 
-        getTotalPrice(selectedServiceObjects, selectedPackageObjects, discountType, discountValue) - calculatedCouponDiscount + calculatedTaxAmount;
+        getTotalPrice(selectedServiceObjects, selectedPackageObjects, discountType, discountValue) - calculatedCouponDiscount - membershipDiscount + calculatedTaxAmount;
       
       // Use provided tax and coupon IDs or fall back to props
       const usedTaxId = summaryParams.appliedTaxId !== undefined ? 
@@ -142,7 +154,10 @@ export default function useSaveAppointment({
         taxAmount: calculatedTaxAmount,
         taxId: usedTaxId,
         couponDiscount: calculatedCouponDiscount,
-        couponId: usedCouponId
+        couponId: usedCouponId,
+        membershipId,
+        membershipName,
+        membershipDiscount
       });
 
       // Create or update appointment with properly typed status
@@ -162,7 +177,10 @@ export default function useSaveAppointment({
         location: locationId,
         tax_amount: calculatedTaxAmount,
         tax_id: usedTaxId,
-        coupon_id: usedCouponId
+        coupon_id: usedCouponId,
+        membership_id: membershipId,
+        membership_name: membershipName,
+        membership_discount: membershipDiscount
       };
 
       let createdAppointmentId;
@@ -196,92 +214,114 @@ export default function useSaveAppointment({
         createdAppointmentId = data.id;
       }
 
-      // Create bookings for each service with properly typed status
-      for (const serviceId of selectedServices) {
-        const service = services.find(s => s.id === serviceId);
-        if (!service) continue;
+      // Calculate adjusted prices for services based on discounts
+      const adjustedItems = calculateAdjustedPrices(
+        selectedServices,
+        selectedPackages,
+        services,
+        packages,
+        discountType,
+        discountValue,
+        calculatedCouponDiscount,
+        membershipDiscount,
+        customizedServices
+      );
 
-        const serviceStartTime = new Date(startTime);
+      // Create bookings for each service with properly typed status
+      for (const item of adjustedItems) {
         const bookingStatus: AppointmentStatus = 
           currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
 
-        const bookingData = {
+        const bookingData: any = {
           appointment_id: createdAppointmentId,
-          service_id: serviceId,
-          employee_id: selectedStylists[serviceId] === 'any' ? null : selectedStylists[serviceId],
           status: bookingStatus,
-          start_time: serviceStartTime.toISOString(),
-          end_time: addMinutes(serviceStartTime, service.duration).toISOString(),
-          price_paid: service.selling_price,
-          original_price: service.original_price || service.selling_price,
+          price_paid: item.adjustedPrice,
+          original_price: item.originalPrice,
+          employee_id: item.stylistId === 'any' ? null : item.stylistId,
         };
 
-        const { error } = await supabase
-          .from('bookings')
-          .insert(bookingData);
+        if (item.type === 'service') {
+          bookingData.service_id = item.id;
+          
+          const service = services.find(s => s.id === item.id);
+          if (service) {
+            const serviceStartTime = new Date(startTime);
+            bookingData.start_time = serviceStartTime.toISOString();
+            bookingData.end_time = addMinutes(serviceStartTime, service.duration).toISOString();
+          }
+        } else if (item.type === 'package') {
+          bookingData.package_id = item.id;
 
+          const pkg = packages.find(p => p.id === item.id);
+          if (pkg) {
+            // For packages, we'll use the same start/end time as the appointment
+            bookingData.start_time = startTime.toISOString();
+            bookingData.end_time = endTime.toISOString();
+          }
+        }
+
+        const { error } = await supabase.from('bookings').insert(bookingData);
         if (error) throw error;
       }
 
-      // Create bookings for each package
+      // If package has customized services, add them as separate bookings
       for (const packageId of selectedPackages) {
         const pkg = packages.find(p => p.id === packageId);
-        if (!pkg) continue;
-
-        // For each service in the package
-        const packageServiceIds = pkg.package_services?.map((ps: any) => ps.service.id) || [];
+        if (!pkg || !pkg.is_customizable) continue;
         
-        for (const packageServiceId of packageServiceIds) {
-          const packageService = services.find(s => s.id === packageServiceId);
-          if (!packageService) continue;
+        // For each service in the package
+        if (pkg.package_services) {
+          for (const packageService of pkg.package_services) {
+            const service = packageService.service;
+            if (!service) continue;
+            
+            const stylistId = selectedStylists[service.id] || selectedStylists[packageId] || null;
+            
+            const bookingData = {
+              appointment_id: createdAppointmentId,
+              service_id: service.id,
+              package_id: packageId,
+              employee_id: stylistId === 'any' ? null : stylistId,
+              status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
+              start_time: startTime.toISOString(),
+              end_time: addMinutes(startTime, service.duration).toISOString(),
+              price_paid: 0, // Base package services typically don't have individual prices
+              original_price: service.selling_price,
+            };
 
-          const packageServiceStartTime = new Date(startTime);
-          // TODO: Calculate proper start time based on previous services
-
-          const bookingData = {
-            appointment_id: createdAppointmentId,
-            service_id: packageServiceId,
-            package_id: packageId,
-            employee_id: selectedStylists[packageServiceId] === 'any' ? null : selectedStylists[packageServiceId],
-            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
-            start_time: packageServiceStartTime.toISOString(),
-            end_time: addMinutes(packageServiceStartTime, packageService.duration).toISOString(),
-            price_paid: 0, // Package services typically don't have individual prices
-            original_price: packageService.selling_price,
-          };
-
-          const { error } = await supabase
-            .from('bookings')
-            .insert(bookingData);
-
-          if (error) throw error;
+            const { error } = await supabase.from('bookings').insert(bookingData);
+            if (error) throw error;
+          }
         }
-
-        // Add any customized services for this package
+        
+        // Add customized services
         const customServiceIds = customizedServices[packageId] || [];
         for (const customServiceId of customServiceIds) {
           const customService = services.find(s => s.id === customServiceId);
           if (!customService) continue;
-
-          const customServiceStartTime = new Date(startTime);
-          // TODO: Calculate proper start time based on previous services
+          
+          // Find this customized service in the adjusted items to get the price
+          const customItemPrice = adjustedItems.find(
+            item => item.type === 'customService' && 
+            item.id === customServiceId && 
+            item.packageId === packageId
+          )?.adjustedPrice || customService.selling_price;
+          
+          const stylistId = selectedStylists[customServiceId] || selectedStylists[packageId] || null;
 
           const bookingData = {
             appointment_id: createdAppointmentId,
             service_id: customServiceId,
             package_id: packageId,
-            employee_id: selectedStylists[customServiceId] === 'any' ? null : selectedStylists[customServiceId],
+            employee_id: stylistId === 'any' ? null : stylistId,
             status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
-            start_time: customServiceStartTime.toISOString(),
-            end_time: addMinutes(customServiceStartTime, customService.duration).toISOString(),
-            price_paid: customService.selling_price,
+            start_time: startTime.toISOString(),
+            end_time: addMinutes(startTime, customService.duration).toISOString(),
+            price_paid: customItemPrice,
             original_price: customService.selling_price,
           };
 
-          const { error } = await supabase
-            .from('bookings')
-            .insert(bookingData);
-
+          const { error } = await supabase.from('bookings').insert(bookingData);
           if (error) throw error;
         }
       }
@@ -310,6 +350,138 @@ export default function useSaveAppointment({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const calculateAdjustedPrices = (
+    selectedServices: string[],
+    selectedPackages: string[],
+    services: any[],
+    packages: any[],
+    discountType: string,
+    discountValue: number,
+    couponDiscount: number,
+    membershipDiscount: number,
+    customizedServices: Record<string, string[]>
+  ) => {
+    const items = [];
+    const totalBeforeDiscount = getTotalPrice(
+      selectedServices, 
+      selectedPackages, 
+      services, 
+      packages, 
+      customizedServices
+    );
+    
+    if (totalBeforeDiscount <= 0) {
+      return [];
+    }
+    
+    let globalDiscountAmount = 0;
+    if (discountType === 'percentage') {
+      globalDiscountAmount = totalBeforeDiscount * (discountValue / 100);
+    } else if (discountType === 'fixed') {
+      globalDiscountAmount = discountValue;
+    }
+
+    // Determine how to distribute discounts
+    const totalItems = selectedServices.length + selectedPackages.length;
+    const globalDiscountPerItem = totalItems > 0 ? globalDiscountAmount / totalItems : 0;
+    const couponDiscountPerItem = totalItems > 0 ? couponDiscount / totalItems : 0;
+    
+    // Process individual services
+    for (const serviceId of selectedServices) {
+      const service = services.find(s => s.id === serviceId);
+      if (!service) continue;
+      
+      let originalPrice = service.selling_price;
+      let adjustedPrice = originalPrice;
+      
+      // Apply global discount (proportionally)
+      adjustedPrice -= globalDiscountPerItem;
+      
+      // Apply coupon discount (proportionally)
+      adjustedPrice -= couponDiscountPerItem;
+      
+      // Apply membership discount (if applicable)
+      // For simplicity, we're dividing membership discount equally among services
+      const specificMembershipDiscount = selectedServices.length > 0 ? 
+        membershipDiscount / selectedServices.length : 0;
+      adjustedPrice -= specificMembershipDiscount;
+      
+      // Ensure price doesn't go below zero
+      adjustedPrice = Math.max(0, adjustedPrice);
+      
+      items.push({
+        id: serviceId,
+        type: 'service',
+        stylistId: selectedStylists[serviceId],
+        originalPrice,
+        adjustedPrice: parseFloat(adjustedPrice.toFixed(2))
+      });
+    }
+    
+    // Process packages
+    for (const packageId of selectedPackages) {
+      const pkg = packages.find(p => p.id === packageId);
+      if (!pkg) continue;
+      
+      const packageBasePrice = pkg.price;
+      let adjustedPrice = packageBasePrice;
+      
+      // Apply global discount (proportionally)
+      adjustedPrice -= globalDiscountPerItem;
+      
+      // Apply coupon discount (proportionally) 
+      adjustedPrice -= couponDiscountPerItem;
+      
+      // Apply membership discount (if applicable)
+      const specificMembershipDiscount = selectedPackages.length > 0 ? 
+        membershipDiscount / selectedPackages.length : 0;
+      adjustedPrice -= specificMembershipDiscount;
+      
+      // Ensure price doesn't go below zero
+      adjustedPrice = Math.max(0, adjustedPrice);
+      
+      items.push({
+        id: packageId,
+        type: 'package',
+        stylistId: selectedStylists[packageId],
+        originalPrice: packageBasePrice,
+        adjustedPrice: parseFloat(adjustedPrice.toFixed(2))
+      });
+      
+      // Handle customized services for the package
+      if (pkg.is_customizable && customizedServices[packageId]) {
+        for (const customServiceId of customizedServices[packageId]) {
+          const service = services.find(s => s.id === customServiceId);
+          
+          // Check if this service is already included in the package
+          const isBaseService = pkg.package_services?.some(ps => 
+            ps.service.id === customServiceId
+          );
+          
+          // Only add customized services that aren't part of the base package
+          if (service && !isBaseService) {
+            let originalPrice = service.selling_price;
+            let adjustedPrice = originalPrice;
+            
+            // Apply discounts proportionally to customized services as well
+            adjustedPrice = Math.max(0, adjustedPrice);
+            
+            items.push({
+              id: customServiceId,
+              packageId: packageId,
+              type: 'customService',
+              stylistId: selectedStylists[customServiceId] || selectedStylists[packageId],
+              originalPrice,
+              adjustedPrice: parseFloat(adjustedPrice.toFixed(2))
+            });
+          }
+        }
+      }
+    }
+    
+    return items;
   };
 
   return { handleSaveAppointment, isLoading };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,9 @@ import { useAppointmentState } from "../hooks/useAppointmentState";
 import { useActiveServices } from "../hooks/useActiveServices";
 import { useActivePackages } from "../hooks/useActivePackages";
 import useSaveAppointment from "../hooks/useSaveAppointment";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
+import { getTotalPrice, getTotalDuration, calculatePackagePrice } from "../utils/bookingUtils";
 import { Appointment, SCREEN, Service, Package } from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 
@@ -202,190 +204,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     locationId
   });
 
-  const saveAppointment = async (additionalParams = {}) => {
-    if (!selectedCustomer) {
-      toast.error("Please select a customer");
-      return null;
-    }
-
-    const {
-      taxAmount = 0,
-      couponId = null,
-      couponDiscount = 0,
-      membershipId = null,
-      membershipName = null,
-      membershipDiscount = 0,
-      total = 0
-    } = additionalParams;
-
-    try {
-      const adjustedItems = calculateAdjustedPrices(
-        selectedServices, 
-        selectedPackages, 
-        services, 
-        packages, 
-        discountType, 
-        discountValue, 
-        couponDiscount, 
-        membershipDiscount,
-        customizedServices
-      );
-
-      let appointmentData: any = {
-        customer_id: selectedCustomer.id,
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        status: "booked",
-        total_price: total,
-        total_duration: totalDuration,
-        notes: notes,
-        payment_method: paymentMethod,
-        discount_type: discountType,
-        discount_value: discountValue,
-        tax_amount: taxAmount,
-        tax_id: additionalParams.appliedTaxId || null,
-        coupon_id: couponId,
-        location_id: locationId,
-        membership_id: membershipId,
-        membership_name: membershipName,
-        membership_discount: membershipDiscount,
-      };
-
-      if (existingAppointment) {
-        const { error: updateError } = await supabase
-          .from("appointments")
-          .update(appointmentData)
-          .eq("id", existingAppointment.id);
-
-        if (updateError) throw updateError;
-        
-        const { error: deleteError } = await supabase
-          .from("bookings")
-          .delete()
-          .eq("appointment_id", existingAppointment.id);
-
-        if (deleteError) throw deleteError;
-        
-        appointmentId = existingAppointment.id;
-      } else {
-        const { data, error } = await supabase
-          .from("appointments")
-          .insert(appointmentData)
-          .select()
-          .single();
-
-        if (error) throw error;
-        appointmentId = data.id;
-      }
-
-      for (const item of adjustedItems) {
-        const bookingData = {
-          appointment_id: appointmentId,
-          employee_id: item.stylistId,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          status: "booked",
-          price_paid: item.adjustedPrice,
-        };
-
-        if (item.type === 'service') {
-          bookingData['service_id'] = item.id;
-        } else if (item.type === 'package') {
-          bookingData['package_id'] = item.id;
-        }
-
-        const { error } = await supabase
-          .from("bookings")
-          .insert(bookingData);
-
-        if (error) throw error;
-      }
-
-      toast.success(
-        existingAppointment
-          ? "Appointment updated successfully"
-          : "Appointment created successfully"
-      );
-      
-      return appointmentId;
-    } catch (error: any) {
-      console.error("Error creating appointment:", error);
-      toast.error(error.message || "Failed to create appointment");
-      return null;
-    }
-  };
-
-  const calculateAdjustedPrices = (
-    selectedServices,
-    selectedPackages,
-    services,
-    packages,
-    discountType,
-    discountValue,
-    couponDiscount,
-    membershipDiscount,
-    customizedServices
-  ) => {
-    const items = [];
-    const totalBeforeDiscount = getTotalPrice(
-      selectedServices, 
-      selectedPackages, 
-      services, 
-      packages, 
-      customizedServices
-    );
-    
-    if (totalBeforeDiscount <= 0) {
-      return [];
-    }
-    
-    const globalDiscountPercentage = 
-      (discountType === 'percentage' ? discountValue / 100 : discountValue / totalBeforeDiscount) +
-      (couponDiscount / totalBeforeDiscount);
-    
-    for (const serviceId of selectedServices) {
-      const service = services.find(s => s.id === serviceId);
-      if (!service) continue;
-      
-      let price = service.selling_price;
-      
-      const specificMembershipDiscount = membershipDiscount / selectedServices.length;
-      price = Math.max(0, price - specificMembershipDiscount);
-      
-      price = Math.max(0, price * (1 - globalDiscountPercentage));
-      
-      items.push({
-        id: serviceId,
-        type: 'service',
-        stylistId: selectedStylists[serviceId],
-        originalPrice: service.selling_price,
-        adjustedPrice: parseFloat(price.toFixed(2))
-      });
-    }
-    
-    for (const packageId of selectedPackages) {
-      const pkg = packages.find(p => p.id === packageId);
-      if (!pkg) continue;
-      
-      let price = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
-      
-      const specificMembershipDiscount = membershipDiscount / selectedPackages.length;
-      price = Math.max(0, price - specificMembershipDiscount);
-      
-      price = Math.max(0, price * (1 - globalDiscountPercentage));
-      
-      items.push({
-        id: packageId,
-        type: 'package',
-        stylistId: selectedStylists[packageId],
-        originalPrice: pkg.price,
-        adjustedPrice: parseFloat(price.toFixed(2))
-      });
-    }
-    
-    return items;
-  };
-
   const handleProceedToCheckout = async () => {
     if (!selectedCustomer) {
       toast.error("Please select a customer");
@@ -461,7 +279,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   const onHandleSaveAppointment = async() => {
-    const appointmentId = await saveAppointment();
+    const appointmentId = await handleSaveAppointment();
     if(appointmentId){
       onClose();
       resetState();
