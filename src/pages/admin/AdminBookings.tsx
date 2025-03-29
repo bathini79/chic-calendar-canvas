@@ -170,9 +170,7 @@ export default function AdminBookings() {
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
-        <header className="p-4 border-b bg-white flex justify-between items-center">
-          <div className="font-bold text-xl">Define Salon</div>
-          
+        <header className="p-4 border-b bg-white flex justify-between items-center">          
           <div className="flex items-center space-x-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

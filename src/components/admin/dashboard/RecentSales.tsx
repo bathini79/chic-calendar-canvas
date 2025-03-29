@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -18,6 +17,21 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
   });
   const [isLoading, setIsLoading] = useState(true);
   const today = new Date();
+
+  const getStartDateForTimeRange = (range) => {
+    switch (range) {
+      case "today":
+        return startOfDay(today);
+      case "week":
+        return subDays(today, 7);
+      case "month":
+        return subDays(today, 30);
+      case "year":
+        return subDays(today, 365);
+      default:
+        return startOfDay(today);
+    }
+  };
 
   const fetchRevenueData = useCallback(async () => {
     let startDate;
@@ -66,21 +80,8 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       setTotalRevenue(0);
       setAppointmentsStats({ count: 0, value: 0, completed: 0, completedValue: 0 });
     }
-  }, [timeRange, recentSalesLocationId, today]);
-  const getStartDateForTimeRange = (range) => {
-    switch (range) {
-      case "today":
-        return startOfDay(today);
-      case "week":
-        return subDays(today, 7);
-      case "month":
-        return subDays(today, 30);
-      case "year":
-        return subDays(today, 365);
-      default:
-        return startOfDay(today);
-    }
-  };
+  }, [timeRange, recentSalesLocationId]);
+
   const fetchBusinessMetrics = useCallback(async () => {
     try {
       // Calculate revenue
@@ -283,19 +284,35 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
         tipsChange: "--"
       });
     }
-  }, [timeRange, recentSalesLocationId, totalRevenue, today]);
+  }, [timeRange, recentSalesLocationId, totalRevenue]);
 
+  // Fix the infinite loop by separating data fetching from state updates
   useEffect(() => {
-    setIsLoading(true);
-    Promise.all([fetchRevenueData(), fetchBusinessMetrics()])
-      .finally(() => setIsLoading(false));
-  }, [timeRange,recentSalesLocationId]);
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        await fetchRevenueData();
+        await fetchBusinessMetrics();
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    fetchData();
+    
+    // Cleanup function to prevent state updates if component unmounts
+    return () => {
+      isMounted = false;
+    };
+  }, [timeRange, recentSalesLocationId, fetchRevenueData, fetchBusinessMetrics]);
 
   const getTimeRangeLabel = () => {
     return { "today": "Today", "week": "Last 7 days", "month": "Last 30 days", "year": "Last 365 days" }[timeRange] || "Today";
   };
-
-  if (isLoading) return <div>Loading...</div>;
 
   return (
     <Card className="shadow-sm h-full">
@@ -304,7 +321,8 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
           <CardTitle className="text-lg">Recent Sales</CardTitle>
           <CardDescription>{getTimeRangeLabel()}</CardDescription>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+        {/* Mobile: filters in a single row */}
+        <div className="flex flex-row gap-2 w-full sm:w-auto">
           <LocationSelector value={recentSalesLocationId} onChange={setRecentSalesLocationId} locations={locations} />
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-full sm:w-[120px]"><SelectValue placeholder="Select..." /></SelectTrigger>
@@ -318,48 +336,57 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-6">
-          <div className="text-3xl font-bold text-gray-900">₹{appointmentsStats.completedValue.toFixed(2)}</div>
-          <div>
-            <div className="text-sm text-gray-500">Appointments {appointmentsStats.count}</div>
-            <div className="text-lg font-semibold">Appointments value ₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
+        {isLoading ? (
+          <div className="space-y-6 h-[400px] flex items-center justify-center">
+            <div className="text-gray-500">Loading...</div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-gray-600">Occupancy Rate</div>
-                <Percent className="h-4 w-4 text-gray-400" />
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.occupancyRate}%</div>
+        ) : (
+          <div className="space-y-6">
+            <div className="text-3xl font-bold text-gray-900">₹{appointmentsStats.completedValue.toFixed(2)}</div>
+            <div>
+              <div className="text-sm text-gray-500">Appointments {appointmentsStats.count}</div>
+              <div className="text-lg font-semibold">Appointments value ₹{(appointmentsStats.value - appointmentsStats.completedValue).toFixed(2)}</div>
             </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-gray-600">Returning Customer Rate</div>
-                <User className="h-4 w-4 text-gray-400" />
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.returningCustomerRate}%</div>
+            {/* Mobile: metrics in a single row */}
+            <div className="grid grid-cols-2 gap-4 my-6">
+  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+    <div className="flex items-center justify-between mb-2">
+      <div className="text-sm font-medium text-gray-600">Occupancy Rate</div>
+      <Percent className="h-4 w-4 text-gray-400" />
+    </div>
+    <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.occupancyRate}%</div>
+  </div>
+  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+    <div className="flex items-center justify-between mb-2">
+      <div className="text-sm font-medium text-gray-600">Returning Customer Rate</div>
+      <User className="h-4 w-4 text-gray-400" />
+    </div>
+    <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.returningCustomerRate}%</div>
+  </div>
+</div>
+
+            
+            <div className="h-[300px] mt-6 overflow-x-auto overflow-y-auto">
+              {revenueData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={revenueData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="sales" stroke="#8884d8" name="Sales" dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="appointments" stroke="#82ca9d" name="Appointments" dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground">No data available for the selected period</p>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-        <div className="h-[300px] mt-6 overflow-x-auto overflow-y-auto">
-          {revenueData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={revenueData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="sales" stroke="#8884d8" name="Sales" dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="appointments" stroke="#82ca9d" name="Appointments" dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <p className="text-muted-foreground">No data available for the selected period</p>
-            </div>
-          )}
-        </div>
+        )}
       </CardContent>
     </Card>
   );
