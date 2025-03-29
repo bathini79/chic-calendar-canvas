@@ -929,13 +929,14 @@ export default function BookingConfirmation() {
             <X className="h-8 w-8 text-white" />
           </div>
           <h2 className="text-3xl font-bold mb-2 text-gray-900">Booking Failed</h2>
-          <p className="text-gray-600 text-center mb-4 max-w-md">{bookingError}</p>
+          {bookingError}
           <Button 
             variant="default"
             onClick={() => setBookingError(null)}
           >
             Try Again
           </Button>
+           <h4>or reach to the Salon employee </h4>
         </div>
       )}
 

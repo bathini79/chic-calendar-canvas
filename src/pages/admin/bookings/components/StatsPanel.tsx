@@ -41,7 +41,7 @@ export function StatsPanel({
             {chartData.length > 0 ? (
               <>
                 <div className="mb-4">
-                  <h2 className="text-2xl sm:text-3xl font-bold">{totalBooked} booked</h2>
+                  <h2 className="text-2xl sm:text-3xl font-bold mt-4">{totalBooked} booked</h2>
                   <div className="mt-2 space-y-1">
                     <p className="text-xs sm:text-sm text-gray-500">Confirmed appointments <span className="font-semibold">{confirmedCount}</span></p>
                     <p className="text-xs sm:text-sm text-gray-500">Booked appointments <span className="font-semibold">{bookedCount}</span></p>

@@ -62,17 +62,17 @@ export const UpcomingAppointments = ({ locations, upcomingAppointmentsLocationId
   return (
     <Card className="shadow-sm h-full overflow-hidden">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-2 sm:space-y-0">
-        <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
         <div>
-              <CardDescription>Next 7 days</CardDescription>
-            </div>
+        <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
+       <p className="text-sm text-gray-500 mt-1">  Next 7 days </p>
+        </div>
         <div className="w-full sm:w-auto">
           <LocationSelector 
             value={upcomingAppointmentsLocationId} 
             onChange={setUpcomingAppointmentsLocationId} 
             locations={locations} 
             className="w-full"
-          />
+            />
         </div>
       </CardHeader>
       <CardContent className="overflow-x-auto overflow-y-auto max-h-[400px]">
