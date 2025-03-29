@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -295,21 +294,11 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
     setIsLoading(true);
     Promise.all([fetchRevenueData(), fetchBusinessMetrics()])
       .finally(() => setIsLoading(false));
-  }, [timeRange,recentSalesLocationId]);
+  }, [timeRange, recentSalesLocationId, fetchRevenueData, fetchBusinessMetrics]);
 
   const getTimeRangeLabel = () => {
     return { "today": "Today", "week": "Last 7 days", "month": "Last 30 days", "year": "Last 365 days" }[timeRange] || "Today";
   };
-
-  if (isLoading) {
-    return (
-      <Card className="shadow-sm h-full">
-        <CardContent className="flex items-center justify-center h-full">
-          <div className="text-center py-8">Loading...</div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="shadow-sm h-full overflow-hidden">
