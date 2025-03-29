@@ -1,96 +1,151 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { LocationSelector } from './LocationSelector';
-import { formatPrice } from "@/lib/utils";
 
 export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylistsLocationId }) => {
   const [topStylists, setTopStylists] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchTopStylists = useCallback(async () => {
     try {
       const today = new Date();
       const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const lastDayThisMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
 
-      const { data: employeesData, error: employeesError } = await supabase.from("employees").select("id, name").eq("employment_type", "stylist");
-      if (employeesError) throw employeesError;
-
-      let thisMonthQuery = supabase.from("bookings").select("employee_id, price_paid, created_at, appointment_id")
-        .gte("created_at", firstDayThisMonth.toISOString()).lte("created_at", lastDayThisMonth.toISOString()).not("employee_id", "is", null);
-      let lastMonthQuery = supabase.from("bookings").select("employee_id, price_paid, created_at, appointment_id")
-        .gte("created_at", firstDayLastMonth.toISOString()).lte("created_at", lastDayLastMonth.toISOString()).not("employee_id", "is", null);
+      // First get all stylists
+      let stylistsQuery = supabase
+        .from("employees")
+        .select("id, name, photo_url")
+        .eq("employment_type", "stylist")
+        .eq("status", "active");
 
       if (topStylistsLocationId !== "all") {
-        const { data: thisMonthAppointments } = await supabase.from("appointments").select("id").eq("location", topStylistsLocationId)
-          .gte("created_at", firstDayThisMonth.toISOString()).lte("created_at", lastDayThisMonth.toISOString());
-        const { data: lastMonthAppointments } = await supabase.from("appointments").select("id").eq("location", topStylistsLocationId)
-          .gte("created_at", firstDayLastMonth.toISOString()).lte("created_at", lastDayLastMonth.toISOString());
-
-        const thisMonthAppIds = thisMonthAppointments.map(app => app.id);
-        const lastMonthAppIds = lastMonthAppointments.map(app => app.id);
-        thisMonthQuery = thisMonthAppIds.length > 0 ? thisMonthQuery.in("appointment_id", thisMonthAppIds) : thisMonthQuery.eq("appointment_id", "no-results");
-        lastMonthQuery = lastMonthAppIds.length > 0 ? lastMonthQuery.in("appointment_id", lastMonthAppIds) : lastMonthQuery.eq("appointment_id", "no-results");
+        const { data: employeeLocations } = await supabase
+          .from("employee_locations")
+          .select("employee_id")
+          .eq("location_id", topStylistsLocationId);
+        
+        if (employeeLocations && employeeLocations.length > 0) {
+          const employeeIds = employeeLocations.map(el => el.employee_id);
+          stylistsQuery = stylistsQuery.in("id", employeeIds);
+        }
       }
 
-      const [thisMonthResult, lastMonthResult] = await Promise.all([thisMonthQuery, lastMonthQuery]);
-      if (thisMonthResult.error || lastMonthResult.error) throw thisMonthResult.error || lastMonthResult.error;
+      const { data: stylists, error: stylistsError } = await stylistsQuery;
+      if (stylistsError) throw stylistsError;
 
-      const employeeMap = {};
-      employeesData.forEach(employee => employeeMap[employee.id] = employee.name);
+      // Then get all bookings for this month
+      let bookingsQuery = supabase
+        .from("bookings")
+        .select("employee_id, price_paid, appointment_id")
+        .not("employee_id", "is", null);
 
-      const thisMonthRevenue = {};
-      thisMonthResult.data.forEach(booking => {
-        if (booking.employee_id && employeeMap[booking.employee_id]) thisMonthRevenue[employeeMap[booking.employee_id]] = (thisMonthRevenue[employeeMap[booking.employee_id]] || 0) + (booking.price_paid || 0);
+      if (topStylistsLocationId !== "all") {
+        const { data: appointments } = await supabase
+          .from("appointments")
+          .select("id")
+          .eq("location", topStylistsLocationId)
+          .gte("created_at", firstDayThisMonth.toISOString())
+          .lte("created_at", lastDayThisMonth.toISOString());
+        
+        if (appointments && appointments.length > 0) {
+          const appointmentIds = appointments.map(a => a.id);
+          bookingsQuery = bookingsQuery.in("appointment_id", appointmentIds);
+        } else {
+          // No appointments for this location
+          bookingsQuery = bookingsQuery.eq("appointment_id", "no-results");
+        }
+      } else {
+        bookingsQuery = bookingsQuery
+          .gte("created_at", firstDayThisMonth.toISOString())
+          .lte("created_at", lastDayThisMonth.toISOString());
+      }
+
+      const { data: bookings, error: bookingsError } = await bookingsQuery;
+      if (bookingsError) throw bookingsError;
+
+      // Calculate bookings and revenue by stylist
+      const stylistPerformance = {};
+      stylists.forEach(stylist => {
+        stylistPerformance[stylist.id] = {
+          id: stylist.id,
+          name: stylist.name,
+          photoUrl: stylist.photo_url,
+          bookings: 0,
+          revenue: 0
+        };
       });
 
-      const lastMonthRevenue = {};
-      lastMonthResult.data.forEach(booking => {
-        if (booking.employee_id && employeeMap[booking.employee_id]) lastMonthRevenue[employeeMap[booking.employee_id]] = (lastMonthRevenue[employeeMap[booking.employee_id]] || 0) + (booking.price_paid || 0);
+      bookings.forEach(booking => {
+        if (booking.employee_id && stylistPerformance[booking.employee_id]) {
+          stylistPerformance[booking.employee_id].bookings += 1;
+          stylistPerformance[booking.employee_id].revenue += booking.price_paid || 0;
+        }
       });
 
-      const stylistsArray = Object.keys(thisMonthRevenue).map(name => ({ name, thisMonth: thisMonthRevenue[name], lastMonth: lastMonthRevenue[name] || 0 }));
-      stylistsArray.sort((a, b) => b.thisMonth - a.thisMonth);
-      setTopStylists(stylistsArray.slice(0, 5));
+      // Sort by revenue and take top 5
+      const sortedStylists = Object.values(stylistPerformance)
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+      setTopStylists(sortedStylists);
+      setIsLoading(false);
     } catch (error) {
       console.error("Error fetching top stylists:", error);
       setTopStylists([]);
+      setIsLoading(false);
     }
   }, [topStylistsLocationId]);
 
-  useEffect(() => { fetchTopStylists(); }, [fetchTopStylists]);
+  useEffect(() => {
+    setIsLoading(true);
+    fetchTopStylists();
+  }, [fetchTopStylists]);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Top Team Members</CardTitle>
-        <LocationSelector value={topStylistsLocationId} onChange={setTopStylistsLocationId} locations={locations} />
+        <LocationSelector 
+          value={topStylistsLocationId} 
+          onChange={setTopStylistsLocationId} 
+          locations={locations} 
+          className="w-[140px]"
+        />
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="text-left font-medium text-gray-500 pb-3">Team Member</th>
-                <th className="text-right font-medium text-gray-500 pb-3">This month</th>
-                <th className="text-right font-medium text-gray-500 pb-3">Last month</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topStylists.length > 0 ? topStylists.map((stylist, index) => (
-                <tr key={index} className="border-t">
-                  <td className="py-3">{stylist.name}</td>
-                  <td className="py-3 text-right">{formatPrice(stylist.thisMonth)}</td>
-                  <td className="py-3 text-right">{formatPrice(stylist.lastMonth)}</td>
-                </tr>
-              )) : (
-                <tr><td colSpan={3} className="py-8 text-center text-muted-foreground">No team member data available</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center items-center h-40">
+            <p>Loading stylists...</p>
+          </div>
+        ) : topStylists.length > 0 ? (
+          <div className="space-y-4">
+            {topStylists.map(stylist => (
+              <div key={stylist.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar>
+                    <AvatarImage src={stylist.photoUrl} alt={stylist.name} />
+                    <AvatarFallback>{stylist.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-medium">{stylist.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {stylist.bookings} booking{stylist.bookings !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right font-medium">₹{stylist.revenue.toFixed(2)}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-8 text-center text-muted-foreground">
+            No stylist data available
+          </div>
+        )}
       </CardContent>
     </Card>
   );
