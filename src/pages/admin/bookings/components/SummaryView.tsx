@@ -206,9 +206,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             
             {appointment?.coupon_id && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Coupon</span>
+                <span className="text-muted-foreground">
+                  {appointment.coupon_name ? `Coupon (${appointment.coupon_name})` : 'Coupon'}
+                </span>
                 <span className="text-green-600">
-                  Applied
+                  -<IndianRupee className="inline h-3 w-3" />
+                  {appointment.coupon_amount?.toFixed(2) || '0.00'}
                 </span>
               </div>
             )}

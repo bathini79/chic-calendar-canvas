@@ -52,7 +52,7 @@ const useSaveAppointment = ({
     taxAmount?: number;
     couponId?: string | null;
     couponDiscount?: number;
-    couponName?: string;
+    couponName?: string;  // Added couponName parameter
     membershipId?: string | null;
     membershipName?: string | null;
     membershipDiscount?: number;
@@ -131,6 +131,8 @@ const useSaveAppointment = ({
           tax_id: additionalParams.appliedTaxId || null,
           // Adding coupon fields from params
           coupon_id: additionalParams.couponId || null,
+          coupon_name: additionalParams.couponName || null,        // Added coupon_name
+          coupon_amount: additionalParams.couponDiscount || null,  // Added coupon_amount
           // Adding transaction type for proper categorization
           transaction_type: 'sale',
           // Setting original_total_price for potential refund calculations

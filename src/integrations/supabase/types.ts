@@ -11,7 +11,9 @@ export type Database = {
     Tables: {
       appointments: {
         Row: {
+          coupon_amount: number | null
           coupon_id: string | null
+          coupon_name: string | null
           created_at: string | null
           customer_id: string
           discount_type: string | null
@@ -40,7 +42,9 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          coupon_amount?: number | null
           coupon_id?: string | null
+          coupon_name?: string | null
           created_at?: string | null
           customer_id: string
           discount_type?: string | null
@@ -69,7 +73,9 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          coupon_amount?: number | null
           coupon_id?: string | null
+          coupon_name?: string | null
           created_at?: string | null
           customer_id?: string
           discount_type?: string | null
