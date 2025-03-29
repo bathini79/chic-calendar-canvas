@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -311,7 +310,7 @@ export default function AdminBookings() {
             </div>
             <div
               className="bg-white px-4 py-3 flex items-center space-x-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={()=>openAddAppointment()}
+              onClick={openAddAppointment}
             >
               <CalendarIcon className="h-4 w-4 text-gray-600" />
               <span className="text-gray-700">Add Appointment</span>

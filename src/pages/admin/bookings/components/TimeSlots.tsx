@@ -240,7 +240,7 @@ export default function TimeSlots({
                   {employee.name}
                 </div>
                 {Array.from({ length: TOTAL_HOURS }).map((_, hour) => {
-                  const time = hour + 8;
+                  const time = hour + 8; // Start at 8 AM
                   const hourKey = `${employee.id}-${time}`;
                   const isHovered = hoveredTimeSlot === hourKey;
                   
@@ -252,7 +252,13 @@ export default function TimeSlots({
                       }`}
                       onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
-                        handleColumnClick(employee.id, time, rect.x, rect.y);
+                        // Calculate the exact position within the cell
+                        const offsetY = e.clientY - rect.top;
+                        // Calculate precise time with minutes
+                        const exactTime = time + (offsetY / PIXELS_PER_HOUR);
+                        // Round to nearest 15 minute increment
+                        const roundedTime = Math.floor(exactTime * 4) / 4;
+                        handleColumnClick(employee.id, roundedTime, e.clientX, e.clientY);
                       }}
                       onMouseEnter={() => setHoveredTimeSlot(hourKey)}
                       onMouseLeave={() => setHoveredTimeSlot(null)}

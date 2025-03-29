@@ -70,20 +70,19 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
     
-    // Calculate the time based on the pixel position
-    // This converts the Y-coordinate to hours since START_HOUR
-    const clickedTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
+    // Calculate the exact time based on the pixel position (Y coordinate)
+    const exactTime = START_HOUR + (offsetY / PIXELS_PER_HOUR);
     
     // Round to the nearest 15 minutes (0.25 hours)
-    // Math.round(x * 4) / 4 rounds to the nearest 0.25
-    const roundedTime = Math.round(clickedTime * 4) / 4;
+    // Math.floor rounds down to the nearest quarter hour
+    // For example: 8.32 becomes 8.25, 8.78 becomes 8.75
+    const quarterHour = Math.floor(exactTime * 4) / 4;
     
-    // Call the setClickedCell function with the correct data
     setClickedCell({
       employeeId: empId,
-      time: roundedTime,
-      x: e.clientX, // Use clientX instead of pageX for consistent positioning
-      y: e.clientY, // Use clientY instead of pageY for consistent positioning
+      time: quarterHour,
+      x: e.clientX,
+      y: e.clientY,
       date: currentDate,
     });
   };
