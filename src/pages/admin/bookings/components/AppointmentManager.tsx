@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -9,9 +8,8 @@ import { useAppointmentState } from "../hooks/useAppointmentState";
 import { useActiveServices } from "../hooks/useActiveServices";
 import { useActivePackages } from "../hooks/useActivePackages";
 import useSaveAppointment from "../hooks/useSaveAppointment";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { getTotalPrice, getTotalDuration, calculatePackagePrice } from "../utils/bookingUtils";
+import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
 import { Appointment, SCREEN, Service, Package } from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 
@@ -24,15 +22,14 @@ interface AppointmentManagerProps {
   existingAppointment?: Appointment | null;
   locationId?: string;
 }
-
 export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   isOpen,
   onClose,
   selectedDate,
   selectedTime,
-  employees = [],
-  existingAppointment = null,
-  locationId = ''
+  employees,
+  existingAppointment,
+  locationId
 }) => {
   const [currentScreen, setCurrentScreen] = useState(
     SCREEN.SERVICE_SELECTION

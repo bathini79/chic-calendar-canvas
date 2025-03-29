@@ -1,4 +1,3 @@
-
 import { type Service, type Package } from "../types";
 import { getMembershipDiscount } from "@/lib/utils";
 
@@ -201,3 +200,5 @@ export const calculatePackageDuration = (
 
   return duration;
 };
+
+// Use the shared getMembershipDiscount function from utils.ts instead of duplicating it here
