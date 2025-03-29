@@ -11,15 +11,9 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
   const [revenueData, setRevenueData] = useState([]);
   const [appointmentsStats, setAppointmentsStats] = useState({ count: 0, value: 0, completed: 0, completedValue: 0 });
   const [totalRevenue, setTotalRevenue] = useState(0);
-  const [businessMetrics, setBusinessMetrics] = useState({
-    revenue: "0.00", 
-    occupancyRate: "0.00", 
-    returningCustomerRate: "0.00", 
-    tips: "0.00",
-    revenueChange: "0.00", 
-    occupancyChange: "0.00", 
-    returningCustomerChange: "0.00", 
-    tipsChange: "--"
+  const [businessMetrics, setBusinessMetrics = useState({
+    revenue: "0.00", occupancyRate: "0.00", returningCustomerRate: "0.00", tips: "0.00",
+    revenueChange: "0.00", occupancyChange: "0.00", returningCustomerChange: "0.00", tipsChange: "--"
   });
   const [isLoading, setIsLoading] = useState(true);
   const today = new Date();
@@ -72,7 +66,6 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       setAppointmentsStats({ count: 0, value: 0, completed: 0, completedValue: 0 });
     }
   }, [timeRange, recentSalesLocationId, today]);
-
   const getStartDateForTimeRange = (range) => {
     switch (range) {
       case "today":
@@ -87,20 +80,23 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
         return startOfDay(today);
     }
   };
-
   const fetchBusinessMetrics = useCallback(async () => {
     try {
+      // Calculate revenue
       const revenue = totalRevenue;
       
+      // Calculate occupancy rate
       const startDate = getStartDateForTimeRange(timeRange);
       const yesterday = subDays(today, 1);
       
+      // Get available employees (stylists)
       let empQuery = supabase
         .from("employees")
         .select("*")
         .eq("employment_type", "stylist");
       
       if (recentSalesLocationId !== "all") {
+        // Filter employees by location if a specific location is selected
         empQuery = supabase
           .from("employee_locations")
           .select(`
@@ -113,6 +109,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       
       if (empError) throw empError;
       
+      // Get appointments for current period
       let currentAppQuery = supabase
         .from("appointments")
         .select("*")
@@ -127,6 +124,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       
       if (currentAppError) throw currentAppError;
       
+      // Get appointments for comparison period (yesterday, last week, or last month)
       let comparisonStartDate, comparisonEndDate;
       
       if (timeRange === "today") {
@@ -157,10 +155,11 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       
       if (compAppError) throw compAppError;
       
+      // Calculate occupancy rates
       const employeeCount = recentSalesLocationId !== "all" 
         ? (employees?.length || 1) 
         : (employees?.length || 1);
-      const workingHoursPerDay = 8;
+      const workingHoursPerDay = 8; // Assuming 8 working hours per day
       
       let totalPossibleSlots;
       let currentAppointmentHours = 0;
@@ -171,17 +170,22 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       } else if (timeRange === "week") {
         totalPossibleSlots = employeeCount * workingHoursPerDay * 7;
       } else {
-        totalPossibleSlots = employeeCount * workingHoursPerDay * 30;
+        // Month or year
+        const daysInPeriod = timeRange === "month" ? 30 : 365;
+        totalPossibleSlots = employeeCount * workingHoursPerDay * daysInPeriod;
       }
       
+      // Calculate actual hours booked for current period
       currentAppointments?.forEach(app => {
         if (app.total_duration) {
-          currentAppointmentHours += app.total_duration / 60;
+          currentAppointmentHours += app.total_duration / 60; // Convert minutes to hours
         } else {
+          // Estimate 1 hour if duration not specified
           currentAppointmentHours += 1;
         }
       });
       
+      // Calculate actual hours booked for comparison period
       comparisonAppointments?.forEach(app => {
         if (app.total_duration) {
           comparisonAppointmentHours += app.total_duration / 60;
@@ -195,6 +199,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       
       const occupancyRateChange = currentOccupancyRate - comparisonOccupancyRate;
       
+      // Calculate returning customer rate
       let currentCustQuery = supabase
         .from("appointments")
         .select("customer_id, location")
@@ -223,9 +228,11 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       
       if (compCustError) throw compCustError;
       
+      // Count unique customers
       const currentUniqueCustomers = new Set(currentCustomerData?.map(a => a.customer_id) || []);
       const currentTotalCustomers = currentUniqueCustomers.size || 1;
       
+      // Count repeat customers (those who have multiple appointments)
       const customerCount = {};
       currentCustomerData?.forEach(a => {
         customerCount[a.customer_id] = (customerCount[a.customer_id] || 0) + 1;
@@ -234,6 +241,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       const currentReturningCustomers = Object.values(customerCount).filter(count => Number(count) > 1).length;
       const currentReturningRate = (currentReturningCustomers / currentTotalCustomers) * 100;
       
+      // Do the same for comparison period
       const comparisonUniqueCustomers = new Set(comparisonCustomerData?.map(a => a.customer_id) || []);
       const comparisonTotalCustomers = comparisonUniqueCustomers.size || 1;
       
@@ -247,6 +255,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       
       const returningRateChange = currentReturningRate - comparisonReturningRate;
       
+      // Calculate revenue change
       const comparisonRevenue = comparisonAppointments?.reduce((sum, app) => sum + (app.total_price || 0), 0) || 0;
       const revenueChange = comparisonRevenue > 0 ? ((revenue - comparisonRevenue) / comparisonRevenue) * 100 : 0;
       
@@ -254,7 +263,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
         revenue: revenue.toFixed(2),
         occupancyRate: currentOccupancyRate.toFixed(2),
         returningCustomerRate: currentReturningRate.toFixed(2),
-        tips: "0.00",
+        tips: "0.00", // Not implemented yet
         revenueChange: revenueChange.toFixed(2),
         occupancyChange: occupancyRateChange.toFixed(2),
         returningCustomerChange: returningRateChange.toFixed(2),
@@ -292,15 +301,15 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
           <CardTitle className="text-lg">Recent Sales</CardTitle>
           <CardDescription>{getTimeRangeLabel()}</CardDescription>
         </div>
-        <div className="flex flex-row gap-2 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <LocationSelector 
             value={recentSalesLocationId} 
             onChange={setRecentSalesLocationId} 
             locations={locations} 
-            className="w-auto min-w-[120px]" 
+            className="w-full sm:w-[160px]"
           />
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[120px]"><SelectValue placeholder="Select..." /></SelectTrigger>
+          <Select value={timeRange} onValueChange={setTimeRange} className="w-full sm:w-[120px]">
+            <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
             <SelectContent>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="week">Week</SelectItem>
@@ -310,9 +319,9 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
           </Select>
         </div>
       </CardHeader>
-      <CardContent className="overflow-auto">
+      <CardContent className="overflow-x-auto overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center h-[300px]">
+          <div className="flex items-center justify-center h-[400px]">
             <p className="text-muted-foreground">Loading...</p>
           </div>
         ) : (
@@ -338,22 +347,15 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
                 <div className="text-xl sm:text-2xl font-bold text-indigo-700">{businessMetrics.returningCustomerRate}%</div>
               </div>
             </div>
-            <div className="h-[300px] w-full overflow-y-auto overflow-x-auto">
+            <div className="h-[300px] aspect-square max-w-full overflow-hidden">
               {revenueData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart 
-                    data={revenueData} 
-                    margin={{ top: 5, right: 5, left: 5, bottom: 25 }}
-                  >
+                  <LineChart data={revenueData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      align="left"
-                      wrapperStyle={{ bottom: 0, left: 10 }}
-                    />
+                    <Legend />
                     <Line type="monotone" dataKey="sales" stroke="#8884d8" name="Sales" dot={{ r: 4 }} />
                     <Line type="monotone" dataKey="appointments" stroke="#82ca9d" name="Appointments" dot={{ r: 4 }} />
                   </LineChart>

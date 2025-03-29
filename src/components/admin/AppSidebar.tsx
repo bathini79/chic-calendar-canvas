@@ -1,167 +1,78 @@
-
-import React, { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import React from "react";
+import { Link } from "react-router-dom";
 import {
-  BarChart,
-  Calendar,
-  CreditCard,
-  Home,
-  Package,
-  Settings,
-  Scissors,
-  Users,
-  FileBarChart,
-  Map,
-  ChevronLeft,
-  ChevronRight,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
+import { 
+  BarChart3, 
+  Calendar, 
+  CircleDollarSign, 
+  ClipboardList, 
+  Home, 
+  Package, 
+  Settings, 
+  ShoppingBag, 
+  Users 
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useSidebar } from "@/components/ui/sidebar";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { supabase } from "@/integrations/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
-
-const sidebarNavItems = [
-  {
-    title: "Dashboard",
-    href: "/admin",
-    icon: <Home className="mr-2 h-4 w-4" />,
-  },
-  {
-    title: "Bookings",
-    href: "/admin/bookings",
-    icon: <Calendar className="mr-2 h-4 w-4" />,
-  },
-  {
-    title: "Services",
-    href: "/admin/services",
-    icon: <Scissors className="mr-2 h-4 w-4" />,
-  },
-  {
-    title: "Staff",
-    href: "/admin/staff",
-    icon: <Users className="mr-2 h-4 w-4" />,
-  },
-  {
-    title: "Inventory",
-    href: "/admin/inventory",
-    icon: <Package className="mr-2 h-4 w-4" />,
-  },
-  {
-    title: "Reports",
-    href: "/admin/reports",
-    icon: <FileBarChart className="mr-2 h-4 w-4" />,
-  },
-  {
-    title: "Settings",
-    href: "/admin/settings",
-    icon: <Settings className="mr-2 h-4 w-4" />,
-  },
-];
 
 export function AppSidebar() {
-  const { pathname } = useLocation();
-  const { setOpen, open, toggleSidebar } = useSidebar();
-  const isMobile = useIsMobile();
-  const [businessDetails, setBusinessDetails] = useState({
-    name: "",
-    logo_url: null
-  });
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Auto-collapse sidebar on mobile
-  useEffect(() => {
-    if (isMobile) {
-      setOpen(false);
-    }
-  }, [isMobile, setOpen]);
-
-  // Fetch business details
-  useEffect(() => {
-    const fetchBusinessDetails = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("business_details")
-          .select("name, logo_url")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (error && error.code !== "PGRST116") {
-          console.error("Error fetching business details:", error);
-          return;
-        }
-
-        if (data) {
-          setBusinessDetails({
-            name: data.name || "",
-            logo_url: data.logo_url
-          });
-        }
-      } catch (error) {
-        console.error("Failed to load business details:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchBusinessDetails();
-  }, []);
-
   return (
-    <div 
+    <Sidebar className="border-r">
+      <SidebarHeader className="p-3">
+        <div className="flex items-center justify-between">
+          <Link to="/admin" className="flex items-center">
+            <img 
+              src="/logo.png" 
+              alt="Logo" 
+              className="h-8 w-auto" 
+            />
+          </Link>
+          <SidebarTrigger />
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <div className="space-y-1 py-2">
+          <SidebarItem href="/admin" icon={Home} text="Dashboard" />
+          <SidebarItem href="/admin/bookings" icon={Calendar} text="Bookings" />
+          <SidebarItem href="/admin/customers" icon={Users} text="Customers" />
+          <SidebarItem href="/admin/services" icon={ClipboardList} text="Services" />
+          <SidebarItem href="/admin/products" icon={Package} text="Products" />
+          <SidebarItem href="/admin/inventory" icon={ShoppingBag} text="Inventory" />
+          <SidebarItem href="/admin/sales" icon={CircleDollarSign} text="Sales" />
+          <SidebarItem href="/admin/reports" icon={BarChart3} text="Reports" />
+          <SidebarItem href="/admin/settings" icon={Settings} text="Settings" />
+        </div>
+      </SidebarContent>
+      <SidebarFooter>
+        <div className="p-3 text-xs text-muted-foreground">
+          <p>© 2023 Salon Management</p>
+          <p>Version 1.0.0</p>
+        </div>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
+function SidebarItem({ href, icon: Icon, text, className }) {
+  const isActive = window.location.pathname === href || 
+                  (href !== '/admin' && window.location.pathname.startsWith(href));
+  
+  return (
+    <Link
+      to={href}
       className={cn(
-        "relative flex h-screen flex-col border-r bg-background transition-all duration-300",
-        open ? "w-[240px]" : "w-[60px]"
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
+        isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
+        className
       )}
     >
-      <div className="flex h-14 items-center px-3 border-b justify-between">
-        <Link to="/admin" className={cn("flex items-center flex-1", !open && "justify-center")}>
-          {businessDetails.logo_url ? (
-            <img 
-              src={businessDetails.logo_url} 
-              alt="Salon Logo" 
-              className="h-8 w-8 rounded" 
-            />
-          ) : (
-            <CreditCard className="h-8 w-8" />
-          )}
-        </Link>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="flex-shrink-0"
-          onClick={toggleSidebar}
-          aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
-        >
-          {open ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </Button>
-      </div>
-      <ScrollArea className="flex-1">
-        <nav className="grid items-start px-2 py-4 gap-1">
-          {sidebarNavItems.map((item, index) => (
-            <Link to={item.href} key={index}>
-              <Button
-                variant={pathname === item.href ? "secondary" : "ghost"}
-                className={cn("w-full justify-start", {
-                  "bg-muted": pathname === item.href,
-                })}
-                title={!open ? item.title : undefined}
-              >
-                {React.cloneElement(item.icon, { 
-                  className: cn(
-                    item.icon.props.className, 
-                    !open && "mr-0 mx-auto"
-                  ) 
-                })}
-                {open && <span className="transition-opacity">{item.title}</span>}
-              </Button>
-            </Link>
-          ))}
-        </nav>
-      </ScrollArea>
-    </div>
+      <Icon className="h-4 w-4" />
+      <span>{text}</span>
+    </Link>
   );
 }

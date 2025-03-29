@@ -66,14 +66,12 @@ export const TopServices = ({ locations, topServicesLocationId, setTopServicesLo
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Top Services</CardTitle>
-        <div className="w-auto">
-          <LocationSelector 
-            value={topServicesLocationId} 
-            onChange={setTopServicesLocationId} 
-            locations={locations} 
-            className="w-[140px]"
-          />
-        </div>
+        <LocationSelector 
+          value={topServicesLocationId} 
+          onChange={setTopServicesLocationId} 
+          locations={locations} 
+          className="w-[140px]"
+        />
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

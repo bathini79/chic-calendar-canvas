@@ -67,14 +67,12 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Top Team Members</CardTitle>
-        <div className="w-auto">
-          <LocationSelector 
-            value={topStylistsLocationId} 
-            onChange={setTopStylistsLocationId} 
-            locations={locations} 
-            className="w-[140px]"
-          />
-        </div>
+        <LocationSelector 
+          value={topStylistsLocationId} 
+          onChange={setTopStylistsLocationId} 
+          locations={locations} 
+          className="w-[140px]"
+        />
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
