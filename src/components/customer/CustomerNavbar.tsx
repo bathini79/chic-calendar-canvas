@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ProfileMenu } from "@/components/customer/ProfileMenu";
+import { MembershipStatus } from "@/components/customer/MembershipStatus";
 import { cn } from "@/lib/utils";
 
 interface CustomerNavbarProps {
@@ -50,6 +51,7 @@ export function CustomerNavbar({ onCartClick }: CustomerNavbarProps) {
             </NavLink>
           </div>
           <div className="flex items-center space-x-4">
+            {session && <MembershipStatus customerId={session.user.id} />}
             {session ? (
               <ProfileMenu />
             ) : (
