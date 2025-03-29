@@ -205,11 +205,6 @@ export default function AdminBookings() {
     
     setAppointmentTime(timeString);
     setAppointmentDate(cell.date || currentDate);
-    
-    setTimeout(() => {
-      setIsAddAppointmentOpen(true);
-      setClickedCell(null);
-    }, 10);
   };
 
   const handleCheckoutFromAppointment = (appointment: Appointment) => {
