@@ -6,7 +6,7 @@ import {
   hourLabels,
 } from "@/pages/admin/bookings/utils/timeUtils";
 import { Flag } from "lucide-react";
-import React from "react";
+import React, { useState } from "react";
 import { Appointment, Booking, Employee } from "@/pages/admin/bookings/types";
 
 interface TimeSlotsProps {
@@ -34,6 +34,15 @@ interface TimeSlotsProps {
   }) => void;
 }
 
+interface BookingsByTimeSlot {
+  [key: string]: {
+    bookings: {
+      booking: Booking;
+      appointment: Appointment;
+    }[];
+  };
+}
+
 const TimeSlots: React.FC<TimeSlotsProps> = ({
   employees,
   formatTime,
@@ -45,6 +54,8 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
   setClickedCell,
   currentDate,
 }) => {
+  const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+
   const handleColumnClick = (e: React.MouseEvent, empId: string) => {
     if (e.target !== e.currentTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -61,50 +72,90 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     });
   };
 
-  const renderAppointmentBlock = (appointment: Appointment, booking: Booking) => {
-    // Don't render cancelled or voided appointments
-    if (appointment.status === 'canceled' || appointment.status === 'voided' || !booking.id) return null;
+  const renderAppointmentBlocks = (employeeId: string) => {
+    // Group bookings by time slot to avoid overlaps
+    const bookingsByTimeSlot: BookingsByTimeSlot = {};
     
-    const isNoShow = appointment.status === 'no-show' || appointment.status === 'noshow';
-    const statusColor = isNoShow 
-      ? 'bg-red-100 border-red-300 text-red-700'
-      : getAppointmentStatusColor(appointment.status);
-      
-    const duration = booking.service?.duration || booking.package?.duration || 60;
-    const startTime = new Date(booking.start_time);
-    const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+    appointments.forEach(appointment => {
+      appointment.bookings.forEach(booking => {
+        if (booking.employee?.id !== employeeId) return;
+        if (appointment.status === 'canceled' || appointment.status === 'voided' || !booking.id) return;
+        
+        const startTime = new Date(booking.start_time || appointment.start_time);
+        const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+        const roundedStartHour = Math.floor(startHour * 4) / 4; // Round to nearest 15 min
+        
+        const timeSlotKey = `${roundedStartHour}`;
+        
+        if (!bookingsByTimeSlot[timeSlotKey]) {
+          bookingsByTimeSlot[timeSlotKey] = { bookings: [] };
+        }
+        
+        bookingsByTimeSlot[timeSlotKey].bookings.push({
+          booking,
+          appointment
+        });
+      });
+    });
+    
+    // Render bookings for each time slot
+    return Object.entries(bookingsByTimeSlot).map(([timeSlotKey, { bookings }]) => {
+      return bookings.map((bookingData, index) => {
+        const { booking, appointment } = bookingData;
+        const totalBookingsInSlot = bookings.length;
+        
+        // Calculate booking display properties
+        const isNoShow = appointment.status === 'no-show' || appointment.status === 'noshow';
+        const statusColor = isNoShow 
+          ? 'bg-red-100 border-red-300 text-red-700'
+          : getAppointmentStatusColor(appointment.status);
+        
+        const duration = booking.service?.duration || booking.package?.duration || 60;
+        const startTime = new Date(booking.start_time || appointment.start_time);
+        const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+        const cellKey = `${employeeId}-${timeSlotKey}-${index}`;
+        const isHovered = hoveredCell === cellKey;
 
-    const topPositionPx = (startHour - START_HOUR) * PIXELS_PER_HOUR;
-    const heightPx = (duration / 60) * PIXELS_PER_HOUR;
-
-    return (
-      <div
-        key={booking.id}
-        className={`absolute left-2 right-2 rounded border ${statusColor} cursor-pointer z-10 overflow-hidden`}
-        style={{
-          top: `${topPositionPx}px`,
-          height: `${heightPx}px`,
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          setSelectedAppointment(appointment);
-        }}
-      >
-        {isNoShow && (
-          <div className="absolute -top-2 -left-2 bg-red-100 rounded-full p-1 border border-red-300">
-            <Flag className="h-4 w-4 text-red-600" />
+        // Position calculations for multiple bookings in the same slot
+        const topPositionPx = (startHour - START_HOUR) * PIXELS_PER_HOUR;
+        const heightPx = (duration / 60) * PIXELS_PER_HOUR;
+        const widthPercent = 100 / totalBookingsInSlot;
+        const leftPercent = index * widthPercent;
+        
+        return (
+          <div
+            key={`${booking.id}-${index}`}
+            className={`absolute rounded border ${statusColor} cursor-pointer z-10 overflow-hidden transition-colors ${isHovered ? 'ring-2 ring-primary' : ''}`}
+            style={{
+              top: `${topPositionPx}px`,
+              height: `${heightPx}px`,
+              left: `${leftPercent}%`,
+              width: `${widthPercent}%`,
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedAppointment(appointment);
+            }}
+            onMouseEnter={() => setHoveredCell(cellKey)}
+            onMouseLeave={() => setHoveredCell(null)}
+          >
+            {isNoShow && (
+              <div className="absolute -top-2 -left-2 bg-red-100 rounded-full p-1 border border-red-300">
+                <Flag className="h-4 w-4 text-red-600" />
+              </div>
+            )}
+            <div className="p-2 text-xs">
+              <div className="font-medium truncate">
+                {appointment.customer?.full_name || 'No name'}
+              </div>
+              <div className="truncate text-gray-600">
+                {booking.service?.name || booking.package?.name || 'Unnamed service'}
+              </div>
+            </div>
           </div>
-        )}
-        <div className="p-2 text-xs">
-          <div className="font-medium truncate">
-            {appointment.customer?.full_name || 'No name'}
-          </div>
-          <div className="truncate text-gray-600">
-            {booking.service?.name || booking.package?.name || 'Unnamed service'}
-          </div>
-        </div>
-      </div>
-    );
+        );
+      });
+    }).flat();
   };
 
   return (
@@ -165,12 +216,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
               />
             )}
 
-            {appointments.map((appointment) =>
-              appointment.bookings.map((booking) => {
-                if (booking.employee?.id !== emp.id) return null;
-                return renderAppointmentBlock(appointment, booking);
-              })
-            )}
+            {renderAppointmentBlocks(emp.id)}
           </div>
         ))}
       </div>

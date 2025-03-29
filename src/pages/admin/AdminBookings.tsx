@@ -21,7 +21,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
-import { Appointment } from "./bookings/types";
+import { Appointment, Employee } from "./bookings/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +39,7 @@ const initialStats = [
 ];
 
 export default function AdminBookings() {
-  const [employees, setEmployees] = useState([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [stats] = useState(initialStats);
   const [clickedCell, setClickedCell] = useState<{
     employeeId: string;
@@ -74,6 +74,22 @@ export default function AdminBookings() {
     },
   });
 
+  // Query to get business details
+  const { data: businessDetails } = useQuery({
+    queryKey: ['businessDetails'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("business_details")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   useEffect(() => {
     if (!selectedLocationId && locations.length > 0) {
       setSelectedLocationId(locations[0].id);
@@ -100,23 +116,39 @@ export default function AdminBookings() {
         
         if (error) throw error;
         
-        const employeeWithAvatar = data.map((employee) => ({
+        let employeeList = data.map((employee) => ({
           ...employee,
           avatar: employee.name
             .split(" ")
             .map((n) => n[0])
             .join(""),
         }));
+
+        // Add default employee for unassigned bookings
+        const defaultEmployeeName = `${businessDetails?.name || 'Salon'} Employee`;
+        const defaultEmployee: Employee = {
+          id: 'unassigned',
+          name: defaultEmployeeName,
+          avatar: defaultEmployeeName.split(" ").map(n => n[0]).join(""),
+          email: '',
+          employment_type: 'stylist',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
         
-        setEmployees(employeeWithAvatar);
+        employeeList = [defaultEmployee, ...employeeList];
+        setEmployees(employeeList);
       } catch (error) {
         console.error("Error fetching employees:", error);
         setEmployees([]);
       }
     };
 
-    fetchEmployees();
-  }, [selectedLocationId]);
+    if (businessDetails) {
+      fetchEmployees();
+    }
+  }, [selectedLocationId, businessDetails]);
 
   const openAddAppointment = () => {
     if (clickedCell) {
@@ -231,7 +263,7 @@ export default function AdminBookings() {
           hourLabels={[]}
           PIXELS_PER_HOUR={60}
           handleColumnClick={() => {}}
-          renderAppointmentBlock={() => <></>}
+          renderAppointmentBlock={() => null}
         />
         
         <AppointmentDetailsDialog
