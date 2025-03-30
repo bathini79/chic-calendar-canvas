@@ -1,4 +1,3 @@
-
 import React from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -76,7 +75,7 @@ export const AddAddressDialog = ({
     },
   });
 
-  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+  const handleSubmit = async (values: any) => {
     await onSubmit(values);
     form.reset();
   };

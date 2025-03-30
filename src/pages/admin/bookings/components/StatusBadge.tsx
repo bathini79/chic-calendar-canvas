@@ -1,136 +1,103 @@
 
-import React from 'react';
+import React from "react";
 import { Badge } from "@/components/ui/badge";
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Ban, 
-  RotateCcw,
-  CalendarCheck
-} from "lucide-react";
-import type { AppointmentStatus } from '@/types/appointment';
+import { AppointmentStatus } from "@/types/appointment";
+
+export const getStatusBackgroundColor = (
+  status?: AppointmentStatus
+): string => {
+  if (!status) return "";
+
+  switch (status) {
+    case "pending":
+      return "bg-yellow-50";
+    case "booked":
+      return "bg-blue-50";
+    case "confirmed":
+      return "bg-blue-100";
+    case "inprogress":
+      return "bg-purple-50";
+    case "completed":
+      return "bg-green-50";
+    case "noshow":
+      return "bg-red-50";
+    case "canceled":
+      return "bg-gray-100";
+    case "voided":
+      return "bg-gray-100";
+    case "refunded":
+      return "bg-orange-50";
+    case "partially_refunded":
+      return "bg-orange-100";
+    default:
+      return "";
+  }
+};
+
+export const getStatusVariant = (
+  status: AppointmentStatus
+): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case "pending":
+      return "outline";
+    case "booked":
+      return "secondary";
+    case "confirmed":
+      return "secondary";
+    case "inprogress":
+      return "secondary";
+    case "completed":
+      return "default";
+    case "noshow":
+    case "canceled":
+    case "voided":
+      return "destructive";
+    case "refunded":
+    case "partially_refunded":
+      return "outline";
+    default:
+      return "outline";
+  }
+};
+
+export const getStatusLabel = (status: AppointmentStatus): string => {
+  switch (status) {
+    case "pending":
+      return "Pending";
+    case "booked":
+      return "Booked";
+    case "confirmed":
+      return "Confirmed";
+    case "inprogress":
+      return "In Progress";
+    case "completed":
+      return "Completed";
+    case "noshow":
+      return "No Show";
+    case "canceled":
+      return "Canceled";
+    case "voided":
+      return "Voided";
+    case "refunded":
+      return "Refunded";
+    case "partially_refunded":
+      return "Partially Refunded";
+    default:
+      return status;
+  }
+};
 
 interface StatusBadgeProps {
   status: AppointmentStatus;
-  className?: string;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) => {
-  const getStatusConfig = () => {
-    switch (status) {
-      // Completed statuses - green
-      case 'completed':
-        return {
-          label: 'Completed',
-          icon: <CheckCircle className="h-3 w-3 mr-1" />,
-          variant: 'success' as const
-        };
-      
-      // Active/Positive statuses - primary color (blue/purple)
-      case 'confirmed':
-        return {
-          label: 'Confirmed',
-          icon: <CalendarCheck className="h-3 w-3 mr-1" />,
-          variant: 'info' as const
-        };
-      case 'booked':
-        return {
-          label: 'Booked',
-          icon: <CalendarCheck className="h-3 w-3 mr-1" />,
-          variant: 'info2' as const
-        };
-      
-      // In-progress statuses - amber/warning
-      case 'inprogress':
-      case 'pending':
-        return {
-          label: status === 'inprogress' ? 'In Progress' : 'Pending',
-          icon: <Clock className="h-3 w-3 mr-1" />,
-          variant: 'warning' as const
-        };
-      
-      // Canceled statuses - red
-      case 'canceled':
-        return {
-          label: 'Canceled',
-          icon: <XCircle className="h-3 w-3 mr-1" />,
-          variant: 'destructive' as const
-        };
-      
-      // Administrative cancellations - red with different icon
-      case 'voided':
-        return {
-          label: 'Voided',
-          icon: <Ban className="h-3 w-3 mr-1" />,
-          variant: 'destructive' as const
-        };
-      
-      // Refund statuses - purple/info
-      case 'refunded':
-        return {
-          label: 'Refunded',
-          icon: <RotateCcw className="h-3 w-3 mr-1" />,
-          variant: 'info' as const
-        };
-      case 'partially_refunded':
-        return {
-          label: 'Partially Refunded',
-          icon: <RotateCcw className="h-3 w-3 mr-1" />,
-          variant: 'info' as const
-        };
-      
-      // No-show cases - gray/outline
-      case 'noshow':
-        return {
-          label: 'No Show',
-          icon: <Ban className="h-3 w-3 mr-1" />,
-          variant: 'outline' as const
-        };
-      
-      // Default case
-      default:
-        return {
-          label: status || 'Pending',
-          icon: <Clock className="h-3 w-3 mr-1" />,
-          variant: 'outline' as const
-        };
-    }
-  };
-
-  const { label, icon, variant } = getStatusConfig();
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+  const variant = getStatusVariant(status);
+  const label = getStatusLabel(status);
 
   return (
-    <Badge
-      variant={variant}
-      className={`flex items-center text-xs ${className}`}
-    >
-      {icon}
+    <Badge variant={variant} className="min-w-[100px] text-center">
       {label}
     </Badge>
   );
-};
-
-// Helper function to get background color based on status
-export const getStatusBackgroundColor = (status: AppointmentStatus): string => {
-  switch (status) {
-    case 'completed':
-      return 'bg-green-50';
-    case 'confirmed':
-    case 'booked':
-      return 'bg-blue-50';
-    case 'inprogress':
-    case 'pending':
-      return 'bg-amber-50';
-    case 'canceled':
-    case 'voided':
-      return 'bg-red-50';
-    case 'refunded':
-    case 'partially_refunded':
-      return 'bg-indigo-50';
-    case 'noshow':
-      return 'bg-gray-50';
-    default:
-      return '';
-  }
 };
