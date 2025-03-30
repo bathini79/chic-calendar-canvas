@@ -91,7 +91,7 @@ const useSaveAppointment = ({
           customer_id: selectedCustomer.id,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
-          status: status,
+          status: status, // Using the properly typed status
           total_price: totalPrice,
           discount_type: discountType,
           discount_value: discountValue,

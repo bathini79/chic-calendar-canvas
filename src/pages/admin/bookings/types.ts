@@ -1,11 +1,9 @@
-
 export type AppointmentStatus = 
   | 'pending' 
   | 'confirmed' 
   | 'canceled' 
   | 'completed' 
-  | 'no-show'  // Note: This should be 'noshow' to match the system type
-  | 'noshow' 
+  | 'noshow'  // Standardizing to 'noshow' format everywhere
   | 'inprogress'
   | 'voided'
   | 'refunded'

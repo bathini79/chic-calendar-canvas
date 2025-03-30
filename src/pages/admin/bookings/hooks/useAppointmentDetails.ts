@@ -36,15 +36,26 @@ export function useAppointmentDetails(appointmentId?: string | null) {
       if (data) {
         // Handle status conversion to match AppointmentStatus type
         let mappedStatus: AppointmentStatus = data.status as AppointmentStatus;
-        // Convert 'noshow' to 'no-show' if needed for consistency
-        if (data.status === 'noshow') {
-          mappedStatus = 'no-show';
+        
+        // Fetch location name if a location ID is provided
+        let location_name = null;
+        if (data.location) {
+          const { data: locationData, error: locationError } = await supabase
+            .from('locations')
+            .select('name')
+            .eq('id', data.location)
+            .single();
+            
+          if (!locationError && locationData) {
+            location_name = locationData.name;
+          }
         }
 
         const appointmentData: Appointment = {
           ...data,
           location_id: data.location || null, // Map location to location_id for compatibility
           location: data.location,
+          location_name: location_name,
           discount_type: (data.discount_type as "none" | "percentage" | "fixed") || "none",
           // Safely add membership fields with default values if they don't exist
           membership_discount: data.membership_discount ?? 0,
@@ -53,6 +64,8 @@ export function useAppointmentDetails(appointmentId?: string | null) {
           tax_amount: data.tax_amount ?? 0,
           // Set the mapped status
           status: mappedStatus,
+          // Use correct payment method type
+          payment_method: data.payment_method as any,
           // Ensure bookings status is typed correctly
           bookings: data.bookings.map((booking: any) => ({
             ...booking,

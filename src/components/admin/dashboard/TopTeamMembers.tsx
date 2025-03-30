@@ -5,8 +5,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { LocationSelector } from './LocationSelector';
 
+interface StylistPerformance {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  bookings: number;
+  revenue: number;
+}
+
 export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylistsLocationId }) => {
-  const [topStylists, setTopStylists] = useState([]);
+  const [topStylists, setTopStylists] = useState<StylistPerformance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchTopStylists = useCallback(async () => {
@@ -68,8 +76,8 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
       if (bookingsError) throw bookingsError;
 
       // Calculate bookings and revenue by stylist
-      const stylistPerformance = {};
-      stylists.forEach(stylist => {
+      const stylistPerformance: Record<string, StylistPerformance> = {};
+      stylists?.forEach(stylist => {
         stylistPerformance[stylist.id] = {
           id: stylist.id,
           name: stylist.name,
@@ -79,7 +87,7 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
         };
       });
 
-      bookings.forEach(booking => {
+      bookings?.forEach(booking => {
         if (booking.employee_id && stylistPerformance[booking.employee_id]) {
           stylistPerformance[booking.employee_id].bookings += 1;
           stylistPerformance[booking.employee_id].revenue += booking.price_paid || 0;
@@ -88,7 +96,7 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
 
       // Sort by revenue and take top 5
       const sortedStylists = Object.values(stylistPerformance)
-        .sort((a, b) => b.revenue - a.revenue)
+        .sort((a, b) => (b.revenue as number) - (a.revenue as number))
         .slice(0, 5);
 
       setTopStylists(sortedStylists);
@@ -127,7 +135,7 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
               <div key={stylist.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Avatar>
-                    <AvatarImage src={stylist.photoUrl} alt={stylist.name} />
+                    <AvatarImage src={stylist.photoUrl || undefined} alt={stylist.name} />
                     <AvatarFallback>{stylist.name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>

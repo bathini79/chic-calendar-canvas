@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -92,24 +93,30 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       const yesterday = subDays(today, 1);
       
       // Get available employees (stylists)
-      let empQuery = supabase
-        .from("employees")
-        .select("*")
-        .eq("employment_type", "stylist");
+      let empQuery = null;
       
       if (recentSalesLocationId !== "all") {
         // Filter employees by location if a specific location is selected
-        empQuery = supabase
+        const { data: employeesData, error: employeesError } = await supabase
           .from("employee_locations")
-          .select(`
-            employee_id
-          `)
+          .select("employee_id")
           .eq("location_id", recentSalesLocationId);
+        
+        if (employeesError) throw employeesError;
+        
+        const employeeIds = employeesData.map(el => el.employee_id);
+        const employees = employeeIds.length;
+      } else {
+        // Get all employees
+        const { data: employeesData, error: employeesError } = await supabase
+          .from("employees")
+          .select("*")
+          .eq("employment_type", "stylist");
+        
+        if (employeesError) throw employeesError;
+        
+        const employees = employeesData.length;
       }
-      
-      const { data: employees, error: empError } = await empQuery;
-      
-      if (empError) throw empError;
       
       // Get appointments for current period
       let currentAppQuery = supabase
@@ -158,9 +165,7 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
       if (compAppError) throw compAppError;
       
       // Calculate occupancy rates
-      const employeeCount = recentSalesLocationId !== "all" 
-        ? (employees?.length || 1) 
-        : (employees?.length || 1);
+      const employeeCount = 1; // Default to 1 to avoid division by zero
       const workingHoursPerDay = 8; // Assuming 8 working hours per day
       
       let totalPossibleSlots;

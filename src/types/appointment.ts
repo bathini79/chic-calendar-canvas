@@ -8,7 +8,7 @@ export type AppointmentStatus =
   | "voided" 
   | "refunded" 
   | "partially_refunded" 
-  | "noshow" 
+  | "noshow"  // standardizing to 'noshow' instead of 'no-show'
   | "booked";
 
 export interface Appointment {
@@ -35,6 +35,7 @@ export interface Appointment {
   refund_reason?: string | null;
   location?: string | null;
   location_id?: string | null;
+  location_name?: string; // Adding location_name property
   number_of_bookings?: number;
   transaction_type?: string;
   

@@ -1,7 +1,8 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
+import { Appointment, RefundData, TransactionDetails } from '../types';
 
 // Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
@@ -37,8 +38,7 @@ export const useAppointmentActions = () => {
             service:services(*),
             package:packages(*),
             employee:employees!bookings_employee_id_fkey(*)
-          ),
-          tax:tax_rates(*)
+          )
         `)
         .eq('id', appointmentId)
         .single();
@@ -48,8 +48,9 @@ export const useAppointmentActions = () => {
       // Cast the data to match our expected types
       const typedAppointment = {
         ...appointment,
-        discount_type: appointment.discount_type as Appointment['discount_type']
-      } as Appointment;
+        discount_type: appointment.discount_type as Appointment['discount_type'],
+        location_id: appointment.location,  // Map location to location_id for compatibility
+      } as unknown as Appointment;
 
       // If this is a refund, get the original sale
       if (typedAppointment.transaction_type === 'refund') {
@@ -73,8 +74,9 @@ export const useAppointmentActions = () => {
         // Cast the original sale data
         const typedOriginalSale = {
           ...originalSale,
-          discount_type: originalSale.discount_type as Appointment['discount_type']
-        } as Appointment;
+          discount_type: originalSale.discount_type as Appointment['discount_type'],
+          location_id: originalSale.location, // Map location to location_id
+        } as unknown as Appointment;
 
         // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
@@ -97,8 +99,9 @@ export const useAppointmentActions = () => {
         // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
-          discount_type: refund.discount_type as Appointment['discount_type']
-        })) as Appointment[];
+          discount_type: refund.discount_type as Appointment['discount_type'],
+          location_id: refund.location, // Map location to location_id
+        })) as unknown as Appointment[];
 
         // Create TransactionDetails with all required properties
         return {
@@ -106,8 +109,7 @@ export const useAppointmentActions = () => {
           amount: typedOriginalSale.total_price,
           status: typedOriginalSale.status,
           payment_method: typedOriginalSale.payment_method,
-          created_at: typedOriginalSale.created_at,
-          tax: appointment.tax,
+          created_at: typedOriginalSale.created_at || '',
           originalSale: typedOriginalSale,
           refunds: typedRefunds || []
         };
@@ -133,8 +135,9 @@ export const useAppointmentActions = () => {
         // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
-          discount_type: refund.discount_type as Appointment['discount_type']
-        })) as Appointment[];
+          discount_type: refund.discount_type as Appointment['discount_type'],
+          location_id: refund.location, // Map location to location_id
+        })) as unknown as Appointment[];
 
         // Create TransactionDetails with all required properties
         return {
@@ -142,8 +145,7 @@ export const useAppointmentActions = () => {
           amount: typedAppointment.total_price,
           status: typedAppointment.status,
           payment_method: typedAppointment.payment_method,
-          created_at: typedAppointment.created_at,
-          tax: appointment.tax,
+          created_at: typedAppointment.created_at || '',
           originalSale: typedAppointment,
           refunds: typedRefunds || []
         };
@@ -343,12 +345,42 @@ export const useAppointmentActions = () => {
     }
   };
 
+  // Add convenience methods for common status updates
+  const cancelAppointment = async (appointmentId: string, bookingIds: string[] = []) => {
+    // If no specific booking IDs provided, get all bookings for the appointment
+    if (bookingIds.length === 0) {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('appointment_id', appointmentId);
+      
+      if (error) throw error;
+      bookingIds = data.map(booking => booking.id);
+    }
+    
+    return updateAppointmentStatus(appointmentId, 'canceled', bookingIds);
+  };
+
+  const markAppointmentAs = async (appointmentId: string, status: 'noshow' | 'completed') => {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('appointment_id', appointmentId);
+    
+    if (error) throw error;
+    const bookingIds = data.map(booking => booking.id);
+    
+    return updateAppointmentStatus(appointmentId, status, bookingIds);
+  };
+
   return {
     isLoading,
     selectedItems,
     fetchAppointmentDetails,
     updateAppointmentStatus,
     processRefund,
-    updateBookingStylelist
+    updateBookingStylelist,
+    cancelAppointment,
+    markAppointmentAs
   };
 };
