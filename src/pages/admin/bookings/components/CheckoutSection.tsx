@@ -571,12 +571,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
-  // Get background color based on status
-  const cardBackgroundColor = appointmentStatus ? getStatusBackgroundColor(appointmentStatus) : '';
-
   return (
     <div className="h-full w-full bg-gray-50 p-6">
-      <Card className={`h-full ${cardBackgroundColor}`}>
+      <Card>
         <CardContent className="p-6 h-full flex flex-col">
           <div className="flex flex-col gap-3 mb-6">
             <div className="flex items-center justify-between">
