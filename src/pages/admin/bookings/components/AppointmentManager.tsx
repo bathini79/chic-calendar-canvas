@@ -106,7 +106,13 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     if (existingAppointment) {
       processExistingAppointment(existingAppointment);
       setAppointmentStatus(existingAppointment.status || "pending");
-      setCurrentScreen(SCREEN.CHECKOUT);
+      
+      if (existingAppointment.status === "completed") {
+        setCurrentScreen(SCREEN.SUMMARY);
+        setNewAppointmentId(existingAppointment.id);
+      } else {
+        setCurrentScreen(SCREEN.CHECKOUT);
+      }
     }
   }, [selectedDate, selectedTime, existingAppointment]);
 
@@ -366,7 +372,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   const handleStatusChange = (status: AppointmentStatus) => {
-    // Check if we need confirmation for this status change
     if (status === "noshow" || status === "canceled") {
       setPendingStatus(status);
       setShowStatusConfirmation(true);
@@ -377,13 +382,10 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   const applyStatusChange = async (status: AppointmentStatus) => {
-    // Only make API call if we have an existing appointment
     if (existingAppointment?.id) {
       try {
-        // Get all booking IDs for this appointment
         const bookingIds = existingAppointment.bookings?.map(booking => booking.id) || [];
         
-        // Update appointment status through API
         const success = await updateAppointmentStatus(
           existingAppointment.id,
           status,
@@ -393,7 +395,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         if (success) {
           toast.success(`Appointment status updated to ${status}`);
           
-          // If status is completed, show the summary view
           if (status === "completed") {
             setNewAppointmentId(existingAppointment.id);
             setCurrentScreen(SCREEN.SUMMARY);
@@ -415,15 +416,12 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
-  // Check if the appointment is already completed
   const isCompleted = existingAppointment?.status === "completed";
   
-  // Check if we should show the status dropdown (only for existing appointments, not new ones)
   const shouldShowStatusDropdown = existingAppointment !== null && existingAppointment !== undefined;
 
   const displayTime = stateSelectedTime ? formatTimeString(stateSelectedTime) : "";
   
-  // Get background color based on status
   const headerBgColor = appointmentStatus && getStatusBackgroundColor(appointmentStatus);
 
   return (

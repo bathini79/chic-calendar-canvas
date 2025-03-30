@@ -27,7 +27,6 @@ export type Database = {
           notes: string | null
           number_of_bookings: number | null
           original_appointment_id: string | null
-          original_total_price: number | null
           payment_method: string | null
           refund_notes: string | null
           refund_reason: string | null
@@ -58,7 +57,6 @@ export type Database = {
           notes?: string | null
           number_of_bookings?: number | null
           original_appointment_id?: string | null
-          original_total_price?: number | null
           payment_method?: string | null
           refund_notes?: string | null
           refund_reason?: string | null
@@ -89,7 +87,6 @@ export type Database = {
           notes?: string | null
           number_of_bookings?: number | null
           original_appointment_id?: string | null
-          original_total_price?: number | null
           payment_method?: string | null
           refund_notes?: string | null
           refund_reason?: string | null
