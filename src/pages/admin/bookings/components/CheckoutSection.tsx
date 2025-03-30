@@ -46,6 +46,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
+import { cwd } from "process";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -309,12 +310,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     setMembershipDiscount(bestDiscount);
     setMembershipId(bestMembershipId);
     setMembershipName(bestMembershipName);
-    
-    console.log("Membership values set:", {
-      membershipDiscount: bestDiscount,
-      membershipId: bestMembershipId,
-      membershipName: bestMembershipName
-    });
   }, [customerMemberships, selectedServices, selectedPackages, services, packages, customizedServices]);
 
   const handleTaxChange = (taxId: string) => {
@@ -537,19 +532,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         toast.error("Please select a customer");
         return;
       }
-      
-      console.log("Payment data:", {
-        taxId: appliedTaxId,
-        taxAmount,
-        couponId: selectedCouponId,
-        couponDiscount,
-        membershipId,
-        membershipName,
-        membershipDiscount,
-        total,
-        adjustedPrices
-      });
-      
       const saveAppointmentParams = {
         appointmentId,
         appliedTaxId,
@@ -560,7 +542,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         membershipName,
         membershipDiscount,
         total,
-        adjustedPrices
+        adjustedPrices,
+        couponName: availableCoupons?.filter(c => c.id === selectedCouponId)?.[0]?.code || null,
       };
       
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);

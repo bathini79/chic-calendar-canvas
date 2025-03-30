@@ -143,42 +143,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     return location ? location.name : 'Unknown Location';
   };
 
-  const handleRebook = () => {
-    if (!transactionDetails || !transactionDetails.originalSale) return;
-    
-    // Navigate to booking page with prefilled data
-    navigate('/admin/bookings/new', { 
-      state: { 
-        rebookData: {
-          customer: transactionDetails.originalSale.customer,
-          services: transactionDetails.originalSale.bookings
-            .filter(b => b.service_id)
-            .map(b => ({
-              id: b.service_id,
-              name: b.service?.name || '',
-              price: b.service?.selling_price || 0,
-              duration: b.service?.duration || 0
-            })),
-          packages: transactionDetails.originalSale.bookings
-            .filter(b => b.package_id)
-            .map(b => ({
-              id: b.package_id,
-              name: b.package?.name || '',
-              price: b.package?.price || 0,
-              duration: b.package?.duration || 0
-            })),
-          employee_preferences: transactionDetails.originalSale.bookings.reduce((acc, b) => {
-            if (b.employee_id) {
-              if (b.service_id) acc[b.service_id] = b.employee_id;
-              if (b.package_id) acc[b.package_id] = b.employee_id;
-            }
-            return acc;
-          }, {})
-        }
-      }
-    });
-  };
-
   const handleSaveEdits = async () => {
     if (!appointmentId) return;
     

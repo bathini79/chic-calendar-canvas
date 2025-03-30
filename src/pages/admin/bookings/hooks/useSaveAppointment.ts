@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { startOfDay, format, parse, addMinutes } from "date-fns";
+import { addMinutes } from "date-fns";
 import { SCREEN, AppointmentStatus } from "../types";
 
 interface SaveAppointmentProps {
@@ -55,14 +55,8 @@ export default function useSaveAppointment({
   locationId,
   appliedTaxId,
   taxAmount = 0,
-  couponId = null,
   couponDiscount = 0,
   status,
-  membership_discount = 0,
-  membership_id = null,
-  membership_name = null,
-  coupon_name = null,
-  coupon_amount = 0
 }: SaveAppointmentProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -143,47 +137,6 @@ export default function useSaveAppointment({
         (typeof summaryParams.appliedTaxId === 'object' && summaryParams.appliedTaxId !== null ? 
           summaryParams.appliedTaxId.id || summaryParams.appliedTaxId : summaryParams.appliedTaxId) : 
         appliedTaxId;
-        
-      const usedCouponId = summaryParams.couponId !== undefined ? 
-        (typeof summaryParams.couponId === 'object' && summaryParams.couponId !== null ? 
-          summaryParams.couponId.id || summaryParams.couponId : summaryParams.couponId) : 
-        couponId;
-
-      // Extract membership and coupon details from params if available
-      const membershipDiscount = summaryParams.membership_discount !== undefined ?
-        summaryParams.membership_discount :
-        membership_discount;
-        
-      const membershipId = summaryParams.membership_id !== undefined ?
-        summaryParams.membership_id :
-        membership_id;
-        
-      const membershipName = summaryParams.membership_name !== undefined ?
-        summaryParams.membership_name :
-        membership_name;
-        
-      const couponNameValue = summaryParams.coupon_name !== undefined ?
-        summaryParams.coupon_name :
-        coupon_name;
-        
-      const couponAmountValue = summaryParams.coupon_amount !== undefined ?
-        summaryParams.coupon_amount :
-        coupon_amount;
-
-      console.log("Appointment data for saving:", {
-        total: totalPrice,
-        taxAmount: calculatedTaxAmount,
-        taxId: usedTaxId,
-        couponDiscount: calculatedCouponDiscount,
-        couponId: usedCouponId,
-        adjustedPrices: summaryParams.adjustedPrices,
-        membershipDiscount,
-        membershipId,
-        membershipName,
-        couponName: couponNameValue,
-        couponAmount: couponAmountValue
-      });
-
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
         status || (currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending');
@@ -201,12 +154,12 @@ export default function useSaveAppointment({
         payment_method: paymentMethod,
         tax_amount: calculatedTaxAmount,
         tax_id: usedTaxId,
-        coupon_id: usedCouponId,
-        coupon_name: couponNameValue,
-        coupon_amount: couponAmountValue,
-        membership_discount: membershipDiscount,
-        membership_id: membershipId,
-        membership_name: membershipName
+        coupon_id: summaryParams?.couponId,
+        coupon_name: summaryParams?.couponName,
+        coupon_amount: summaryParams?.summaryParams,
+        membership_discount: summaryParams?.membershipDiscount,
+        membership_id: summaryParams?.membershipId,
+        membership_name: summaryParams?.membershipName
       };
 
       let createdAppointmentId;
