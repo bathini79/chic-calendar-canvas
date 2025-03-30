@@ -1,8 +1,7 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, Booking, RefundData, TransactionDetails, AppointmentStatus } from '../types';
+import { Appointment, Booking, RefundData, TransactionDetails } from '../types';
 
 // Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
@@ -278,7 +277,7 @@ export const useAppointmentActions = () => {
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: AppointmentStatus,
+    status: Appointment['status'],
     bookingIds: string[]
   ) => {
     try {
@@ -299,7 +298,7 @@ export const useAppointmentActions = () => {
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({ 
-          status: status === 'inprogress' ? 'pending' : status, // Map inprogress to pending for bookings if needed
+          status,
           updated_at: new Date().toISOString()
         })
         .in('id', bookingIds);
@@ -329,42 +328,6 @@ export const useAppointmentActions = () => {
     }
   };
 
-  const cancelAppointment = async (appointmentId: string) => {
-    try {
-      const { data: bookings, error: fetchBookingsError } = await supabase
-        .from('bookings')
-        .select('id')
-        .eq('appointment_id', appointmentId);
-      
-      if (fetchBookingsError) throw fetchBookingsError;
-      
-      const bookingIds = bookings.map(booking => booking.id);
-      return await updateAppointmentStatus(appointmentId, 'canceled', bookingIds);
-    } catch (error) {
-      console.error("Error canceling appointment:", error);
-      toast.error("Failed to cancel appointment");
-      return false;
-    }
-  }
-
-  const markAppointmentAs = async (appointmentId: string, status: "noshow" | "completed") => {
-    try {
-      const { data: bookings, error: fetchBookingsError } = await supabase
-        .from('bookings')
-        .select('id')
-        .eq('appointment_id', appointmentId);
-      
-      if (fetchBookingsError) throw fetchBookingsError;
-      
-      const bookingIds = bookings.map(booking => booking.id);
-      return await updateAppointmentStatus(appointmentId, status, bookingIds);
-    } catch (error) {
-      console.error(`Error marking appointment as ${status}:`, error);
-      toast.error(`Failed to mark appointment as ${status}`);
-      return false;
-    }
-  }
-
   const updateBookingStylelist = async (bookingId: string, employeeId: string) => {
     try {
       const { error } = await supabase
@@ -386,8 +349,6 @@ export const useAppointmentActions = () => {
     fetchAppointmentDetails,
     updateAppointmentStatus,
     processRefund,
-    updateBookingStylelist,
-    cancelAppointment,
-    markAppointmentAs
+    updateBookingStylelist
   };
 };
