@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -17,18 +18,6 @@ import { useAppointmentActions } from "../hooks/useAppointmentActions";
 import { useAppointmentDetails } from "../hooks/useAppointmentDetails";
 import { StatusBadge, getStatusBackgroundColor } from "./StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { supabase } from '@/integrations/supabase/client';
 
 interface AppointmentManagerProps {
   isOpen: boolean;
@@ -54,14 +43,12 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
   const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("pending");
-  const [showStatusConfirmDialog, setShowStatusConfirmDialog] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
   
   const { appointment, refetch: refetchAppointment } = useAppointmentDetails(
     existingAppointment?.id
   );
   
-  const { cancelAppointment, markAppointmentAs, updateAppointmentStatus } = useAppointmentActions();
+  const { cancelAppointment, markAppointmentAs } = useAppointmentActions();
 
   const { data: services } = useActiveServices(locationId);
   const { data: packages } = useActivePackages(locationId);
@@ -105,13 +92,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     if (existingAppointment) {
       processExistingAppointment(existingAppointment);
       setAppointmentStatus(existingAppointment.status || "pending");
-      
-      // If appointment is already completed, go directly to summary
-      if (existingAppointment.status === "completed") {
-        setCurrentScreen(SCREEN.SUMMARY);
-      } else {
-        setCurrentScreen(SCREEN.CHECKOUT);
-      }
+      setCurrentScreen(SCREEN.CHECKOUT);
     }
   }, [selectedDate, selectedTime, existingAppointment]);
 
@@ -361,52 +342,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
-  const handleStatusChange = async (newStatus: AppointmentStatus) => {
-    // If status is noshow or canceled, prompt for confirmation
-    if (newStatus === "noshow" || newStatus === "canceled") {
-      setPendingStatus(newStatus);
-      setShowStatusConfirmDialog(true);
-      return;
-    }
-    
-    await updateStatusAndSave(newStatus);
-  };
-  
-  const updateStatusAndSave = async (newStatus: AppointmentStatus) => {
-    setAppointmentStatus(newStatus);
-    
-    // Only make API call if we have an existing appointment
-    if (existingAppointment?.id) {
-      try {
-        // Get all bookings for this appointment
-        const { data, error } = await supabase
-          .from('bookings')
-          .select('id')
-          .eq('appointment_id', existingAppointment.id);
-        
-        if (error) throw error;
-        const bookingIds = data.map(booking => booking.id);
-        
-        await updateAppointmentStatus(existingAppointment.id, newStatus, bookingIds);
-        toast.success(`Appointment status updated to ${newStatus}`);
-        
-        if (onAppointmentSaved) {
-          onAppointmentSaved();
-        }
-      } catch (error) {
-        console.error("Error updating appointment status:", error);
-        toast.error("Failed to update appointment status");
-      }
-    }
-  };
-
-  // Handle confirmation of status change
-  const confirmStatusChange = async () => {
-    if (pendingStatus) {
-      await updateStatusAndSave(pendingStatus);
-      setPendingStatus(null);
-    }
-    setShowStatusConfirmDialog(false);
+  const handleStatusChange = (status: AppointmentStatus) => {
+    setAppointmentStatus(status);
   };
 
   // Check if the appointment is already completed
@@ -449,6 +386,39 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                     <p className="text-sm text-muted-foreground">
                       {displayTime}
                     </p>
+                    
+                    {shouldShowStatusDropdown && (
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={appointmentStatus}
+                          onValueChange={(value) => handleStatusChange(value as AppointmentStatus)}
+                          disabled={isCompleted}
+                        >
+                          <SelectTrigger className="w-[140px] h-8">
+                            <SelectValue>
+                              <StatusBadge status={appointmentStatus} />
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="booked">
+                              <StatusBadge status="booked" />
+                            </SelectItem>
+                            <SelectItem value="confirmed">
+                              <StatusBadge status="confirmed" />
+                            </SelectItem>
+                            <SelectItem value="inprogress">
+                              <StatusBadge status="inprogress" />
+                            </SelectItem>
+                            <SelectItem value="noshow">
+                              <StatusBadge status="noshow" />
+                            </SelectItem>
+                            <SelectItem value="canceled">
+                              <StatusBadge status="canceled" />
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <button
@@ -510,7 +480,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   notes={appointmentNotes}
                   onDiscountTypeChange={setDiscountType}
                   onDiscountValueChange={setDiscountValue}
-                  onPaymentMethodChange={setPaymentMethod as (method: PaymentMethod) => void}
+                  onPaymentMethodChange={setPaymentMethod}
                   onNotesChange={setAppointmentNotes}
                   onPaymentComplete={handlePaymentComplete}
                   selectedStylists={selectedStylists}
@@ -524,53 +494,20 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   customizedServices={customizedServices}
                   isExistingAppointment={!!existingAppointment}
                   locationId={locationId}
-                  
-                  // Additional props for actions
-                  extraActionSlot={
-                    shouldShowStatusDropdown && (
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={appointmentStatus}
-                          onValueChange={(value) => handleStatusChange(value as AppointmentStatus)}
-                          disabled={isCompleted}
-                        >
-                          <SelectTrigger className="w-[140px] h-9">
-                            <SelectValue>
-                              <StatusBadge status={appointmentStatus} />
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="booked">
-                              <StatusBadge status="booked" />
-                            </SelectItem>
-                            <SelectItem value="confirmed">
-                              <StatusBadge status="confirmed" />
-                            </SelectItem>
-                            <SelectItem value="inprogress">
-                              <StatusBadge status="inprogress" />
-                            </SelectItem>
-                            <SelectItem value="noshow">
-                              <StatusBadge status="noshow" />
-                            </SelectItem>
-                            <SelectItem value="canceled">
-                              <StatusBadge status="canceled" />
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )
-                  }
-                  // Pass existing appointment without modifying code
+                  // Additional props for existing appointments
+                  onCancelAppointment={existingAppointment ? handleCancelAppointment : undefined}
+                  onMarkAsNoShow={existingAppointment ? () => handleMarkAs("noshow") : undefined}
+                  onMarkAsCompleted={existingAppointment ? () => handleMarkAs("completed") : undefined}
                   appointmentStatus={appointmentStatus}
                 />
               )}
 
-              {currentScreen === SCREEN.SUMMARY && (newAppointmentId || (existingAppointment && existingAppointment.id)) && (
+              {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
                 <div className="p-6">
                   <h3 className="text-xl font-semibold mb-6">
                     Appointment Summary
                   </h3>
-                  <SummaryView appointmentId={newAppointmentId || existingAppointment!.id} />
+                  <SummaryView appointmentId={newAppointmentId} />
                   <div className="mt-6 flex justify-end">
                     <Button
                       onClick={() => {
@@ -587,27 +524,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Status confirmation dialog */}
-      <AlertDialog open={showStatusConfirmDialog} onOpenChange={setShowStatusConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Change Appointment Status</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to mark this appointment as {pendingStatus === "noshow" ? "No Show" : "Canceled"}?
-              {pendingStatus === "noshow" && " This will affect the customer's attendance record."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowStatusConfirmDialog(false)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={confirmStatusChange}>
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

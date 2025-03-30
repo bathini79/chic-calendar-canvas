@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Appointment, RefundData, TransactionDetails, AppointmentStatus } from '../types';
+import { Appointment, RefundData, TransactionDetails } from '../types';
 
 // Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
@@ -279,7 +279,7 @@ export const useAppointmentActions = () => {
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: AppointmentStatus,
+    status: Appointment['status'],
     bookingIds: string[]
   ) => {
     try {
@@ -316,7 +316,7 @@ export const useAppointmentActions = () => {
           message = 'Appointment marked as no-show';
           break;
         default:
-          message = `Appointment status updated to ${status} successfully`;
+          message = `Appointment ${status} successfully`;
       }
       
       toast.success(message);
@@ -355,7 +355,7 @@ export const useAppointmentActions = () => {
         .eq('appointment_id', appointmentId);
       
       if (error) throw error;
-      bookingIds = data.map((booking: any) => booking.id);
+      bookingIds = data.map(booking => booking.id);
     }
     
     return updateAppointmentStatus(appointmentId, 'canceled', bookingIds);
@@ -368,7 +368,7 @@ export const useAppointmentActions = () => {
       .eq('appointment_id', appointmentId);
     
     if (error) throw error;
-    const bookingIds = data.map((booking: any) => booking.id);
+    const bookingIds = data.map(booking => booking.id);
     
     return updateAppointmentStatus(appointmentId, status, bookingIds);
   };
