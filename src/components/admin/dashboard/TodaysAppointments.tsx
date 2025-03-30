@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Clock } from "lucide-react";
 import { format } from "date-fns";
 import { LocationSelector } from './LocationSelector';
 import { useAppointmentsByDate } from '@/pages/admin/bookings/hooks/useAppointmentsByDate';
+import { AppointmentManager } from '@/pages/admin/bookings/components/AppointmentManager';
 
 export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, setTodayAppointmentsLocationId, onAppointmentClick }) => {
   const today = new Date();
@@ -13,6 +14,11 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
     today,
     todayAppointmentsLocationId !== "all" ? todayAppointmentsLocationId : undefined
   );
+  
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [isAppointmentManagerOpen, setIsAppointmentManagerOpen] = useState(false);
+  const [appointmentDate, setAppointmentDate] = useState(null);
+  const [appointmentTime, setAppointmentTime] = useState("");
 
   const formatAppointmentStatus = (status) => {
     const styles = {
@@ -23,6 +29,24 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
       booked: "px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800"
     };
     return <span className={styles[status] || "px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800"}>{status.toUpperCase()}</span>;
+  };
+
+  const handleAppointmentClick = (appointment) => {
+    setSelectedAppointment(appointment);
+    const startDate = new Date(appointment.start_time);
+    setAppointmentDate(startDate);
+    setAppointmentTime(format(startDate, 'HH:mm'));
+    setIsAppointmentManagerOpen(true);
+    
+    // Still call the parent's callback if provided
+    if (onAppointmentClick) {
+      onAppointmentClick(appointment);
+    }
+  };
+
+  const closeAppointmentManager = () => {
+    setIsAppointmentManagerOpen(false);
+    setSelectedAppointment(null);
   };
 
   return (
@@ -57,7 +81,7 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
                   <div 
                     key={appointment.id} 
                     className="flex items-start hover:bg-gray-50 p-2 rounded cursor-pointer transition-colors border-b last:border-b-0 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 active:bg-gray-100"
-                    onClick={() => onAppointmentClick(appointment)}
+                    onClick={() => handleAppointmentClick(appointment)}
                     tabIndex={0}
                     role="button"
                   >
@@ -89,6 +113,19 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
           )}
         </ScrollArea>
       </CardContent>
+
+      {/* Direct AppointmentManager implementation instead of using AppointmentDetailsDialog */}
+      {isAppointmentManagerOpen && appointmentDate && (
+        <AppointmentManager
+          isOpen={isAppointmentManagerOpen}
+          onClose={closeAppointmentManager}
+          selectedDate={appointmentDate}
+          selectedTime={appointmentTime}
+          employees={[]} // We'll pass employees later
+          existingAppointment={selectedAppointment}
+          locationId={todayAppointmentsLocationId !== "all" ? todayAppointmentsLocationId : undefined}
+        />
+      )}
     </Card>
   );
 };

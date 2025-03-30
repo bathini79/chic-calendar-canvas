@@ -24,7 +24,8 @@ export function useAppointmentsByDate(date: Date, locationId?: string) {
           )
         `)
         .gte('start_time', start)
-        .lte('start_time', end);
+        .lte('start_time', end)
+        .not('status', 'eq', 'canceled'); // Filter out canceled appointments
       
       // Add location filter if provided
       if (locationId) {

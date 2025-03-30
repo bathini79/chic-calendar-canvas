@@ -1,8 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import { AppointmentDetailsDialog } from "./bookings/components/AppointmentDetailsDialog";
-import { AppointmentManager } from "./bookings/components/AppointmentManager";
 import { format } from "date-fns";
 import { TopTeamMembers } from '@/components/admin/dashboard/TopTeamMembers';
 import { TodaysAppointments } from '@/components/admin/dashboard/TodaysAppointments';
@@ -20,11 +18,6 @@ export default function AdminDashboard() {
   const [inventoryLocationId, setInventoryLocationId] = useState("all");
   const [topServicesLocationId, setTopServicesLocationId] = useState("all");
   const [topStylistsLocationId, setTopStylistsLocationId] = useState("all");
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
-  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
-  const [appointmentDate, setAppointmentDate] = useState(null);
-  const [appointmentTime, setAppointmentTime] = useState("");
   const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
@@ -57,25 +50,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAppointmentClick = (appointment) => {
-    setSelectedAppointment(appointment);
-    setIsDetailsDialogOpen(true);
-  };
-
-  const handleCheckoutFromAppointment = (appointment) => {
-    setSelectedAppointment(appointment);
-    const startDate = new Date(appointment.start_time);
-    setAppointmentDate(startDate);
-    setAppointmentTime(format(startDate, 'HH:mm'));
-    setIsDetailsDialogOpen(false);
-    setIsAddAppointmentOpen(true);
-  };
-
-  const closeAppointmentManager = () => {
-    setIsAddAppointmentOpen(false);
-    setSelectedAppointment(null);
-  };
-
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 overflow-hidden">
       <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Dashboard</h1>
@@ -96,7 +70,8 @@ export default function AdminDashboard() {
             locations={locations}
             todayAppointmentsLocationId={todayAppointmentsLocationId}
             setTodayAppointmentsLocationId={setTodayAppointmentsLocationId}
-            onAppointmentClick={handleAppointmentClick}
+            onAppointmentClick={() => {}}
+            employees={employees}
           />
         </div>
       </div>
@@ -136,27 +111,6 @@ export default function AdminDashboard() {
           />
         </div>
       </div>
-      
-      {/* Appointment Dialogs */}
-      <AppointmentDetailsDialog 
-        appointment={selectedAppointment}
-        open={isDetailsDialogOpen}
-        onOpenChange={setIsDetailsDialogOpen}
-        onUpdated={() => {}}
-        onCheckout={handleCheckoutFromAppointment}
-        onEdit={() => handleCheckoutFromAppointment(selectedAppointment)}
-      />
-      {isAddAppointmentOpen && appointmentDate && (
-        <AppointmentManager
-          isOpen={true}
-          onClose={closeAppointmentManager}
-          selectedDate={appointmentDate}
-          selectedTime={appointmentTime}
-          employees={employees}
-          existingAppointment={selectedAppointment}
-          locationId={todayAppointmentsLocationId !== "all" ? todayAppointmentsLocationId : undefined}
-        />
-      )}
     </div>
   );
 }
