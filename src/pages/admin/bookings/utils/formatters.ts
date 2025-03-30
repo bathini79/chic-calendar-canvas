@@ -10,6 +10,3 @@ export const formatRefundReason = (reason: string): string => {
   };
   return reasons[reason] || reason;
 };
-export const formatCurrency = (amount: number) => {
-  return `₹${amount.toFixed(2)}`;
-};

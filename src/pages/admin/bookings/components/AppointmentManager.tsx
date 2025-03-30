@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,6 @@ import { formatTime, formatTimeString } from "../utils/timeUtils";
 import { useAppointmentActions } from "../hooks/useAppointmentActions";
 import { useAppointmentDetails } from "../hooks/useAppointmentDetails";
 import { StatusBadge, getStatusBackgroundColor } from "./StatusBadge";
-import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
@@ -54,7 +52,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 }) => {
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
-  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("pending");
+  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("");
   const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
   
@@ -97,12 +95,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   } = useAppointmentState();
 
   useEffect(() => {
-    if (appointment) {
-      setAppointmentStatus(appointment.status || "pending");
-    }
-  }, [appointment]);
-
-  useEffect(() => {
     if (selectedDate) {
       setSelectedDate(selectedDate);
     }
@@ -115,7 +107,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       processExistingAppointment(existingAppointment);
       setAppointmentStatus(existingAppointment.status || "pending");
       
-      if (existingAppointment.status === "completed" || existingAppointment.status === "refunded" || existingAppointment.status === "partially_refunded") {
+      if (existingAppointment.status === "completed" || existingAppointment.status === "refunded") {
         setCurrentScreen(SCREEN.SUMMARY);
         setNewAppointmentId(existingAppointment.id);
       } else {
@@ -325,29 +317,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
-  const handlePaymentComplete = async (appointmentId?: string) => {
-    const savedId = appointmentId || newAppointmentId;
-    setNewAppointmentId(savedId);
+  const handlePaymentComplete = (appointmentId?: string) => {
+    setNewAppointmentId(appointmentId || null);
     setCurrentScreen(SCREEN.SUMMARY);
-    
-    if (savedId) {
-      try {
-        const { data } = await supabase
-          .from('bookings')
-          .select('id')
-          .eq('appointment_id', savedId);
-          
-        const bookingIds = data?.map(b => b.id) || [];
-        
-        await updateAppointmentStatus(savedId, "completed", bookingIds);
-        
-        await refetchAppointment();
-        
-        setAppointmentStatus("completed");
-      } catch (error) {
-        console.error("Error updating status after payment:", error);
-      }
-    }
 
     if (onAppointmentSaved) {
       onAppointmentSaved();
@@ -388,13 +360,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       try {
         await markAppointmentAs(existingAppointment.id, status);
         toast.success(`Appointment marked as ${status}`);
-        
-        setAppointmentStatus(status);
-        
-        if (status === "completed") {
-          setCurrentScreen(SCREEN.SUMMARY);
-        }
-        
+        onClose();
         if (onAppointmentSaved) {
           onAppointmentSaved();
         }
@@ -405,13 +371,13 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
-  const handleStatusChange = async (status: AppointmentStatus) => {
+  const handleStatusChange = (status: AppointmentStatus) => {
     if (status === "noshow" || status === "canceled") {
       setPendingStatus(status);
       setShowStatusConfirmation(true);
     } else {
       setAppointmentStatus(status);
-      await applyStatusChange(status);
+      applyStatusChange(status);
     }
   };
 
@@ -429,14 +395,10 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         if (success) {
           toast.success(`Appointment status updated to ${status}`);
           
-          setAppointmentStatus(status);
-          
           if (status === "completed") {
             setNewAppointmentId(existingAppointment.id);
             setCurrentScreen(SCREEN.SUMMARY);
           }
-          
-          await refetchAppointment();
         }
       } catch (error) {
         console.error("Error updating appointment status:", error);
@@ -445,23 +407,22 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
-  const confirmStatusChange = async () => {
+  const confirmStatusChange = () => {
     if (pendingStatus) {
       setAppointmentStatus(pendingStatus);
-      await applyStatusChange(pendingStatus);
+      applyStatusChange(pendingStatus);
       setPendingStatus(null);
       setShowStatusConfirmation(false);
     }
   };
 
-  const currentStatus = appointment?.status || appointmentStatus;
-  const isCompleted = currentStatus === "completed";
+  const isCompleted = existingAppointment?.status === "completed";
   
   const shouldShowStatusDropdown = existingAppointment !== null && existingAppointment !== undefined;
 
   const displayTime = stateSelectedTime ? formatTimeString(stateSelectedTime) : "";
   
-  const headerBgColor = currentStatus && getStatusBackgroundColor(currentStatus);
+  const headerBgColor = appointmentStatus && getStatusBackgroundColor(appointmentStatus);
 
   return (
     <div
@@ -496,13 +457,13 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                     {shouldShowStatusDropdown && (
                       <div className="flex items-center gap-2">
                         <Select
-                          value={currentStatus}
+                          value={appointmentStatus}
                           onValueChange={(value) => handleStatusChange(value as AppointmentStatus)}
                           disabled={isCompleted}
                         >
                           <SelectTrigger className="w-[180px] h-8">
                             <SelectValue>
-                              <StatusBadge status={currentStatus} />
+                              <StatusBadge status={appointmentStatus} />
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
@@ -603,7 +564,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   onCancelAppointment={existingAppointment ? handleCancelAppointment : undefined}
                   onMarkAsNoShow={existingAppointment ? () => handleMarkAs("noshow") : undefined}
                   onMarkAsCompleted={existingAppointment ? () => handleMarkAs("completed") : undefined}
-                  appointmentStatus={currentStatus}
+                  appointmentStatus={appointmentStatus}
                 />
               )}
 
