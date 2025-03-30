@@ -46,4 +46,5 @@ export interface Appointment {
   // Joined data
   bookings?: any[];
   tax?: any;
+  customer?: any;
 }

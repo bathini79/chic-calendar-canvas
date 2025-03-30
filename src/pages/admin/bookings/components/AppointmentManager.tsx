@@ -11,11 +11,13 @@ import { useActivePackages } from "../hooks/useActivePackages";
 import useSaveAppointment from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
-import { Appointment, SCREEN, Service, Package, PaymentMethod } from "../types";
+import { Appointment, SCREEN, Service, Package, PaymentMethod, AppointmentStatus } from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 import { formatTime, formatTimeString } from "../utils/timeUtils";
 import { useAppointmentActions } from "../hooks/useAppointmentActions";
 import { useAppointmentDetails } from "../hooks/useAppointmentDetails";
+import { StatusBadge, getStatusBackgroundColor } from "./StatusBadge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AppointmentManagerProps {
   isOpen: boolean;
@@ -40,6 +42,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 }) => {
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
+  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("pending");
   
   const { appointment, refetch: refetchAppointment } = useAppointmentDetails(
     existingAppointment?.id
@@ -88,6 +91,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
     if (existingAppointment) {
       processExistingAppointment(existingAppointment);
+      setAppointmentStatus(existingAppointment.status || "pending");
       setCurrentScreen(SCREEN.CHECKOUT);
     }
   }, [selectedDate, selectedTime, existingAppointment]);
@@ -213,6 +217,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     customizedServices,
     currentScreen,
     locationId,
+    status: appointmentStatus,
   });
 
   const handleProceedToCheckout = async () => {
@@ -337,7 +342,20 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
+  const handleStatusChange = (status: AppointmentStatus) => {
+    setAppointmentStatus(status);
+  };
+
+  // Check if the appointment is already completed
+  const isCompleted = existingAppointment?.status === "completed";
+  
+  // Check if we should show the status dropdown (only for existing appointments, not new ones)
+  const shouldShowStatusDropdown = existingAppointment !== null && existingAppointment !== undefined;
+
   const displayTime = stateSelectedTime ? formatTimeString(stateSelectedTime) : "";
+  
+  // Get background color based on status
+  const headerBgColor = getStatusBackgroundColor(appointmentStatus);
 
   return (
     <div
@@ -356,7 +374,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
           </div>
 
           <div className="w-[70%] flex flex-col h-full">
-            <div className="p-6 border-b flex-shrink-0">
+            <div className={`p-6 border-b flex-shrink-0 ${headerBgColor}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-start flex-col">
                   {stateSelectedDate && (
@@ -364,9 +382,44 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                       {format(stateSelectedDate, "EEE d MMM")}
                     </div>
                   )}
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {displayTime}
-                  </p>
+                  <div className="flex items-center mt-1 gap-4">
+                    <p className="text-sm text-muted-foreground">
+                      {displayTime}
+                    </p>
+                    
+                    {shouldShowStatusDropdown && (
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={appointmentStatus}
+                          onValueChange={(value) => handleStatusChange(value as AppointmentStatus)}
+                          disabled={isCompleted}
+                        >
+                          <SelectTrigger className="w-[140px] h-8">
+                            <SelectValue>
+                              <StatusBadge status={appointmentStatus} />
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="booked">
+                              <StatusBadge status="booked" />
+                            </SelectItem>
+                            <SelectItem value="confirmed">
+                              <StatusBadge status="confirmed" />
+                            </SelectItem>
+                            <SelectItem value="inprogress">
+                              <StatusBadge status="inprogress" />
+                            </SelectItem>
+                            <SelectItem value="noshow">
+                              <StatusBadge status="noshow" />
+                            </SelectItem>
+                            <SelectItem value="canceled">
+                              <StatusBadge status="canceled" />
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={onClose}
@@ -445,7 +498,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   onCancelAppointment={existingAppointment ? handleCancelAppointment : undefined}
                   onMarkAsNoShow={existingAppointment ? () => handleMarkAs("noshow") : undefined}
                   onMarkAsCompleted={existingAppointment ? () => handleMarkAs("completed") : undefined}
-                  appointmentStatus={existingAppointment?.status}
+                  appointmentStatus={appointmentStatus}
                 />
               )}
 
@@ -473,4 +526,4 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       </div>
     </div>
   );
-}
+};

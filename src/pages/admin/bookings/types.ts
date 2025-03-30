@@ -4,7 +4,7 @@ export type AppointmentStatus =
   | 'confirmed' 
   | 'canceled' 
   | 'completed' 
-  | 'no-show' 
+  | 'no-show'  // Note: This should be 'noshow' to match the system type
   | 'noshow' 
   | 'inprogress'
   | 'voided'

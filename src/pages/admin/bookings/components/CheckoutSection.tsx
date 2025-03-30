@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,7 +82,6 @@ interface CheckoutSectionProps {
   isExistingAppointment?: boolean;
   customizedServices?: Record<string, string[]>;
   locationId?: string;
-  // Additional props for existing appointments
   appointmentStatus?: AppointmentStatus;
   onCancelAppointment?: () => void;
   onMarkAsNoShow?: () => void;
@@ -576,17 +574,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   // Get background color based on status
   const cardBackgroundColor = appointmentStatus ? getStatusBackgroundColor(appointmentStatus) : '';
 
-  // Function to handle status change
-  const handleStatusChange = (status: string) => {
-    if (status === 'noshow' && onMarkAsNoShow) {
-      onMarkAsNoShow();
-    } else if (status === 'completed' && onMarkAsCompleted) {
-      onMarkAsCompleted();
-    } else if (status === 'canceled' && onCancelAppointment) {
-      onCancelAppointment();
-    }
-  };
-
   return (
     <div className="h-full w-full bg-gray-50 p-6">
       <Card className={`h-full ${cardBackgroundColor}`}>
@@ -595,43 +582,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Checkout Summary</h2>
             </div>
-            
-            {isExistingAppointment && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={appointmentStatus || 'pending'} className="ml-0" />
-                </div>
-                {(onCancelAppointment || onMarkAsNoShow || onMarkAsCompleted) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        Change Status <ChevronDown className="h-4 w-4 ml-1" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      {onMarkAsCompleted && (
-                        <DropdownMenuItem onClick={() => handleStatusChange('completed')}>
-                          <Check className="h-4 w-4 mr-2 text-green-600" />
-                          Mark as Completed
-                        </DropdownMenuItem>
-                      )}
-                      {onMarkAsNoShow && (
-                        <DropdownMenuItem onClick={() => handleStatusChange('noshow')}>
-                          <XCircle className="h-4 w-4 mr-2 text-amber-600" />
-                          Mark as No-Show
-                        </DropdownMenuItem>
-                      )}
-                      {onCancelAppointment && (
-                        <DropdownMenuItem onClick={() => handleStatusChange('canceled')}>
-                          <X className="h-4 w-4 mr-2 text-destructive" />
-                          Cancel Appointment
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            )}
             
             <div className="flex justify-end">
               <Button
