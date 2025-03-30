@@ -1,9 +1,9 @@
 
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format, addMinutes } from "date-fns";
-import { v4 as uuidv4 } from "uuid";
-import { PaymentMethod, AppointmentStatus, SCREEN } from "../types";
+import { startOfDay, format, parse, addMinutes } from "date-fns";
+import { SCREEN, AppointmentStatus } from "../types";
 
 interface SaveAppointmentProps {
   selectedDate: Date | null;
@@ -18,15 +18,18 @@ interface SaveAppointmentProps {
   getTotalPrice: (services: any[], packages: any[], discountType: string, discountValue: number) => number;
   discountType: string;
   discountValue: number;
-  paymentMethod: PaymentMethod;
+  paymentMethod: string;
   notes: string;
   customizedServices: Record<string, string[]>;
-  currentScreen: string;
+  currentScreen: SCREEN;
   locationId?: string;
-  status?: AppointmentStatus;
+  appliedTaxId?: string | null;
+  taxAmount?: number;
+  couponId?: string | null;
+  couponDiscount?: number;
 }
 
-const useSaveAppointment = ({
+export default function useSaveAppointment({
   selectedDate,
   selectedTime,
   selectedCustomer,
@@ -44,153 +47,288 @@ const useSaveAppointment = ({
   customizedServices,
   currentScreen,
   locationId,
-}: SaveAppointmentProps) => {
-  
-  const handleSaveAppointment = async (): Promise<string | null> => {
-    if (!selectedCustomer || !selectedCustomer.id) {
-      toast.error("Please select a customer");
-      return null;
-    }
+  appliedTaxId,
+  taxAmount = 0,
+  couponId = null,
+  couponDiscount = 0
+}: SaveAppointmentProps) {
+  const [isLoading, setIsLoading] = useState(false);
 
-    if (selectedServices.length === 0 && selectedPackages.length === 0) {
-      toast.error("Please select at least one service or package");
-      return null;
-    }
-
-    if (!selectedDate) {
-      toast.error("Please select an appointment date");
-      return null;
-    }
-
+  const handleSaveAppointment = async (params?: any): Promise<string | undefined> => {
     try {
-      // Parse selected time
-      const [hours, minutes] = selectedTime.split(':').map(Number);
+      setIsLoading(true);
       
-      // Create appointment start date
-      const startDate = new Date(selectedDate);
-      startDate.setHours(hours, minutes, 0, 0);
-
-      // Calculate total duration
-      const totalDuration = getTotalDuration(services, packages);
+      // Extract appointment ID if it was passed as first parameter (backward compatibility)
+      let appointmentId: string | undefined;
+      let summaryParams: any = {};
       
-      // Calculate appointment end time
-      const endDate = addMinutes(startDate, totalDuration);
-      
-      // Generate appointment ID
-      const appointmentId = uuidv4();
-      
-      // Calculate total price
-      const totalPrice = getTotalPrice(services, packages, discountType, discountValue);
-      const appointmentStatus: AppointmentStatus = 
-currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
-      // Create appointment record
-      const { data: appointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert({
-          id: appointmentId,
-          customer_id: selectedCustomer.id,
-          start_time: startDate.toISOString(),
-          end_time: endDate.toISOString(),
-          status: appointmentStatus, // Using the properly typed status
-          total_price: totalPrice,
-          discount_type: discountType,
-          discount_value: discountValue,
-          payment_method: paymentMethod,
-          notes,
-          location: locationId || null,
-        })
-        .select()
-        .single();
-
-      if (appointmentError) {
-        throw appointmentError;
-      }
-
-      // Create bookings for each service
-      for (const serviceId of selectedServices) {
-        const service = services.find((s) => s.id === serviceId);
-        if (service) {
-          const stylistId = selectedStylists[serviceId] || null;
-          await supabase.from('bookings').insert({
-            appointment_id: appointmentId,
-            service_id: serviceId,
-            employee_id: stylistId,
-            price_paid: service.selling_price,
-            start_time: startDate.toISOString(),
-            end_time: addMinutes(startDate, service.duration).toISOString(),
-          });
-        }
-      }
-
-      // Create bookings for each package and its associated services
-      for (const packageId of selectedPackages) {
-        const pkg = packages.find((p) => p.id === packageId);
-        if (pkg) {
-          const stylistId = selectedStylists[packageId] || null;
+      if (params) {
+        if (typeof params === 'string') {
+          // If params is a string, it's an appointmentId from the old function signature
+          appointmentId = params;
+        } else if (typeof params === 'object') {
+          // If params is an object, it contains summary values AND might contain appointmentId
+          summaryParams = params;
           
-          // Book the package itself
-          await supabase.from('bookings').insert({
-            appointment_id: appointmentId,
-            package_id: packageId,
-            employee_id: stylistId,
-            price_paid: pkg.price,
-            start_time: startDate.toISOString(),
-            end_time: addMinutes(startDate, pkg.duration).toISOString(),
-          });
-
-          // Book each service in the package
-          if (pkg.package_services) {
-            for (const ps of pkg.package_services) {
-              await supabase.from('bookings').insert({
-                appointment_id: appointmentId,
-                service_id: ps.service.id,
-                package_id: packageId,
-                employee_id: stylistId,
-                price_paid: ps.package_selling_price || ps.service.selling_price,
-                start_time: startDate.toISOString(),
-                end_time: addMinutes(startDate, ps.service.duration).toISOString(),
-              });
-            }
-          }
-
-          // Book any additional customized services for this package
-          const extraServices = customizedServices[packageId] || [];
-          for (const serviceId of extraServices) {
-            const service = services.find(s => s.id === serviceId);
-            if (service) {
-              await supabase.from('bookings').insert({
-                appointment_id: appointmentId,
-                service_id: serviceId,
-                package_id: packageId,
-                employee_id: stylistId,
-                price_paid: service.selling_price,
-                start_time: startDate.toISOString(),
-                end_time: addMinutes(startDate, service.duration).toISOString(),
-              });
-            }
+          if (params.appointmentId) {
+            appointmentId = params.appointmentId;
           }
         }
       }
 
-      const formattedDate = format(startDate, "MMMM d, yyyy");
-      const formattedTime = format(startDate, "h:mm a");
-      
-      if (currentScreen === "checkout") {
-        toast.success(`Payment completed successfully for appointment on ${formattedDate} at ${formattedTime}`);
-      } else {
-        toast.success(`Appointment booked successfully for ${formattedDate} at ${formattedTime}`);
+      if (!selectedCustomer) {
+        toast.error("Please select a customer");
+        return;
       }
 
-      return appointmentId;
+      if (selectedServices.length === 0 && selectedPackages.length === 0) {
+        toast.error("Please select at least one service or package");
+        return;
+      }
 
+      if (!selectedDate) {
+        toast.error("Please select a date");
+        return;
+      }
+
+      // Parse the time string and combine it with the selected date
+      const timeComponents = selectedTime.split(':');
+      const hours = parseInt(timeComponents[0], 10);
+      const minutes = parseInt(timeComponents[1], 10);
+      
+      const startTime = new Date(selectedDate);
+      startTime.setHours(hours, minutes, 0, 0);
+
+      // Get all selected services and packages
+      const selectedServiceObjects = selectedServices.map(id => 
+        services.find(s => s.id === id)
+      ).filter(Boolean);
+      
+      const selectedPackageObjects = selectedPackages.map(id => 
+        packages.find(p => p.id === id)
+      ).filter(Boolean);
+
+      // Calculate total duration and end time
+      const totalDuration = getTotalDuration(selectedServiceObjects, selectedPackageObjects);
+      const endTime = addMinutes(startTime, totalDuration);
+
+      // Use the values from summary params if available, otherwise calculate
+      const calculatedTaxAmount = summaryParams.taxAmount !== undefined ? 
+        summaryParams.taxAmount : 
+        taxAmount;
+      
+      const calculatedCouponDiscount = summaryParams.couponDiscount !== undefined ? 
+        summaryParams.couponDiscount : 
+        couponDiscount;
+        
+      // Use provided summary total price or calculate it
+      const totalPrice = summaryParams.total !== undefined ? 
+        summaryParams.total : 
+        getTotalPrice(selectedServiceObjects, selectedPackageObjects, discountType, discountValue) - calculatedCouponDiscount + calculatedTaxAmount;
+      
+      // Use provided tax and coupon IDs or fall back to props
+      const usedTaxId = summaryParams.appliedTaxId !== undefined ? 
+        (typeof summaryParams.appliedTaxId === 'object' && summaryParams.appliedTaxId !== null ? 
+          summaryParams.appliedTaxId.id || summaryParams.appliedTaxId : summaryParams.appliedTaxId) : 
+        appliedTaxId;
+        
+      const usedCouponId = summaryParams.couponId !== undefined ? 
+        (typeof summaryParams.couponId === 'object' && summaryParams.couponId !== null ? 
+          summaryParams.couponId.id || summaryParams.couponId : summaryParams.couponId) : 
+        couponId;
+
+      console.log("Appointment data for saving:", {
+        total: totalPrice,
+        taxAmount: calculatedTaxAmount,
+        taxId: usedTaxId,
+        couponDiscount: calculatedCouponDiscount,
+        couponId: usedCouponId,
+        adjustedPrices: summaryParams.adjustedPrices
+      });
+
+      // Create or update appointment with properly typed status
+      const appointmentStatus: AppointmentStatus = 
+        currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
+
+      const appointmentData = {
+        customer_id: selectedCustomer.id,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        location: locationId,
+        notes: notes,
+        status: appointmentStatus,
+        total_price: totalPrice,
+        discount_type: discountType as 'none' | 'percentage' | 'fixed',
+        discount_value: discountValue,
+        payment_method: paymentMethod,
+        tax_amount: calculatedTaxAmount,
+        tax_id: usedTaxId,
+        coupon_id: usedCouponId
+      };
+
+      let createdAppointmentId;
+
+      if (appointmentId) {
+        // Update existing appointment
+        const { error } = await supabase
+          .from('appointments')
+          .update(appointmentData)
+          .eq('id', appointmentId);
+
+        if (error) throw error;
+        createdAppointmentId = appointmentId;
+
+        // Delete existing bookings
+        const { error: deleteError } = await supabase
+          .from('bookings')
+          .delete()
+          .eq('appointment_id', appointmentId);
+
+        if (deleteError) throw deleteError;
+      } else {
+        // Create new appointment
+        const { data, error } = await supabase
+          .from('appointments')
+          .insert(appointmentData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        createdAppointmentId = data.id;
+      }
+
+      // Create bookings for each service with properly typed status
+      for (const serviceId of selectedServices) {
+        const service = services.find(s => s.id === serviceId);
+        if (!service) continue;
+
+        const serviceStartTime = new Date(startTime);
+        const bookingStatus: AppointmentStatus = 
+          currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
+          
+        // Use adjusted price if available, otherwise use original price
+        const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[serviceId] !== undefined
+          ? summaryParams.adjustedPrices[serviceId]
+          : service.selling_price;
+
+        const bookingData = {
+          appointment_id: createdAppointmentId,
+          service_id: serviceId,
+          employee_id: selectedStylists[serviceId] === 'any' ? null : selectedStylists[serviceId],
+          status: bookingStatus,
+          start_time: serviceStartTime.toISOString(),
+          end_time: addMinutes(serviceStartTime, service.duration).toISOString(),
+          price_paid: pricePaid,
+          original_price: service.original_price || service.selling_price,
+        };
+
+        const { error } = await supabase
+          .from('bookings')
+          .insert(bookingData);
+
+        if (error) throw error;
+      }
+
+      // Create bookings for each package
+      for (const packageId of selectedPackages) {
+        const pkg = packages.find(p => p.id === packageId);
+        if (!pkg) continue;
+
+        // For each service in the package
+        const packageServiceIds = pkg.package_services?.map((ps: any) => ps.service.id) || [];
+        
+        for (const packageServiceId of packageServiceIds) {
+          const packageService = services.find(s => s.id === packageServiceId);
+          if (!packageService) continue;
+
+          const packageServiceStartTime = new Date(startTime);
+          
+          // Use adjusted price if available
+          const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[packageServiceId] !== undefined
+            ? summaryParams.adjustedPrices[packageServiceId]
+            : 0; // Package services typically don't have individual prices
+
+          const bookingData = {
+            appointment_id: createdAppointmentId,
+            service_id: packageServiceId,
+            package_id: packageId,
+            employee_id: selectedStylists[packageServiceId] === 'any' ? null : selectedStylists[packageServiceId],
+            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
+            start_time: packageServiceStartTime.toISOString(),
+            end_time: addMinutes(packageServiceStartTime, packageService.duration).toISOString(),
+            price_paid: pricePaid,
+            original_price: packageService.selling_price,
+          };
+
+          const { error } = await supabase
+            .from('bookings')
+            .insert(bookingData);
+
+          if (error) throw error;
+        }
+
+        // Add any customized services for this package
+        const customServiceIds = customizedServices[packageId] || [];
+        for (const customServiceId of customServiceIds) {
+          const customService = services.find(s => s.id === customServiceId);
+          if (!customService) continue;
+
+          const customServiceStartTime = new Date(startTime);
+          
+          // Check if this service is already in the package
+          const isInPackage = packageServiceIds.includes(customServiceId);
+          if (isInPackage) continue; // Skip if already handled above
+          
+          // Use adjusted price if available
+          const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[customServiceId] !== undefined
+            ? summaryParams.adjustedPrices[customServiceId]
+            : customService.selling_price;
+
+          const bookingData = {
+            appointment_id: createdAppointmentId,
+            service_id: customServiceId,
+            package_id: packageId,
+            employee_id: selectedStylists[customServiceId] === 'any' ? null : selectedStylists[customServiceId],
+            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
+            start_time: customServiceStartTime.toISOString(),
+            end_time: addMinutes(customServiceStartTime, customService.duration).toISOString(),
+            price_paid: pricePaid,
+            original_price: customService.selling_price,
+          };
+
+          const { error } = await supabase
+            .from('bookings')
+            .insert(bookingData);
+
+          if (error) throw error;
+        }
+      }
+
+      // Update the appointment with the number of bookings
+      const { count, error: countError } = await supabase
+        .from('bookings')
+        .select('id', { count: 'exact' })
+        .eq('appointment_id', createdAppointmentId);
+
+      if (countError) throw countError;
+
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({ number_of_bookings: count })
+        .eq('id', createdAppointmentId);
+
+      if (updateError) throw updateError;
+
+      toast.success(appointmentId ? "Appointment updated" : "Appointment created");
+      return createdAppointmentId;
     } catch (error: any) {
-      console.error("Error saving appointment:", error);
-      toast.error(`Failed to save appointment: ${error.message}`);
-      return null;
+      console.error('Error saving appointment:', error);
+      toast.error(error.message || 'Failed to save appointment');
+      return undefined;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  return { handleSaveAppointment };
-};
-
-export default useSaveAppointment;
+  return { handleSaveAppointment, isLoading };
+}

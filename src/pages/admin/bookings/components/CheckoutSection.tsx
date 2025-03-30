@@ -18,14 +18,10 @@ import {
   Plus,
   ArrowLeft,
   Trash2,
-  Award,
-  X,
-  Check,
-  XCircle,
-  ChevronDown
+  Award
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Service, Package, Customer, AppointmentStatus, PaymentMethod, DiscountType } from "../types";
+import type { Service, Package, Customer } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -36,26 +32,20 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { format } from 'date-fns';
 import { 
   getTotalPrice, 
   getTotalDuration, 
   getFinalPrice, 
+  getServicePriceInPackage,
   calculatePackagePrice,
-  getAdjustedServicePrices,
+  getAdjustedServicePrices
 } from "../utils/bookingUtils";
+import { getMembershipDiscount } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
-import { LoaderCircle } from "lucide-react";
-import { StatusBadge, getStatusBackgroundColor } from "./StatusBadge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -64,13 +54,13 @@ interface CheckoutSectionProps {
   selectedPackages: string[];
   services: Service[];
   packages: Package[];
-  discountType: DiscountType;
+  discountType: 'none' | 'percentage' | 'fixed';
   discountValue: number;
-  paymentMethod: PaymentMethod;
+  paymentMethod: 'cash' | 'online';
   notes: string;
-  onDiscountTypeChange: (type: DiscountType) => void;
+  onDiscountTypeChange: (type: 'none' | 'percentage' | 'fixed') => void;
   onDiscountValueChange: (value: number) => void;
-  onPaymentMethodChange: (method: PaymentMethod) => void;
+  onPaymentMethodChange: (method: 'cash' | 'online') => void;
   onNotesChange: (notes: string) => void;
   onPaymentComplete: (appointmentId?: string) => void;
   selectedStylists: Record<string, string>;
@@ -82,10 +72,6 @@ interface CheckoutSectionProps {
   isExistingAppointment?: boolean;
   customizedServices?: Record<string, string[]>;
   locationId?: string;
-  appointmentStatus?: AppointmentStatus;
-  onCancelAppointment?: () => void;
-  onMarkAsNoShow?: () => void;
-  onMarkAsCompleted?: () => void;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -112,11 +98,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onBackToServices,
   isExistingAppointment,
   customizedServices = {},
-  locationId,
-  appointmentStatus,
-  onCancelAppointment,
-  onMarkAsNoShow,
-  onMarkAsCompleted
+  locationId
 }) => {
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -140,7 +122,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [membershipDiscount, setMembershipDiscount] = useState<number>(0);
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [membershipName, setMembershipName] = useState<string | null>(null);
-  const [loadPayment,setLoadPayment] = useState(false)
   
   const { data: paymentMethods = [], isLoading: paymentMethodsLoading } = useQuery({
     queryKey: ['payment-methods'],
@@ -328,6 +309,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     setMembershipDiscount(bestDiscount);
     setMembershipId(bestMembershipId);
     setMembershipName(bestMembershipName);
+    
+    console.log("Membership values set:", {
+      membershipDiscount: bestDiscount,
+      membershipId: bestMembershipId,
+      membershipName: bestMembershipName
+    });
   }, [customerMemberships, selectedServices, selectedPackages, services, packages, customizedServices]);
 
   const handleTaxChange = (taxId: string) => {
@@ -355,11 +342,28 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     return `${minutes}m`;
   };
 
+  const formatTimeSlot = (timeString: string) => {
+    try {
+      const baseDate = new Date();
+      const [hours, minutes] = timeString.split(':').map(Number);
+      baseDate.setHours(hours, minutes);
+      return format(baseDate, 'hh:mm a');
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return timeString;
+    }
+  };
+
   const getStylistName = (stylistId: string) => {
     if (!employees || !stylistId) return null;
     const stylist = employees.find(emp => emp.id === stylistId);
     return stylist ? stylist.name : null;
   };
+
+  const totalDuration = useMemo(() => 
+    getTotalDuration(selectedServices, selectedPackages, services, packages, customizedServices),
+    [selectedServices, selectedPackages, services, packages, customizedServices]
+  );
 
   const taxAmount = useMemo(() => {
     const regularDiscountedPrice = getFinalPrice(subtotal, discountType, discountValue);
@@ -527,19 +531,24 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     adjustedPrices
   ]);
 
-  const handleCheckout = async () => {
+  const handlePayment = async () => {
     try {
       if (!selectedCustomer) {
         toast.error("Please select a customer");
         return;
-      }  
-      setLoadPayment(true)    
-      
-      // Get coupon name if available
-      let couponName = null;
-      if (selectedCoupon) {
-        couponName = selectedCoupon.code;
       }
+      
+      console.log("Payment data:", {
+        taxId: appliedTaxId,
+        taxAmount,
+        couponId: selectedCouponId,
+        couponDiscount,
+        membershipId,
+        membershipName,
+        membershipDiscount,
+        total,
+        adjustedPrices
+      });
       
       const saveAppointmentParams = {
         appointmentId,
@@ -547,7 +556,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         taxAmount,
         couponId: selectedCouponId,
         couponDiscount,
-        couponName,
         membershipId,
         membershipName,
         membershipDiscount,
@@ -564,32 +572,25 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       toast.success("Payment completed successfully");
       onPaymentComplete(savedAppointmentId);
     } catch (error: any) {
-      console.error("Error during checkout:", error);
-      toast.error(`Error: ${error.message}`);
-    } finally {
-      setLoadPayment(false);
+      console.error("Error completing payment:", error);
+      toast.error(error.message || "Failed to complete payment");
     }
   };
 
   return (
     <div className="h-full w-full bg-gray-50 p-6">
-      <Card>
+      <Card className="h-full">
         <CardContent className="p-6 h-full flex flex-col">
-          <div className="flex flex-col gap-3 mb-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Checkout Summary</h2>
-            </div>
-            
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                onClick={onBackToServices}
-                className="flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Service
-              </Button>
-            </div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">Checkout Summary</h2>
+            <Button
+              variant="outline"
+              onClick={onBackToServices}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Service
+            </Button>
           </div>
 
           <div className="flex-1 space-y-6 overflow-hidden flex flex-col">
@@ -643,38 +644,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                               {item.price}
                             </p>
                           )}
-                          {item.type === "service" && (
-                            <div className="flex justify-end">
-                              {item.price !== item.adjustedPrice && (
-                                <p className="font-medium text-lg line-through text-muted-foreground mr-2">
-                                  <IndianRupee className="inline h-4 w-4" />
-                                  {item.price.toFixed(2)}
-                                </p>
-                              )}
-                              <p className={`font-semibold text-lg ${item.price !== item.adjustedPrice ? "text-green-600" : ""}`}>
-                                <IndianRupee className="inline h-4 w-4" />
-                                {item.adjustedPrice.toFixed(2)}
-                              </p>
-                            </div>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => {
-                              if (item.type === 'service') {
-                                onRemoveService(item.id);
-                              } else {
-                                onRemovePackage(item.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {item.type === "package" && item.services && item.services.length > 0 && (
+                           {item.type === "package" && item.services && item.services.length > 0 && (
                         <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
                           {item.services.map(service => (
                             <div key={service.id} className="flex items-center justify-between py-1">
@@ -713,6 +683,39 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           ))}
                         </div>
                       )}
+
+                      {item.type === "service" && (
+                        <div className="flex justify-end">
+                          {item.price !== item.adjustedPrice && (
+                            <p className="font-medium text-lg line-through text-muted-foreground mr-2">
+                              <IndianRupee className="inline h-4 w-4" />
+                              {item.price.toFixed(2)}
+                            </p>
+                          )}
+                          <p className={`font-semibold text-lg ${item.price !== item.adjustedPrice ? "text-green-600" : ""}`}>
+                            <IndianRupee className="inline h-4 w-4" />
+                            {item.adjustedPrice.toFixed(2)}
+                          </p>
+                        </div>
+                      )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              if (item.type === 'service') {
+                                onRemoveService(item.id);
+                              } else {
+                                onRemovePackage(item.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                     
                     </div>
                   )
                 ))}
@@ -812,7 +815,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               <h4 className="text-sm font-medium mb-2">Payment Method</h4>
               <Select 
                 value={paymentMethod} 
-                onValueChange={(value) => onPaymentMethodChange(value as PaymentMethod)} 
+                onValueChange={onPaymentMethodChange} 
                 defaultValue="cash"
               >
                 <SelectTrigger>
@@ -841,17 +844,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               <Button 
                 className="flex-1" 
                 size="lg"
-                onClick={handleCheckout}
+                onClick={handlePayment}
                 disabled={selectedItems.length === 0}
               >
-                {loadPayment ? (
-                  <LoaderCircle
-                    className="-ms-1 me-2 animate-spin"
-                    size={16}
-                    strokeWidth={2}
-                    aria-hidden="true"
-                  />
-                ) : null}
                 Complete Payment
               </Button>
               <Popover>
@@ -866,7 +861,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     <div className="flex gap-4">
                       <Select
                         value={discountType}
-                        onValueChange={(value) => onDiscountTypeChange(value as DiscountType)}
+                        onValueChange={onDiscountTypeChange}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Discount type" />
@@ -877,28 +872,31 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           <SelectItem value="fixed">Fixed Amount</SelectItem>
                         </SelectContent>
                       </Select>
-
                       {discountType !== "none" && (
-                        <div className="flex-1">
-                          <Input
-                            type="number"
-                            value={discountValue}
-                            onChange={(e) => onDiscountValueChange(Number(e.target.value))}
-                            min="0"
-                            step={discountType === "percentage" ? "1" : "100"}
-                            placeholder={discountType === "percentage" ? "%" : "₹"}
-                          />
-                        </div>
+                        <Input
+                          type="number"
+                          placeholder={
+                            discountType === "percentage"
+                              ? "Enter %"
+                              : "Enter amount"
+                          }
+                          value={discountValue}
+                          onChange={(e) =>
+                            onDiscountValueChange(Number(e.target.value))
+                          }
+                          className="w-24"
+                        />
                       )}
                     </div>
-                    
-                    <h3 className="font-semibold">Notes</h3>
-                    <Textarea
-                      value={notes}
-                      onChange={(e) => onNotesChange(e.target.value)}
-                      placeholder="Add notes about this appointment"
-                      className="min-h-20"
-                    />
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Notes</h3>
+                      <Textarea
+                        placeholder="Add appointment notes..."
+                        value={notes}
+                        onChange={(e) => onNotesChange(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -908,4 +906,4 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       </Card>
     </div>
   );
-};
+}

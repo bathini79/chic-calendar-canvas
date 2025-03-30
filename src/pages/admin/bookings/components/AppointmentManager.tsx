@@ -53,7 +53,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 }) => {
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
-  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("pending");
+  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("");
   const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
   
@@ -414,7 +414,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   const displayTime = stateSelectedTime ? formatTimeString(stateSelectedTime) : "";
   
   // Get background color based on status
-  const headerBgColor = getStatusBackgroundColor(appointmentStatus);
+  const headerBgColor = appointmentStatus && getStatusBackgroundColor(appointmentStatus);
 
   return (
     <div
