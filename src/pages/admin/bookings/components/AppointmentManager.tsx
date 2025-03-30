@@ -107,7 +107,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       processExistingAppointment(existingAppointment);
       setAppointmentStatus(existingAppointment.status || "pending");
       
-      if (existingAppointment.status === "completed") {
+      if (existingAppointment.status === "completed" || existingAppointment.status === "refunded") {
         setCurrentScreen(SCREEN.SUMMARY);
         setNewAppointmentId(existingAppointment.id);
       } else {
