@@ -1,4 +1,8 @@
 
+/**
+ * Utility functions for formatting data in the bookings module
+ */
+
 export const formatRefundReason = (reason: string): string => {
   const reasons: Record<string, string> = {
     'customer_dissatisfaction': 'Customer Dissatisfaction',
