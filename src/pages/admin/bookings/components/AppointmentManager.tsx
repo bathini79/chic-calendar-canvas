@@ -474,9 +474,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                             <SelectItem value="canceled">
                               <StatusBadge status="canceled" />
                             </SelectItem>
-                            <SelectItem value="completed">
-                              <StatusBadge status="completed" />
-                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
