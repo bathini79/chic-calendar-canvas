@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addMinutes } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
-import { PaymentMethod, AppointmentStatus } from "../types";
+import { PaymentMethod, AppointmentStatus, SCREEN } from "../types";
 
 interface SaveAppointmentProps {
   selectedDate: Date | null;
