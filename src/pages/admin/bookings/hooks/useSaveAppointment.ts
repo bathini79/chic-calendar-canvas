@@ -44,10 +44,9 @@ const useSaveAppointment = ({
   customizedServices,
   currentScreen,
   locationId,
-  status,
 }: SaveAppointmentProps) => {
   
-  const handleSaveAppointment = async (params?: any): Promise<string | null> => {
+  const handleSaveAppointment = async (): Promise<string | null> => {
     if (!selectedCustomer || !selectedCustomer.id) {
       toast.error("Please select a customer");
       return null;
@@ -78,23 +77,12 @@ const useSaveAppointment = ({
       const endDate = addMinutes(startDate, totalDuration);
       
       // Generate appointment ID
-      const appointmentId = params?.appointmentId || uuidv4();
+      const appointmentId = uuidv4();
       
       // Calculate total price
       const totalPrice = getTotalPrice(services, packages, discountType, discountValue);
       const appointmentStatus: AppointmentStatus = 
-        currentScreen === SCREEN.CHECKOUT ? 'completed' : (status || 'pending');
-      
-      // Extract membership and coupon data from params if provided
-      const membershipDiscount = params?.membershipDiscount || 0;
-      const membershipId = params?.membershipId || null;
-      const membershipName = params?.membershipName || null;
-      const couponId = params?.couponId || null;
-      const couponAmount = params?.couponDiscount || 0;
-      const couponName = params?.couponName || null;
-      const taxAmount = params?.taxAmount || 0;
-      const taxId = params?.appliedTaxId || null;
-
+currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
       // Create appointment record
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
@@ -103,24 +91,13 @@ const useSaveAppointment = ({
           customer_id: selectedCustomer.id,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
-          status: appointmentStatus,
+          status: appointmentStatus, // Using the properly typed status
           total_price: totalPrice,
           discount_type: discountType,
           discount_value: discountValue,
           payment_method: paymentMethod,
           notes,
           location: locationId || null,
-          // Add membership details
-          membership_discount: membershipDiscount,
-          membership_id: membershipId,
-          membership_name: membershipName,
-          // Add coupon details
-          coupon_id: couponId,
-          coupon_name: couponName,
-          coupon_amount: couponAmount,
-          // Add tax details
-          tax_amount: taxAmount,
-          tax_id: taxId,
         })
         .select()
         .single();
