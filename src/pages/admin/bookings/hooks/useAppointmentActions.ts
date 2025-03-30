@@ -273,7 +273,7 @@ export const useAppointmentActions = () => {
         if (originalBooking) {
           const { data: bookingDetails, error: detailsError } = await supabase
             .from('bookings')
-            .select('*, service:services(*), package:packages(*), employee:employees(*)')
+            .select('*, service:services(*), package:packages(*), employee:bookings_employee_id_fkey(*)')
             .eq('id', bookingId)
             .single();
             
