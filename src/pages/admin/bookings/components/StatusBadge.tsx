@@ -103,7 +103,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
   return (
     <Badge
       variant={variant}
-      className={`flex items-center text-xs ${className}`}
+      className={`flex items-center text-xs whitespace-nowrap min-w-[100px] justify-center ${className}`}
     >
       {icon}
       {label}
