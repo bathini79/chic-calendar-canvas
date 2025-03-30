@@ -18,6 +18,17 @@ import { useAppointmentActions } from "../hooks/useAppointmentActions";
 import { useAppointmentDetails } from "../hooks/useAppointmentDetails";
 import { StatusBadge, getStatusBackgroundColor } from "./StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface AppointmentManagerProps {
   isOpen: boolean;
@@ -43,12 +54,14 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
   const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("pending");
+  const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
   
   const { appointment, refetch: refetchAppointment } = useAppointmentDetails(
     existingAppointment?.id
   );
   
-  const { cancelAppointment, markAppointmentAs } = useAppointmentActions();
+  const { cancelAppointment, markAppointmentAs, updateAppointmentStatus } = useAppointmentActions();
 
   const { data: services } = useActiveServices(locationId);
   const { data: packages } = useActivePackages(locationId);
@@ -343,7 +356,53 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   const handleStatusChange = (status: AppointmentStatus) => {
-    setAppointmentStatus(status);
+    // Check if we need confirmation for this status change
+    if (status === "noshow" || status === "canceled") {
+      setPendingStatus(status);
+      setShowStatusConfirmation(true);
+    } else {
+      setAppointmentStatus(status);
+      applyStatusChange(status);
+    }
+  };
+
+  const applyStatusChange = async (status: AppointmentStatus) => {
+    // Only make API call if we have an existing appointment
+    if (existingAppointment?.id) {
+      try {
+        // Get all booking IDs for this appointment
+        const bookingIds = existingAppointment.bookings?.map(booking => booking.id) || [];
+        
+        // Update appointment status through API
+        const success = await updateAppointmentStatus(
+          existingAppointment.id,
+          status,
+          bookingIds
+        );
+        
+        if (success) {
+          toast.success(`Appointment status updated to ${status}`);
+          
+          // If status is completed, show the summary view
+          if (status === "completed") {
+            setNewAppointmentId(existingAppointment.id);
+            setCurrentScreen(SCREEN.SUMMARY);
+          }
+        }
+      } catch (error) {
+        console.error("Error updating appointment status:", error);
+        toast.error("Failed to update appointment status");
+      }
+    }
+  };
+
+  const confirmStatusChange = () => {
+    if (pendingStatus) {
+      setAppointmentStatus(pendingStatus);
+      applyStatusChange(pendingStatus);
+      setPendingStatus(null);
+      setShowStatusConfirmation(false);
+    }
   };
 
   // Check if the appointment is already completed
@@ -394,7 +453,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                           onValueChange={(value) => handleStatusChange(value as AppointmentStatus)}
                           disabled={isCompleted}
                         >
-                          <SelectTrigger className="w-[140px] h-8">
+                          <SelectTrigger className="w-[180px] h-8">
                             <SelectValue>
                               <StatusBadge status={appointmentStatus} />
                             </SelectValue>
@@ -414,6 +473,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                             </SelectItem>
                             <SelectItem value="canceled">
                               <StatusBadge status="canceled" />
+                            </SelectItem>
+                            <SelectItem value="completed">
+                              <StatusBadge status="completed" />
                             </SelectItem>
                           </SelectContent>
                         </Select>
@@ -524,6 +586,37 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showStatusConfirmation} onOpenChange={setShowStatusConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingStatus === "canceled" 
+                ? "Cancel Appointment" 
+                : pendingStatus === "noshow" 
+                  ? "Mark as No Show" 
+                  : "Change Status"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingStatus === "canceled" 
+                ? "Are you sure you want to cancel this appointment? This will notify the customer and free up the time slot."
+                : pendingStatus === "noshow" 
+                  ? "Are you sure you want to mark this appointment as a no-show? This will be recorded in the customer's history."
+                  : "Are you sure you want to change the status?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmStatusChange}>
+              {pendingStatus === "canceled" 
+                ? "Yes, Cancel Appointment" 
+                : pendingStatus === "noshow" 
+                  ? "Yes, Mark as No Show" 
+                  : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
