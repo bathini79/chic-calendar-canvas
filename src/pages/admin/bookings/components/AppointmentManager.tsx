@@ -17,6 +17,7 @@ import { useAppointmentActions } from "../hooks/useAppointmentActions";
 import { useAppointmentDetails } from "../hooks/useAppointmentDetails";
 import { StatusBadge, getStatusBackgroundColor } from "./StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -107,7 +108,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       processExistingAppointment(existingAppointment);
       setAppointmentStatus(existingAppointment.status || "pending");
       
-      if (existingAppointment.status === "completed" || existingAppointment.status === "refunded") {
+      if (existingAppointment.status === "completed" || existingAppointment.status === "refunded" || existingAppointment.status === "partially_refunded") {
         setCurrentScreen(SCREEN.SUMMARY);
         setNewAppointmentId(existingAppointment.id);
       } else {
@@ -115,6 +116,16 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       }
     }
   }, [selectedDate, selectedTime, existingAppointment]);
+
+  useEffect(() => {
+    if (appointment && appointment.status !== appointmentStatus) {
+      setAppointmentStatus(appointment.status);
+      
+      if (appointment.status === "refunded" || appointment.status === "partially_refunded") {
+        setCurrentScreen(SCREEN.SUMMARY);
+      }
+    }
+  }, [appointment]);
 
   const processExistingAppointment = (appointment: Appointment) => {
     const services: string[] = [];
@@ -317,8 +328,23 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setCurrentScreen(SCREEN.SERVICE_SELECTION);
   };
 
-  const handlePaymentComplete = (appointmentId?: string) => {
-    setNewAppointmentId(appointmentId || null);
+  const handlePaymentComplete = async (appointmentId?: string) => {
+    const savedId = appointmentId || newAppointmentId;
+    
+    if (savedId) {
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('appointment_id', savedId);
+        
+      if (!bookingsError && bookings) {
+        const bookingIds = bookings.map(booking => booking.id);
+        await updateAppointmentStatus(savedId, "completed", bookingIds);
+        setAppointmentStatus("completed");
+      }
+    }
+    
+    setNewAppointmentId(savedId || null);
     setCurrentScreen(SCREEN.SUMMARY);
 
     if (onAppointmentSaved) {
@@ -459,7 +485,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                         <Select
                           value={appointmentStatus}
                           onValueChange={(value) => handleStatusChange(value as AppointmentStatus)}
-                          disabled={isCompleted}
+                          disabled={isCompleted || appointmentStatus === "refunded" || appointmentStatus === "partially_refunded"}
                         >
                           <SelectTrigger className="w-[180px] h-8">
                             <SelectValue>
@@ -554,7 +580,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   selectedTimeSlots={{
                     [newAppointmentId || existingAppointment?.id || ""]: stateSelectedTime,
                   }}
-                  onSaveAppointment={handleSaveAppointment}
+                  onSaveAppointment={onHandleSaveAppointment}
                   onRemoveService={handleRemoveService}
                   onRemovePackage={handleRemovePackage}
                   onBackToServices={handleBackToServices}
@@ -573,7 +599,12 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   <h3 className="text-xl font-semibold mb-6">
                     Appointment Summary
                   </h3>
-                  <SummaryView appointmentId={newAppointmentId} />
+                  <SummaryView 
+                    appointmentId={newAppointmentId} 
+                    onRefundProcessed={() => {
+                      refetchAppointment();
+                    }}
+                  />
                   <div className="mt-6 flex justify-end">
                     <Button
                       onClick={() => {
