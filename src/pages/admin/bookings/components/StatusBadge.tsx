@@ -110,27 +110,3 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
     </Badge>
   );
 };
-
-// Helper function to get background color based on status
-export const getStatusBackgroundColor = (status: AppointmentStatus): string => {
-  switch (status) {
-    case 'completed':
-      return 'bg-green-50';
-    case 'confirmed':
-    case 'booked':
-      return 'bg-blue-50';
-    case 'inprogress':
-    case 'pending':
-      return 'bg-amber-50';
-    case 'canceled':
-    case 'voided':
-      return 'bg-red-50';
-    case 'refunded':
-    case 'partially_refunded':
-      return 'bg-indigo-50';
-    case 'noshow':
-      return 'bg-gray-50';
-    default:
-      return '';
-  }
-};
