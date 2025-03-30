@@ -57,6 +57,11 @@ export default function useSaveAppointment({
   taxAmount = 0,
   couponDiscount = 0,
   status,
+  membership_discount,
+  membership_id,
+  membership_name,
+  coupon_name,
+  coupon_amount
 }: SaveAppointmentProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -137,15 +142,30 @@ export default function useSaveAppointment({
         (typeof summaryParams.appliedTaxId === 'object' && summaryParams.appliedTaxId !== null ? 
           summaryParams.appliedTaxId.id || summaryParams.appliedTaxId : summaryParams.appliedTaxId) : 
         appliedTaxId;
+        
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
         status || (currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending');
+
+      // If we're updating an existing appointment, first fetch its current data to preserve values
+      let existingAppointmentLocation;
+      if (appointmentId) {
+        const { data: existingAppointment, error } = await supabase
+          .from('appointments')
+          .select('location')
+          .eq('id', appointmentId)
+          .single();
+          
+        if (!error && existingAppointment) {
+          existingAppointmentLocation = existingAppointment.location;
+        }
+      }
 
       const appointmentData = {
         customer_id: selectedCustomer.id,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
-        location: locationId,
+        location: locationId || existingAppointmentLocation || null, // Preserve location or use provided locationId
         notes: notes,
         status: appointmentStatus,
         total_price: totalPrice,
@@ -155,11 +175,11 @@ export default function useSaveAppointment({
         tax_amount: calculatedTaxAmount,
         tax_id: usedTaxId,
         coupon_id: summaryParams?.couponId,
-        coupon_name: summaryParams?.couponName,
-        coupon_amount: summaryParams?.summaryParams,
-        membership_discount: summaryParams?.membershipDiscount,
-        membership_id: summaryParams?.membershipId,
-        membership_name: summaryParams?.membershipName
+        coupon_name: summaryParams?.couponName || coupon_name,
+        coupon_amount: summaryParams?.couponAmount || coupon_amount,
+        membership_discount: summaryParams?.membershipDiscount || membership_discount,
+        membership_id: summaryParams?.membershipId || membership_id,
+        membership_name: summaryParams?.membershipName || membership_name
       };
 
       let createdAppointmentId;

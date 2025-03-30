@@ -26,19 +26,28 @@ export const useAppointmentDetails = (appointmentId: string | undefined) => {
       if (error) throw error;
       
       // Fetch location name if a location ID is provided
+      let locationName = null;
       if (data.location) {
-        const { data: locationData, error: locationError } = await supabase
-          .from('locations')
-          .select('name')
-          .eq('id', data.location)
-          .single();
-          
-        if (!locationError && locationData) {
-          data.location_name = locationData.name;
+        try {
+          const { data: locationData, error: locationError } = await supabase
+            .from('locations')
+            .select('name')
+            .eq('id', data.location)
+            .single();
+            
+          if (!locationError && locationData) {
+            locationName = locationData.name;
+          }
+        } catch (locError) {
+          console.error("Error fetching location:", locError);
         }
       }
       
-      return data;
+      // Return data with location_name added
+      return {
+        ...data,
+        location_name: locationName
+      };
     },
     enabled: !!appointmentId
   });

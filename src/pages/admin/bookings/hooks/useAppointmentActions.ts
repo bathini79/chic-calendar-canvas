@@ -241,7 +241,8 @@ export const useAppointmentActions = () => {
           membership_name: originalAppointment.membership_name,
           coupon_id: originalAppointment.coupon_id,
           coupon_name: originalAppointment.coupon_name,
-          coupon_amount: originalAppointment.coupon_amount
+          coupon_amount: originalAppointment.coupon_amount,
+          location: originalAppointment.location // Preserve the same location for the refund
         })
         .select()
         .single();
