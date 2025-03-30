@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Appointment, RefundData, TransactionDetails } from '../types';
+import { AppointmentStatus } from '@/types/appointment';
 
 // Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
@@ -279,11 +280,22 @@ export const useAppointmentActions = () => {
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: Appointment['status'],
-    bookingIds: string[]
+    status: AppointmentStatus,
+    bookingIds: string[] = []
   ) => {
     try {
       setIsLoading(true);
+
+      // If no bookingIds provided, get all bookings for this appointment
+      if (bookingIds.length === 0) {
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('id')
+          .eq('appointment_id', appointmentId);
+        
+        if (error) throw error;
+        bookingIds = data.map(booking => booking.id);
+      }
 
       // First update the appointment status
       const { error: appointmentError } = await supabase
@@ -315,15 +327,27 @@ export const useAppointmentActions = () => {
         case 'noshow':
           message = 'Appointment marked as no-show';
           break;
+        case 'completed':
+          message = 'Appointment marked as completed';
+          break;
+        case 'confirmed':
+          message = 'Appointment confirmed';
+          break;
+        case 'booked':
+          message = 'Appointment booked';
+          break;
+        case 'inprogress':
+          message = 'Appointment marked as in progress';
+          break;
         default:
-          message = `Appointment ${status} successfully`;
+          message = `Appointment status updated to ${status}`;
       }
       
       toast.success(message);
       return true;
     } catch (error: any) {
       console.error('Error updating appointment:', error);
-      toast.error(error.message || 'Failed to update appointment');
+      toast.error(error.message || 'Failed to update appointment status');
       return false;
     } finally {
       setIsLoading(false);
@@ -347,21 +371,10 @@ export const useAppointmentActions = () => {
 
   // Add convenience methods for common status updates
   const cancelAppointment = async (appointmentId: string, bookingIds: string[] = []) => {
-    // If no specific booking IDs provided, get all bookings for the appointment
-    if (bookingIds.length === 0) {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('id')
-        .eq('appointment_id', appointmentId);
-      
-      if (error) throw error;
-      bookingIds = data.map(booking => booking.id);
-    }
-    
     return updateAppointmentStatus(appointmentId, 'canceled', bookingIds);
   };
 
-  const markAppointmentAs = async (appointmentId: string, status: 'noshow' | 'completed') => {
+  const markAppointmentAs = async (appointmentId: string, status: AppointmentStatus) => {
     const { data, error } = await supabase
       .from('bookings')
       .select('id')
