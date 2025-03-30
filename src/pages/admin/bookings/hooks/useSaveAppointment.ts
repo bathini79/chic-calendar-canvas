@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addMinutes } from "date-fns";
@@ -44,6 +43,7 @@ const useSaveAppointment = ({
   customizedServices,
   currentScreen,
   locationId,
+  status,
 }: SaveAppointmentProps) => {
   
   const handleSaveAppointment = async (): Promise<string | null> => {
@@ -91,7 +91,7 @@ currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
           customer_id: selectedCustomer.id,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
-          status: appointmentStatus, // Using the properly typed status
+          status: status || appointmentStatus, // Using the properly typed status
           total_price: totalPrice,
           discount_type: discountType,
           discount_value: discountValue,
