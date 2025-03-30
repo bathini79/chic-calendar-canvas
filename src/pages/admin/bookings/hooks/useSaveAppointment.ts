@@ -44,7 +44,6 @@ const useSaveAppointment = ({
   customizedServices,
   currentScreen,
   locationId,
-  status = "pending",
 }: SaveAppointmentProps) => {
   
   const handleSaveAppointment = async (): Promise<string | null> => {
@@ -82,7 +81,8 @@ const useSaveAppointment = ({
       
       // Calculate total price
       const totalPrice = getTotalPrice(services, packages, discountType, discountValue);
-      
+      const appointmentStatus: AppointmentStatus = 
+currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
       // Create appointment record
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
@@ -91,7 +91,7 @@ const useSaveAppointment = ({
           customer_id: selectedCustomer.id,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
-          status: status, // Using the properly typed status
+          status: appointmentStatus, // Using the properly typed status
           total_price: totalPrice,
           discount_type: discountType,
           discount_value: discountValue,
