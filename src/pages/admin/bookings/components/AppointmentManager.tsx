@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -91,6 +90,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     resetState,
     customizedServices,
     setCustomizedServices,
+    appliedTaxId,
+    taxAmount,
   } = useAppointmentState();
 
   useEffect(() => {
@@ -230,7 +231,16 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     customizedServices,
     currentScreen,
     locationId,
+    appliedTaxId,
+    taxAmount,
+    couponId: existingAppointment?.coupon_id,
+    couponDiscount: existingAppointment?.discount_value || 0,
     status: appointmentStatus,
+    membership_discount: existingAppointment?.membership_discount || 0,
+    membership_id: existingAppointment?.membership_id,
+    membership_name: existingAppointment?.membership_name,
+    coupon_name: existingAppointment?.coupon_name,
+    coupon_amount: existingAppointment?.coupon_amount
   });
 
   const handleProceedToCheckout = async () => {
@@ -553,7 +563,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   customizedServices={customizedServices}
                   isExistingAppointment={!!existingAppointment}
                   locationId={locationId}
-                  // Additional props for existing appointments
                   onCancelAppointment={existingAppointment ? handleCancelAppointment : undefined}
                   onMarkAsNoShow={existingAppointment ? () => handleMarkAs("noshow") : undefined}
                   onMarkAsCompleted={existingAppointment ? () => handleMarkAs("completed") : undefined}
