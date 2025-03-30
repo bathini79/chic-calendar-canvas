@@ -92,30 +92,23 @@ export const getFinalPrice = (
   return Math.max(0, totalPrice - (discountType === 'fixed' ? discountValue : 0));
 };
 
-export function getAppointmentStatusColor(status: string): string {
+export const getAppointmentStatusColor = (status: string) => {
   switch (status) {
-    case 'completed':
-      return 'bg-green-100 border-green-300 text-green-700';
-    case 'confirmed':
-      return 'bg-blue-100 border-blue-300 text-blue-700';
-    case 'booked':
-      return 'bg-indigo-100 border-indigo-300 text-indigo-700';
-    case 'pending':
-      return 'bg-amber-100 border-amber-300 text-amber-700';
-    case 'inprogress':
-      return 'bg-amber-100 border-amber-300 text-amber-700';
-    case 'canceled':
-    case 'voided':
-      return 'bg-red-100 border-red-300 text-red-700';
-    case 'refunded':
-    case 'partially_refunded':
-      return 'bg-purple-100 border-purple-300 text-purple-700';
-    case 'noshow':
-      return 'bg-gray-100 border-gray-300 text-gray-700';
+    case "confirmed":
+      return "bg-green-100 hover:bg-green-200 border-green-300";
+    case "canceled":
+      return "bg-red-100 hover:bg-red-200 border-red-300";
+    case "noshow":
+    case "no-show":
+      return "bg-red-100 hover:bg-red-200 border-red-300 text-red-700";
+    case "completed":
+      return "bg-blue-100 hover:bg-blue-200 border-blue-300";
+    case "inprogress":
+      return "bg-yellow-100 hover:bg-yellow-200 border-yellow-300";
     default:
-      return 'bg-gray-100 border-gray-300 text-gray-700';
+      return "bg-purple-100 hover:bg-purple-200 border-purple-300";
   }
-}
+};
 
 export const calculatePackagePrice = (
   pkg: Package,
