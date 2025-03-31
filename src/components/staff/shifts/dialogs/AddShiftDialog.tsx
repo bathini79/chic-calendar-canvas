@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { 
   Dialog, 
@@ -48,37 +48,12 @@ export function AddShiftDialog({
   const [startTime, setStartTime] = useState('10:00');
   const [endTime, setEndTime] = useState('19:00');
   const [employeeId, setEmployeeId] = useState(selectedEmployee?.id || '');
-  const [locationId, setLocationId] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [locationId, setLocationId] = useState(locations.length > 0 ? locations[0].id : '');
   
   const { toast } = useToast();
 
-  // Fetch user's locations if not provided
-  useEffect(() => {
-    const fetchLocations = async () => {
-      if (locations && locations.length > 0) {
-        setLocationId(locations[0].id);
-        return;
-      }
-      
-      try {
-        const { data, error } = await supabase.from('locations').select('*').eq('status', 'active');
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          setLocationId(data[0].id);
-        }
-      } catch (error) {
-        console.error('Error fetching locations:', error);
-      }
-    };
-    
-    fetchLocations();
-  }, [locations]);
-
   const handleSave = async () => {
     try {
-      setIsLoading(true);
       // Validate inputs
       if (!employeeId) {
         toast({
@@ -140,8 +115,6 @@ export function AddShiftDialog({
         description: "Failed to add shift",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -162,7 +135,7 @@ export function AddShiftDialog({
               value={employeeId} 
               onValueChange={setEmployeeId}
             >
-              <SelectTrigger className="border-2 focus:border-blue-500">
+              <SelectTrigger>
                 <SelectValue placeholder="Select team member" />
               </SelectTrigger>
               <SelectContent>
@@ -181,19 +154,15 @@ export function AddShiftDialog({
               value={locationId} 
               onValueChange={setLocationId}
             >
-              <SelectTrigger className="border-2 focus:border-blue-500">
+              <SelectTrigger>
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
-                {locations && locations.length > 0 ? (
-                  locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="loading">Loading locations...</SelectItem>
-                )}
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -205,7 +174,7 @@ export function AddShiftDialog({
                 <Button
                   id="date"
                   variant="outline"
-                  className="w-full justify-start text-left font-normal border-2 focus:border-blue-500"
+                  className="w-full justify-start text-left font-normal"
                 >
                   {date ? format(date, "PPP") : "Select date"}
                 </Button>
@@ -231,7 +200,7 @@ export function AddShiftDialog({
                 value={startTime} 
                 onValueChange={setStartTime}
               >
-                <SelectTrigger className="border-2 focus:border-blue-500">
+                <SelectTrigger>
                   <SelectValue placeholder="Select start time" />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,7 +219,7 @@ export function AddShiftDialog({
                 value={endTime} 
                 onValueChange={setEndTime}
               >
-                <SelectTrigger className="border-2 focus:border-blue-500">
+                <SelectTrigger>
                   <SelectValue placeholder="Select end time" />
                 </SelectTrigger>
                 <SelectContent>
@@ -269,8 +238,8 @@ export function AddShiftDialog({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isLoading}>
-            {isLoading ? "Saving..." : "Save"}
+          <Button onClick={handleSave}>
+            Save
           </Button>
         </div>
       </DialogContent>

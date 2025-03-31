@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { 
   Dialog, 
@@ -52,13 +52,11 @@ export function AddTimeOffDialog({
   const [isRepeat, setIsRepeat] = useState(false);
   const [description, setDescription] = useState('');
   const [isApproved, setIsApproved] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   
   const { toast } = useToast();
 
   const handleSave = async () => {
     try {
-      setIsLoading(true);
       // Validate inputs
       if (!employeeId) {
         toast({
@@ -103,8 +101,6 @@ export function AddTimeOffDialog({
         description: "Failed to create time off request",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -125,7 +121,7 @@ export function AddTimeOffDialog({
               value={employeeId} 
               onValueChange={setEmployeeId}
             >
-              <SelectTrigger className="border-2 focus:border-blue-500">
+              <SelectTrigger>
                 <SelectValue placeholder="Select team member" />
               </SelectTrigger>
               <SelectContent>
@@ -144,7 +140,7 @@ export function AddTimeOffDialog({
               value={timeOffType} 
               onValueChange={setTimeOffType}
             >
-              <SelectTrigger className="border-2 focus:border-blue-500">
+              <SelectTrigger>
                 <SelectValue placeholder="Select time off type" />
               </SelectTrigger>
               <SelectContent>
@@ -164,7 +160,7 @@ export function AddTimeOffDialog({
                   <Button
                     id="start-date"
                     variant="outline"
-                    className="w-full justify-start text-left font-normal border-2 focus:border-blue-500"
+                    className="w-full justify-start text-left font-normal"
                   >
                     {startDate ? format(startDate, "PPP") : "Select start date"}
                   </Button>
@@ -189,7 +185,7 @@ export function AddTimeOffDialog({
                 value={startTime} 
                 onValueChange={setStartTime}
               >
-                <SelectTrigger className="border-2 focus:border-blue-500">
+                <SelectTrigger>
                   <SelectValue placeholder="Select start time" />
                 </SelectTrigger>
                 <SelectContent>
@@ -209,7 +205,7 @@ export function AddTimeOffDialog({
                   <Button
                     id="end-date"
                     variant="outline"
-                    className="w-full justify-start text-left font-normal border-2 focus:border-blue-500"
+                    className="w-full justify-start text-left font-normal"
                   >
                     {endDate ? format(endDate, "PPP") : "Select end date"}
                   </Button>
@@ -235,7 +231,7 @@ export function AddTimeOffDialog({
                 value={endTime} 
                 onValueChange={setEndTime}
               >
-                <SelectTrigger className="border-2 focus:border-blue-500">
+                <SelectTrigger>
                   <SelectValue placeholder="Select end time" />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,7 +257,7 @@ export function AddTimeOffDialog({
           <div>
             <Label htmlFor="description" className="flex justify-between">
               Description
-              <span className="text-xs text-gray-500">{description.length}/100</span>
+              <span className="text-xs text-gray-500">0/100</span>
             </Label>
             <Textarea
               id="description"
@@ -269,7 +265,6 @@ export function AddTimeOffDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={100}
-              className="border-2 focus:border-blue-500"
             />
           </div>
           
@@ -290,8 +285,8 @@ export function AddTimeOffDialog({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save"}
+            <Button onClick={handleSave}>
+              Save
             </Button>
           </div>
         </div>
