@@ -102,12 +102,15 @@ export function SpecificShifts({
     });
   };
 
-  const handleDialogClose = () => {
+  const handleDialogClose = (saved: boolean = false) => {
     setShowAddShiftDialog(false);
     setShowSetRegularShiftDialog(false);
     setShowAddTimeOffDialog(false);
     setSelectedCell(null);
-    fetchShiftsForWeek(weekDays);
+    
+    if (saved) {
+      fetchShiftsForWeek(weekDays);
+    }
   };
 
   return (
@@ -201,7 +204,7 @@ export function SpecificShifts({
                           <div className="bg-blue-100 p-2 rounded text-center text-sm">
                             {shifts.map((shift) => (
                               <div key={shift.id}>
-                                {format(new Date(shift.start_time), 'h:mma')} - {format(new Date(shift.end_time), 'h:mma')}
+                                {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
                               </div>
                             ))}
                           </div>
@@ -280,6 +283,7 @@ export function SpecificShifts({
           selectedEmployee={selectedCell.employee}
           employees={employees}
           locations={locations}
+          selectedLocation={selectedLocation}
         />
       )}
 
@@ -288,7 +292,8 @@ export function SpecificShifts({
           isOpen={showSetRegularShiftDialog}
           onClose={handleDialogClose}
           employee={selectedCell.employee}
-          onSave={handleDialogClose}
+          onSave={() => handleDialogClose(true)}
+          locationId={selectedLocation}
         />
       )}
 
@@ -298,6 +303,8 @@ export function SpecificShifts({
           onClose={handleDialogClose}
           employees={employees}
           selectedEmployee={selectedCell.employee}
+          locations={locations}
+          selectedLocation={selectedLocation}
         />
       )}
       
