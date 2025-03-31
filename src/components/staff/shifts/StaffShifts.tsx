@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { RegularShifts } from './RegularShifts';
-import { SpecificShifts } from './SpecificShifts';
 import { TimeOffRequests } from './TimeOffRequests';
 import { supabase } from "@/integrations/supabase/client";
 
@@ -63,23 +62,13 @@ export function StaffShifts() {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="regular" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 mb-6">
+        <TabsList className="grid grid-cols-2 mb-6">
           <TabsTrigger value="regular">Regular Shifts</TabsTrigger>
-          <TabsTrigger value="specific">Specific Shifts</TabsTrigger>
           <TabsTrigger value="timeoff">Time Off</TabsTrigger>
         </TabsList>
         
         <TabsContent value="regular" className="mt-0">
           <RegularShifts 
-            locations={locations}
-            selectedLocation={selectedLocation}
-            setSelectedLocation={setSelectedLocation}
-            employees={employees}
-          />
-        </TabsContent>
-        
-        <TabsContent value="specific" className="mt-0">
-          <SpecificShifts 
             locations={locations}
             selectedLocation={selectedLocation}
             setSelectedLocation={setSelectedLocation}

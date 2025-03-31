@@ -2,10 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Info, Pencil, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from '@/hooks/use-toast';
 import { StaffMemberRow } from './StaffMemberRow';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface RegularShiftsProps {
   locations: any[];
@@ -26,6 +33,7 @@ export function RegularShifts({
   const [weekDays, setWeekDays] = useState<Date[]>([]);
   const [recurringShifts, setRecurringShifts] = useState<any[]>([]);
   const [specificShifts, setSpecificShifts] = useState<any[]>([]);
+  const [timeOffRequests, setTimeOffRequests] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Generate week days
@@ -83,8 +91,22 @@ export function RegularShifts({
       
       if (specificError) throw specificError;
       
+      // Query for time off requests in the date range
+      let timeOffQuery = supabase.from('time_off_requests')
+        .select(`
+          *,
+          employees (*)
+        `)
+        .overlaps('start_date', days[0].toISOString().split('T')[0], days[days.length - 1].toISOString().split('T')[0])
+        .eq('status', 'approved');
+        
+      const { data: timeOffData, error: timeOffError } = await timeOffQuery;
+      
+      if (timeOffError) throw timeOffError;
+      
       setRecurringShifts(recurringData || []);
       setSpecificShifts(specificData || []);
+      setTimeOffRequests(timeOffData || []);
     } catch (error) {
       console.error('Error fetching shifts:', error);
       toast({
@@ -111,37 +133,31 @@ export function RegularShifts({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Scheduled shifts</h2>
-        <div className="flex space-x-2">
-          <Button variant="outline" className="hidden md:flex">
-            Options
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-          <Button variant="default">
-            Add
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       <div className="flex flex-col md:flex-row justify-between gap-4">
         <div>
-          <select 
-            className="border rounded-md p-2"
+          <Select 
             value={selectedLocation}
-            onChange={(e) => setSelectedLocation(e.target.value)}
+            onValueChange={setSelectedLocation}
           >
-            <option value="all">All Locations</option>
-            {locations.map(loc => (
-              <option key={loc.id} value={loc.id}>{loc.name}</option>
-            ))}
-          </select>
+            <SelectTrigger className="w-[200px] border-2 focus:border-blue-500">
+              <SelectValue placeholder="All Locations" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {locations.map(loc => (
+                <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         
         <div className="flex items-center space-x-2">
           <Button variant="ghost" size="icon" onClick={goToPreviousWeek}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm">
+          <span className="text-sm font-medium">
             {format(weekStart, 'dd MMM')} - {format(weekEnd, 'dd MMM, yyyy')}
           </span>
           <Button variant="ghost" size="icon" onClick={goToNextWeek}>
@@ -190,11 +206,6 @@ export function RegularShifts({
           To set your opening hours, <a href="#" className="text-blue-500">click here</a>.
         </p>
       </div>
-      
-      {/* Mobile add button */}
-      <Button className="fixed bottom-4 right-4 md:hidden rounded-full h-14 w-14 flex items-center justify-center shadow-lg" size="icon">
-        <Plus className="h-6 w-6" />
-      </Button>
     </div>
   );
 }

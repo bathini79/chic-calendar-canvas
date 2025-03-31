@@ -9,6 +9,7 @@ import { SetRegularShiftsDialog } from './dialogs/SetRegularShiftsDialog';
 import { AddShiftDialog } from './dialogs/AddShiftDialog';
 import { AddTimeOffDialog } from './dialogs/AddTimeOffDialog';
 import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 interface StaffMemberRowProps {
   employee: any;
@@ -27,6 +28,7 @@ export function StaffMemberRow({
   const [showAddSpecificShiftDialog, setShowAddSpecificShiftDialog] = useState(false);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const { toast } = useToast();
 
   // Function to find shifts for a specific day
   const getShiftsForDay = (day: Date) => {
@@ -72,6 +74,14 @@ export function StaffMemberRow({
     setSelectedDay(null);
   };
 
+  const handleDialogSave = () => {
+    toast({
+      title: "Success",
+      description: "Shift information has been saved.",
+    });
+    handleDialogClose();
+  };
+
   return (
     <>
       <tr className="border-t">
@@ -96,7 +106,7 @@ export function StaffMemberRow({
                   <Pencil className="h-4 w-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-48">
+              <PopoverContent align="end" className="w-48 z-50">
                 <div className="flex flex-col space-y-2">
                   <Button 
                     variant="ghost" 
@@ -159,11 +169,11 @@ export function StaffMemberRow({
                       <Plus className="h-4 w-4" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-48" align="center">
+                  <PopoverContent className="w-48 z-50" align="center" side="bottom">
                     <div className="flex flex-col space-y-2">
                       <Button 
                         variant="ghost" 
-                        className="w-full justify-start"
+                        className="w-full justify-start hover:bg-gray-100"
                         onClick={() => {
                           setSelectedDay(day);
                           setShowAddSpecificShiftDialog(true);
@@ -173,14 +183,14 @@ export function StaffMemberRow({
                       </Button>
                       <Button 
                         variant="ghost" 
-                        className="w-full justify-start"
+                        className="w-full justify-start hover:bg-gray-100"
                         onClick={() => setShowSetRegularShiftDialog(true)}
                       >
                         Set regular shifts
                       </Button>
                       <Button 
                         variant="ghost" 
-                        className="w-full justify-start"
+                        className="w-full justify-start hover:bg-gray-100"
                         onClick={() => {
                           setSelectedDay(day);
                           setShowAddTimeOffDialog(true);
@@ -202,7 +212,7 @@ export function StaffMemberRow({
           isOpen={showSetRegularShiftDialog}
           onClose={handleDialogClose}
           employee={employee}
-          onSave={handleDialogClose}
+          onSave={handleDialogSave}
         />
       )}
 

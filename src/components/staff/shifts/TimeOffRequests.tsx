@@ -65,6 +65,7 @@ export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) 
         badgeClass = 'bg-green-100 text-green-800';
         break;
       case 'denied':
+      case 'declined':
         badgeClass = 'bg-red-100 text-red-800';
         break;
       case 'pending':
@@ -109,7 +110,7 @@ export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) 
     try {
       const { error } = await supabase
         .from('time_off_requests')
-        .update({ status: 'denied' })
+        .update({ status: 'declined' })
         .eq('id', id);
         
       if (error) throw error;
@@ -135,7 +136,7 @@ export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) 
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Time Off Requests</h2>
         <Button variant="default" onClick={() => setShowAddTimeOffDialog(true)}>
-          Add
+          Add Time Off
           <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -176,7 +177,9 @@ export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) 
                     <span>{request.employees?.name || 'Unknown Employee'}</span>
                   </div>
                 </TableCell>
-                <TableCell>{request.reason || 'Not specified'}</TableCell>
+                <TableCell>
+                  <span className="font-medium">{request.reason || 'Not specified'}</span>
+                </TableCell>
                 <TableCell>{format(new Date(request.start_date), 'MMM d, yyyy')}</TableCell>
                 <TableCell>{format(new Date(request.end_date), 'MMM d, yyyy')}</TableCell>
                 <TableCell>{getStatusBadge(request.status)}</TableCell>
