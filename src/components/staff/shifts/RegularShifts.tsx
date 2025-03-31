@@ -28,6 +28,11 @@ export function RegularShifts({
   const [specificShifts, setSpecificShifts] = useState<any[]>([]);
   const { toast } = useToast();
 
+
+    useEffect(()=>{
+      setSelectedLocation(locations?.[0]?.id)
+    }
+    ,[locations])
   // Generate week days
   useEffect(() => {
     const days: Date[] = [];
@@ -130,7 +135,6 @@ export function RegularShifts({
             value={selectedLocation}
             onChange={(e) => setSelectedLocation(e.target.value)}
           >
-            <option value="all">All Locations</option>
             {locations.map(loc => (
               <option key={loc.id} value={loc.id}>{loc.name}</option>
             ))}
