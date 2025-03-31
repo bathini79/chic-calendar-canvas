@@ -22,7 +22,6 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -124,7 +123,6 @@ export function AddShiftDialog({
         <DialogHeader>
           <DialogTitle>Add shift</DialogTitle>
           <Button variant="ghost" className="absolute right-4 top-4" onClick={onClose}>
-            <X className="h-4 w-4" />
           </Button>
         </DialogHeader>
         

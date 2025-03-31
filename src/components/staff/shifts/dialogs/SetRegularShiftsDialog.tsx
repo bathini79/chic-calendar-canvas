@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, addMonths } from 'date-fns';
 import { 
   Dialog, 
   DialogContent, 
   DialogHeader, 
-  DialogTitle 
+  DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { 
   Select, 
@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Info, Trash2, X } from 'lucide-react';
+import { Info, Trash2, X, Plus, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -203,6 +203,7 @@ export function SetRegularShiftsDialog({
       });
       
       onSave();
+      onClose();
     } catch (error) {
       console.error('Error saving recurring shifts:', error);
       toast({
@@ -224,29 +225,32 @@ export function SetRegularShiftsDialog({
     { day: "Saturday", value: 6 },
   ];
 
+  // Generate time options for dropdown
+  const timeOptions = Array.from({ length: 24 }).map((_, hour) => ({
+    value: `${hour.toString().padStart(2, '0')}:00`,
+    label: `${hour.toString().padStart(2, '0')}:00`
+  }));
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Set {employee?.name}'s regular shifts</DialogTitle>
-          <Button variant="ghost" className="absolute right-4 top-4" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto p-6">
+        <DialogHeader className="border-b pb-4">
+          <DialogTitle className="text-xl">Set {employee?.name}'s regular shifts</DialogTitle>
+          <p className="text-sm text-gray-500 mt-1">
+            Set weekly, biweekly or custom shifts. Changes saved will apply to all upcoming shifts for the selected period.
+          </p>
         </DialogHeader>
         
-        <div className="mt-2 text-sm text-gray-500">
-          Set weekly, biweekly or custom shifts. Changes saved will apply to all upcoming shifts for the selected period.
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          {/* Left Column - Schedule Settings */}
+          <div className="space-y-5">
             <div>
-              <Label htmlFor="schedule-type">Schedule type</Label>
+              <Label htmlFor="schedule-type" className="font-medium mb-1.5 block">Schedule type</Label>
               <Select 
                 value={scheduleType} 
                 onValueChange={setScheduleType}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full" id="schedule-type">
                   <SelectValue placeholder="Select schedule type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -258,7 +262,7 @@ export function SetRegularShiftsDialog({
             </div>
             
             <div>
-              <Label htmlFor="start-date">Start date</Label>
+              <Label htmlFor="start-date" className="font-medium mb-1.5 block">Start date</Label>
               <Popover open={openStartDate} onOpenChange={setOpenStartDate}>
                 <PopoverTrigger asChild>
                   <Button
@@ -284,9 +288,9 @@ export function SetRegularShiftsDialog({
             </div>
             
             <div>
-              <Label htmlFor="end-option">Ends</Label>
+              <Label htmlFor="end-option" className="font-medium mb-1.5 block">Ends</Label>
               <Select value={endOption} onValueChange={setEndOption}>
-                <SelectTrigger>
+                <SelectTrigger id="end-option">
                   <SelectValue placeholder="Select end option" />
                 </SelectTrigger>
                 <SelectContent>
@@ -298,9 +302,11 @@ export function SetRegularShiftsDialog({
             
             {endOption === 'date' && (
               <div>
+                <Label htmlFor="end-date" className="font-medium mb-1.5 block">End date</Label>
                 <Popover open={openEndDate} onOpenChange={setOpenEndDate}>
                   <PopoverTrigger asChild>
                     <Button
+                      id="end-date"
                       variant="outline"
                       className="w-full justify-start text-left font-normal"
                     >
@@ -323,90 +329,96 @@ export function SetRegularShiftsDialog({
               </div>
             )}
             
-            <div className="bg-blue-50 p-3 rounded-md flex">
-              <Info className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
-              <p className="text-xs">Team members will not be scheduled on business closed periods.</p>
+            <div className="bg-blue-50 p-4 rounded-md flex mt-4">
+              <Info className="h-5 w-5 text-blue-500 mr-3 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-700">Team members will not be scheduled on business closed periods.</p>
             </div>
           </div>
           
-          <div className="space-y-4">
+          {/* Right Column - Day Shifts */}
+          <div className="space-y-5 border-t lg:border-t-0 pt-4 lg:pt-0">
+            <h3 className="font-medium text-sm text-gray-500 mb-2 lg:hidden">Weekly Schedule</h3>
+            
             {days.map(({ day, value }) => (
-              <div key={value} className="space-y-2">
+              <div key={value} className={`p-3 rounded-lg transition-colors ${dayShifts[value].enabled ? 'bg-gray-50' : ''}`}>
                 <div className="flex items-center">
                   <Checkbox
                     id={`day-${value}`}
                     checked={dayShifts[value].enabled}
                     onCheckedChange={() => toggleDayEnabled(value)}
-                    className="mr-2"
+                    className="mr-3"
                   />
-                  <Label htmlFor={`day-${value}`} className="font-medium">
+                  <Label htmlFor={`day-${value}`} className="font-medium cursor-pointer flex-1">
                     {day}
                   </Label>
-                  <div className="ml-auto">
-                    {!dayShifts[value].enabled && (
-                      <span className="text-gray-500 text-sm">No shifts</span>
-                    )}
-                  </div>
+                  {!dayShifts[value].enabled && (
+                    <span className="text-gray-400 text-sm">No shifts</span>
+                  )}
                 </div>
                 
                 {dayShifts[value].enabled && (
-                  <div className="ml-6 space-y-2">
+                  <div className="mt-3 space-y-3">
                     {dayShifts[value].shifts.map((shift, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                        <div className="col-span-5">
-                          <Select
-                            value={shift.start}
-                            onValueChange={(val) => updateShiftTime(value, index, 'start', val)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: 24 }).map((_, hour) => (
-                                <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                                  {hour.toString().padStart(2, '0')}:00
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="h-5 w-5 flex items-center justify-center">
+                          <Clock className="h-4 w-4 text-gray-400" />
                         </div>
-                        <div className="col-span-1 text-center">-</div>
-                        <div className="col-span-5">
-                          <Select
-                            value={shift.end}
-                            onValueChange={(val) => updateShiftTime(value, index, 'end', val)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: 24 }).map((_, hour) => (
-                                <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                                  {hour.toString().padStart(2, '0')}:00
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        <div className="flex-1 grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-5">
+                            <Select
+                              value={shift.start}
+                              onValueChange={(val) => updateShiftTime(value, index, 'start', val)}
+                            >
+                              <SelectTrigger className="text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {timeOptions.map((time) => (
+                                  <SelectItem key={time.value} value={time.value}>
+                                    {time.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-2 text-center text-gray-400">to</div>
+                          <div className="col-span-5">
+                            <Select
+                              value={shift.end}
+                              onValueChange={(val) => updateShiftTime(value, index, 'end', val)}
+                            >
+                              <SelectTrigger className="text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {timeOptions.map((time) => (
+                                  <SelectItem key={time.value} value={time.value}>
+                                    {time.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        <div className="col-span-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeShift(value, index)}
-                            disabled={dayShifts[value].shifts.length === 1}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeShift(value, index)}
+                          disabled={dayShifts[value].shifts.length === 1}
+                          className="text-gray-400 hover:text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="ml-0"
+                      className="mt-2 text-xs"
                       onClick={() => addShift(value)}
                     >
-                      Add a shift
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
+                      Add another shift
                     </Button>
                   </div>
                 )}
@@ -415,15 +427,17 @@ export function SetRegularShiftsDialog({
           </div>
         </div>
         
-        <div className="mt-6 flex justify-end">
-          <Button 
-            variant="default" 
-            onClick={handleSave}
-            className="ml-2"
-          >
-            Save
+        <DialogFooter className="mt-8 pt-4 border-t">
+          <Button variant="outline" onClick={onClose} className="mr-2">
+            Cancel
           </Button>
-        </div>
+          <Button 
+            variant="default"
+            onClick={handleSave}
+          >
+            Save shifts
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
