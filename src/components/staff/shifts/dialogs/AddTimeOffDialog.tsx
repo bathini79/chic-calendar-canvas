@@ -50,6 +50,7 @@ export function AddTimeOffDialog({
   const [openStartDate, setOpenStartDate] = useState(false);
   const [openEndDate, setOpenEndDate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [locationId, setLocationId] = useState(selectedLocation);
   
   const { toast } = useToast();
 
@@ -99,7 +100,7 @@ export function AddTimeOffDialog({
         end_date: formattedEndDate,
         reason: reason || 'Time Off',
         status: 'pending',
-        location_id: selectedLocation || null
+        location_id: locationId || null
       });
       
       if (error) throw error;
@@ -144,6 +145,25 @@ export function AddTimeOffDialog({
                 {employees.map((employee) => (
                   <SelectItem key={employee.id} value={employee.id}>
                     {employee.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <Label htmlFor="location">Location</Label>
+            <Select 
+              value={locationId} 
+              onValueChange={setLocationId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select location" />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
                   </SelectItem>
                 ))}
               </SelectContent>

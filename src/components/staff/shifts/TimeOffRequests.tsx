@@ -151,16 +151,6 @@ export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) 
     }
   };
 
-  const handleDialogClose = (saved: boolean = false) => {
-    setShowAddTimeOffDialog(false);
-    setSelectedRequest(null);
-    
-    // Only fetch if changes were made
-    if (saved) {
-      fetchTimeOffRequests();
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -264,7 +254,11 @@ export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) 
       
       <AddTimeOffDialog
         isOpen={showAddTimeOffDialog}
-        onClose={handleDialogClose}
+        onClose={() => {
+          setShowAddTimeOffDialog(false);
+          setSelectedRequest(null);
+          fetchTimeOffRequests();
+        }}
         employees={employees}
         selectedEmployee={selectedRequest?.employee || null}
         locations={locations}

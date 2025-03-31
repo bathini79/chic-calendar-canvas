@@ -11,7 +11,6 @@ export function StaffShifts() {
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [employees, setEmployees] = useState<any[]>([]);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Fetch locations
   useEffect(() => {
@@ -64,12 +63,7 @@ export function StaffShifts() {
     };
 
     fetchEmployees();
-  }, [selectedLocation, refreshTrigger]);
-
-  // Function to trigger a refresh of the data
-  const handleDataChange = () => {
-    setRefreshTrigger(prev => prev + 1);
-  };
+  }, [selectedLocation]);
 
   return (
     <div className="space-y-6">
@@ -86,7 +80,6 @@ export function StaffShifts() {
             selectedLocation={selectedLocation}
             setSelectedLocation={setSelectedLocation}
             employees={employees}
-            onDataChange={handleDataChange}
           />
         </TabsContent>
         
