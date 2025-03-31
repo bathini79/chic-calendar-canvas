@@ -98,7 +98,7 @@ export function AddTimeOffDialog({
         start_date: formattedStartDate,
         end_date: formattedEndDate,
         reason: reason || 'Time Off',
-        status: 'pending',
+        status: 'approved', // Auto-approve time off requests
         location_id: selectedLocation || null
       });
       
@@ -106,7 +106,7 @@ export function AddTimeOffDialog({
       
       toast({
         title: "Success",
-        description: "Time off request has been submitted",
+        description: "Time off request has been approved",
       });
       
       onClose(true); // Pass true to indicate data was changed
@@ -221,6 +221,15 @@ export function AddTimeOffDialog({
               </Popover>
             </div>
           </div>
+          
+          {selectedLocation && (
+            <div>
+              <Label>Location</Label>
+              <div className="text-sm font-medium py-2 px-3 border rounded-md bg-gray-50">
+                {locations.find(loc => loc.id === selectedLocation)?.name || 'Selected Location'}
+              </div>
+            </div>
+          )}
         </div>
         
         <div className="mt-6 flex justify-end space-x-2">
