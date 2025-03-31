@@ -26,6 +26,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { X } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AddTimeOffDialogProps {
   isOpen: boolean;
@@ -53,6 +55,7 @@ export function AddTimeOffDialog({
   const [isApproved, setIsApproved] = useState(false);
   
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const handleSave = async () => {
     try {
@@ -105,189 +108,384 @@ export function AddTimeOffDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Add time off</DialogTitle>
-          <Button variant="ghost" className="absolute right-4 top-4" onClick={onClose}>
-          </Button>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="employee">Team member</Label>
-            <Select 
-              value={employeeId} 
-              onValueChange={setEmployeeId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select team member" />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>
-                    {employee.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div>
-            <Label htmlFor="type">Type</Label>
-            <Select 
-              value={timeOffType} 
-              onValueChange={setTimeOffType}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select time off type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Annual leave">Annual leave</SelectItem>
-                <SelectItem value="Sick leave">Sick leave</SelectItem>
-                <SelectItem value="Personal leave">Personal leave</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="start-date">Start date</Label>
-              <Popover open={openStartDate} onOpenChange={setOpenStartDate}>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="start-date"
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
+      <DialogContent className={isMobile ? "sm:max-w-[500px] p-0 rounded-t-xl h-[90vh] mt-auto" : "sm:max-w-[500px]"}>
+        {isMobile ? (
+          <>
+            <div className="sticky top-0 z-10 bg-background p-4 border-b flex justify-between items-center">
+              <DialogTitle className="text-xl font-semibold">Add time off</DialogTitle>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="overflow-y-auto p-6 space-y-6">
+              <div>
+                <Label htmlFor="employee" className="text-sm font-medium block mb-2">Team member</Label>
+                <Select 
+                  value={employeeId} 
+                  onValueChange={setEmployeeId}
+                >
+                  <SelectTrigger className="w-full h-12 rounded-lg">
+                    <SelectValue placeholder="Select team member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="type" className="text-sm font-medium block mb-2">Type</Label>
+                <Select 
+                  value={timeOffType} 
+                  onValueChange={setTimeOffType}
+                >
+                  <SelectTrigger className="w-full h-12 rounded-lg">
+                    <SelectValue placeholder="Select time off type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Annual leave">Annual leave</SelectItem>
+                    <SelectItem value="Sick leave">Sick leave</SelectItem>
+                    <SelectItem value="Personal leave">Personal leave</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="start-date" className="text-sm font-medium block mb-2">Start date</Label>
+                <Popover open={openStartDate} onOpenChange={setOpenStartDate}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="start-date"
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal h-12 rounded-lg"
+                    >
+                      {startDate ? format(startDate, "PPP") : "Select start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={(date) => {
+                        setStartDate(date || new Date());
+                        setOpenStartDate(false);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="start-time" className="text-sm font-medium block mb-2">Start time</Label>
+                  <Select 
+                    value={startTime} 
+                    onValueChange={setStartTime}
                   >
-                    {startDate ? format(startDate, "PPP") : "Select start date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={(date) => {
-                      setStartDate(date || new Date());
-                      setOpenStartDate(false);
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            
-            <div>
-              <Label htmlFor="start-time">Start time</Label>
-              <Select 
-                value={startTime} 
-                onValueChange={setStartTime}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select start time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 24 }).map((_, hour) => (
-                    <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                      {hour.toString().padStart(2, '0')}:00
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="end-date">End date</Label>
-              <Popover open={openEndDate} onOpenChange={setOpenEndDate}>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="end-date"
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
+                    <SelectTrigger className="h-12 rounded-lg">
+                      <SelectValue placeholder="Select start time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }).map((_, hour) => (
+                        <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
+                          {hour < 12 ? `${hour === 0 ? '12' : hour}:00am` : `${hour === 12 ? '12' : hour - 12}:00pm`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="end-time" className="text-sm font-medium block mb-2">End time</Label>
+                  <Select 
+                    value={endTime} 
+                    onValueChange={setEndTime}
                   >
-                    {endDate ? format(endDate, "PPP") : "Select end date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={(date) => {
-                      setEndDate(date || new Date());
-                      setOpenEndDate(false);
-                    }}
-                    initialFocus
-                    disabled={(date) => date < startDate}
-                  />
-                </PopoverContent>
-              </Popover>
+                    <SelectTrigger className="h-12 rounded-lg">
+                      <SelectValue placeholder="Select end time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }).map((_, hour) => (
+                        <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
+                          {hour < 12 ? `${hour === 0 ? '12' : hour}:00am` : `${hour === 12 ? '12' : hour - 12}:00pm`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="end-date" className="text-sm font-medium block mb-2">End date</Label>
+                <Popover open={openEndDate} onOpenChange={setOpenEndDate}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="end-date"
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal h-12 rounded-lg"
+                    >
+                      {endDate ? format(endDate, "PPP") : "Select end date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={endDate}
+                      onSelect={(date) => {
+                        setEndDate(date || new Date());
+                        setOpenEndDate(false);
+                      }}
+                      initialFocus
+                      disabled={(date) => date < startDate}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="repeat" 
+                  checked={isRepeat} 
+                  onCheckedChange={(checked) => setIsRepeat(checked === true)}
+                />
+                <Label htmlFor="repeat" className="text-sm font-medium">Repeat</Label>
+              </div>
+              
+              <div>
+                <Label htmlFor="description" className="flex justify-between text-sm font-medium mb-2">
+                  Description
+                  <span className="text-xs text-gray-500">0/100</span>
+                </Label>
+                <Textarea
+                  id="description"
+                  placeholder="Add description or note (optional)"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={100}
+                  className="min-h-[80px] rounded-lg"
+                />
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="approved" 
+                  checked={isApproved} 
+                  onCheckedChange={(checked) => setIsApproved(checked === true)}
+                />
+                <Label htmlFor="approved" className="text-sm font-medium">Approved</Label>
+              </div>
+              
+              <p className="text-sm text-gray-500">
+                Online bookings cannot be placed during time off.
+              </p>
             </div>
             
-            <div>
-              <Label htmlFor="end-time">End time</Label>
-              <Select 
-                value={endTime} 
-                onValueChange={setEndTime}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select end time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 24 }).map((_, hour) => (
-                    <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                      {hour.toString().padStart(2, '0')}:00
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="sticky bottom-0 p-4 border-t bg-background">
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" className="w-full" onClick={onClose}>
+                  Delete
+                </Button>
+                <Button className="w-full" onClick={handleSave}>
+                  Save
+                </Button>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="repeat" 
-              checked={isRepeat} 
-              onCheckedChange={(checked) => setIsRepeat(checked === true)}
-            />
-            <Label htmlFor="repeat">Repeat</Label>
-          </div>
-          
-          <div>
-            <Label htmlFor="description" className="flex justify-between">
-              Description
-              <span className="text-xs text-gray-500">0/100</span>
-            </Label>
-            <Textarea
-              id="description"
-              placeholder="Add description or note (optional)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              maxLength={100}
-            />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="approved" 
-              checked={isApproved} 
-              onCheckedChange={(checked) => setIsApproved(checked === true)}
-            />
-            <Label htmlFor="approved">Approved</Label>
-          </div>
-          
-          <p className="text-sm text-gray-500">
-            Online bookings cannot be placed during time off.
-          </p>
-          
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave}>
-              Save
-            </Button>
-          </div>
-        </div>
+          </>
+        ) : (
+          // Desktop layout
+          <>
+            <DialogHeader>
+              <DialogTitle>Add time off</DialogTitle>
+              <Button variant="ghost" className="absolute right-4 top-4" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="employee">Team member</Label>
+                <Select 
+                  value={employeeId} 
+                  onValueChange={setEmployeeId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select team member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="type">Type</Label>
+                <Select 
+                  value={timeOffType} 
+                  onValueChange={setTimeOffType}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select time off type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Annual leave">Annual leave</SelectItem>
+                    <SelectItem value="Sick leave">Sick leave</SelectItem>
+                    <SelectItem value="Personal leave">Personal leave</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="start-date">Start date</Label>
+                  <Popover open={openStartDate} onOpenChange={setOpenStartDate}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="start-date"
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        {startDate ? format(startDate, "PPP") : "Select start date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={(date) => {
+                          setStartDate(date || new Date());
+                          setOpenStartDate(false);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div>
+                  <Label htmlFor="start-time">Start time</Label>
+                  <Select 
+                    value={startTime} 
+                    onValueChange={setStartTime}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select start time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }).map((_, hour) => (
+                        <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
+                          {hour.toString().padStart(2, '0')}:00
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="end-date">End date</Label>
+                  <Popover open={openEndDate} onOpenChange={setOpenEndDate}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="end-date"
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        {endDate ? format(endDate, "PPP") : "Select end date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={(date) => {
+                          setEndDate(date || new Date());
+                          setOpenEndDate(false);
+                        }}
+                        initialFocus
+                        disabled={(date) => date < startDate}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div>
+                  <Label htmlFor="end-time">End time</Label>
+                  <Select 
+                    value={endTime} 
+                    onValueChange={setEndTime}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select end time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }).map((_, hour) => (
+                        <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
+                          {hour.toString().padStart(2, '0')}:00
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="repeat" 
+                  checked={isRepeat} 
+                  onCheckedChange={(checked) => setIsRepeat(checked === true)}
+                />
+                <Label htmlFor="repeat">Repeat</Label>
+              </div>
+              
+              <div>
+                <Label htmlFor="description" className="flex justify-between">
+                  Description
+                  <span className="text-xs text-gray-500">0/100</span>
+                </Label>
+                <Textarea
+                  id="description"
+                  placeholder="Add description or note (optional)"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="approved" 
+                  checked={isApproved} 
+                  onCheckedChange={(checked) => setIsApproved(checked === true)}
+                />
+                <Label htmlFor="approved">Approved</Label>
+              </div>
+              
+              <p className="text-sm text-gray-500">
+                Online bookings cannot be placed during time off.
+              </p>
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave}>
+                  Save
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
