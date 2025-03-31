@@ -54,7 +54,7 @@ export function RegularShifts({
           .select('*')
           .order('day_of_week');
           
-        if (selectedLocation && selectedLocation !== 'all') {
+        if (selectedLocation) {
           query = query.eq('location_id', selectedLocation);
         }
         
@@ -94,7 +94,7 @@ export function RegularShifts({
           .gte('start_time', startDate.toISOString())
           .lte('end_time', endDate.toISOString());
           
-        if (selectedLocation && selectedLocation !== 'all') {
+        if (selectedLocation) {
           query = query.eq('location_id', selectedLocation);
         }
         
@@ -115,19 +115,11 @@ export function RegularShifts({
   useEffect(() => {
     const loadTimeOffRequests = async () => {
       try {
-        // For time off, we need to get any approved requests that might overlap with this week
-        if (weekDays.length === 0) return;
-        
-        const startDate = weekDays[0];
-        const endDate = weekDays[6];
-        
         let query = supabase
           .from('time_off_requests')
-          .select('*')
-          .eq('status', 'approved')
-          .or(`start_date.lte.${format(endDate, 'yyyy-MM-dd')},end_date.gte.${format(startDate, 'yyyy-MM-dd')}`);
+          .select('*');
           
-        if (selectedLocation && selectedLocation !== 'all') {
+        if (selectedLocation) {
           query = query.eq('location_id', selectedLocation);
         }
         
@@ -142,7 +134,7 @@ export function RegularShifts({
     };
     
     loadTimeOffRequests();
-  }, [weekDays, selectedLocation, refreshTrigger]);
+  }, [selectedLocation, refreshTrigger]);
 
   const handleDataChange = () => {
     setRefreshTrigger(prev => prev + 1);

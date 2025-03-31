@@ -35,7 +35,7 @@ export function StaffMemberRow({
   const [showAddSpecificShiftDialog, setShowAddSpecificShiftDialog] = useState(false);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const [hoveredDay, setHoveredDay] = useState<Date | null>(null);
+  const [hoveredDay, setHoveredDay] = useState(null);
 
   // Function to format time in 12-hour format with AM/PM
   const formatTimeAMPM = (timeString: string) => {
@@ -55,20 +55,9 @@ export function StaffMemberRow({
   const getShiftsForDay = (day: Date) => {
     // Check for time off first (highest priority)
     const dayTimeOff = timeOffRequests.filter(timeOff => {
-      // Convert string dates to Date objects for comparison
       const startDate = new Date(timeOff.start_date);
       const endDate = new Date(timeOff.end_date);
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-      
-      const checkDay = new Date(day);
-      checkDay.setHours(12, 0, 0, 0); // Middle of the day to avoid timezone issues
-      
-      return (
-        checkDay >= startDate && 
-        checkDay <= endDate && 
-        timeOff.status === 'approved'
-      );
+      return day >= startDate && day <= endDate && timeOff.status === 'approved';
     });
     
     if (dayTimeOff.length > 0) {
@@ -199,7 +188,7 @@ export function StaffMemberRow({
             <td 
               key={day.toString()} 
               className="p-1 align-top border relative cursor-pointer"
-              onMouseEnter={() => setHoveredDay(day)}
+              onMouseEnter={() => setHoveredDay(day as any)}
               onMouseLeave={() => setHoveredDay(null)}
             >
               {/* Cell content (shifts, time off, or empty space) */}
@@ -280,11 +269,11 @@ export function StaffMemberRow({
         />
       )}
 
-      {showAddSpecificShiftDialog && selectedDay && (
+      {showAddSpecificShiftDialog && (
         <AddShiftDialog
           isOpen={showAddSpecificShiftDialog}
           onClose={(saved) => handleDialogClose(saved)}
-          selectedDate={selectedDay}
+          selectedDate={selectedDay || new Date()}
           selectedEmployee={employee}
           employees={[employee]}
           locations={locations}

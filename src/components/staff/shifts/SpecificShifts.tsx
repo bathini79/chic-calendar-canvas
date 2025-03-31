@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns';
+import { format, addDays, startOfWeek, endOfWeek, isSameDay } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Info, Pencil, Plus } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +28,6 @@ export function SpecificShifts({
   const [weekEnd, setWeekEnd] = useState(endOfWeek(selectedDate, { weekStartsOn: 6 }));
   const [weekDays, setWeekDays] = useState<Date[]>([]);
   const [specificShifts, setSpecificShifts] = useState<any[]>([]);
-  const [timeOffRequests, setTimeOffRequests] = useState<any[]>([]);
   const [showAddShiftDialog, setShowAddShiftDialog] = useState(false);
   const [showSetRegularShiftDialog, setShowSetRegularShiftDialog] = useState(false);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
@@ -46,20 +45,8 @@ export function SpecificShifts({
     }
     
     setWeekDays(days);
-    fetchDataForWeek(days);
+    fetchShiftsForWeek(days);
   }, [weekStart, selectedLocation]);
-
-  const fetchDataForWeek = async (days: Date[]) => {
-    try {
-      // Fetch specific shifts for the week
-      await fetchShiftsForWeek(days);
-      
-      // Fetch time off requests that might overlap with this week
-      await fetchTimeOffForWeek(days);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  };
 
   const fetchShiftsForWeek = async (days: Date[]) => {
     try {
@@ -92,37 +79,6 @@ export function SpecificShifts({
     }
   };
 
-  const fetchTimeOffForWeek = async (days: Date[]) => {
-    try {
-      // We need to handle time off requests that might start before the week but extend into it,
-      // or start during the week but extend beyond it
-      const weekStart = days[0];
-      const weekEnd = days[6];
-      
-      let query = supabase.from('time_off_requests')
-        .select('*')
-        .or(`start_date.lte.${format(weekEnd, 'yyyy-MM-dd')},end_date.gte.${format(weekStart, 'yyyy-MM-dd')}`);
-      
-      // Add location filter if selected
-      if (selectedLocation !== "all") {
-        query = query.eq('location_id', selectedLocation);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      
-      setTimeOffRequests(data || []);
-    } catch (error) {
-      console.error('Error fetching time off requests:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch time off requests.',
-        variant: 'destructive'
-      });
-    }
-  };
-
   const goToPreviousWeek = () => {
     const newWeekStart = addDays(weekStart, -7);
     setWeekStart(newWeekStart);
@@ -139,53 +95,7 @@ export function SpecificShifts({
     setSelectedCell({ day, employee });
   };
 
-  const isEmployeeOnTimeOff = (day: Date, employeeId: string) => {
-    return timeOffRequests.some(timeOff => {
-      if (timeOff.employee_id !== employeeId || timeOff.status !== 'approved') {
-        return false;
-      }
-      
-      const startDate = new Date(timeOff.start_date);
-      const endDate = new Date(timeOff.end_date);
-      
-      // Normalize the dates to compare only year, month, day
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-      
-      const checkDay = new Date(day);
-      checkDay.setHours(12, 0, 0, 0);
-      
-      return checkDay >= startDate && checkDay <= endDate;
-    });
-  };
-
   const getShiftsForDayEmployee = (day: Date, employeeId: string) => {
-    // Check for time off first - this takes priority
-    const timeOff = timeOffRequests.find(timeOff => {
-      if (timeOff.employee_id !== employeeId || timeOff.status !== 'approved') {
-        return false;
-      }
-      
-      const startDate = new Date(timeOff.start_date);
-      const endDate = new Date(timeOff.end_date);
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-      
-      const checkDay = new Date(day);
-      checkDay.setHours(12, 0, 0, 0);
-      
-      return checkDay >= startDate && checkDay <= endDate;
-    });
-    
-    if (timeOff) {
-      return [{
-        isTimeOff: true,
-        reason: timeOff.reason || 'Time Off',
-        id: timeOff.id
-      }];
-    }
-    
-    // If no time off, return specific shifts
     return specificShifts.filter(shift => {
       const shiftDate = new Date(shift.start_time);
       return isSameDay(shiftDate, day) && shift.employee_id === employeeId;
@@ -199,7 +109,7 @@ export function SpecificShifts({
     setSelectedCell(null);
     
     if (saved) {
-      fetchDataForWeek(weekDays);
+      fetchShiftsForWeek(weekDays);
     }
   };
 
@@ -283,7 +193,6 @@ export function SpecificShifts({
                   
                   {weekDays.map((day) => {
                     const shifts = getShiftsForDayEmployee(day, employee.id);
-                    const hasTimeOff = shifts.length > 0 && shifts[0].isTimeOff;
                     
                     return (
                       <td 
@@ -292,14 +201,10 @@ export function SpecificShifts({
                         onClick={() => handleCellClick(day, employee)}
                       >
                         {shifts.length > 0 ? (
-                          <div className={`p-2 rounded text-center text-sm ${hasTimeOff ? 'bg-red-100' : 'bg-blue-100'}`}>
-                            {shifts.map((shift, idx) => (
-                              <div key={`${shift.id}-${idx}`}>
-                                {shift.isTimeOff ? (
-                                  <span className="font-medium text-red-700">{shift.reason}</span>
-                                ) : (
-                                  `${format(parseISO(shift.start_time), 'h:mm a')} - ${format(parseISO(shift.end_time), 'h:mm a')}`
-                                )}
+                          <div className="bg-blue-100 p-2 rounded text-center text-sm">
+                            {shifts.map((shift) => (
+                              <div key={shift.id}>
+                                {format(new Date(shift.start_time), 'h:mm a')} - {format(new Date(shift.end_time), 'h:mm a')}
                               </div>
                             ))}
                           </div>
@@ -366,7 +271,7 @@ export function SpecificShifts({
       <div className="bg-blue-50 p-4 rounded-lg flex items-start">
         <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
         <p className="text-sm">
-          Click on any cell to add a specific shift for that day and employee. Time off requests (in red) override shifts.
+          Click on any cell to add a specific shift for that day and employee.
         </p>
       </div>
 

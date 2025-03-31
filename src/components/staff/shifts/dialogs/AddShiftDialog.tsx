@@ -49,6 +49,7 @@ export function AddShiftDialog({
   const [startTime, setStartTime] = useState('10:00');
   const [endTime, setEndTime] = useState('19:00');
   const [employeeId, setEmployeeId] = useState(selectedEmployee?.id || '');
+  const [locationId, setLocationId] = useState(selectedLocation || (locations.length > 0 ? locations[0].id : ''));
   const [isSaving, setIsSaving] = useState(false);
   
   const { toast } = useToast();
@@ -79,10 +80,10 @@ export function AddShiftDialog({
         return;
       }
       
-      if (!selectedLocation) {
+      if (!locationId) {
         toast({
           title: "Error",
-          description: "No location selected",
+          description: "Please select a location",
           variant: "destructive",
         });
         return;
@@ -111,7 +112,7 @@ export function AddShiftDialog({
       // Save to the database
       const { data, error } = await supabase.from('shifts').insert({
         employee_id: employeeId,
-        location_id: selectedLocation,
+        location_id: locationId,
         start_time: startDate.toISOString(),
         end_time: endDate.toISOString(),
       });
@@ -166,9 +167,21 @@ export function AddShiftDialog({
           
           <div>
             <Label htmlFor="location">Location</Label>
-            <div className="text-sm font-medium py-2 px-3 border rounded-md bg-gray-50">
-              {locations.find(loc => loc.id === selectedLocation)?.name || 'Selected Location'}
-            </div>
+            <Select 
+              value={locationId} 
+              onValueChange={setLocationId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select location" />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           <div>

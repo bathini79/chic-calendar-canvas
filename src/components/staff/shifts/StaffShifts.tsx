@@ -66,7 +66,7 @@ export function StaffShifts() {
     fetchEmployees();
   }, [selectedLocation, refreshTrigger]);
 
-  // Function to trigger a refresh of all data
+  // Function to trigger a refresh of the data
   const handleDataChange = () => {
     setRefreshTrigger(prev => prev + 1);
   };
@@ -102,10 +102,7 @@ export function StaffShifts() {
         <TabsContent value="timeoff" className="mt-0">
           <TimeOffRequests 
             locations={locations}
-            employees={employees}
-            selectedLocation={selectedLocation}
-            setSelectedLocation={setSelectedLocation}
-            onDataChange={handleDataChange}
+            employees={employees} 
           />
         </TabsContent>
       </Tabs>
