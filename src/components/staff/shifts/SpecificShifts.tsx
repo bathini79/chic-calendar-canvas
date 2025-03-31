@@ -28,10 +28,12 @@ export function SpecificShifts({
   const [weekEnd, setWeekEnd] = useState(endOfWeek(selectedDate, { weekStartsOn: 6 }));
   const [weekDays, setWeekDays] = useState<Date[]>([]);
   const [specificShifts, setSpecificShifts] = useState<any[]>([]);
+  const [timeOffRequests, setTimeOffRequests] = useState<any[]>([]);
   const [showAddShiftDialog, setShowAddShiftDialog] = useState(false);
   const [showSetRegularShiftDialog, setShowSetRegularShiftDialog] = useState(false);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ day: Date, employee: any } | null>(null);
+  const [dataVersion, setDataVersion] = useState(0);
   const { toast } = useToast();
 
   // Generate week days
@@ -46,10 +48,14 @@ export function SpecificShifts({
     
     setWeekDays(days);
     fetchShiftsForWeek(days);
-  }, [weekStart, selectedLocation]);
+  }, [weekStart, selectedLocation, dataVersion]);
 
   const fetchShiftsForWeek = async (days: Date[]) => {
     try {
+      // Prepare date strings for time off requests
+      const startDateStr = days[0].toISOString().split('T')[0];
+      const endDateStr = days[days.length - 1].toISOString().split('T')[0];
+
       // Query for specific shifts in the date range
       let query = supabase.from('shifts')
         .select(`
@@ -68,7 +74,25 @@ export function SpecificShifts({
       
       if (error) throw error;
       
+      // Query for time off requests that overlap with the week
+      let timeOffQuery = supabase.from('time_off_requests')
+        .select(`
+          *,
+          employees(*)
+        `)
+        .or(`start_date.lte.${endDateStr},end_date.gte.${startDateStr}`);
+      
+      // Add location filter if selected
+      if (selectedLocation !== "all") {
+        timeOffQuery = timeOffQuery.eq('location_id', selectedLocation);
+      }
+      
+      const { data: timeOffData, error: timeOffError } = await timeOffQuery;
+      
+      if (timeOffError) throw timeOffError;
+      
       setSpecificShifts(data || []);
+      setTimeOffRequests(timeOffData || []);
     } catch (error) {
       console.error('Error fetching shifts:', error);
       toast({
@@ -77,6 +101,10 @@ export function SpecificShifts({
         variant: 'destructive'
       });
     }
+  };
+
+  const refreshData = () => {
+    setDataVersion(prev => prev + 1);
   };
 
   const goToPreviousWeek = () => {
@@ -95,19 +123,57 @@ export function SpecificShifts({
     setSelectedCell({ day, employee });
   };
 
-  const getShiftsForDayEmployee = (day: Date, employeeId: string) => {
-    return specificShifts.filter(shift => {
-      const shiftDate = new Date(shift.start_time);
-      return isSameDay(shiftDate, day) && shift.employee_id === employeeId;
+  // Check for time off for a specific day and employee
+  const getTimeOffForDayEmployee = (day: Date, employeeId: string) => {
+    return timeOffRequests.filter(timeOff => {
+      const startDate = new Date(timeOff.start_date);
+      const endDate = new Date(timeOff.end_date);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      
+      const checkDay = new Date(day);
+      checkDay.setHours(0, 0, 0, 0);
+      
+      return checkDay >= startDate && checkDay <= endDate && 
+             timeOff.employee_id === employeeId &&
+             (timeOff.status === 'approved' || timeOff.status === 'pending');
     });
   };
 
-  const handleDialogClose = () => {
+  const getShiftsForDayEmployee = (day: Date, employeeId: string) => {
+    // First check for time off
+    const timeOff = getTimeOffForDayEmployee(day, employeeId);
+    
+    if (timeOff.length > 0) {
+      return {
+        hasTimeOff: true,
+        timeOff: timeOff[0],
+        shifts: []
+      };
+    }
+    
+    // Then check for specific shifts
+    const shifts = specificShifts.filter(shift => {
+      const shiftDate = new Date(shift.start_time);
+      return isSameDay(shiftDate, day) && shift.employee_id === employeeId;
+    });
+    
+    return {
+      hasTimeOff: false,
+      timeOff: null,
+      shifts
+    };
+  };
+
+  const handleDialogClose = (shouldRefresh: boolean = false) => {
     setShowAddShiftDialog(false);
     setShowSetRegularShiftDialog(false);
     setShowAddTimeOffDialog(false);
     setSelectedCell(null);
-    fetchShiftsForWeek(weekDays);
+    
+    if (shouldRefresh) {
+      refreshData();
+    }
   };
 
   return (
@@ -189,7 +255,7 @@ export function SpecificShifts({
                   </td>
                   
                   {weekDays.map((day) => {
-                    const shifts = getShiftsForDayEmployee(day, employee.id);
+                    const { hasTimeOff, timeOff, shifts } = getShiftsForDayEmployee(day, employee.id);
                     
                     return (
                       <td 
@@ -197,7 +263,20 @@ export function SpecificShifts({
                         className="p-1 align-top border cursor-pointer hover:bg-gray-50 relative group"
                         onClick={() => handleCellClick(day, employee)}
                       >
-                        {shifts.length > 0 ? (
+                        {hasTimeOff ? (
+                          <div className={`${
+                            timeOff.status === 'approved' ? 'bg-red-100' : 'bg-yellow-100'
+                          } p-2 rounded text-center text-sm`}>
+                            <span className={`font-medium ${
+                              timeOff.status === 'approved' ? 'text-red-700' : 'text-yellow-700'
+                            }`}>
+                              {timeOff.reason || 'Time Off'}
+                            </span>
+                            <span className="text-xs block">
+                              ({timeOff.status === 'approved' ? 'Approved' : 'Pending'})
+                            </span>
+                          </div>
+                        ) : shifts.length > 0 ? (
                           <div className="bg-blue-100 p-2 rounded text-center text-sm">
                             {shifts.map((shift) => (
                               <div key={shift.id}>
@@ -275,29 +354,31 @@ export function SpecificShifts({
       {showAddShiftDialog && selectedCell && (
         <AddShiftDialog
           isOpen={showAddShiftDialog}
-          onClose={handleDialogClose}
+          onClose={(saved) => handleDialogClose(saved)}
           selectedDate={selectedCell.day}
           selectedEmployee={selectedCell.employee}
-          employees={employees}
-          locations={locations}
+          employees={[selectedCell.employee]}
+          selectedLocation={selectedLocation}
         />
       )}
 
       {showSetRegularShiftDialog && selectedCell && (
         <SetRegularShiftsDialog
           isOpen={showSetRegularShiftDialog}
-          onClose={handleDialogClose}
+          onClose={(saved) => handleDialogClose(saved)}
           employee={selectedCell.employee}
-          onSave={handleDialogClose}
+          onSave={() => handleDialogClose(true)}
+          locationId={selectedLocation}
         />
       )}
 
       {showAddTimeOffDialog && selectedCell && (
         <AddTimeOffDialog
           isOpen={showAddTimeOffDialog}
-          onClose={handleDialogClose}
-          employees={employees}
+          onClose={(saved) => handleDialogClose(saved)}
+          employees={[selectedCell.employee]}
           selectedEmployee={selectedCell.employee}
+          selectedLocation={selectedLocation}
         />
       )}
       

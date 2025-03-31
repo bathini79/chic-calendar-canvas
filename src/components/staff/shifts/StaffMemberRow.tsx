@@ -57,13 +57,21 @@ export function StaffMemberRow({
     const dayTimeOff = timeOffRequests.filter(timeOff => {
       const startDate = new Date(timeOff.start_date);
       const endDate = new Date(timeOff.end_date);
-      return day >= startDate && day <= endDate && timeOff.status === 'approved';
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      
+      const checkDay = new Date(day);
+      checkDay.setHours(0, 0, 0, 0);
+      
+      return checkDay >= startDate && checkDay <= endDate && 
+             (timeOff.status === 'approved' || timeOff.status === 'pending');
     });
     
     if (dayTimeOff.length > 0) {
       return dayTimeOff.map(timeOff => ({
         isTimeOff: true,
         reason: timeOff.reason || 'Time Off',
+        status: timeOff.status,
         id: timeOff.id
       }));
     }
@@ -193,11 +201,26 @@ export function StaffMemberRow({
             >
               {/* Cell content (shifts, time off, or empty space) */}
               {shifts.length > 0 ? (
-                <div className={`p-2 rounded text-center text-sm ${shifts[0].isTimeOff ? 'bg-red-100' : 'bg-blue-100'}`}>
+                <div className={`p-2 rounded text-center text-sm ${
+                  shifts[0].isTimeOff 
+                    ? shifts[0].status === 'approved' 
+                      ? 'bg-red-100' 
+                      : 'bg-yellow-100'
+                    : 'bg-blue-100'
+                }`}>
                   {shifts.map((shift, idx) => (
                     <div key={`${shift.id}-${idx}`}>
                       {shift.isTimeOff ? (
-                        <span className="font-medium text-red-700">{shift.reason}</span>
+                        <>
+                          <span className={`font-medium ${
+                            shift.status === 'approved' ? 'text-red-700' : 'text-yellow-700'
+                          }`}>
+                            {shift.reason}
+                          </span>
+                          <span className="text-xs block">
+                            ({shift.status === 'approved' ? 'Approved' : 'Pending'})
+                          </span>
+                        </>
                       ) : (
                         `${shift.formattedStartTime} - ${shift.formattedEndTime}`
                       )}
@@ -276,7 +299,6 @@ export function StaffMemberRow({
           selectedDate={selectedDay || new Date()}
           selectedEmployee={employee}
           employees={[employee]}
-          locations={locations}
           selectedLocation={selectedLocation}
         />
       )}
@@ -287,7 +309,6 @@ export function StaffMemberRow({
           onClose={(saved) => handleDialogClose(saved)}
           selectedEmployee={employee}
           employees={[employee]}
-          locations={locations}
           selectedLocation={selectedLocation}
         />
       )}

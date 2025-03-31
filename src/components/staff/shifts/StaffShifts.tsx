@@ -11,6 +11,7 @@ export function StaffShifts() {
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [employees, setEmployees] = useState<any[]>([]);
+  const [dataVersion, setDataVersion] = useState(0);
 
   // Fetch locations
   useEffect(() => {
@@ -63,7 +64,12 @@ export function StaffShifts() {
     };
 
     fetchEmployees();
-  }, [selectedLocation]);
+  }, [selectedLocation, dataVersion]);
+
+  // Function to refresh data throughout the component
+  const refreshData = () => {
+    setDataVersion(prev => prev + 1);
+  };
 
   return (
     <div className="space-y-6">

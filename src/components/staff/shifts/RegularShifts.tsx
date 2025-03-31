@@ -30,11 +30,11 @@ export function RegularShifts({
   const [dataVersion, setDataVersion] = useState(0);
   const { toast } = useToast();
 
-  useEffect(()=>{
+  useEffect(() => {
     if (locations?.length > 0) {
-      setSelectedLocation(locations[0]?.id)
+      setSelectedLocation(locations[0]?.id);
     }
-  }, [locations, setSelectedLocation])
+  }, [locations, setSelectedLocation]);
 
   // Generate week days
   useEffect(() => {

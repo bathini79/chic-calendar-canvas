@@ -14,13 +14,6 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { AddTimeOffDialog } from './dialogs/AddTimeOffDialog';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
 
 interface TimeOffRequestsProps {
   locations: any[];
@@ -160,24 +153,6 @@ export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) 
           <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
-
-      <div className="mb-4">
-        <Select 
-          value={selectedLocation} 
-          onValueChange={setSelectedLocation}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select location" />
-          </SelectTrigger>
-          <SelectContent>
-            {locations.map(location => (
-              <SelectItem key={location.id} value={location.id}>
-                {location.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
       
       {isLoading ? (
         <div className="text-center py-10">Loading time off requests...</div>
@@ -261,7 +236,6 @@ export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) 
         }}
         employees={employees}
         selectedEmployee={selectedRequest?.employee || null}
-        locations={locations}
         selectedLocation={selectedLocation}
       />
       
