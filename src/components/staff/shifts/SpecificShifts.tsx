@@ -6,67 +6,33 @@ import { ChevronLeft, ChevronRight, Info, Pencil, Plus } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from '@/hooks/use-toast';
 import { AddShiftDialog } from './dialogs/AddShiftDialog';
+import { SetRegularShiftsDialog } from './dialogs/SetRegularShiftsDialog';
+import { AddTimeOffDialog } from './dialogs/AddTimeOffDialog';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-export function SpecificShifts() {
+interface SpecificShiftsProps {
+  locations: any[];
+  selectedLocation: string;
+  setSelectedLocation: (locationId: string) => void;
+  employees: any[];
+}
+
+export function SpecificShifts({ 
+  locations,
+  selectedLocation,
+  setSelectedLocation,
+  employees
+}: SpecificShiftsProps) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekStart, setWeekStart] = useState(startOfWeek(selectedDate, { weekStartsOn: 6 })); // Start on Saturday
   const [weekEnd, setWeekEnd] = useState(endOfWeek(selectedDate, { weekStartsOn: 6 }));
   const [weekDays, setWeekDays] = useState<Date[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [specificShifts, setSpecificShifts] = useState<any[]>([]);
   const [showAddShiftDialog, setShowAddShiftDialog] = useState(false);
+  const [showSetRegularShiftDialog, setShowSetRegularShiftDialog] = useState(false);
+  const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ day: Date, employee: any } | null>(null);
   const { toast } = useToast();
-
-  // Fetch locations
-  useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        const { data, error } = await supabase.from('locations').select('*').eq('status', 'active');
-        if (error) throw error;
-        setLocations(data || []);
-      } catch (error) {
-        console.error('Error fetching locations:', error);
-      }
-    };
-
-    fetchLocations();
-  }, []);
-
-  // Fetch employees
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        let query = supabase.from('employees')
-          .select(`
-            *,
-            employee_locations(*)
-          `)
-          .eq('employment_type', 'stylist')
-          .eq('status', 'active');
-        
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        
-        // Filter by location if needed
-        let filteredEmployees = data || [];
-        if (selectedLocation !== "all") {
-          filteredEmployees = filteredEmployees.filter(emp => 
-            emp.employee_locations?.some((loc: any) => loc.location_id === selectedLocation)
-          );
-        }
-        
-        setEmployees(filteredEmployees);
-      } catch (error) {
-        console.error('Error fetching employees:', error);
-      }
-    };
-
-    fetchEmployees();
-  }, [selectedLocation]);
 
   // Generate week days
   useEffect(() => {
@@ -127,7 +93,6 @@ export function SpecificShifts() {
 
   const handleCellClick = (day: Date, employee: any) => {
     setSelectedCell({ day, employee });
-    setShowAddShiftDialog(true);
   };
 
   const getShiftsForDayEmployee = (day: Date, employeeId: string) => {
@@ -135,6 +100,14 @@ export function SpecificShifts() {
       const shiftDate = new Date(shift.start_time);
       return isSameDay(shiftDate, day) && shift.employee_id === employeeId;
     });
+  };
+
+  const handleDialogClose = () => {
+    setShowAddShiftDialog(false);
+    setShowSetRegularShiftDialog(false);
+    setShowAddTimeOffDialog(false);
+    setSelectedCell(null);
+    fetchShiftsForWeek(weekDays);
   };
 
   return (
@@ -221,7 +194,7 @@ export function SpecificShifts() {
                     return (
                       <td 
                         key={day.toString()} 
-                        className="p-1 align-top border cursor-pointer hover:bg-gray-50"
+                        className="p-1 align-top border cursor-pointer hover:bg-gray-50 relative group"
                         onClick={() => handleCellClick(day, employee)}
                       >
                         {shifts.length > 0 ? (
@@ -235,6 +208,53 @@ export function SpecificShifts() {
                         ) : (
                           <div className="h-12" />
                         )}
+                        
+                        <div className="hidden group-hover:block absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm" className="bg-white">
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48" align="center">
+                              <div className="flex flex-col space-y-2">
+                                <Button 
+                                  variant="ghost" 
+                                  className="w-full justify-start"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedCell({ day, employee });
+                                    setShowAddShiftDialog(true);
+                                  }}
+                                >
+                                  Add specific shift
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  className="w-full justify-start"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedCell({ day, employee });
+                                    setShowSetRegularShiftDialog(true);
+                                  }}
+                                >
+                                  Set regular shifts
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  className="w-full justify-start"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedCell({ day, employee });
+                                    setShowAddTimeOffDialog(true);
+                                  }}
+                                >
+                                  Add time off
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </td>
                     );
                   })}
@@ -252,18 +272,32 @@ export function SpecificShifts() {
         </p>
       </div>
 
-      {showAddShiftDialog && (
+      {showAddShiftDialog && selectedCell && (
         <AddShiftDialog
           isOpen={showAddShiftDialog}
-          onClose={() => {
-            setShowAddShiftDialog(false);
-            setSelectedCell(null);
-            fetchShiftsForWeek(weekDays);
-          }}
-          selectedDate={selectedCell?.day || new Date()}
-          selectedEmployee={selectedCell?.employee || null}
+          onClose={handleDialogClose}
+          selectedDate={selectedCell.day}
+          selectedEmployee={selectedCell.employee}
           employees={employees}
           locations={locations}
+        />
+      )}
+
+      {showSetRegularShiftDialog && selectedCell && (
+        <SetRegularShiftsDialog
+          isOpen={showSetRegularShiftDialog}
+          onClose={handleDialogClose}
+          employee={selectedCell.employee}
+          onSave={handleDialogClose}
+        />
+      )}
+
+      {showAddTimeOffDialog && selectedCell && (
+        <AddTimeOffDialog
+          isOpen={showAddTimeOffDialog}
+          onClose={handleDialogClose}
+          employees={employees}
+          selectedEmployee={selectedCell.employee}
         />
       )}
       

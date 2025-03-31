@@ -1,13 +1,65 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { RegularShifts } from './RegularShifts';
 import { SpecificShifts } from './SpecificShifts';
 import { TimeOffRequests } from './TimeOffRequests';
+import { supabase } from "@/integrations/supabase/client";
 
 export function StaffShifts() {
   const [activeTab, setActiveTab] = useState("regular");
-  
+  const [locations, setLocations] = useState<any[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  const [employees, setEmployees] = useState<any[]>([]);
+
+  // Fetch locations
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const { data, error } = await supabase.from('locations').select('*').eq('status', 'active');
+        if (error) throw error;
+        setLocations(data || []);
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+      }
+    };
+
+    fetchLocations();
+  }, []);
+
+  // Fetch employees based on selected location
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        let query = supabase.from('employees')
+          .select(`
+            *,
+            employee_locations(*)
+          `)
+          .eq('employment_type', 'stylist')
+          .eq('status', 'active');
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        // Filter by location if needed
+        let filteredEmployees = data || [];
+        if (selectedLocation !== "all") {
+          filteredEmployees = filteredEmployees.filter(emp => 
+            emp.employee_locations?.some((loc: any) => loc.location_id === selectedLocation)
+          );
+        }
+        
+        setEmployees(filteredEmployees);
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+      }
+    };
+
+    fetchEmployees();
+  }, [selectedLocation]);
+
   return (
     <div className="space-y-6">
       <Tabs defaultValue="regular" value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -18,15 +70,28 @@ export function StaffShifts() {
         </TabsList>
         
         <TabsContent value="regular" className="mt-0">
-          <RegularShifts />
+          <RegularShifts 
+            locations={locations}
+            selectedLocation={selectedLocation}
+            setSelectedLocation={setSelectedLocation}
+            employees={employees}
+          />
         </TabsContent>
         
         <TabsContent value="specific" className="mt-0">
-          <SpecificShifts />
+          <SpecificShifts 
+            locations={locations}
+            selectedLocation={selectedLocation}
+            setSelectedLocation={setSelectedLocation}
+            employees={employees}
+          />
         </TabsContent>
         
         <TabsContent value="timeoff" className="mt-0">
-          <TimeOffRequests />
+          <TimeOffRequests 
+            locations={locations}
+            employees={employees} 
+          />
         </TabsContent>
       </Tabs>
     </div>

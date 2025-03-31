@@ -3,43 +3,30 @@ import React, { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Info, Pencil, Plus } from 'lucide-react';
-import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { supabase } from "@/integrations/supabase/client";
-import { SetRegularShiftsDialog } from './dialogs/SetRegularShiftsDialog';
-import { WeeklyShiftView } from './WeeklyShiftView';
-import { StaffShiftHeader } from './StaffShiftHeader';
-import { StaffMemberRow } from './StaffMemberRow';
 import { useToast } from '@/hooks/use-toast';
-import { RegularShiftsActions } from './RegularShiftsActions';
+import { StaffMemberRow } from './StaffMemberRow';
 
-export function RegularShifts() {
+interface RegularShiftsProps {
+  locations: any[];
+  selectedLocation: string;
+  setSelectedLocation: (locationId: string) => void;
+  employees: any[];
+}
+
+export function RegularShifts({ 
+  locations,
+  selectedLocation,
+  setSelectedLocation,
+  employees
+}: RegularShiftsProps) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekStart, setWeekStart] = useState(startOfWeek(selectedDate, { weekStartsOn: 6 })); // Start on Saturday
   const [weekEnd, setWeekEnd] = useState(endOfWeek(selectedDate, { weekStartsOn: 6 }));
   const [weekDays, setWeekDays] = useState<Date[]>([]);
-  const [showDialog, setShowDialog] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<string>("all");
-  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
-  const [locations, setLocations] = useState<any[]>([]);
-  const { data: employees = [], isLoading } = useSupabaseCrud('employees');
   const [recurringShifts, setRecurringShifts] = useState<any[]>([]);
   const [specificShifts, setSpecificShifts] = useState<any[]>([]);
   const { toast } = useToast();
-
-  // Fetch locations
-  useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        const { data, error } = await supabase.from('locations').select('*').eq('status', 'active');
-        if (error) throw error;
-        setLocations(data || []);
-      } catch (error) {
-        console.error('Error fetching locations:', error);
-      }
-    };
-
-    fetchLocations();
-  }, []);
 
   // Generate week days
   useEffect(() => {
@@ -120,24 +107,6 @@ export function RegularShifts() {
     setWeekEnd(addDays(newWeekStart, 6));
   };
 
-  const handleSetRegularShifts = (employee: any) => {
-    setSelectedEmployee(employee);
-    setShowDialog(true);
-  };
-
-  const onCloseDialog = () => {
-    setSelectedEmployee(null);
-    setShowDialog(false);
-    fetchShiftsForWeek(weekDays);
-  };
-
-  // Filter employees if location is selected
-  const filteredEmployees = selectedLocation === "all" 
-    ? employees 
-    : employees.filter(emp => 
-        emp.employee_locations?.some((loc: any) => loc.location_id === selectedLocation)
-    );
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -147,7 +116,7 @@ export function RegularShifts() {
             Options
             <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
-          <Button variant="default" onClick={() => setShowDialog(true)}>
+          <Button variant="default">
             Add
             <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
@@ -185,7 +154,7 @@ export function RegularShifts() {
         <table className="w-full">
           <thead>
             <tr>
-              <th className="w-52 text-left px-4 py-2">Team member <a href="#" className="text-blue-500">Change</a></th>
+              <th className="w-52 text-left px-4 py-2">Team member</th>
               {weekDays.map((day) => (
                 <th key={day.toString()} className="text-center px-4 py-2">
                   <div>{format(day, 'EEE, d MMM')}</div>
@@ -195,23 +164,18 @@ export function RegularShifts() {
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={8} className="text-center py-4">Loading staff members...</td>
-              </tr>
-            ) : filteredEmployees.length === 0 ? (
+            {employees.length === 0 ? (
               <tr>
                 <td colSpan={8} className="text-center py-4">No staff members found</td>
               </tr>
             ) : (
-              filteredEmployees.map((employee) => (
+              employees.map((employee) => (
                 <StaffMemberRow 
                   key={employee.id} 
                   employee={employee}
                   weekDays={weekDays}
                   recurringShifts={recurringShifts.filter(shift => shift.employee_id === employee.id)}
                   specificShifts={specificShifts.filter(shift => shift.employee_id === employee.id)}
-                  onSetRegularShifts={() => handleSetRegularShifts(employee)}
                 />
               ))
             )}
@@ -226,15 +190,6 @@ export function RegularShifts() {
           To set your opening hours, <a href="#" className="text-blue-500">click here</a>.
         </p>
       </div>
-
-      {showDialog && selectedEmployee && (
-        <SetRegularShiftsDialog
-          isOpen={showDialog}
-          onClose={onCloseDialog}
-          employee={selectedEmployee}
-          onSave={onCloseDialog}
-        />
-      )}
       
       {/* Mobile add button */}
       <Button className="fixed bottom-4 right-4 md:hidden rounded-full h-14 w-14 flex items-center justify-center shadow-lg" size="icon">

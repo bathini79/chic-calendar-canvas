@@ -15,9 +15,13 @@ import {
 } from "@/components/ui/table";
 import { AddTimeOffDialog } from './dialogs/AddTimeOffDialog';
 
-export function TimeOffRequests() {
+interface TimeOffRequestsProps {
+  locations: any[];
+  employees: any[];
+}
+
+export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) {
   const [timeOffRequests, setTimeOffRequests] = useState<any[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
@@ -25,7 +29,6 @@ export function TimeOffRequests() {
 
   useEffect(() => {
     fetchTimeOffRequests();
-    fetchEmployees();
   }, []);
 
   const fetchTimeOffRequests = async () => {
@@ -51,22 +54,6 @@ export function TimeOffRequests() {
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchEmployees = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('employment_type', 'stylist')
-        .eq('status', 'active');
-        
-      if (error) throw error;
-      
-      setEmployees(data || []);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
     }
   };
 
