@@ -31,13 +31,17 @@ interface AddTimeOffDialogProps {
   onClose: (saved?: boolean) => void;
   selectedEmployee?: any;
   employees: any[];
+  locations?: any[];
+  selectedLocation?: string;
 }
 
 export function AddTimeOffDialog({
   isOpen,
   onClose,
   selectedEmployee,
-  employees
+  employees,
+  locations = [],
+  selectedLocation = ''
 }: AddTimeOffDialogProps) {
   const [employeeId, setEmployeeId] = useState(selectedEmployee?.id || '');
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -46,6 +50,7 @@ export function AddTimeOffDialog({
   const [openStartDate, setOpenStartDate] = useState(false);
   const [openEndDate, setOpenEndDate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [locationId, setLocationId] = useState(selectedLocation);
   
   const { toast } = useToast();
 
@@ -94,7 +99,8 @@ export function AddTimeOffDialog({
         start_date: formattedStartDate,
         end_date: formattedEndDate,
         reason: reason || 'Time Off',
-        status: 'pending'
+        status: 'pending',
+        location_id: locationId || null
       });
       
       if (error) throw error;
@@ -145,6 +151,25 @@ export function AddTimeOffDialog({
             </Select>
           </div>
           
+          <div>
+            <Label htmlFor="location">Location</Label>
+            <Select 
+              value={locationId} 
+              onValueChange={setLocationId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select location" />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label htmlFor="reason">Reason</Label>
             <Input

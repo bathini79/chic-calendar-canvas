@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function StaffShifts() {
   const [activeTab, setActiveTab] = useState("regular");
   const [locations, setLocations] = useState<any[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [employees, setEmployees] = useState<any[]>([]);
 
   // Fetch locations
@@ -19,6 +19,9 @@ export function StaffShifts() {
         const { data, error } = await supabase.from('locations').select('*').eq('status', 'active');
         if (error) throw error;
         setLocations(data || []);
+        if (data && data.length > 0) {
+          setSelectedLocation(data[0].id);
+        }
       } catch (error) {
         console.error('Error fetching locations:', error);
       }
@@ -31,6 +34,8 @@ export function StaffShifts() {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
+        if (!selectedLocation) return;
+        
         let query = supabase.from('employees')
           .select(`
             *,

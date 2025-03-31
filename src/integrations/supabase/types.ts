@@ -1747,6 +1747,7 @@ export type Database = {
           employee_id: string | null
           end_time: string
           id: string
+          location_id: string | null
           start_time: string
           updated_at: string
         }
@@ -1758,6 +1759,7 @@ export type Database = {
           employee_id?: string | null
           end_time: string
           id?: string
+          location_id?: string | null
           start_time: string
           updated_at?: string
         }
@@ -1769,6 +1771,7 @@ export type Database = {
           employee_id?: string | null
           end_time?: string
           id?: string
+          location_id?: string | null
           start_time?: string
           updated_at?: string
         }
@@ -1778,6 +1781,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_shifts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]
@@ -1942,6 +1952,7 @@ export type Database = {
           end_time: string
           id: string
           is_pattern_generated: boolean | null
+          location_id: string | null
           pattern_id: string | null
           start_time: string
           updated_at: string
@@ -1952,6 +1963,7 @@ export type Database = {
           end_time: string
           id?: string
           is_pattern_generated?: boolean | null
+          location_id?: string | null
           pattern_id?: string | null
           start_time: string
           updated_at?: string
@@ -1962,6 +1974,7 @@ export type Database = {
           end_time?: string
           id?: string
           is_pattern_generated?: boolean | null
+          location_id?: string | null
           pattern_id?: string | null
           start_time?: string
           updated_at?: string
@@ -1972,6 +1985,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
           {
@@ -2091,6 +2111,7 @@ export type Database = {
           employee_id: string | null
           end_date: string
           id: string
+          location_id: string | null
           reason: string | null
           start_date: string
           status: Database["public"]["Enums"]["shift_status"] | null
@@ -2101,6 +2122,7 @@ export type Database = {
           employee_id?: string | null
           end_date: string
           id?: string
+          location_id?: string | null
           reason?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["shift_status"] | null
@@ -2111,6 +2133,7 @@ export type Database = {
           employee_id?: string | null
           end_date?: string
           id?: string
+          location_id?: string | null
           reason?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["shift_status"] | null
@@ -2122,6 +2145,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_off_requests_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]

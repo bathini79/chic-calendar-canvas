@@ -287,6 +287,8 @@ export function StaffMemberRow({
           onClose={(saved) => handleDialogClose(saved)}
           selectedEmployee={employee}
           employees={[employee]}
+          locations={locations}
+          selectedLocation={selectedLocation}
         />
       )}
     </>

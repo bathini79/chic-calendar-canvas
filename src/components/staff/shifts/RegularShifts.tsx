@@ -31,9 +31,10 @@ export function RegularShifts({
   const { toast } = useToast();
 
   useEffect(()=>{
-    setSelectedLocation(locations?.[0]?.id)
-  }
-  ,[locations])
+    if (locations?.length > 0) {
+      setSelectedLocation(locations[0]?.id)
+    }
+  }, [locations, setSelectedLocation])
 
   // Generate week days
   useEffect(() => {
@@ -79,7 +80,10 @@ export function RegularShifts({
 
       const { data: recurringData, error: recurringError } = await recurringQuery;
       
-      if (recurringError) throw recurringError;
+      if (recurringError) {
+        console.error('Recurring shifts error:', recurringError);
+        throw recurringError;
+      }
       
       // Query for specific shifts in the date range
       let specificQuery = supabase.from('shifts')
@@ -97,7 +101,10 @@ export function RegularShifts({
       
       const { data: specificData, error: specificError } = await specificQuery;
       
-      if (specificError) throw specificError;
+      if (specificError) {
+        console.error('Specific shifts error:', specificError);
+        throw specificError;
+      }
       
       // Query for time off requests that overlap with the week
       let timeOffQuery = supabase.from('time_off_requests')
@@ -107,9 +114,17 @@ export function RegularShifts({
         `)
         .or(`start_date.lte.${endDateStr},end_date.gte.${startDateStr}`);
       
+      // Add location filter if selected
+      if (selectedLocation !== "all") {
+        timeOffQuery = timeOffQuery.eq('location_id', selectedLocation);
+      }
+      
       const { data: timeOffData, error: timeOffError } = await timeOffQuery;
       
-      if (timeOffError) throw timeOffError;
+      if (timeOffError) {
+        console.error('Time off error:', timeOffError);
+        throw timeOffError;
+      }
       
       setRecurringShifts(recurringData || []);
       setSpecificShifts(specificData || []);
