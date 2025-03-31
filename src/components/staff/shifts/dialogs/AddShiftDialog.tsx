@@ -27,11 +27,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface AddShiftDialogProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (saved?: boolean) => void;
   selectedDate: Date;
   selectedEmployee: any;
   employees: any[];
   locations: any[];
+  selectedLocation: string;
 }
 
 export function AddShiftDialog({
@@ -40,19 +41,35 @@ export function AddShiftDialog({
   selectedDate,
   selectedEmployee,
   employees,
-  locations
+  locations,
+  selectedLocation
 }: AddShiftDialogProps) {
   const [date, setDate] = useState<Date>(selectedDate);
   const [openDate, setOpenDate] = useState(false);
   const [startTime, setStartTime] = useState('10:00');
   const [endTime, setEndTime] = useState('19:00');
   const [employeeId, setEmployeeId] = useState(selectedEmployee?.id || '');
-  const [locationId, setLocationId] = useState(locations.length > 0 ? locations[0].id : '');
+  const [locationId, setLocationId] = useState(selectedLocation || (locations.length > 0 ? locations[0].id : ''));
+  const [isSaving, setIsSaving] = useState(false);
   
   const { toast } = useToast();
 
+  // Function to format time for display (12-hour format with AM/PM)
+  const formatTimeAMPM = (timeString: string) => {
+    const [hourStr, minuteStr] = timeString.split(':');
+    const hour = parseInt(hourStr, 10);
+    const minute = minuteStr || '00';
+    
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12; // Convert 0 to 12 for 12 AM
+    
+    return `${displayHour}:${minute} ${period}`;
+  };
+
   const handleSave = async () => {
     try {
+      setIsSaving(true);
+      
       // Validate inputs
       if (!employeeId) {
         toast({
@@ -88,11 +105,12 @@ export function AddShiftDialog({
           description: "End time must be after start time",
           variant: "destructive",
         });
+        setIsSaving(false);
         return;
       }
       
       // Save to the database
-      const { error } = await supabase.from('shifts').insert({
+      const { data, error } = await supabase.from('shifts').insert({
         employee_id: employeeId,
         location_id: locationId,
         start_time: startDate.toISOString(),
@@ -103,10 +121,10 @@ export function AddShiftDialog({
       
       toast({
         title: "Success",
-        description: "Shift has been added",
+        description: "Specific shift has been added",
       });
       
-      onClose();
+      onClose(true); // Pass true to indicate data has changed
     } catch (error) {
       console.error('Error adding shift:', error);
       toast({
@@ -114,15 +132,16 @@ export function AddShiftDialog({
         description: "Failed to add shift",
         variant: "destructive",
       });
+      setIsSaving(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add shift</DialogTitle>
-          <Button variant="ghost" className="absolute right-4 top-4" onClick={onClose}>
+          <DialogTitle>Add specific shift</DialogTitle>
+          <Button variant="ghost" className="absolute right-4 top-4" onClick={() => onClose()}>
           </Button>
         </DialogHeader>
         
@@ -199,12 +218,17 @@ export function AddShiftDialog({
                 onValueChange={setStartTime}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select start time" />
+                  <SelectValue placeholder={formatTimeAMPM(startTime)} />
                 </SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: 24 }).map((_, hour) => (
                     <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                      {hour.toString().padStart(2, '0')}:00
+                      {formatTimeAMPM(`${hour.toString().padStart(2, '0')}:00`)}
+                    </SelectItem>
+                  ))}
+                  {Array.from({ length: 24 }).map((_, hour) => (
+                    <SelectItem key={`${hour}-30`} value={`${hour.toString().padStart(2, '0')}:30`}>
+                      {formatTimeAMPM(`${hour.toString().padStart(2, '0')}:30`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -218,12 +242,17 @@ export function AddShiftDialog({
                 onValueChange={setEndTime}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select end time" />
+                  <SelectValue placeholder={formatTimeAMPM(endTime)} />
                 </SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: 24 }).map((_, hour) => (
                     <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                      {hour.toString().padStart(2, '0')}:00
+                      {formatTimeAMPM(`${hour.toString().padStart(2, '0')}:00`)}
+                    </SelectItem>
+                  ))}
+                  {Array.from({ length: 24 }).map((_, hour) => (
+                    <SelectItem key={`${hour}-30`} value={`${hour.toString().padStart(2, '0')}:30`}>
+                      {formatTimeAMPM(`${hour.toString().padStart(2, '0')}:30`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -233,11 +262,11 @@ export function AddShiftDialog({
         </div>
         
         <div className="mt-6 flex justify-end space-x-2">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={() => onClose()}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            Save
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </DialogContent>

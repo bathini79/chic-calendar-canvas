@@ -22,40 +22,37 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AddTimeOffDialogProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (saved?: boolean) => void;
+  selectedEmployee?: any;
   employees: any[];
-  selectedEmployee: any;
 }
 
 export function AddTimeOffDialog({
   isOpen,
   onClose,
-  employees,
-  selectedEmployee
+  selectedEmployee,
+  employees
 }: AddTimeOffDialogProps) {
   const [employeeId, setEmployeeId] = useState(selectedEmployee?.id || '');
-  const [timeOffType, setTimeOffType] = useState('Annual leave');
   const [startDate, setStartDate] = useState<Date>(new Date());
-  const [openStartDate, setOpenStartDate] = useState(false);
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('17:00');
   const [endDate, setEndDate] = useState<Date>(new Date());
+  const [reason, setReason] = useState('');
+  const [openStartDate, setOpenStartDate] = useState(false);
   const [openEndDate, setOpenEndDate] = useState(false);
-  const [isRepeat, setIsRepeat] = useState(false);
-  const [description, setDescription] = useState('');
-  const [isApproved, setIsApproved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const { toast } = useToast();
 
   const handleSave = async () => {
     try {
+      setIsSaving(true);
+      
       // Validate inputs
       if (!employeeId) {
         toast({
@@ -63,52 +60,68 @@ export function AddTimeOffDialog({
           description: "Please select an employee",
           variant: "destructive",
         });
+        setIsSaving(false);
         return;
       }
       
-      // Ensure end date is not before start date
+      if (!startDate || !endDate) {
+        toast({
+          title: "Error",
+          description: "Please select both start and end date",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+      
       if (endDate < startDate) {
         toast({
           title: "Error",
-          description: "End date cannot be before start date",
+          description: "End date must be after or equal to start date",
           variant: "destructive",
         });
+        setIsSaving(false);
         return;
       }
       
-      // Create time off request
-      const { error } = await supabase.from('time_off_requests').insert({
+      // Format dates for database (YYYY-MM-DD)
+      const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+      const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+      
+      // Save to database
+      const { data, error } = await supabase.from('time_off_requests').insert({
         employee_id: employeeId,
-        reason: timeOffType,
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-        status: isApproved ? 'approved' : 'pending',
+        start_date: formattedStartDate,
+        end_date: formattedEndDate,
+        reason: reason || 'Time Off',
+        status: 'pending'
       });
       
       if (error) throw error;
       
       toast({
         title: "Success",
-        description: "Time off request has been created",
+        description: "Time off request has been submitted",
       });
       
-      onClose();
+      onClose(true); // Pass true to indicate data was changed
     } catch (error) {
-      console.error('Error creating time off request:', error);
+      console.error('Error adding time off request:', error);
       toast({
         title: "Error",
-        description: "Failed to create time off request",
+        description: "Failed to submit time off request",
         variant: "destructive",
       });
+      setIsSaving(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add time off</DialogTitle>
-          <Button variant="ghost" className="absolute right-4 top-4" onClick={onClose}>
+          <Button variant="ghost" className="absolute right-4 top-4" onClick={() => onClose()}>
           </Button>
         </DialogHeader>
         
@@ -133,24 +146,16 @@ export function AddTimeOffDialog({
           </div>
           
           <div>
-            <Label htmlFor="type">Type</Label>
-            <Select 
-              value={timeOffType} 
-              onValueChange={setTimeOffType}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select time off type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Annual leave">Annual leave</SelectItem>
-                <SelectItem value="Sick leave">Sick leave</SelectItem>
-                <SelectItem value="Personal leave">Personal leave</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="reason">Reason</Label>
+            <Input
+              id="reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Vacation, Sick leave, etc."
+            />
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="start-date">Start date</Label>
               <Popover open={openStartDate} onOpenChange={setOpenStartDate}>
@@ -160,7 +165,7 @@ export function AddTimeOffDialog({
                     variant="outline"
                     className="w-full justify-start text-left font-normal"
                   >
-                    {startDate ? format(startDate, "PPP") : "Select start date"}
+                    {startDate ? format(startDate, "PPP") : "Select date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -168,32 +173,18 @@ export function AddTimeOffDialog({
                     mode="single"
                     selected={startDate}
                     onSelect={(date) => {
-                      setStartDate(date || new Date());
+                      if (date) {
+                        setStartDate(date);
+                        if (date > endDate) {
+                          setEndDate(date);
+                        }
+                      }
                       setOpenStartDate(false);
                     }}
                     initialFocus
                   />
                 </PopoverContent>
               </Popover>
-            </div>
-            
-            <div>
-              <Label htmlFor="start-time">Start time</Label>
-              <Select 
-                value={startTime} 
-                onValueChange={setStartTime}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select start time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 24 }).map((_, hour) => (
-                    <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                      {hour.toString().padStart(2, '0')}:00
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
             
             <div>
@@ -205,7 +196,7 @@ export function AddTimeOffDialog({
                     variant="outline"
                     className="w-full justify-start text-left font-normal"
                   >
-                    {endDate ? format(endDate, "PPP") : "Select end date"}
+                    {endDate ? format(endDate, "PPP") : "Select date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -213,80 +204,27 @@ export function AddTimeOffDialog({
                     mode="single"
                     selected={endDate}
                     onSelect={(date) => {
-                      setEndDate(date || new Date());
+                      if (date) {
+                        setEndDate(date);
+                      }
                       setOpenEndDate(false);
                     }}
-                    initialFocus
                     disabled={(date) => date < startDate}
+                    initialFocus
                   />
                 </PopoverContent>
               </Popover>
             </div>
-            
-            <div>
-              <Label htmlFor="end-time">End time</Label>
-              <Select 
-                value={endTime} 
-                onValueChange={setEndTime}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select end time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 24 }).map((_, hour) => (
-                    <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                      {hour.toString().padStart(2, '0')}:00
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="repeat" 
-              checked={isRepeat} 
-              onCheckedChange={(checked) => setIsRepeat(checked === true)}
-            />
-            <Label htmlFor="repeat">Repeat</Label>
-          </div>
-          
-          <div>
-            <Label htmlFor="description" className="flex justify-between">
-              Description
-              <span className="text-xs text-gray-500">0/100</span>
-            </Label>
-            <Textarea
-              id="description"
-              placeholder="Add description or note (optional)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              maxLength={100}
-            />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="approved" 
-              checked={isApproved} 
-              onCheckedChange={(checked) => setIsApproved(checked === true)}
-            />
-            <Label htmlFor="approved">Approved</Label>
-          </div>
-          
-          <p className="text-sm text-gray-500">
-            Online bookings cannot be placed during time off.
-          </p>
-          
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave}>
-              Save
-            </Button>
-          </div>
+        </div>
+        
+        <div className="mt-6 flex justify-end space-x-2">
+          <Button variant="outline" onClick={() => onClose()}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Submitting...' : 'Submit Request'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

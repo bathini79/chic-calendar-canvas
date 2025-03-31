@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format, addMonths } from 'date-fns';
 import { 
@@ -29,16 +30,18 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface SetRegularShiftsDialogProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (saved?: boolean) => void;
   employee: any;
   onSave: () => void;
+  locationId?: string;
 }
 
 export function SetRegularShiftsDialog({
   isOpen,
   onClose,
   employee,
-  onSave
+  onSave,
+  locationId
 }: SetRegularShiftsDialogProps) {
   const [scheduleType, setScheduleType] = useState("weekly");
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -46,6 +49,7 @@ export function SetRegularShiftsDialog({
   const [endDate, setEndDate] = useState<Date | undefined>(addMonths(new Date(), 6));
   const [openStartDate, setOpenStartDate] = useState(false);
   const [openEndDate, setOpenEndDate] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [dayShifts, setDayShifts] = useState<Record<number, { enabled: boolean, shifts: { start: string, end: string }[] }>>({
     0: { enabled: false, shifts: [] }, // Sunday
@@ -59,15 +63,36 @@ export function SetRegularShiftsDialog({
   
   const { toast } = useToast();
   
+  // Format time for display (12-hour format with AM/PM)
+  const formatTimeAMPM = (timeString: string) => {
+    if (!timeString) return '';
+    
+    const [hourStr, minuteStr] = timeString.split(':');
+    const hour = parseInt(hourStr, 10);
+    const minute = minuteStr || '00';
+    
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12; // Convert 0 to 12 for 12 AM
+    
+    return `${displayHour}:${minute} ${period}`;
+  };
+  
   // Fetch existing recurring shifts for the employee
   useEffect(() => {
     const fetchRecurringShifts = async () => {
       try {
-        const { data, error } = await supabase
+        const query = supabase
           .from('recurring_shifts')
           .select('*')
           .eq('employee_id', employee.id);
           
+        // Add location filter if specified
+        if (locationId && locationId !== 'all') {
+          query.eq('location_id', locationId);
+        }
+          
+        const { data, error } = await query;
+        
         if (error) throw error;
         
         if (data && data.length > 0) {
@@ -101,10 +126,10 @@ export function SetRegularShiftsDialog({
       }
     };
     
-    if (employee) {
+    if (employee && isOpen) {
       fetchRecurringShifts();
     }
-  }, [employee]);
+  }, [employee, isOpen, locationId]);
 
   const toggleDayEnabled = (day: number) => {
     setDayShifts(prev => ({
@@ -159,11 +184,24 @@ export function SetRegularShiftsDialog({
 
   const handleSave = async () => {
     try {
-      // Delete existing recurring shifts for this employee
+      setIsSaving(true);
+      
+      if (!locationId || locationId === 'all') {
+        toast({
+          title: "Error",
+          description: "Please select a location for the shifts.",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+      
+      // Delete existing recurring shifts for this employee at this location
       const { error: deleteError } = await supabase
         .from('recurring_shifts')
         .delete()
-        .eq('employee_id', employee.id);
+        .eq('employee_id', employee.id)
+        .eq('location_id', locationId);
         
       if (deleteError) throw deleteError;
       
@@ -175,6 +213,7 @@ export function SetRegularShiftsDialog({
           for (const shift of dayData.shifts) {
             shiftsToInsert.push({
               employee_id: employee.id,
+              location_id: locationId,
               day_of_week: parseInt(day),
               start_time: shift.start,
               end_time: shift.end,
@@ -202,7 +241,7 @@ export function SetRegularShiftsDialog({
       });
       
       onSave();
-      onClose();
+      onClose(true); // Pass true to indicate data was changed
     } catch (error) {
       console.error('Error saving recurring shifts:', error);
       toast({
@@ -210,6 +249,7 @@ export function SetRegularShiftsDialog({
         description: "Failed to save regular shifts",
         variant: "destructive",
       });
+      setIsSaving(false);
     }
   };
 
@@ -225,7 +265,7 @@ export function SetRegularShiftsDialog({
   ];
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto p-6">
         <DialogHeader>
           <DialogTitle className="text-lg font-medium">Set {employee?.name}'s regular shifts</DialogTitle>
@@ -360,12 +400,17 @@ export function SetRegularShiftsDialog({
                                 onValueChange={(val) => updateShiftTime(value, index, 'start', val)}
                               >
                                 <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue />
+                                  <SelectValue>{formatTimeAMPM(shift.start)}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                   {Array.from({ length: 24 }).map((_, hour) => (
                                     <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                                      {hour.toString().padStart(2, '0')}:00
+                                      {formatTimeAMPM(`${hour.toString().padStart(2, '0')}:00`)}
+                                    </SelectItem>
+                                  ))}
+                                  {Array.from({ length: 24 }).map((_, hour) => (
+                                    <SelectItem key={`${hour}-30`} value={`${hour.toString().padStart(2, '0')}:30`}>
+                                      {formatTimeAMPM(`${hour.toString().padStart(2, '0')}:30`)}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -378,12 +423,17 @@ export function SetRegularShiftsDialog({
                                 onValueChange={(val) => updateShiftTime(value, index, 'end', val)}
                               >
                                 <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue />
+                                  <SelectValue>{formatTimeAMPM(shift.end)}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                   {Array.from({ length: 24 }).map((_, hour) => (
                                     <SelectItem key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                                      {hour.toString().padStart(2, '0')}:00
+                                      {formatTimeAMPM(`${hour.toString().padStart(2, '0')}:00`)}
+                                    </SelectItem>
+                                  ))}
+                                  {Array.from({ length: 24 }).map((_, hour) => (
+                                    <SelectItem key={`${hour}-30`} value={`${hour.toString().padStart(2, '0')}:30`}>
+                                      {formatTimeAMPM(`${hour.toString().padStart(2, '0')}:30`)}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -421,15 +471,16 @@ export function SetRegularShiftsDialog({
         </div>
         
         <DialogFooter className="mt-6 pt-4 border-t gap-2 sm:gap-0">
-          <Button variant="outline" onClick={onClose} size="sm">
+          <Button variant="outline" onClick={() => onClose()} size="sm">
             Cancel
           </Button>
           <Button 
             variant="default"
             onClick={handleSave}
             size="sm"
+            disabled={isSaving}
           >
-            Save shifts
+            {isSaving ? 'Saving...' : 'Save shifts'}
           </Button>
         </DialogFooter>
       </DialogContent>

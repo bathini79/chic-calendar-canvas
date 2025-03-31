@@ -15,6 +15,10 @@ interface StaffMemberRowProps {
   weekDays: Date[];
   recurringShifts: any[];
   specificShifts: any[];
+  timeOffRequests: any[];
+  locations: any[];
+  selectedLocation: string;
+  onDataChange: () => void;
 }
 
 export function StaffMemberRow({
@@ -22,15 +26,49 @@ export function StaffMemberRow({
   weekDays,
   recurringShifts,
   specificShifts,
+  timeOffRequests,
+  locations,
+  selectedLocation,
+  onDataChange
 }: StaffMemberRowProps) {
   const [showSetRegularShiftDialog, setShowSetRegularShiftDialog] = useState(false);
   const [showAddSpecificShiftDialog, setShowAddSpecificShiftDialog] = useState(false);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [hoveredDay, setHoveredDay] = useState(null);
-  // Function to find shifts for a specific day
+
+  // Function to format time in 12-hour format with AM/PM
+  const formatTimeAMPM = (timeString: string) => {
+    if (!timeString) return '';
+    
+    const [hourStr, minuteStr] = timeString.split(':');
+    const hour = parseInt(hourStr, 10);
+    const minute = minuteStr || '00';
+    
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12; // Convert 0 to 12 for 12 AM
+    
+    return `${displayHour}:${minute} ${period}`;
+  };
+
+  // Function to find shifts and time off for a specific day
   const getShiftsForDay = (day: Date) => {
-    // Check for specific shifts first (they override recurring shifts)
+    // Check for time off first (highest priority)
+    const dayTimeOff = timeOffRequests.filter(timeOff => {
+      const startDate = new Date(timeOff.start_date);
+      const endDate = new Date(timeOff.end_date);
+      return day >= startDate && day <= endDate && timeOff.status === 'approved';
+    });
+    
+    if (dayTimeOff.length > 0) {
+      return dayTimeOff.map(timeOff => ({
+        isTimeOff: true,
+        reason: timeOff.reason || 'Time Off',
+        id: timeOff.id
+      }));
+    }
+    
+    // Check for specific shifts next (they override recurring shifts)
     const daySpecificShifts = specificShifts.filter(shift => {
       const startTime = new Date(shift.start_time);
       return isSameDay(startTime, day);
@@ -38,10 +76,12 @@ export function StaffMemberRow({
     
     if (daySpecificShifts.length > 0) {
       return daySpecificShifts.map(shift => ({
-        startTime: format(new Date(shift.start_time), 'h:mma'),
-        endTime: format(new Date(shift.end_time), 'h:mma'),
+        startTime: format(new Date(shift.start_time), 'HH:mm'),
+        endTime: format(new Date(shift.end_time), 'HH:mm'),
         id: shift.id,
-        isSpecific: true
+        isSpecific: true,
+        formattedStartTime: formatTimeAMPM(format(new Date(shift.start_time), 'HH:mm')),
+        formattedEndTime: formatTimeAMPM(format(new Date(shift.end_time), 'HH:mm'))
       }));
     }
     
@@ -55,7 +95,9 @@ export function StaffMemberRow({
       startTime: shift.start_time,
       endTime: shift.end_time,
       id: shift.id,
-      isRecurring: true
+      isRecurring: true,
+      formattedStartTime: formatTimeAMPM(shift.start_time),
+      formattedEndTime: formatTimeAMPM(shift.end_time)
     }));
   };
 
@@ -65,11 +107,16 @@ export function StaffMemberRow({
     .map((n: string) => n[0])
     .join('');
 
-  const handleDialogClose = () => {
+  const handleDialogClose = (shouldRefresh: boolean = false) => {
     setShowSetRegularShiftDialog(false);
     setShowAddSpecificShiftDialog(false);
     setShowAddTimeOffDialog(false);
     setSelectedDay(null);
+    
+    // If any changes were made, trigger the parent component to refresh the data
+    if (shouldRefresh) {
+      onDataChange();
+    }
   };
 
   return (
@@ -136,99 +183,108 @@ export function StaffMemberRow({
         </td>
         
         {weekDays.map((day) => {
-  const shifts = getShiftsForDay(day);
-  return (
-    <td 
-      key={day.toString()} 
-      className="p-1 align-top border relative cursor-pointer"
-      onMouseEnter={() => setHoveredDay(day)}
-      onMouseLeave={() => setHoveredDay(null)}
-    >
-      {/* Cell content (shifts or empty space) */}
-      {shifts.length > 0 ? (
-        <div className="bg-blue-100 p-2 rounded text-center text-sm">
-          {shifts.map((shift, idx) => (
-            <div key={`${shift.id}-${idx}`}>
-              {shift.startTime} - {shift.endTime}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="h-12" />
-      )}
-      
-      {/* Centered plus button that appears when this day is hovered */}
-      {hoveredDay === day && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="bg-white shadow-sm">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-48" side="bottom">
-              <div className="flex flex-col space-y-2">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setSelectedDay(day);
-                    setShowAddSpecificShiftDialog(true);
-                  }}
-                >
-                  Add specific shift
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => setShowSetRegularShiftDialog(true)}
-                >
-                  Set regular shifts
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setSelectedDay(day);
-                    setShowAddTimeOffDialog(true);
-                  }}
-                >
-                  Add time off
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-      )}
-    </td>
-  );
-})}
+          const shifts = getShiftsForDay(day);
+          return (
+            <td 
+              key={day.toString()} 
+              className="p-1 align-top border relative cursor-pointer"
+              onMouseEnter={() => setHoveredDay(day as any)}
+              onMouseLeave={() => setHoveredDay(null)}
+            >
+              {/* Cell content (shifts, time off, or empty space) */}
+              {shifts.length > 0 ? (
+                <div className={`p-2 rounded text-center text-sm ${shifts[0].isTimeOff ? 'bg-red-100' : 'bg-blue-100'}`}>
+                  {shifts.map((shift, idx) => (
+                    <div key={`${shift.id}-${idx}`}>
+                      {shift.isTimeOff ? (
+                        <span className="font-medium text-red-700">{shift.reason}</span>
+                      ) : (
+                        `${shift.formattedStartTime} - ${shift.formattedEndTime}`
+                      )}
+                      {shift.isSpecific && !shift.isTimeOff && (
+                        <span className="text-xs block text-blue-700">(Specific)</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-12" />
+              )}
+              
+              {/* Centered plus button that appears when this day is hovered */}
+              {hoveredDay === day && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="bg-white shadow-sm">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48" side="bottom">
+                      <div className="flex flex-col space-y-2">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            setSelectedDay(day);
+                            setShowAddSpecificShiftDialog(true);
+                          }}
+                        >
+                          Add specific shift
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => setShowSetRegularShiftDialog(true)}
+                        >
+                          Set regular shifts
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            setSelectedDay(day);
+                            setShowAddTimeOffDialog(true);
+                          }}
+                        >
+                          Add time off
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+            </td>
+          );
+        })}
       </tr>
 
       {showSetRegularShiftDialog && (
         <SetRegularShiftsDialog
           isOpen={showSetRegularShiftDialog}
-          onClose={handleDialogClose}
+          onClose={(saved) => handleDialogClose(saved)}
           employee={employee}
-          onSave={handleDialogClose}
+          onSave={() => handleDialogClose(true)}
+          locationId={selectedLocation}
         />
       )}
 
       {showAddSpecificShiftDialog && (
         <AddShiftDialog
           isOpen={showAddSpecificShiftDialog}
-          onClose={handleDialogClose}
+          onClose={(saved) => handleDialogClose(saved)}
           selectedDate={selectedDay || new Date()}
           selectedEmployee={employee}
           employees={[employee]}
-          locations={[]}
+          locations={locations}
+          selectedLocation={selectedLocation}
         />
       )}
 
       {showAddTimeOffDialog && (
         <AddTimeOffDialog
           isOpen={showAddTimeOffDialog}
-          onClose={handleDialogClose}
+          onClose={(saved) => handleDialogClose(saved)}
           selectedEmployee={employee}
           employees={[employee]}
         />

@@ -26,13 +26,15 @@ export function RegularShifts({
   const [weekDays, setWeekDays] = useState<Date[]>([]);
   const [recurringShifts, setRecurringShifts] = useState<any[]>([]);
   const [specificShifts, setSpecificShifts] = useState<any[]>([]);
+  const [timeOffRequests, setTimeOffRequests] = useState<any[]>([]);
+  const [dataVersion, setDataVersion] = useState(0);
   const { toast } = useToast();
 
+  useEffect(()=>{
+    setSelectedLocation(locations?.[0]?.id)
+  }
+  ,[locations])
 
-    useEffect(()=>{
-      setSelectedLocation(locations?.[0]?.id)
-    }
-    ,[locations])
   // Generate week days
   useEffect(() => {
     const days: Date[] = [];
@@ -45,10 +47,19 @@ export function RegularShifts({
     
     setWeekDays(days);
     fetchShiftsForWeek(days);
-  }, [weekStart, selectedLocation]);
+  }, [weekStart, selectedLocation, dataVersion]);
+
+  // Function to refresh data
+  const refreshData = () => {
+    setDataVersion(prev => prev + 1);
+  };
 
   const fetchShiftsForWeek = async (days: Date[]) => {
     try {
+      // Prepare date strings for time off requests
+      const startDateStr = days[0].toISOString().split('T')[0];
+      const endDateStr = days[days.length - 1].toISOString().split('T')[0];
+      
       // Fetch recurring shifts
       const weekDayNumbers = days.map(day => day.getDay());
       
@@ -88,8 +99,21 @@ export function RegularShifts({
       
       if (specificError) throw specificError;
       
+      // Query for time off requests that overlap with the week
+      let timeOffQuery = supabase.from('time_off_requests')
+        .select(`
+          *,
+          employees(*)
+        `)
+        .or(`start_date.lte.${endDateStr},end_date.gte.${startDateStr}`);
+      
+      const { data: timeOffData, error: timeOffError } = await timeOffQuery;
+      
+      if (timeOffError) throw timeOffError;
+      
       setRecurringShifts(recurringData || []);
       setSpecificShifts(specificData || []);
+      setTimeOffRequests(timeOffData || []);
     } catch (error) {
       console.error('Error fetching shifts:', error);
       toast({
@@ -180,6 +204,10 @@ export function RegularShifts({
                   weekDays={weekDays}
                   recurringShifts={recurringShifts.filter(shift => shift.employee_id === employee.id)}
                   specificShifts={specificShifts.filter(shift => shift.employee_id === employee.id)}
+                  timeOffRequests={timeOffRequests.filter(req => req.employee_id === employee.id)}
+                  locations={locations}
+                  selectedLocation={selectedLocation}
+                  onDataChange={refreshData}
                 />
               ))
             )}
