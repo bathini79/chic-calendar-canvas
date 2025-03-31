@@ -3,12 +3,15 @@ import React from 'react';
 import { format, isSameDay } from 'date-fns';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SetRegularShiftsDialog } from './dialogs/SetRegularShiftsDialog';
 import { AddShiftDialog } from './dialogs/AddShiftDialog';
 import { AddTimeOffDialog } from './dialogs/AddTimeOffDialog';
 import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface StaffMemberRowProps {
   employee: any;
@@ -36,6 +39,9 @@ export function StaffMemberRow({
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [hoveredDay, setHoveredDay] = useState(null);
+  const [showDeleteShiftConfirm, setShowDeleteShiftConfirm] = useState(false);
+  const [shiftToDelete, setShiftToDelete] = useState<any>(null);
+  const { toast } = useToast();
 
   // Function to format time in 12-hour format with AM/PM
   const formatTimeAMPM = (timeString: string) => {
@@ -64,6 +70,7 @@ export function StaffMemberRow({
       checkDay.setHours(0, 0, 0, 0);
       
       return checkDay >= startDate && checkDay <= endDate && 
+             timeOff.employee_id === employee.id && 
              (timeOff.status === 'approved' || timeOff.status === 'pending');
     });
     
@@ -79,27 +86,31 @@ export function StaffMemberRow({
     // Check for specific shifts next (they override recurring shifts)
     const daySpecificShifts = specificShifts.filter(shift => {
       const startTime = new Date(shift.start_time);
-      return isSameDay(startTime, day);
+      return isSameDay(startTime, day) && shift.employee_id === employee.id;
     });
     
     if (daySpecificShifts.length > 0) {
       return daySpecificShifts.map(shift => ({
+        isTimeOff: false,
         startTime: format(new Date(shift.start_time), 'HH:mm'),
         endTime: format(new Date(shift.end_time), 'HH:mm'),
         id: shift.id,
         isSpecific: true,
         formattedStartTime: formatTimeAMPM(format(new Date(shift.start_time), 'HH:mm')),
-        formattedEndTime: formatTimeAMPM(format(new Date(shift.end_time), 'HH:mm'))
+        formattedEndTime: formatTimeAMPM(format(new Date(shift.end_time), 'HH:mm')),
+        start_time: shift.start_time,
+        end_time: shift.end_time
       }));
     }
     
     // Then check for recurring shifts
     const dayOfWeek = day.getDay();
     const dayRecurringShifts = recurringShifts.filter(shift => 
-      shift.day_of_week === dayOfWeek
+      shift.day_of_week === dayOfWeek && shift.employee_id === employee.id
     );
     
     return dayRecurringShifts.map(shift => ({
+      isTimeOff: false,
       startTime: shift.start_time,
       endTime: shift.end_time,
       id: shift.id,
@@ -124,6 +135,35 @@ export function StaffMemberRow({
     // If any changes were made, trigger the parent component to refresh the data
     if (shouldRefresh) {
       onDataChange();
+    }
+  };
+
+  const handleDeleteShift = async () => {
+    if (!shiftToDelete) return;
+    
+    try {
+      const { error } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('id', shiftToDelete.id);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Shift has been deleted",
+      });
+      
+      onDataChange();
+      setShowDeleteShiftConfirm(false);
+      setShiftToDelete(null);
+    } catch (error) {
+      console.error('Error deleting shift:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete shift",
+        variant: "destructive",
+      });
     }
   };
 
@@ -184,6 +224,15 @@ export function StaffMemberRow({
                   >
                     Edit team member
                   </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-red-500"
+                    onClick={() => {
+                      setShowDeleteShiftConfirm(true);
+                    }}
+                  >
+                    Delete shifts
+                  </Button>
                 </div>
               </PopoverContent>
             </Popover>
@@ -224,8 +273,10 @@ export function StaffMemberRow({
                       ) : (
                         `${shift.formattedStartTime} - ${shift.formattedEndTime}`
                       )}
-                      {shift.isSpecific && !shift.isTimeOff && (
-                        <span className="text-xs block text-blue-700">(Specific)</span>
+                      {!shift.isTimeOff && (
+                        <span className="text-xs block text-blue-700">
+                          {shift.isSpecific ? "(Specific)" : "(Regular)"}
+                        </span>
                       )}
                     </div>
                   ))}
@@ -245,16 +296,50 @@ export function StaffMemberRow({
                     </PopoverTrigger>
                     <PopoverContent className="w-48" side="bottom">
                       <div className="flex flex-col space-y-2">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={() => {
-                            setSelectedDay(day);
-                            setShowAddSpecificShiftDialog(true);
-                          }}
-                        >
-                          Add specific shift
-                        </Button>
+                        {shifts.length > 0 && !shifts[0].isTimeOff && shifts[0].isSpecific ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                const shiftData = {
+                                  id: shifts[0].id,
+                                  start_time: shifts[0].start_time,
+                                  end_time: shifts[0].end_time,
+                                  employee_id: employee.id
+                                };
+                                setSelectedDay(day);
+                                setShowAddSpecificShiftDialog(true);
+                                setShiftToDelete(shiftData);
+                              }}
+                            >
+                              Edit specific shift
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-red-500"
+                              onClick={() => {
+                                setShiftToDelete({
+                                  id: shifts[0].id
+                                });
+                                setShowDeleteShiftConfirm(true);
+                              }}
+                            >
+                              Delete specific shift
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setSelectedDay(day);
+                              setShowAddSpecificShiftDialog(true);
+                            }}
+                          >
+                            Add specific shift
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           className="w-full justify-start"
@@ -300,6 +385,7 @@ export function StaffMemberRow({
           selectedEmployee={employee}
           employees={[employee]}
           selectedLocation={selectedLocation}
+          shiftToEdit={shiftToDelete}
         />
       )}
 
@@ -311,6 +397,29 @@ export function StaffMemberRow({
           employees={[employee]}
           selectedLocation={selectedLocation}
         />
+      )}
+
+      {/* Confirmation dialog for deleting shifts */}
+      {showDeleteShiftConfirm && (
+        <Dialog open={showDeleteShiftConfirm} onOpenChange={setShowDeleteShiftConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm deletion</DialogTitle>
+            </DialogHeader>
+            <p>Are you sure you want to delete {shiftToDelete ? 'this shift' : 'all shifts'} for {employee.name}?</p>
+            <div className="flex justify-end space-x-2 mt-4">
+              <Button variant="outline" onClick={() => {
+                setShowDeleteShiftConfirm(false);
+                setShiftToDelete(null);
+              }}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteShift}>
+                Delete
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );

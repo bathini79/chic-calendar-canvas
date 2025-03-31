@@ -1,146 +1,171 @@
 
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { Button } from "@/components/ui/button";
-import { ChevronRight, Info, Plus } from 'lucide-react';
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from '@/hooks/use-toast';
+import { format, parseISO, isAfter } from 'date-fns';
 import { 
-  Table,
+  Table, 
   TableBody, 
   TableCell, 
   TableHead, 
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { 
+  ChevronRight, 
+  Trash2, 
+  Check, 
+  X, 
+  Plus 
+} from 'lucide-react';
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from '@/hooks/use-toast';
 import { AddTimeOffDialog } from './dialogs/AddTimeOffDialog';
 
 interface TimeOffRequestsProps {
   locations: any[];
   employees: any[];
+  selectedLocation?: string;
+  onDataChange: () => void;
 }
 
-export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) {
-  const [timeOffRequests, setTimeOffRequests] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export function TimeOffRequests({ 
+  locations, 
+  employees,
+  selectedLocation = "",
+  onDataChange
+}: TimeOffRequestsProps) {
+  const [timeOffs, setTimeOffs] = useState<any[]>([]);
+  const [filteredTimeOffs, setFilteredTimeOffs] = useState<any[]>([]);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<any>(null);
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [viewMode, setViewMode] = useState<'all' | 'pending' | 'approved'>('all');
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const [dataVersion, setDataVersion] = useState(0);
 
+  // Fetch time off requests
   useEffect(() => {
-    if (locations?.length > 0 && !selectedLocation) {
-      setSelectedLocation(locations[0]?.id);
-    }
-  }, [locations, selectedLocation]);
+    const fetchTimeOffs = async () => {
+      try {
+        setIsLoading(true);
 
-  useEffect(() => {
-    fetchTimeOffRequests();
-  }, [selectedLocation]);
-
-  const fetchTimeOffRequests = async () => {
-    setIsLoading(true);
-    try {
-      let query = supabase
-        .from('time_off_requests')
-        .select(`
-          *,
-          employees(*)
-        `)
-        .order('start_date', { ascending: false });
+        let query = supabase
+          .from('time_off_requests')
+          .select(`
+            *,
+            employees(*)
+          `)
+          .order('start_date', { ascending: false });
         
-      // Add location filter if selected
-      if (selectedLocation) {
-        query = query.eq('location_id', selectedLocation);
+        if (selectedLocation && selectedLocation !== "all") {
+          query = query.eq('location_id', selectedLocation);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+
+        setTimeOffs(data || []);
+      } catch (error) {
+        console.error('Error fetching time offs:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch time off requests',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
       }
-      
-      const { data, error } = await query;
-        
-      if (error) throw error;
-      
-      setTimeOffRequests(data || []);
-    } catch (error) {
-      console.error('Error fetching time off requests:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch time off requests.',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
 
-  const getStatusBadge = (status: string) => {
-    let badgeClass = '';
+    fetchTimeOffs();
+  }, [selectedLocation, dataVersion]);
+
+  // Apply filters when viewMode or selectedEmployee changes
+  useEffect(() => {
+    let filtered = timeOffs;
     
-    switch (status) {
-      case 'approved':
-        badgeClass = 'bg-green-100 text-green-800';
-        break;
-      case 'denied':
-        badgeClass = 'bg-red-100 text-red-800';
-        break;
-      case 'pending':
-      default:
-        badgeClass = 'bg-yellow-100 text-yellow-800';
-        break;
+    // Filter by status
+    if (viewMode !== 'all') {
+      filtered = filtered.filter(timeOff => timeOff.status === viewMode);
     }
     
-    return (
-      <span className={`px-2 py-1 text-xs font-medium rounded ${badgeClass}`}>
-        {status.toUpperCase()}
-      </span>
-    );
+    // Filter by employee
+    if (selectedEmployee !== "all") {
+      filtered = filtered.filter(timeOff => timeOff.employee_id === selectedEmployee);
+    }
+    
+    setFilteredTimeOffs(filtered);
+  }, [timeOffs, viewMode, selectedEmployee]);
+
+  const refreshData = () => {
+    setDataVersion(prev => prev + 1);
+    onDataChange();
   };
 
-  const handleApprove = async (id: string) => {
+  const handleStatusChange = async (timeOffId: string, newStatus: 'approved' | 'denied') => {
     try {
       const { error } = await supabase
         .from('time_off_requests')
-        .update({ status: 'approved' })
-        .eq('id', id);
+        .update({ status: newStatus === 'denied' ? 'declined' : newStatus })
+        .eq('id', timeOffId);
         
       if (error) throw error;
       
       toast({
         title: 'Success',
-        description: 'Time off request approved.',
+        description: `Time off request ${newStatus}`,
       });
       
-      fetchTimeOffRequests();
+      refreshData();
     } catch (error) {
-      console.error('Error approving time off request:', error);
+      console.error('Error updating time off status:', error);
       toast({
         title: 'Error',
-        description: 'Failed to approve time off request.',
+        description: 'Failed to update time off status',
         variant: 'destructive'
       });
     }
   };
 
-  const handleDeny = async (id: string) => {
+  const handleDelete = async (timeOffId: string) => {
+    if (!confirm('Are you sure you want to delete this time off request?')) {
+      return;
+    }
+    
     try {
       const { error } = await supabase
         .from('time_off_requests')
-        .update({ status: 'denied' })
-        .eq('id', id);
+        .delete()
+        .eq('id', timeOffId);
         
       if (error) throw error;
       
       toast({
         title: 'Success',
-        description: 'Time off request denied.',
+        description: 'Time off request deleted',
       });
       
-      fetchTimeOffRequests();
+      refreshData();
     } catch (error) {
-      console.error('Error denying time off request:', error);
+      console.error('Error deleting time off:', error);
       toast({
         title: 'Error',
-        description: 'Failed to deny time off request.',
+        description: 'Failed to delete time off request',
         variant: 'destructive'
       });
+    }
+  };
+
+  const handleAddTimeOff = () => {
+    setShowAddTimeOffDialog(true);
+  };
+
+  const handleTimeOffDialogClose = (saved: boolean = false) => {
+    setShowAddTimeOffDialog(false);
+    
+    if (saved) {
+      refreshData();
     }
   };
 
@@ -148,105 +173,138 @@ export function TimeOffRequests({ locations, employees }: TimeOffRequestsProps) 
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Time Off Requests</h2>
-        <Button variant="default" onClick={() => setShowAddTimeOffDialog(true)}>
-          Add
+        <Button variant="default" onClick={handleAddTimeOff}>
+          Add Time Off
           <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
-      
-      {isLoading ? (
-        <div className="text-center py-10">Loading time off requests...</div>
-      ) : timeOffRequests.length === 0 ? (
-        <div className="text-center py-10">
-          <p className="text-gray-500">No time off requests found</p>
-          <Button 
-            variant="outline" 
-            className="mt-4"
-            onClick={() => setShowAddTimeOffDialog(true)}
+
+      <div className="flex flex-wrap gap-4">
+        <div>
+          <select 
+            className="border rounded-md p-2"
+            value={viewMode} 
+            onChange={(e) => setViewMode(e.target.value as 'all' | 'pending' | 'approved')}
           >
-            Add Time Off Request
-          </Button>
+            <option value="all">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+          </select>
         </div>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Employee</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Start Date</TableHead>
-              <TableHead>End Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {timeOffRequests.map((request) => (
-              <TableRow key={request.id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <div className="bg-purple-100 rounded-full h-8 w-8 flex items-center justify-center">
-                      {request.employees?.name?.split(' ').map((n: string) => n[0]).join('') || '??'}
-                    </div>
-                    <span>{request.employees?.name || 'Unknown Employee'}</span>
-                  </div>
-                </TableCell>
-                <TableCell>{request.reason || 'Not specified'}</TableCell>
-                <TableCell>{format(new Date(request.start_date), 'MMM d, yyyy')}</TableCell>
-                <TableCell>{format(new Date(request.end_date), 'MMM d, yyyy')}</TableCell>
-                <TableCell>{getStatusBadge(request.status)}</TableCell>
-                <TableCell className="text-right">
-                  {request.status === 'pending' && (
-                    <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleDeny(request.id)}
-                      >
-                        Deny
-                      </Button>
-                      <Button 
-                        variant="default" 
-                        size="sm"
-                        onClick={() => handleApprove(request.id)}
-                      >
-                        Approve
-                      </Button>
-                    </div>
-                  )}
-                </TableCell>
-              </TableRow>
+        
+        <div>
+          <select 
+            className="border rounded-md p-2"
+            value={selectedEmployee}
+            onChange={(e) => setSelectedEmployee(e.target.value)}
+          >
+            <option value="all">All Employees</option>
+            {employees.map(employee => (
+              <option key={employee.id} value={employee.id}>
+                {employee.name}
+              </option>
             ))}
-          </TableBody>
-        </Table>
-      )}
-      
-      <div className="bg-blue-50 p-4 rounded-lg flex items-start">
-        <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
-        <p className="text-sm">
-          Online bookings cannot be placed during approved time off periods.
-        </p>
+          </select>
+        </div>
       </div>
       
-      <AddTimeOffDialog
-        isOpen={showAddTimeOffDialog}
-        onClose={() => {
-          setShowAddTimeOffDialog(false);
-          setSelectedRequest(null);
-          fetchTimeOffRequests();
-        }}
-        employees={employees}
-        selectedEmployee={selectedRequest?.employee || null}
-        selectedLocation={selectedLocation}
-      />
-      
-      {/* Mobile add button */}
-      <Button 
-        className="fixed bottom-4 right-4 md:hidden rounded-full h-14 w-14 flex items-center justify-center shadow-lg" 
-        size="icon"
-        onClick={() => setShowAddTimeOffDialog(true)}
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      {isLoading ? (
+        <div className="text-center py-4">Loading...</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Employee</TableHead>
+                <TableHead>From</TableHead>
+                <TableHead>To</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-28">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredTimeOffs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-4">
+                    No time off requests found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredTimeOffs.map(timeOff => {
+                  const startDate = parseISO(timeOff.start_date);
+                  const endDate = parseISO(timeOff.end_date);
+                  const isPast = isAfter(new Date(), endDate);
+                  
+                  return (
+                    <TableRow key={timeOff.id}>
+                      <TableCell>
+                        {timeOff.employees?.name || 'Unknown'}
+                      </TableCell>
+                      <TableCell>
+                        {format(startDate, 'MMM d, yyyy')}
+                      </TableCell>
+                      <TableCell>
+                        {format(endDate, 'MMM d, yyyy')}
+                      </TableCell>
+                      <TableCell>
+                        {timeOff.reason || 'No reason provided'}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded ${
+                          timeOff.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          timeOff.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {timeOff.status.charAt(0).toUpperCase() + timeOff.status.slice(1)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-1">
+                          {timeOff.status === 'pending' && !isPast && (
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleStatusChange(timeOff.id, 'approved')}
+                              >
+                                <Check className="h-4 w-4 text-green-600" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleStatusChange(timeOff.id, 'denied')}
+                              >
+                                <X className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </>
+                          )}
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleDelete(timeOff.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {showAddTimeOffDialog && (
+        <AddTimeOffDialog
+          isOpen={showAddTimeOffDialog}
+          onClose={(saved) => handleTimeOffDialogClose(saved)}
+          employees={employees}
+          selectedLocation={selectedLocation}
+        />
+      )}
     </div>
   );
 }

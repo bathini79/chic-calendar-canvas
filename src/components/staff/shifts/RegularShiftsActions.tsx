@@ -15,10 +15,12 @@ import { supabase } from '@/integrations/supabase/client';
 interface RegularShiftsActionsProps {
   employee: any;
   onSetRegularShifts: () => void;
+  onDataChange: () => void;
 }
 
-export function RegularShiftsActions({ employee, onSetRegularShifts }: RegularShiftsActionsProps) {
+export function RegularShiftsActions({ employee, onSetRegularShifts, onDataChange }: RegularShiftsActionsProps) {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmDeleteShiftsDialog, setConfirmDeleteShiftsDialog] = useState(false);
   const { toast } = useToast();
 
   const handleUnassignFromLocation = async () => {
@@ -35,6 +37,9 @@ export function RegularShiftsActions({ employee, onSetRegularShifts }: RegularSh
         title: "Success",
         description: "Employee unassigned from location",
       });
+      
+      onDataChange();
+      setConfirmDialogOpen(false);
     } catch (error) {
       console.error('Error unassigning employee:', error);
       toast({
@@ -63,11 +68,13 @@ export function RegularShiftsActions({ employee, onSetRegularShifts }: RegularSh
         
       if (specificError) throw specificError;
       
-      setConfirmDialogOpen(false);
+      setConfirmDeleteShiftsDialog(false);
       toast({
         title: "Success",
         description: "All shifts have been deleted",
       });
+      
+      onDataChange();
     } catch (error) {
       console.error('Error deleting shifts:', error);
       toast({
@@ -90,26 +97,45 @@ export function RegularShiftsActions({ employee, onSetRegularShifts }: RegularSh
           <DropdownMenuItem onClick={onSetRegularShifts}>
             Set regular shifts
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleUnassignFromLocation}>
+          <DropdownMenuItem onClick={() => setConfirmDialogOpen(true)}>
             Unassign from location
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => window.location.href = `/admin/Staff?edit=${employee.id}`}>
             Edit team member
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-red-500" onClick={() => setConfirmDialogOpen(true)}>
+          <DropdownMenuItem className="text-red-500" onClick={() => setConfirmDeleteShiftsDialog(true)}>
             Delete all shifts
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       
+      {/* Confirm unassign dialog */}
       <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm unassign</DialogTitle>
+          </DialogHeader>
+          <p>Are you sure you want to unassign {employee.name} from this location?</p>
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleUnassignFromLocation}>
+              Unassign
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Confirm delete shifts dialog */}
+      <Dialog open={confirmDeleteShiftsDialog} onOpenChange={setConfirmDeleteShiftsDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirm deletion</DialogTitle>
           </DialogHeader>
           <p>Are you sure you want to delete all shifts for {employee.name}?</p>
           <div className="flex justify-end space-x-2 mt-4">
-            <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setConfirmDeleteShiftsDialog(false)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDeleteAllShifts}>
