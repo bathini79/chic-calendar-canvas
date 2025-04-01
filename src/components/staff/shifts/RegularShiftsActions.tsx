@@ -15,9 +15,10 @@ import { supabase } from '@/integrations/supabase/client';
 interface RegularShiftsActionsProps {
   employee: any;
   onSetRegularShifts: () => void;
+  onRefreshData: () => void;
 }
 
-export function RegularShiftsActions({ employee, onSetRegularShifts }: RegularShiftsActionsProps) {
+export function RegularShiftsActions({ employee, onSetRegularShifts, onRefreshData }: RegularShiftsActionsProps) {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -35,6 +36,8 @@ export function RegularShiftsActions({ employee, onSetRegularShifts }: RegularSh
         title: "Success",
         description: "Employee unassigned from location",
       });
+      
+      onRefreshData();
     } catch (error) {
       console.error('Error unassigning employee:', error);
       toast({
@@ -68,6 +71,8 @@ export function RegularShiftsActions({ employee, onSetRegularShifts }: RegularSh
         title: "Success",
         description: "All shifts have been deleted",
       });
+      
+      onRefreshData();
     } catch (error) {
       console.error('Error deleting shifts:', error);
       toast({

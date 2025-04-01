@@ -1,195 +1,174 @@
-
 import React, { useState, useEffect } from 'react';
-import { format, addDays, startOfWeek, endOfWeek } from 'date-fns';
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Info, Pencil, Plus } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from '@/hooks/use-toast';
-import { StaffMemberRow } from './StaffMemberRow';
+import { format } from 'date-fns';
+import { RegularShiftsActions } from './RegularShiftsActions';
+import { SetRegularShiftsDialog } from './dialogs/SetRegularShiftsDialog';
 
-interface RegularShiftsProps {
-  locations: any[];
-  selectedLocation: string;
-  setSelectedLocation: (locationId: string) => void;
-  employees: any[];
-}
-
-export function RegularShifts({ 
+export function RegularShifts({
   locations,
   selectedLocation,
   setSelectedLocation,
   employees
-}: RegularShiftsProps) {
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [weekStart, setWeekStart] = useState(startOfWeek(selectedDate, { weekStartsOn: 6 })); // Start on Saturday
-  const [weekEnd, setWeekEnd] = useState(endOfWeek(selectedDate, { weekStartsOn: 6 }));
-  const [weekDays, setWeekDays] = useState<Date[]>([]);
+}: {
+  locations: any[];
+  selectedLocation: string;
+  setSelectedLocation: (locationId: string) => void;
+  employees: any[];
+}) {
   const [recurringShifts, setRecurringShifts] = useState<any[]>([]);
   const [specificShifts, setSpecificShifts] = useState<any[]>([]);
   const [timeOffRequests, setTimeOffRequests] = useState<any[]>([]);
+  const [showSetRegularShiftDialog, setShowSetRegularShiftDialog] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [dataVersion, setDataVersion] = useState(0);
-  const { toast } = useToast();
+  
+  // Weekdays starting from Sunday (0) to Saturday (6)
+  const weekDays = [0, 1, 2, 3, 4, 5, 6].map(dayIndex => {
+    return {
+      day: getDayName(dayIndex),
+      dayIndex
+    };
+  });
+  
+  function getDayName(dayIndex: number): string {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[dayIndex];
+  }
 
+  // Fetch recurring shifts when location changes
   useEffect(() => {
-    if (locations?.length > 0) {
-      setSelectedLocation(locations[0]?.id);
-    }
-  }, [locations, setSelectedLocation]);
+    const fetchShifts = async () => {
+      try {
+        // Fetch recurring shifts
+        let query = supabase.from('recurring_shifts')
+          .select('*');
+        
+        // Filter by location if selected
+        if (selectedLocation && selectedLocation !== "all") {
+          query = query.eq('location_id', selectedLocation);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        setRecurringShifts(data || []);
+        
+        // Fetch specific shifts for the current week
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay()); // Previous Sunday
+        
+        const endOfWeek = new Date(now);
+        endOfWeek.setDate(now.getDate() + (6 - now.getDay())); // Next Saturday
+        
+        let specificQuery = supabase.from('shifts')
+          .select('*')
+          .gte('start_time', startOfWeek.toISOString())
+          .lte('start_time', endOfWeek.toISOString());
+        
+        if (selectedLocation && selectedLocation !== "all") {
+          specificQuery = specificQuery.eq('location_id', selectedLocation);
+        }
+        
+        const { data: specificData, error: specificError } = await specificQuery;
+        if (specificError) throw specificError;
+        
+        setSpecificShifts(specificData || []);
 
-  // Generate week days
-  useEffect(() => {
-    const days: Date[] = [];
-    let day = weekStart;
+        // Fetch time off requests
+        let timeOffQuery = supabase.from('time_off_requests')
+          .select('*');
+        
+        if (selectedLocation && selectedLocation !== "all") {
+          timeOffQuery = timeOffQuery.eq('location_id', selectedLocation);
+        }
+        
+        const { data: timeOffData, error: timeOffError } = await timeOffQuery;
+        if (timeOffError) throw timeOffError;
+        
+        setTimeOffRequests(timeOffData || []);
+      } catch (error) {
+        console.error('Error fetching shifts:', error);
+      }
+    };
     
-    for (let i = 0; i < 7; i++) {
-      days.push(day);
-      day = addDays(day, 1);
-    }
-    
-    setWeekDays(days);
-    fetchShiftsForWeek(days);
-  }, [weekStart, selectedLocation, dataVersion]);
+    fetchShifts();
+  }, [selectedLocation, dataVersion]);
 
-  // Function to refresh data
   const refreshData = () => {
     setDataVersion(prev => prev + 1);
   };
 
-  const fetchShiftsForWeek = async (days: Date[]) => {
-    try {
-      // Prepare date strings for time off requests
-      const startDateStr = days[0].toISOString().split('T')[0];
-      const endDateStr = days[days.length - 1].toISOString().split('T')[0];
-      
-      // Fetch recurring shifts
-      const weekDayNumbers = days.map(day => day.getDay());
-      
-      // Query for recurring shifts
-      let recurringQuery = supabase.from('recurring_shifts')
-        .select(`
-          *,
-          employees (*)
-        `)
-        .in('day_of_week', weekDayNumbers)
-        .lte('effective_from', days[days.length - 1].toISOString());
-      
-      // Add location filter if selected
-      if (selectedLocation !== "all") {
-        recurringQuery = recurringQuery.eq('location_id', selectedLocation);
-      }
+  const handleSetRegularShifts = (employee: any) => {
+    setSelectedEmployee(employee);
+    setShowSetRegularShiftDialog(true);
+  };
 
-      const { data: recurringData, error: recurringError } = await recurringQuery;
+  const getEmployeeShifts = (employeeId: string, dayOfWeek: number) => {
+    const employeeRegularShifts = recurringShifts
+      .filter(shift => shift.employee_id === employeeId && shift.day_of_week === dayOfWeek);
+    
+    // Check time off requests that overlap with this day
+    const today = new Date();
+    const dayDate = new Date(today);
+    dayDate.setDate(today.getDate() - today.getDay() + dayOfWeek); // Set to the current week's corresponding day
+    
+    const hasTimeOff = timeOffRequests.some(timeOff => {
+      const startDate = new Date(timeOff.start_date);
+      const endDate = new Date(timeOff.end_date);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
       
-      if (recurringError) {
-        console.error('Recurring shifts error:', recurringError);
-        throw recurringError;
-      }
+      const checkDay = new Date(dayDate);
+      checkDay.setHours(0, 0, 0, 0);
       
-      // Query for specific shifts in the date range
-      let specificQuery = supabase.from('shifts')
-        .select(`
-          *,
-          employees (*)
-        `)
-        .gte('start_time', days[0].toISOString())
-        .lte('end_time', days[days.length - 1].toISOString());
-
-      // Add location filter if selected
-      if (selectedLocation !== "all") {
-        specificQuery = specificQuery.eq('location_id', selectedLocation);
-      }
-      
-      const { data: specificData, error: specificError } = await specificQuery;
-      
-      if (specificError) {
-        console.error('Specific shifts error:', specificError);
-        throw specificError;
-      }
-      
-      // Query for time off requests that overlap with the week
-      let timeOffQuery = supabase.from('time_off_requests')
-        .select(`
-          *,
-          employees(*)
-        `)
-        .or(`start_date.lte.${endDateStr},end_date.gte.${startDateStr}`);
-      
-      // Add location filter if selected
-      if (selectedLocation !== "all") {
-        timeOffQuery = timeOffQuery.eq('location_id', selectedLocation);
-      }
-      
-      const { data: timeOffData, error: timeOffError } = await timeOffQuery;
-      
-      if (timeOffError) {
-        console.error('Time off error:', timeOffError);
-        throw timeOffError;
-      }
-      
-      setRecurringShifts(recurringData || []);
-      setSpecificShifts(specificData || []);
-      setTimeOffRequests(timeOffData || []);
-    } catch (error) {
-      console.error('Error fetching shifts:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch shifts.',
-        variant: 'destructive'
+      return (
+        checkDay >= startDate && 
+        checkDay <= endDate && 
+        timeOff.employee_id === employeeId &&
+        (timeOff.status === 'approved' || timeOff.status === 'pending')
+      );
+    });
+    
+    if (hasTimeOff) {
+      const timeOff = timeOffRequests.find(t => {
+        const startDate = new Date(t.start_date);
+        const endDate = new Date(t.end_date);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        
+        const checkDay = new Date(dayDate);
+        checkDay.setHours(0, 0, 0, 0);
+        
+        return (
+          checkDay >= startDate && 
+          checkDay <= endDate && 
+          t.employee_id === employeeId &&
+          (t.status === 'approved' || t.status === 'pending')
+        );
       });
+      
+      return { hasTimeOff: true, timeOff };
     }
-  };
-
-  const goToPreviousWeek = () => {
-    const newWeekStart = addDays(weekStart, -7);
-    setWeekStart(newWeekStart);
-    setWeekEnd(addDays(newWeekStart, 6));
-  };
-
-  const goToNextWeek = () => {
-    const newWeekStart = addDays(weekStart, 7);
-    setWeekStart(newWeekStart);
-    setWeekEnd(addDays(newWeekStart, 6));
+    
+    return { hasTimeOff: false, shifts: employeeRegularShifts };
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Scheduled shifts</h2>
-        <div className="flex space-x-2">
-          <Button variant="outline" className="hidden md:flex">
-            Options
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-          <Button variant="default">
-            Add
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-col md:flex-row justify-between gap-4">
+        <h2 className="text-2xl font-bold">Regular Weekly Schedule</h2>
         <div>
           <select 
             className="border rounded-md p-2"
             value={selectedLocation}
             onChange={(e) => setSelectedLocation(e.target.value)}
           >
+            <option value="all">All Locations</option>
             {locations.map(loc => (
               <option key={loc.id} value={loc.id}>{loc.name}</option>
             ))}
           </select>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="icon" onClick={goToPreviousWeek}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm">
-            {format(weekStart, 'dd MMM')} - {format(weekEnd, 'dd MMM, yyyy')}
-          </span>
-          <Button variant="ghost" size="icon" onClick={goToNextWeek}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
@@ -197,77 +176,103 @@ export function RegularShifts({
         <table className="w-full">
           <thead>
             <tr>
-              <th className="w-52 text-left px-4 py-2">Team member</th>
-              {weekDays.map((day) => (
-                <th key={day.toString()} className="text-center px-4 py-2">
-                  <div>{format(day, 'EEE, d MMM')}</div>
-                  <div className="text-xs text-gray-500">{calculateHours(day, specificShifts)}h</div>
-                </th>
+              <th className="text-left px-4 py-2">Team Member</th>
+              {weekDays.map(({ day, dayIndex }) => (
+                <th key={dayIndex} className="px-4 py-2 text-center">{day}</th>
               ))}
+              <th className="px-4 py-2 text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {employees.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-4">No staff members found</td>
+                <td colSpan={9} className="text-center py-4">No staff members found</td>
               </tr>
             ) : (
-              employees.map((employee) => (
-                <StaffMemberRow 
-                  key={employee.id} 
-                  employee={employee}
-                  weekDays={weekDays}
-                  recurringShifts={recurringShifts.filter(shift => shift.employee_id === employee.id)}
-                  specificShifts={specificShifts.filter(shift => shift.employee_id === employee.id)}
-                  timeOffRequests={timeOffRequests.filter(req => req.employee_id === employee.id)}
-                  locations={locations}
-                  selectedLocation={selectedLocation}
-                  onDataChange={refreshData}
-                />
+              employees.map(employee => (
+                <tr key={employee.id} className="border-t">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-purple-100 rounded-full h-10 w-10 flex items-center justify-center">
+                        {employee.name.split(' ').map((n: string) => n[0]).join('')}
+                      </div>
+                      <div>
+                        <p className="font-medium">{employee.name}</p>
+                        <p className="text-xs text-gray-500">{employee.employment_type}</p>
+                      </div>
+                    </div>
+                  </td>
+                  
+                  {weekDays.map(({ dayIndex }) => {
+                    const { hasTimeOff, timeOff, shifts } = getEmployeeShifts(employee.id, dayIndex);
+                    
+                    return (
+                      <td key={dayIndex} className="px-4 py-3 text-center border-l">
+                        {hasTimeOff ? (
+                          <div className={`p-1 rounded ${
+                            timeOff.status === 'approved' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            Time Off
+                            <div className="text-xs">
+                              ({timeOff.status === 'approved' ? 'Approved' : 'Pending'})
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            {shifts && shifts.length > 0 ? (
+                              shifts.map((shift, index) => (
+                                <div key={index} className="text-sm mb-1">
+                                  {formatTimeAMPM(shift.start_time)} - {formatTimeAMPM(shift.end_time)}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  
+                  <td className="px-4 py-3 text-center">
+                    <RegularShiftsActions 
+                      employee={employee} 
+                      onSetRegularShifts={() => handleSetRegularShifts(employee)}
+                      onRefreshData={refreshData}
+                    />
+                  </td>
+                </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
 
-      <div className="bg-blue-50 p-4 rounded-lg flex items-start">
-        <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
-        <p className="text-sm">
-          The team roster shows your availability for bookings and is not linked to your business opening hours.
-          To set your opening hours, <a href="#" className="text-blue-500">click here</a>.
-        </p>
-      </div>
-      
-      {/* Mobile add button */}
-      <Button className="fixed bottom-4 right-4 md:hidden rounded-full h-14 w-14 flex items-center justify-center shadow-lg" size="icon">
-        <Plus className="h-6 w-6" />
-      </Button>
+      {showSetRegularShiftDialog && selectedEmployee && (
+        <SetRegularShiftsDialog
+          isOpen={showSetRegularShiftDialog}
+          onClose={(saved) => {
+            setShowSetRegularShiftDialog(false);
+            if (saved) refreshData();
+          }}
+          employee={selectedEmployee}
+          onSave={refreshData}
+          locationId={selectedLocation !== "all" ? selectedLocation : undefined}
+        />
+      )}
     </div>
   );
 }
 
-// Helper function to calculate total hours for a day
-function calculateHours(day: Date, shifts: any[]): string {
-  const dayShifts = shifts.filter(shift => {
-    const shiftDate = new Date(shift.start_time);
-    return shiftDate.getDate() === day.getDate() &&
-      shiftDate.getMonth() === day.getMonth() &&
-      shiftDate.getFullYear() === day.getFullYear();
-  });
+function formatTimeAMPM(timeString: string) {
+  if (!timeString) return '';
   
-  let totalMinutes = 0;
+  const [hourStr, minuteStr] = timeString.split(':');
+  const hour = parseInt(hourStr, 10);
+  const minute = minuteStr || '00';
   
-  dayShifts.forEach(shift => {
-    const startTime = new Date(shift.start_time);
-    const endTime = new Date(shift.end_time);
-    const diffInMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
-    totalMinutes += diffInMinutes;
-  });
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12; // Convert 0 to 12 for 12 AM
   
-  // Return formatted string like "9h" or "0min"
-  const hours = Math.floor(totalMinutes / 60);
-  if (hours > 0) {
-    return `${hours}h`;
-  }
-  return "0min";
+  return `${displayHour}:${minute} ${period}`;
 }
