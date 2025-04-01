@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { format, addMinutes } from 'date-fns';
 import { 
   Dialog, 
@@ -25,8 +25,8 @@ interface AddShiftDialogProps {
   selectedDate?: Date;
   selectedEmployee?: any;
   employees: any[];
+  locations?: any[];
   selectedLocation?: string;
-  shiftToEdit?: any;
 }
 
 export function AddShiftDialog({
@@ -35,8 +35,7 @@ export function AddShiftDialog({
   selectedDate = new Date(),
   selectedEmployee,
   employees,
-  selectedLocation = '',
-  shiftToEdit = null
+  selectedLocation = ''
 }: AddShiftDialogProps) {
   const [employeeId, setEmployeeId] = useState(selectedEmployee?.id || '');
   const [startHour, setStartHour] = useState("09");
@@ -44,30 +43,8 @@ export function AddShiftDialog({
   const [endHour, setEndHour] = useState("17");
   const [endMinute, setEndMinute] = useState("00");
   const [isSaving, setIsSaving] = useState(false);
-  const [isNew, setIsNew] = useState(true);
   
   const { toast } = useToast();
-
-  // Load shift data when editing
-  useEffect(() => {
-    if (shiftToEdit) {
-      setIsNew(false);
-      const startTime = new Date(shiftToEdit.start_time);
-      const endTime = new Date(shiftToEdit.end_time);
-      
-      setStartHour(startTime.getHours().toString().padStart(2, '0'));
-      setStartMinute((Math.floor(startTime.getMinutes() / 15) * 15).toString().padStart(2, '0'));
-      
-      setEndHour(endTime.getHours().toString().padStart(2, '0'));
-      setEndMinute((Math.floor(endTime.getMinutes() / 15) * 15).toString().padStart(2, '0'));
-      
-      if (shiftToEdit.employee_id) {
-        setEmployeeId(shiftToEdit.employee_id);
-      }
-    } else {
-      setIsNew(true);
-    }
-  }, [shiftToEdit]);
 
   const handleSave = async () => {
     try {
@@ -104,47 +81,27 @@ export function AddShiftDialog({
         return;
       }
       
-      if (isNew) {
-        // Save to database
-        const { data, error } = await supabase.from('shifts').insert({
-          employee_id: employeeId,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          location_id: selectedLocation || null
-        });
-        
-        if (error) throw error;
-        
-        toast({
-          title: "Success",
-          description: "Shift has been added",
-        });
-      } else {
-        // Update existing shift
-        const { error } = await supabase
-          .from('shifts')
-          .update({
-            employee_id: employeeId,
-            start_time: startTime.toISOString(),
-            end_time: endTime.toISOString(),
-            location_id: selectedLocation || null
-          })
-          .eq('id', shiftToEdit.id);
-          
-        if (error) throw error;
-        
-        toast({
-          title: "Success",
-          description: "Shift has been updated",
-        });
-      }
+      // Save to database
+      const { data, error } = await supabase.from('shifts').insert({
+        employee_id: employeeId,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        location_id: selectedLocation || null
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Shift has been added",
+      });
       
       onClose(true); // Pass true to indicate data was changed
     } catch (error) {
-      console.error('Error saving shift:', error);
+      console.error('Error adding shift:', error);
       toast({
         title: "Error",
-        description: "Failed to save shift",
+        description: "Failed to add shift",
         variant: "destructive",
       });
       setIsSaving(false);
@@ -166,7 +123,7 @@ export function AddShiftDialog({
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{isNew ? 'Add specific shift' : 'Edit specific shift'}</DialogTitle>
+          <DialogTitle>Add specific shift</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 py-2">
@@ -266,7 +223,7 @@ export function AddShiftDialog({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : (isNew ? 'Save' : 'Update')}
+            {isSaving ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </DialogContent>

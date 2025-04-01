@@ -86,7 +86,6 @@ export function StaffShifts() {
             selectedLocation={selectedLocation}
             setSelectedLocation={setSelectedLocation}
             employees={employees}
-            onDataChange={refreshData}
           />
         </TabsContent>
         
@@ -102,9 +101,7 @@ export function StaffShifts() {
         <TabsContent value="timeoff" className="mt-0">
           <TimeOffRequests 
             locations={locations}
-            employees={employees}
-            selectedLocation={selectedLocation} 
-            onDataChange={refreshData}
+            employees={employees} 
           />
         </TabsContent>
       </Tabs>

@@ -32,10 +32,8 @@ export function SpecificShifts({
   const [showAddShiftDialog, setShowAddShiftDialog] = useState(false);
   const [showSetRegularShiftDialog, setShowSetRegularShiftDialog] = useState(false);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
-  const [selectedCell, setSelectedCell] = useState<{ day: Date, employee: any, shiftToEdit?: any } | null>(null);
+  const [selectedCell, setSelectedCell] = useState<{ day: Date, employee: any } | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
-  const [showDeleteShiftConfirm, setShowDeleteShiftConfirm] = useState(false);
-  const [shiftToDelete, setShiftToDelete] = useState<any>(null);
   const { toast } = useToast();
 
   // Generate week days
@@ -122,13 +120,7 @@ export function SpecificShifts({
   };
 
   const handleCellClick = (day: Date, employee: any) => {
-    // Check if there's an existing specific shift for this day/employee
-    const existingShift = specificShifts.find(shift => {
-      const shiftDate = new Date(shift.start_time);
-      return isSameDay(shiftDate, day) && shift.employee_id === employee.id;
-    });
-    
-    setSelectedCell({ day, employee, shiftToEdit: existingShift });
+    setSelectedCell({ day, employee });
   };
 
   // Check for time off for a specific day and employee
@@ -181,34 +173,6 @@ export function SpecificShifts({
     
     if (shouldRefresh) {
       refreshData();
-    }
-  };
-
-  const handleDeleteShift = async (shift: any) => {
-    try {
-      const { error } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('id', shift.id);
-        
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: 'Shift has been deleted',
-      });
-      
-      refreshData();
-    } catch (error) {
-      console.error('Error deleting shift:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete shift',
-        variant: 'destructive'
-      });
-    } finally {
-      setShowDeleteShiftConfirm(false);
-      setShiftToDelete(null);
     }
   };
 
@@ -333,45 +297,17 @@ export function SpecificShifts({
                             </PopoverTrigger>
                             <PopoverContent className="w-48" align="center">
                               <div className="flex flex-col space-y-2">
-                                {shifts.length > 0 ? (
-                                  // If there's an existing shift, show edit and delete options
-                                  <>
-                                    <Button 
-                                      variant="ghost" 
-                                      className="w-full justify-start"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedCell({ day, employee, shiftToEdit: shifts[0] });
-                                        setShowAddShiftDialog(true);
-                                      }}
-                                    >
-                                      Edit specific shift
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      className="w-full justify-start text-red-600"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShiftToDelete(shifts[0]);
-                                        setShowDeleteShiftConfirm(true);
-                                      }}
-                                    >
-                                      Delete shift
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Button 
-                                    variant="ghost" 
-                                    className="w-full justify-start"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedCell({ day, employee });
-                                      setShowAddShiftDialog(true);
-                                    }}
-                                  >
-                                    Add specific shift
-                                  </Button>
-                                )}
+                                <Button 
+                                  variant="ghost" 
+                                  className="w-full justify-start"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedCell({ day, employee });
+                                    setShowAddShiftDialog(true);
+                                  }}
+                                >
+                                  Add specific shift
+                                </Button>
                                 <Button 
                                   variant="ghost" 
                                   className="w-full justify-start"
@@ -423,7 +359,6 @@ export function SpecificShifts({
           selectedEmployee={selectedCell.employee}
           employees={[selectedCell.employee]}
           selectedLocation={selectedLocation}
-          shiftToEdit={selectedCell.shiftToEdit}
         />
       )}
 
@@ -445,33 +380,6 @@ export function SpecificShifts({
           selectedEmployee={selectedCell.employee}
           selectedLocation={selectedLocation}
         />
-      )}
-
-      {/* Confirmation dialog for deleting shifts */}
-      {showDeleteShiftConfirm && shiftToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h3 className="text-lg font-medium mb-4">Confirm Deletion</h3>
-            <p className="mb-4">Are you sure you want to delete this shift?</p>
-            <div className="flex justify-end space-x-2">
-              <Button 
-                variant="outline"
-                onClick={() => {
-                  setShowDeleteShiftConfirm(false);
-                  setShiftToDelete(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="destructive"
-                onClick={() => handleDeleteShift(shiftToDelete)}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
       )}
       
       {/* Mobile add button */}
