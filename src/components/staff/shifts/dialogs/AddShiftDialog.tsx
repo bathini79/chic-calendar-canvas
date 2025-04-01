@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { format, addMinutes } from 'date-fns';
 import { 
   Dialog, 
@@ -25,8 +25,8 @@ interface AddShiftDialogProps {
   selectedDate?: Date;
   selectedEmployee?: any;
   employees: any[];
+  locations?: any[];
   selectedLocation?: string;
-  existingShift?: any | null;
 }
 
 export function AddShiftDialog({
@@ -35,8 +35,7 @@ export function AddShiftDialog({
   selectedDate = new Date(),
   selectedEmployee,
   employees,
-  selectedLocation = '',
-  existingShift = null,
+  selectedLocation = ''
 }: AddShiftDialogProps) {
   const [employeeId, setEmployeeId] = useState(selectedEmployee?.id || '');
   const [startHour, setStartHour] = useState("09");
@@ -46,31 +45,6 @@ export function AddShiftDialog({
   const [isSaving, setIsSaving] = useState(false);
   
   const { toast } = useToast();
-
-  // Pre-populate form with existing shift data if available
-  useEffect(() => {
-    if (existingShift) {
-      if (existingShift.startTime) {
-        const [hour, minute] = existingShift.startTime.split(':');
-        setStartHour(hour);
-        setStartMinute(minute);
-      } else if (existingShift.start_time) {
-        const startTime = new Date(existingShift.start_time);
-        setStartHour(startTime.getHours().toString().padStart(2, '0'));
-        setStartMinute(startTime.getMinutes().toString().padStart(2, '0'));
-      }
-
-      if (existingShift.endTime) {
-        const [hour, minute] = existingShift.endTime.split(':');
-        setEndHour(hour);
-        setEndMinute(minute);
-      } else if (existingShift.end_time) {
-        const endTime = new Date(existingShift.end_time);
-        setEndHour(endTime.getHours().toString().padStart(2, '0'));
-        setEndMinute(endTime.getMinutes().toString().padStart(2, '0'));
-      }
-    }
-  }, [existingShift]);
 
   const handleSave = async () => {
     try {
@@ -106,16 +80,6 @@ export function AddShiftDialog({
         setIsSaving(false);
         return;
       }
-
-      // If we're updating an existing shift, delete it first if it's a specific shift
-      if (existingShift && existingShift.isSpecific) {
-        const { error: deleteError } = await supabase
-          .from('shifts')
-          .delete()
-          .eq('id', existingShift.id);
-
-        if (deleteError) throw deleteError;
-      }
       
       // Save to database
       const { data, error } = await supabase.from('shifts').insert({
@@ -129,7 +93,7 @@ export function AddShiftDialog({
       
       toast({
         title: "Success",
-        description: existingShift ? "Shift has been updated" : "Shift has been added",
+        description: "Shift has been added",
       });
       
       onClose(true); // Pass true to indicate data was changed
@@ -159,7 +123,7 @@ export function AddShiftDialog({
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{existingShift ? "Update specific shift" : "Add specific shift"}</DialogTitle>
+          <DialogTitle>Add specific shift</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 py-2">
@@ -259,7 +223,7 @@ export function AddShiftDialog({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : existingShift ? 'Update' : 'Save'}
+            {isSaving ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </DialogContent>

@@ -9,8 +9,6 @@ import { SetRegularShiftsDialog } from './dialogs/SetRegularShiftsDialog';
 import { AddShiftDialog } from './dialogs/AddShiftDialog';
 import { AddTimeOffDialog } from './dialogs/AddTimeOffDialog';
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 interface StaffMemberRowProps {
   employee: any;
@@ -38,8 +36,6 @@ export function StaffMemberRow({
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [hoveredDay, setHoveredDay] = useState(null);
-  const [selectedShift, setSelectedShift] = useState<any>(null);
-  const { toast } = useToast();
 
   // Function to format time in 12-hour format with AM/PM
   const formatTimeAMPM = (timeString: string) => {
@@ -88,15 +84,12 @@ export function StaffMemberRow({
     
     if (daySpecificShifts.length > 0) {
       return daySpecificShifts.map(shift => ({
-        isTimeOff: false,
         startTime: format(new Date(shift.start_time), 'HH:mm'),
         endTime: format(new Date(shift.end_time), 'HH:mm'),
         id: shift.id,
         isSpecific: true,
         formattedStartTime: formatTimeAMPM(format(new Date(shift.start_time), 'HH:mm')),
-        formattedEndTime: formatTimeAMPM(format(new Date(shift.end_time), 'HH:mm')),
-        start_time: shift.start_time,
-        end_time: shift.end_time
+        formattedEndTime: formatTimeAMPM(format(new Date(shift.end_time), 'HH:mm'))
       }));
     }
     
@@ -107,7 +100,6 @@ export function StaffMemberRow({
     );
     
     return dayRecurringShifts.map(shift => ({
-      isTimeOff: false,
       startTime: shift.start_time,
       endTime: shift.end_time,
       id: shift.id,
@@ -128,59 +120,11 @@ export function StaffMemberRow({
     setShowAddSpecificShiftDialog(false);
     setShowAddTimeOffDialog(false);
     setSelectedDay(null);
-    setSelectedShift(null);
     
     // If any changes were made, trigger the parent component to refresh the data
     if (shouldRefresh) {
       onDataChange();
     }
-  };
-
-  const handleDeleteAllShifts = async () => {
-    try {
-      // Delete all recurring shifts
-      const { error: recurringError } = await supabase
-        .from('recurring_shifts')
-        .delete()
-        .eq('employee_id', employee.id);
-        
-      if (recurringError) throw recurringError;
-      
-      // Delete all specific shifts
-      const { error: specificError } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('employee_id', employee.id);
-        
-      if (specificError) throw specificError;
-      
-      toast({
-        title: "Success",
-        description: "All shifts have been deleted",
-      });
-
-      onDataChange();
-    } catch (error) {
-      console.error('Error deleting shifts:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete shifts",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleCellClick = (day: Date, shifts: any[]) => {
-    setSelectedDay(day);
-    
-    // If there are shifts, set the selectedShift to the first one
-    if (shifts && shifts.length > 0) {
-      setSelectedShift(shifts[0]);
-    } else {
-      setSelectedShift(null);
-    }
-    
-    setShowAddSpecificShiftDialog(true);
   };
 
   return (
@@ -240,13 +184,6 @@ export function StaffMemberRow({
                   >
                     Edit team member
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start text-red-600"
-                    onClick={handleDeleteAllShifts}
-                  >
-                    Delete all shifts
-                  </Button>
                 </div>
               </PopoverContent>
             </Popover>
@@ -270,9 +207,7 @@ export function StaffMemberRow({
                       ? 'bg-red-100' 
                       : 'bg-yellow-100'
                     : 'bg-blue-100'
-                }`}
-                  onClick={() => handleCellClick(day, shifts)}
-                >
+                }`}>
                   {shifts.map((shift, idx) => (
                     <div key={`${shift.id}-${idx}`}>
                       {shift.isTimeOff ? (
@@ -289,14 +224,14 @@ export function StaffMemberRow({
                       ) : (
                         `${shift.formattedStartTime} - ${shift.formattedEndTime}`
                       )}
-                      {!shift.isTimeOff && shift.isSpecific && (
+                      {shift.isSpecific && !shift.isTimeOff && (
                         <span className="text-xs block text-blue-700">(Specific)</span>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="h-12" onClick={() => handleCellClick(day, [])} />
+                <div className="h-12" />
               )}
               
               {/* Centered plus button that appears when this day is hovered */}
@@ -315,12 +250,10 @@ export function StaffMemberRow({
                           className="w-full justify-start"
                           onClick={() => {
                             setSelectedDay(day);
-                            const dayShifts = getShiftsForDay(day);
-                            setSelectedShift(dayShifts.length > 0 ? dayShifts[0] : null);
                             setShowAddSpecificShiftDialog(true);
                           }}
                         >
-                          {shifts.length > 0 && !shifts[0].isTimeOff ? "Edit specific shift" : "Add specific shift"}
+                          Add specific shift
                         </Button>
                         <Button
                           variant="ghost"
@@ -367,7 +300,6 @@ export function StaffMemberRow({
           selectedEmployee={employee}
           employees={[employee]}
           selectedLocation={selectedLocation}
-          existingShift={selectedShift && !selectedShift.isTimeOff ? selectedShift : null}
         />
       )}
 

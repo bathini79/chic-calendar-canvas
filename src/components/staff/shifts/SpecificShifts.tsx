@@ -33,7 +33,6 @@ export function SpecificShifts({
   const [showSetRegularShiftDialog, setShowSetRegularShiftDialog] = useState(false);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ day: Date, employee: any } | null>(null);
-  const [selectedShift, setSelectedShift] = useState<any>(null);
   const [dataVersion, setDataVersion] = useState(0);
   const { toast } = useToast();
 
@@ -121,28 +120,7 @@ export function SpecificShifts({
   };
 
   const handleCellClick = (day: Date, employee: any) => {
-    const { hasTimeOff, timeOff, shifts } = getShiftsForDayEmployee(day, employee.id);
-    
     setSelectedCell({ day, employee });
-    
-    if (shifts.length > 0) {
-      // If there's an existing specific shift, set it as selected
-      setSelectedShift({
-        isTimeOff: false,
-        startTime: format(new Date(shifts[0].start_time), 'HH:mm'),
-        endTime: format(new Date(shifts[0].end_time), 'HH:mm'),
-        id: shifts[0].id,
-        isSpecific: true,
-        formattedStartTime: format(new Date(shifts[0].start_time), 'h:mm a'),
-        formattedEndTime: format(new Date(shifts[0].end_time), 'h:mm a'),
-        start_time: shifts[0].start_time,
-        end_time: shifts[0].end_time
-      });
-    } else {
-      setSelectedShift(null);
-    }
-    
-    setShowAddShiftDialog(true);
   };
 
   // Check for time off for a specific day and employee
@@ -192,44 +170,9 @@ export function SpecificShifts({
     setShowSetRegularShiftDialog(false);
     setShowAddTimeOffDialog(false);
     setSelectedCell(null);
-    setSelectedShift(null);
     
     if (shouldRefresh) {
       refreshData();
-    }
-  };
-
-  const handleDeleteAllShifts = async (employeeId: string) => {
-    try {
-      // Delete all recurring shifts for this employee
-      const { error: recurringError } = await supabase
-        .from('recurring_shifts')
-        .delete()
-        .eq('employee_id', employeeId);
-        
-      if (recurringError) throw recurringError;
-      
-      // Delete all specific shifts for this employee
-      const { error: specificError } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('employee_id', employeeId);
-        
-      if (specificError) throw specificError;
-      
-      toast({
-        title: "Success",
-        description: "All shifts have been deleted",
-      });
-      
-      refreshData();
-    } catch (error) {
-      console.error('Error deleting shifts:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete shifts",
-        variant: "destructive",
-      });
     }
   };
 
@@ -308,14 +251,6 @@ export function SpecificShifts({
                         <p className="font-medium">{employee.name}</p>
                         <p className="text-xs text-gray-500">{employee.employment_type}</p>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-red-600 ml-auto"
-                        onClick={() => handleDeleteAllShifts(employee.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </td>
                   
@@ -367,29 +302,11 @@ export function SpecificShifts({
                                   className="w-full justify-start"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const { shifts } = getShiftsForDayEmployee(day, employee.id);
-                                    
-                                    if (shifts.length > 0) {
-                                      setSelectedShift({
-                                        isTimeOff: false,
-                                        startTime: format(new Date(shifts[0].start_time), 'HH:mm'),
-                                        endTime: format(new Date(shifts[0].end_time), 'HH:mm'),
-                                        id: shifts[0].id,
-                                        isSpecific: true,
-                                        formattedStartTime: format(new Date(shifts[0].start_time), 'h:mm a'),
-                                        formattedEndTime: format(new Date(shifts[0].end_time), 'h:mm a'),
-                                        start_time: shifts[0].start_time,
-                                        end_time: shifts[0].end_time
-                                      });
-                                    } else {
-                                      setSelectedShift(null);
-                                    }
-                                    
                                     setSelectedCell({ day, employee });
                                     setShowAddShiftDialog(true);
                                   }}
                                 >
-                                  {shifts.length > 0 ? "Edit specific shift" : "Add specific shift"}
+                                  Add specific shift
                                 </Button>
                                 <Button 
                                   variant="ghost" 
@@ -442,7 +359,6 @@ export function SpecificShifts({
           selectedEmployee={selectedCell.employee}
           employees={[selectedCell.employee]}
           selectedLocation={selectedLocation}
-          existingShift={selectedShift}
         />
       )}
 
