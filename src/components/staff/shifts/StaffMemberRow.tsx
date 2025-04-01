@@ -145,7 +145,7 @@ export function StaffMemberRow({
     setSelectedDay(day);
     setSelectedShift(shift);
     
-    if (shift.isTimeOff) {
+    if (shift && "isTimeOff" in shift && shift.isTimeOff) {
       setSelectedTimeOff(shift);
       setShowAddTimeOffDialog(true);
     } else {
@@ -169,7 +169,7 @@ export function StaffMemberRow({
           description: "Time off request has been deleted",
         });
       } else if (selectedShift) {
-        if (selectedShift.isSpecific) {
+        if ("isSpecific" in selectedShift && selectedShift.isSpecific) {
           // Delete specific shift
           const { error } = await supabase
             .from('shifts')
@@ -182,7 +182,7 @@ export function StaffMemberRow({
             title: "Success",
             description: "Shift has been deleted",
           });
-        } else if (selectedShift.isRecurring) {
+        } else if ("isRecurring" in selectedShift && selectedShift.isRecurring) {
           // For recurring shifts, create an override (specific shift) for this day
           toast({
             title: "Info",
@@ -199,6 +199,65 @@ export function StaffMemberRow({
       toast({
         title: "Error",
         description: "Failed to delete shift",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteAllShifts = async () => {
+    try {
+      // Get all shifts for this employee
+      const { data: shifts, error: shiftsError } = await supabase
+        .from('shifts')
+        .select('id')
+        .eq('employee_id', employee.id)
+        .eq('location_id', selectedLocation);
+      
+      if (shiftsError) throw shiftsError;
+      
+      // Get all time-off requests for this employee
+      const { data: timeOffs, error: timeOffsError } = await supabase
+        .from('time_off_requests')
+        .select('id')
+        .eq('employee_id', employee.id)
+        .eq('location_id', selectedLocation);
+      
+      if (timeOffsError) throw timeOffsError;
+      
+      // Delete all shifts
+      if (shifts && shifts.length > 0) {
+        const shiftIds = shifts.map(shift => shift.id);
+        const { error: deleteShiftsError } = await supabase
+          .from('shifts')
+          .delete()
+          .in('id', shiftIds);
+        
+        if (deleteShiftsError) throw deleteShiftsError;
+      }
+      
+      // Delete all time-off requests
+      if (timeOffs && timeOffs.length > 0) {
+        const timeOffIds = timeOffs.map(timeOff => timeOff.id);
+        const { error: deleteTimeOffsError } = await supabase
+          .from('time_off_requests')
+          .delete()
+          .in('id', timeOffIds);
+        
+        if (deleteTimeOffsError) throw deleteTimeOffsError;
+      }
+      
+      toast({
+        title: "Success",
+        description: "All shifts and time off requests have been deleted",
+      });
+      
+      setConfirmDeleteDialogOpen(false);
+      onDataChange();
+    } catch (error) {
+      console.error('Error deleting all shifts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete shifts",
         variant: "destructive",
       });
     }
@@ -264,7 +323,11 @@ export function StaffMemberRow({
                   <Button 
                     variant="ghost" 
                     className="w-full justify-start text-red-500"
-                    onClick={() => setConfirmDeleteDialogOpen(true)}
+                    onClick={() => {
+                      setSelectedShift(null);
+                      setSelectedTimeOff(null);
+                      setConfirmDeleteDialogOpen(true);
+                    }}
                   >
                     Delete all shifts
                   </Button>
@@ -276,25 +339,36 @@ export function StaffMemberRow({
         
         {weekDays.map((day) => {
           const shifts = getShiftsForDay(day);
+          const hasShifts = shifts.length > 0;
           return (
             <td 
               key={day.toString()} 
               className="p-1 align-top border relative cursor-pointer"
               onMouseEnter={() => setHoveredDay(day as any)}
               onMouseLeave={() => setHoveredDay(null)}
+              onClick={() => {
+                if (hasShifts) {
+                  // When clicking on a cell with shifts, show the dropdown directly
+                  setSelectedDay(day);
+                  setSelectedShift(shifts[0]);
+                  if ("isTimeOff" in shifts[0] && shifts[0].isTimeOff) {
+                    setSelectedTimeOff(shifts[0]);
+                  }
+                }
+              }}
             >
               {/* Cell content (shifts, time off, or empty space) */}
-              {shifts.length > 0 ? (
+              {hasShifts ? (
                 <div className={`p-2 rounded text-center text-sm ${
-                  shifts[0].isTimeOff 
+                  "isTimeOff" in shifts[0] && shifts[0].isTimeOff 
                     ? shifts[0].status === 'approved' 
                       ? 'bg-red-100' 
                       : 'bg-yellow-100'
                     : 'bg-blue-100'
-                }`}>
+                } relative`}>
                   {shifts.map((shift, idx) => (
                     <div key={`${shift.id}-${idx}`}>
-                      {shift.isTimeOff ? (
+                      {"isTimeOff" in shift && shift.isTimeOff ? (
                         <>
                           <span className={`font-medium ${
                             shift.status === 'approved' ? 'text-red-700' : 'text-yellow-700'
@@ -308,29 +382,23 @@ export function StaffMemberRow({
                       ) : (
                         `${shift.formattedStartTime} - ${shift.formattedEndTime}`
                       )}
-                      {shift.isSpecific && !shift.isTimeOff && (
+                      {"isSpecific" in shift && shift.isSpecific && !("isTimeOff" in shift && shift.isTimeOff) && (
                         <span className="text-xs block text-blue-700">(Specific)</span>
                       )}
                     </div>
                   ))}
-                </div>
-              ) : (
-                <div className="h-12" />
-              )}
-              
-              {/* Centered plus button that appears when this day is hovered */}
-              {hoveredDay === day && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="bg-white shadow-sm">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-48" side="bottom">
-                      <div className="flex flex-col space-y-2">
-                        {shifts.length > 0 ? (
-                          <>
+                  
+                  {/* Small plus button at the bottom of cells with content */}
+                  {hoveredDay === day && (
+                    <div className="absolute bottom-0 right-0 p-1">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-5 w-5 p-0 bg-white shadow-sm opacity-80 hover:opacity-100">
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48" side="bottom">
+                          <div className="flex flex-col space-y-2">
                             <Button
                               variant="ghost"
                               className="w-full justify-start"
@@ -344,44 +412,60 @@ export function StaffMemberRow({
                               onClick={() => {
                                 setSelectedDay(day);
                                 setSelectedShift(shifts[0]);
-                                setSelectedTimeOff(shifts[0].isTimeOff ? shifts[0] : null);
+                                setSelectedTimeOff("isTimeOff" in shifts[0] && shifts[0].isTimeOff ? shifts[0] : null);
                                 setConfirmDeleteDialogOpen(true);
                               }}
                             >
                               Delete shift
                             </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                              onClick={() => {
-                                setSelectedDay(day);
-                                setShowAddSpecificShiftDialog(true);
-                              }}
-                            >
-                              Add specific shift
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                              onClick={() => setShowSetRegularShiftDialog(true)}
-                            >
-                              Set regular shifts
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                              onClick={() => {
-                                setSelectedDay(day);
-                                setShowAddTimeOffDialog(true);
-                              }}
-                            >
-                              Add time off
-                            </Button>
-                          </>
-                        )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="h-12" />
+              )}
+              
+              {/* Centered plus button that appears when this day is hovered and there's no content */}
+              {hoveredDay === day && !hasShifts && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="bg-white shadow-sm">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48" side="bottom">
+                      <div className="flex flex-col space-y-2">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            setSelectedDay(day);
+                            setShowAddSpecificShiftDialog(true);
+                          }}
+                        >
+                          Add specific shift
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => setShowSetRegularShiftDialog(true)}
+                        >
+                          Set regular shifts
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            setSelectedDay(day);
+                            setShowAddTimeOffDialog(true);
+                          }}
+                        >
+                          Add time off
+                        </Button>
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -410,7 +494,7 @@ export function StaffMemberRow({
           selectedEmployee={employee}
           employees={[employee]}
           selectedLocation={selectedLocation}
-          existingShift={selectedShift && !selectedShift.isTimeOff ? {
+          existingShift={selectedShift && !("isTimeOff" in selectedShift && selectedShift.isTimeOff) ? {
             startHour: selectedShift.startTime ? selectedShift.startTime.split(':')[0] : '09',
             startMinute: selectedShift.startTime ? selectedShift.startTime.split(':')[1] : '00',
             endHour: selectedShift.endTime ? selectedShift.endTime.split(':')[0] : '17',
@@ -440,12 +524,25 @@ export function StaffMemberRow({
           <DialogHeader>
             <DialogTitle>Confirm deletion</DialogTitle>
           </DialogHeader>
-          <p>Are you sure you want to delete this {selectedTimeOff ? 'time off request' : 'shift'}?</p>
+          {selectedShift || selectedTimeOff ? (
+            <p>Are you sure you want to delete this {selectedTimeOff ? 'time off request' : 'shift'}?</p>
+          ) : (
+            <p>Are you sure you want to delete all shifts and time off for {employee.name}?</p>
+          )}
           <div className="flex justify-end space-x-2 mt-4">
             <Button variant="outline" onClick={() => setConfirmDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteShift}>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                if (selectedShift || selectedTimeOff) {
+                  handleDeleteShift();
+                } else {
+                  handleDeleteAllShifts();
+                }
+              }}
+            >
               Delete
             </Button>
           </div>
