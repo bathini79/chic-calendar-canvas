@@ -69,7 +69,7 @@ export function useAppointmentDetails(appointmentId?: string | null) {
           // Ensure bookings status is typed correctly
           bookings: data.bookings.map((booking: any) => ({
             ...booking,
-            status: booking.status || 'pending'
+            status: booking.status || 'booked'
           }))
         };
         

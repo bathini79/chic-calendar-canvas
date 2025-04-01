@@ -43,7 +43,6 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
       
       // In-progress statuses - amber/warning
       case 'inprogress':
-      case 'pending':
         return {
           label: status === 'inprogress' ? 'In Progress' : 'Pending',
           icon: <Clock className="h-3 w-3 mr-1" />,
@@ -120,7 +119,6 @@ export const getStatusBackgroundColor = (status: AppointmentStatus): string => {
     case 'booked':
       return 'bg-blue-50';
     case 'inprogress':
-    case 'pending':
       return 'bg-amber-50';
     case 'canceled':
     case 'voided':

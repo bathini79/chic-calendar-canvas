@@ -145,7 +145,7 @@ export default function useSaveAppointment({
         
       // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
-        status || (currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending');
+        status || (currentScreen === SCREEN.CHECKOUT ? 'completed' : 'booked');
 
       // If we're updating an existing appointment, first fetch its current data to preserve values
       let existingAppointmentLocation;
@@ -220,7 +220,7 @@ export default function useSaveAppointment({
 
         const serviceStartTime = new Date(startTime);
         const bookingStatus: AppointmentStatus = 
-          currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending';
+          currentScreen === SCREEN.CHECKOUT ? 'completed' : 'booked';
           
         // Use adjusted price if available, otherwise use original price
         const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[serviceId] !== undefined
@@ -269,7 +269,7 @@ export default function useSaveAppointment({
             service_id: packageServiceId,
             package_id: packageId,
             employee_id: selectedStylists[packageServiceId] === 'any' ? null : selectedStylists[packageServiceId],
-            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
+            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'booked',
             start_time: packageServiceStartTime.toISOString(),
             end_time: addMinutes(packageServiceStartTime, packageService.duration).toISOString(),
             price_paid: pricePaid,
@@ -305,7 +305,7 @@ export default function useSaveAppointment({
             service_id: customServiceId,
             package_id: packageId,
             employee_id: selectedStylists[customServiceId] === 'any' ? null : selectedStylists[customServiceId],
-            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'pending',
+            status: currentScreen === SCREEN.CHECKOUT ? 'completed' : 'booked',
             start_time: customServiceStartTime.toISOString(),
             end_time: addMinutes(customServiceStartTime, customService.duration).toISOString(),
             price_paid: pricePaid,

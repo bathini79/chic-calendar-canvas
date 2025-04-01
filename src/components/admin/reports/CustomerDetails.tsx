@@ -508,7 +508,7 @@ export function CustomerDetails({ customerId, onBack }: CustomerDetailsProps) {
                             appointment.status === 'canceled' ? 'destructive' :
                             'secondary'
                           }>
-                            {appointment.status || 'pending'}
+                            {appointment.status || 'booked'}
                           </Badge>
                         </TableCell>
                         <TableCell>{formatPrice(appointment.total_price || 0)}</TableCell>

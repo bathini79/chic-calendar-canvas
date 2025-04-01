@@ -51,7 +51,7 @@ interface AppointmentDetailsDialogProps {
 }
 
 const TERMINAL_STATUSES: AppointmentStatus[] = ['completed', 'refunded', 'partially_refunded', 'voided'];
-const ACTIVE_STATUSES: AppointmentStatus[] = ['pending', 'confirmed', 'inprogress','booked'];
+const ACTIVE_STATUSES: AppointmentStatus[] = [ 'confirmed', 'inprogress','booked'];
 
 const statusMessages = {
   canceled: {
@@ -195,7 +195,7 @@ export function AppointmentDetailsDialog({
     services: [] as typeof appointment.bookings 
   });
 
-  const showCheckoutButton = ['inprogress', 'confirmed', 'pending'].includes(appointment.status);
+  const showCheckoutButton = ['inprogress', 'confirmed', 'booked'].includes(appointment.status);
 
   const selectedMessage = selectedStatus ? statusMessages[selectedStatus as keyof typeof statusMessages] : null;
 
@@ -233,12 +233,6 @@ export function AppointmentDetailsDialog({
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-gray-500" />
                         Booked
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pending">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-gray-500" />
-                        Pending
                       </div>
                     </SelectItem>
                     <SelectItem value="confirmed">

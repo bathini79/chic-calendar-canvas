@@ -53,7 +53,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 }) => {
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
-  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("pending");
+  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("booked");
   const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
   
@@ -106,7 +106,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
     if (existingAppointment) {
       processExistingAppointment(existingAppointment);
-      setAppointmentStatus(existingAppointment.status || "pending");
+      setAppointmentStatus(existingAppointment.status || "booked");
       
       if (existingAppointment.status === "completed" || existingAppointment.status === "refunded" || existingAppointment.status === "partially_refunded") {
         setCurrentScreen(SCREEN.SUMMARY);

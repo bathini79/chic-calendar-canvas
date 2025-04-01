@@ -2324,7 +2324,6 @@ export type Database = {
     }
     Enums: {
       appointment_status:
-        | "pending"
         | "confirmed"
         | "canceled"
         | "completed"
@@ -2335,7 +2334,6 @@ export type Database = {
         | "noshow"
         | "booked"
       booking_status:
-        | "pending"
         | "confirmed"
         | "canceled"
         | "completed"

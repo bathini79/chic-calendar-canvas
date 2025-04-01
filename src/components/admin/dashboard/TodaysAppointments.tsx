@@ -23,7 +23,6 @@ export const TodaysAppointments = ({ locations, todayAppointmentsLocationId, set
   const formatAppointmentStatus = (status) => {
     const styles = {
       confirmed: "px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800",
-      pending: "px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800",
       canceled: "px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800",
       completed: "px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800",
       booked: "px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800"
