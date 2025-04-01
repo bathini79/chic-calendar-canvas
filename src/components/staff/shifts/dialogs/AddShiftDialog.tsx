@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, addMinutes } from 'date-fns';
 import { 
   Dialog, 
@@ -27,6 +27,12 @@ interface AddShiftDialogProps {
   employees: any[];
   locations?: any[];
   selectedLocation?: string;
+  existingShift?: {
+    startHour: string;
+    startMinute: string;
+    endHour: string;
+    endMinute: string;
+  };
 }
 
 export function AddShiftDialog({
@@ -35,16 +41,27 @@ export function AddShiftDialog({
   selectedDate = new Date(),
   selectedEmployee,
   employees,
-  selectedLocation = ''
+  selectedLocation = '',
+  existingShift
 }: AddShiftDialogProps) {
   const [employeeId, setEmployeeId] = useState(selectedEmployee?.id || '');
-  const [startHour, setStartHour] = useState("09");
-  const [startMinute, setStartMinute] = useState("00");
-  const [endHour, setEndHour] = useState("17");
-  const [endMinute, setEndMinute] = useState("00");
+  const [startHour, setStartHour] = useState(existingShift?.startHour || "09");
+  const [startMinute, setStartMinute] = useState(existingShift?.startMinute || "00");
+  const [endHour, setEndHour] = useState(existingShift?.endHour || "17");
+  const [endMinute, setEndMinute] = useState(existingShift?.endMinute || "00");
   const [isSaving, setIsSaving] = useState(false);
   
   const { toast } = useToast();
+  
+  // Update state if existingShift changes
+  useEffect(() => {
+    if (existingShift) {
+      setStartHour(existingShift.startHour);
+      setStartMinute(existingShift.startMinute);
+      setEndHour(existingShift.endHour);
+      setEndMinute(existingShift.endMinute);
+    }
+  }, [existingShift]);
 
   const handleSave = async () => {
     try {
@@ -81,27 +98,54 @@ export function AddShiftDialog({
         return;
       }
       
-      // Save to database
-      const { data, error } = await supabase.from('shifts').insert({
-        employee_id: employeeId,
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        location_id: selectedLocation || null
-      });
+      // Check if there's a specific shift already on this day for this employee
+      const { data: existingShifts } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .gte('start_time', new Date(selectedDate.setHours(0,0,0,0)).toISOString())
+        .lte('start_time', new Date(selectedDate.setHours(23,59,59,999)).toISOString());
       
-      if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: "Shift has been added",
-      });
+      if (existingShifts && existingShifts.length > 0) {
+        // Update existing shift
+        const { data, error } = await supabase
+          .from('shifts')
+          .update({
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            location_id: selectedLocation || null
+          })
+          .eq('id', existingShifts[0].id);
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Shift has been updated",
+        });
+      } else {
+        // Save as new shift
+        const { data, error } = await supabase.from('shifts').insert({
+          employee_id: employeeId,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          location_id: selectedLocation || null
+        });
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Shift has been added",
+        });
+      }
       
       onClose(true); // Pass true to indicate data was changed
     } catch (error) {
-      console.error('Error adding shift:', error);
+      console.error('Error saving shift:', error);
       toast({
         title: "Error",
-        description: "Failed to add shift",
+        description: "Failed to save shift",
         variant: "destructive",
       });
       setIsSaving(false);
@@ -123,7 +167,7 @@ export function AddShiftDialog({
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add specific shift</DialogTitle>
+          <DialogTitle>{existingShift ? 'Edit specific shift' : 'Add specific shift'}</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 py-2">
@@ -139,6 +183,7 @@ export function AddShiftDialog({
             <Select 
               value={employeeId} 
               onValueChange={setEmployeeId}
+              disabled={!!selectedEmployee}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select team member" />
@@ -223,7 +268,7 @@ export function AddShiftDialog({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? 'Saving...' : existingShift ? 'Update' : 'Save'}
           </Button>
         </div>
       </DialogContent>

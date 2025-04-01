@@ -3,12 +3,15 @@ import React from 'react';
 import { format, isSameDay } from 'date-fns';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SetRegularShiftsDialog } from './dialogs/SetRegularShiftsDialog';
 import { AddShiftDialog } from './dialogs/AddShiftDialog';
 import { AddTimeOffDialog } from './dialogs/AddTimeOffDialog';
 import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from '@/integrations/supabase/client';
 
 interface StaffMemberRowProps {
   employee: any;
@@ -36,6 +39,11 @@ export function StaffMemberRow({
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [hoveredDay, setHoveredDay] = useState(null);
+  const [selectedShift, setSelectedShift] = useState<any>(null);
+  const [confirmDeleteDialogOpen, setConfirmDeleteDialogOpen] = useState(false);
+  const [selectedTimeOff, setSelectedTimeOff] = useState<any>(null);
+  
+  const { toast } = useToast();
 
   // Function to format time in 12-hour format with AM/PM
   const formatTimeAMPM = (timeString: string) => {
@@ -71,8 +79,10 @@ export function StaffMemberRow({
       return dayTimeOff.map(timeOff => ({
         isTimeOff: true,
         reason: timeOff.reason || 'Time Off',
-        status: timeOff.status,
-        id: timeOff.id
+        status: timeOff.status || 'pending',
+        id: timeOff.id,
+        start_date: timeOff.start_date,
+        end_date: timeOff.end_date
       }));
     }
     
@@ -89,7 +99,9 @@ export function StaffMemberRow({
         id: shift.id,
         isSpecific: true,
         formattedStartTime: formatTimeAMPM(format(new Date(shift.start_time), 'HH:mm')),
-        formattedEndTime: formatTimeAMPM(format(new Date(shift.end_time), 'HH:mm'))
+        formattedEndTime: formatTimeAMPM(format(new Date(shift.end_time), 'HH:mm')),
+        start_time: shift.start_time,
+        end_time: shift.end_time
       }));
     }
     
@@ -120,10 +132,75 @@ export function StaffMemberRow({
     setShowAddSpecificShiftDialog(false);
     setShowAddTimeOffDialog(false);
     setSelectedDay(null);
+    setSelectedShift(null);
+    setSelectedTimeOff(null);
     
     // If any changes were made, trigger the parent component to refresh the data
     if (shouldRefresh) {
       onDataChange();
+    }
+  };
+  
+  const handleEditShift = (day: Date, shift: any) => {
+    setSelectedDay(day);
+    setSelectedShift(shift);
+    
+    if (shift.isTimeOff) {
+      setSelectedTimeOff(shift);
+      setShowAddTimeOffDialog(true);
+    } else {
+      setShowAddSpecificShiftDialog(true);
+    }
+  };
+  
+  const handleDeleteShift = async () => {
+    try {
+      if (selectedTimeOff) {
+        // Delete time off request
+        const { error } = await supabase
+          .from('time_off_requests')
+          .delete()
+          .eq('id', selectedTimeOff.id);
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Time off request has been deleted",
+        });
+      } else if (selectedShift) {
+        if (selectedShift.isSpecific) {
+          // Delete specific shift
+          const { error } = await supabase
+            .from('shifts')
+            .delete()
+            .eq('id', selectedShift.id);
+            
+          if (error) throw error;
+          
+          toast({
+            title: "Success",
+            description: "Shift has been deleted",
+          });
+        } else if (selectedShift.isRecurring) {
+          // For recurring shifts, create an override (specific shift) for this day
+          toast({
+            title: "Info",
+            description: "To delete a recurring shift pattern, use the 'Set regular shifts' option",
+          });
+          return;
+        }
+      }
+      
+      setConfirmDeleteDialogOpen(false);
+      onDataChange();
+    } catch (error) {
+      console.error('Error deleting shift:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete shift",
+        variant: "destructive",
+      });
     }
   };
 
@@ -183,6 +260,13 @@ export function StaffMemberRow({
                     onClick={() => window.location.href = `/admin/Staff?edit=${employee.id}`}
                   >
                     Edit team member
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start text-red-500"
+                    onClick={() => setConfirmDeleteDialogOpen(true)}
+                  >
+                    Delete all shifts
                   </Button>
                 </div>
               </PopoverContent>
@@ -245,33 +329,59 @@ export function StaffMemberRow({
                     </PopoverTrigger>
                     <PopoverContent className="w-48" side="bottom">
                       <div className="flex flex-col space-y-2">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={() => {
-                            setSelectedDay(day);
-                            setShowAddSpecificShiftDialog(true);
-                          }}
-                        >
-                          Add specific shift
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={() => setShowSetRegularShiftDialog(true)}
-                        >
-                          Set regular shifts
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={() => {
-                            setSelectedDay(day);
-                            setShowAddTimeOffDialog(true);
-                          }}
-                        >
-                          Add time off
-                        </Button>
+                        {shifts.length > 0 ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => handleEditShift(day, shifts[0])}
+                            >
+                              Edit shift
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-red-500"
+                              onClick={() => {
+                                setSelectedDay(day);
+                                setSelectedShift(shifts[0]);
+                                setSelectedTimeOff(shifts[0].isTimeOff ? shifts[0] : null);
+                                setConfirmDeleteDialogOpen(true);
+                              }}
+                            >
+                              Delete shift
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                setSelectedDay(day);
+                                setShowAddSpecificShiftDialog(true);
+                              }}
+                            >
+                              Add specific shift
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => setShowSetRegularShiftDialog(true)}
+                            >
+                              Set regular shifts
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                setSelectedDay(day);
+                                setShowAddTimeOffDialog(true);
+                              }}
+                            >
+                              Add time off
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -300,6 +410,12 @@ export function StaffMemberRow({
           selectedEmployee={employee}
           employees={[employee]}
           selectedLocation={selectedLocation}
+          existingShift={selectedShift && !selectedShift.isTimeOff ? {
+            startHour: selectedShift.startTime ? selectedShift.startTime.split(':')[0] : '09',
+            startMinute: selectedShift.startTime ? selectedShift.startTime.split(':')[1] : '00',
+            endHour: selectedShift.endTime ? selectedShift.endTime.split(':')[0] : '17',
+            endMinute: selectedShift.endTime ? selectedShift.endTime.split(':')[1] : '00',
+          } : undefined}
         />
       )}
 
@@ -310,8 +426,31 @@ export function StaffMemberRow({
           selectedEmployee={employee}
           employees={[employee]}
           selectedLocation={selectedLocation}
+          existingTimeOff={selectedTimeOff ? {
+            start_date: selectedTimeOff.start_date,
+            end_date: selectedTimeOff.end_date,
+            reason: selectedTimeOff.reason,
+            id: selectedTimeOff.id
+          } : undefined}
         />
       )}
+      
+      <Dialog open={confirmDeleteDialogOpen} onOpenChange={setConfirmDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm deletion</DialogTitle>
+          </DialogHeader>
+          <p>Are you sure you want to delete this {selectedTimeOff ? 'time off request' : 'shift'}?</p>
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button variant="outline" onClick={() => setConfirmDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteShift}>
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
