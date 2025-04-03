@@ -62,7 +62,9 @@ export default function ThirdParty() {
         }
 
         if (data) {
-          const settings = JSON.parse(data.settings || "{}");
+          const settings = data.settings ? 
+            (typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings) : {};
+            
           form.setValue("accountSid", settings.accountSid || "");
           form.setValue("authToken", settings.authToken || "");
           form.setValue("phoneNumber", settings.phoneNumber || "");
@@ -104,7 +106,7 @@ export default function ThirdParty() {
         result = await supabase
           .from("system_settings")
           .update({
-            settings: JSON.stringify(settingsObj),
+            settings: settingsObj,
             is_active: data.isActive,
             updated_at: new Date().toISOString(),
           })
@@ -115,7 +117,7 @@ export default function ThirdParty() {
           .from("system_settings")
           .insert({
             category: "twilio",
-            settings: JSON.stringify(settingsObj),
+            settings: settingsObj,
             is_active: data.isActive,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
