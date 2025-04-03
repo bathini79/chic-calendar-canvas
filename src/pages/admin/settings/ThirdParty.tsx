@@ -52,9 +52,9 @@ export default function ThirdParty() {
         setIsLoading(true);
         const { data, error } = await supabase
           .from("system_settings")
-          .select("*")
+          .select()
           .eq("category", "twilio")
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error("Error fetching Twilio config:", error);
@@ -62,8 +62,7 @@ export default function ThirdParty() {
         }
 
         if (data) {
-          const settings = data.settings ? 
-            (typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings) : {};
+          const settings = data.settings || {};
             
           form.setValue("accountSid", settings.accountSid || "");
           form.setValue("authToken", settings.authToken || "");
@@ -97,7 +96,7 @@ export default function ThirdParty() {
         .from("system_settings")
         .select("id")
         .eq("category", "twilio")
-        .single();
+        .maybeSingle();
       
       let result;
       
