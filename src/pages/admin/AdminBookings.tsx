@@ -317,7 +317,7 @@ export default function AdminBookings() {
             onClose={closeAddAppointment}
             selectedDate={appointmentDate}
             selectedTime={appointmentTime}
-            employees={employees}
+            employees={employees.filter(emp => emp.id != "unassigned")}
             existingAppointment={selectedAppointment}
             locationId={selectedLocationId}
             onAppointmentSaved={() => {
