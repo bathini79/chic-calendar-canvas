@@ -155,12 +155,6 @@ export function RegularShifts({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Scheduled shifts</h2>
-        <div className="flex space-x-2">
-          <Button variant="default">
-            Add
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       <div className="flex flex-col md:flex-row justify-between gap-4">
@@ -223,16 +217,7 @@ export function RegularShifts({
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="bg-blue-50 p-4 rounded-lg flex items-start">
-        <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
-        <p className="text-sm">
-          The team roster shows your availability for bookings and is not linked to your business opening hours.
-          To set your opening hours, <a href="#" className="text-blue-500">click here</a>.
-        </p>
-      </div>
-      
+      </div>      
       {/* Mobile add button */}
       <Button className="fixed bottom-4 right-4 md:hidden rounded-full h-14 w-14 flex items-center justify-center shadow-lg" size="icon">
         <Plus className="h-6 w-6" />

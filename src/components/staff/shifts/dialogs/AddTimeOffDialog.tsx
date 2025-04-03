@@ -15,7 +15,6 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; 
@@ -23,6 +22,9 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { SelectItemProps } from '@radix-ui/react-select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 
 interface AddTimeOffDialogProps {
   isOpen: boolean;
@@ -50,13 +52,25 @@ export function AddTimeOffDialog({
   const [startDate, setStartDate] = useState<Date | undefined>(
     existingTimeOff ? new Date(existingTimeOff.start_date) : new Date()
   );
+  console.log("selectedEmployee",selectedEmployee)
   const [endDate, setEndDate] = useState<Date | undefined>(
-    existingTimeOff ? new Date(existingTimeOff.end_date) : new Date()
+    existingTimeOff ? new Date(existingTimeOff.end_date) : new Date(),
   );
-  const [reason, setReason] = useState(existingTimeOff?.reason || '');
+  const [reason, setReason] = useState<string>(existingTimeOff?.reason || 'Vacation');
+  const [reasonText, setReasonText] = useState<string>(existingTimeOff?.reason || 'Vacation')
+  const [approved, setApproved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
   const { toast } = useToast();
+
+  const reasonOptions: { label: string, value: string }[] = [
+    { label: "Vacation", value: "Vacation" },
+    { label: "Sick Leave", value: "Sick Leave" },
+    { label: "Personal Day", value: "Personal Day" },
+    { label: "Other", value: "Other" },
+  ];
+
+
   
   // Update form if existingTimeOff changes
   useEffect(() => {
@@ -66,6 +80,14 @@ export function AddTimeOffDialog({
       setReason(existingTimeOff.reason);
     }
   }, [existingTimeOff]);
+
+  useEffect(() => {
+    if (reason !== "Other") {
+      setReasonText(reason);
+    }
+  }, [reason]);
+
+  const showReasonInput = reason === "Other";
 
   const handleSave = async () => {
     try {
@@ -107,7 +129,7 @@ export function AddTimeOffDialog({
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
         reason: reason || 'Time Off',
-        status: 'pending',
+        status: approved ? 'approved' : 'pending',
         location_id: selectedLocation || null
       };
       
@@ -155,31 +177,11 @@ export function AddTimeOffDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            {existingTimeOff ? 'Edit time off request' : 'Add time off request'}
+            {existingTimeOff ? `Edit time off request for ${selectedEmployee?.name}` : `Add time off request for ${selectedEmployee?.name}`}
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 py-2">
-          <div>
-            <Label htmlFor="employee">Team member</Label>
-            <Select 
-              value={employeeId} 
-              onValueChange={setEmployeeId}
-              disabled={!!selectedEmployee}
-            >
-              <SelectTrigger id="employee">
-                <SelectValue placeholder="Select team member" />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>
-                    {employee.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>Start date</Label>
@@ -234,14 +236,47 @@ export function AddTimeOffDialog({
             </div>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="reason">Reason (optional)</Label>
-            <Input 
-              id="reason" 
-              value={reason} 
-              onChange={(e) => setReason(e.target.value)} 
-              placeholder="Enter reason for time off"
+           <div className="space-y-2">
+            <Label>Reason</Label>
+            <div className='flex items-center space-x-4'>
+              <Select onValueChange={value => {
+                setReason(value)
+                setReasonText(value)
+                }}>
+                <SelectTrigger className='w-[180px]'>
+                  <SelectValue placeholder='Select a reason' />
+                </SelectTrigger>
+                <SelectContent>
+                  {reasonOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value} >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {showReasonInput && (
+                <Input
+                  type="text"
+                  value={reasonText}
+                  onChange={(e) => setReasonText(e.target.value)}
+                  placeholder="Enter reason"
+                  className="w-full"
+                />
+                )}
+              
+
+            </div>
+          </div>
+
+          <div className='flex items-center space-x-2'>
+            <Checkbox
+              id="approved"
+              checked={approved}
+              onCheckedChange={setApproved}
             />
+            <label htmlFor="approved" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              Approved
+            </label>
           </div>
         </div>
         
