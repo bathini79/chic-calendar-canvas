@@ -2,7 +2,7 @@
 import React from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { SettingsIcon, Globe, Tag, Building, Users, FileText, CreditCard, Gift, Award } from "lucide-react";
+import { SettingsIcon, Globe, Tag, Building, Users, FileText, CreditCard, Gift, Award, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function Settings() {
@@ -35,6 +35,22 @@ export default function Settings() {
                 <h3 className="text-base md:text-lg font-semibold">Business setup</h3>
                 <p className="text-xs md:text-sm text-muted-foreground">
                   Customize business details, manage locations, and client referral sources.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/admin/settings/third-party">
+          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="pt-4 md:pt-6">
+              <div className="flex flex-col h-full">
+                <div className="mb-3 md:mb-4">
+                  <Phone className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+                </div>
+                <h3 className="text-base md:text-lg font-semibold">Third party configuration</h3>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Configure Twilio and other third-party integrations.
                 </p>
               </div>
             </CardContent>
