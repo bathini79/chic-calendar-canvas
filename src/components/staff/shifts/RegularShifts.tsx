@@ -156,10 +156,6 @@ export function RegularShifts({
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Scheduled shifts</h2>
         <div className="flex space-x-2">
-          <Button variant="outline" className="hidden md:flex">
-            Options
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
           <Button variant="default">
             Add
             <ChevronRight className="ml-2 h-4 w-4" />
@@ -201,7 +197,6 @@ export function RegularShifts({
               {weekDays.map((day) => (
                 <th key={day.toString()} className="text-center px-4 py-2">
                   <div>{format(day, 'EEE, d MMM')}</div>
-                  <div className="text-xs text-gray-500">{calculateHours(day, specificShifts)}h</div>
                 </th>
               ))}
             </tr>

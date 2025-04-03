@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { format, isSameDay } from 'date-fns';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -38,7 +37,9 @@ export function StaffMemberRow({
   const [showAddSpecificShiftDialog, setShowAddSpecificShiftDialog] = useState(false);
   const [showAddTimeOffDialog, setShowAddTimeOffDialog] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const [hoveredDay, setHoveredDay] = useState(null);
+  const [hoveredDay, setHoveredDay] = useState<Date | null>(null);
+  const [showCellPopover, setShowCellPopover] = useState(false);
+  const [showAddPopover, setShowAddPopover] = useState(false);
   const [selectedShift, setSelectedShift] = useState<any>(null);
   const [confirmDeleteDialogOpen, setConfirmDeleteDialogOpen] = useState(false);
   const [selectedTimeOff, setSelectedTimeOff] = useState<any>(null);
@@ -340,25 +341,29 @@ export function StaffMemberRow({
         {weekDays.map((day) => {
           const shifts = getShiftsForDay(day);
           const hasShifts = shifts.length > 0;
+          const isDayHovered = hoveredDay && isSameDay(hoveredDay, day);
+          
           return (
             <td 
               key={day.toString()} 
               className="p-1 align-top border relative cursor-pointer"
-              onMouseEnter={() => setHoveredDay(day as any)}
+              onMouseEnter={() => setHoveredDay(day)}
               onMouseLeave={() => setHoveredDay(null)}
               onClick={() => {
                 if (hasShifts) {
-                  // When clicking on a cell with shifts, show the dropdown directly
+                  // When clicking on a cell with shifts, show the popover
                   setSelectedDay(day);
                   setSelectedShift(shifts[0]);
                   if ("isTimeOff" in shifts[0] && shifts[0].isTimeOff) {
                     setSelectedTimeOff(shifts[0]);
                   }
+                  setShowCellPopover(!showCellPopover); // Toggle the popover
                 }
               }}
             >
               {/* Cell content (shifts, time off, or empty space) */}
               {hasShifts ? (
+                <> 
                 <div className={`p-2 rounded text-center text-sm ${
                   "isTimeOff" in shifts[0] && shifts[0].isTimeOff 
                     ? shifts[0].status === 'approved' 
@@ -373,9 +378,7 @@ export function StaffMemberRow({
                           <span className={`font-medium ${
                             shift.status === 'approved' ? 'text-red-700' : 'text-yellow-700'
                           }`}>
-                            {shift.reason}
-                          </span>
-                          <span className="text-xs block">
+                            {shift.reason} 
                             ({shift.status === 'approved' ? 'Approved' : 'Pending'})
                           </span>
                         </>
@@ -387,14 +390,38 @@ export function StaffMemberRow({
                       )}
                     </div>
                   ))}
+                </div>
                   
-                  {/* Small plus button at the bottom of cells with content */}
-                  {hoveredDay === day && (
-                    <div className="absolute bottom-0 right-0 p-1">
-                      <Popover>
+                  {/* Small plus button at the bottom of cells with content - only shown when cell is hovered */}
+                  {isDayHovered && (
+                    <div className={`mt-1 p-2 rounded text-center text-sm ${ 
+                  "isTimeOff" in shifts[0] && shifts[0].isTimeOff 
+                    ? shifts[0].status === 'approved' 
+                      ? 'bg-red-100' 
+                      : 'bg-yellow-100'
+                    : 'bg-blue-100'
+                } relative`}>
+                      <Popover
+                        open={selectedDay && isSameDay(selectedDay, day) && showAddPopover}
+                        onOpenChange={(open) => {
+                          if (open) {
+                            setSelectedDay(day);
+                          }
+                          setShowAddPopover(open);
+                        }}
+                      >
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-5 w-5 p-0 bg-white shadow-sm opacity-80 hover:opacity-100">
-                            <Plus className="h-3 w-3" />
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-4 w-4 p-0 rounded-full bg-white shadow-sm hover:bg-gray-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDay(day);
+                              setShowAddPopover(true);
+                            }}
+                          >
+                            <Plus className="h-2 w-2" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-48" side="bottom">
@@ -402,73 +429,125 @@ export function StaffMemberRow({
                             <Button
                               variant="ghost"
                               className="w-full justify-start"
-                              onClick={() => handleEditShift(day, shifts[0])}
+                              onClick={() => {
+                                setSelectedDay(day);
+                                setShowAddSpecificShiftDialog(true);
+                                setShowAddPopover(false);
+                              }}
                             >
-                              Edit shift
+                              Add specific shift
                             </Button>
                             <Button
                               variant="ghost"
-                              className="w-full justify-start text-red-500"
+                              className="w-full justify-start"
                               onClick={() => {
-                                setSelectedDay(day);
-                                setSelectedShift(shifts[0]);
-                                setSelectedTimeOff("isTimeOff" in shifts[0] && shifts[0].isTimeOff ? shifts[0] : null);
-                                setConfirmDeleteDialogOpen(true);
+                                setShowSetRegularShiftDialog(true);
+                                setShowAddPopover(false);
                               }}
                             >
-                              Delete shift
+                              Set regular shifts
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                setSelectedDay(day);
+                                setShowAddTimeOffDialog(true);
+                                setShowAddPopover(false);
+                              }}
+                            >
+                              Add time off
                             </Button>
                           </div>
                         </PopoverContent>
                       </Popover>
                     </div>
                   )}
-                </div>
+                  
+                  {/* Edit/Delete popover when cell is clicked */}
+                  {selectedDay && isSameDay(selectedDay, day) && showCellPopover && (
+                    <Popover 
+                      open={showCellPopover} 
+                      onOpenChange={setShowCellPopover}
+                    >
+                      <PopoverTrigger asChild>
+                        <div className="absolute inset-0 cursor-pointer" />
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48" side="bottom">
+                        <div className="flex flex-col space-y-2">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              handleEditShift(day, shifts[0]);
+                              setShowCellPopover(false);
+                            }}
+                          >
+                            Edit shift
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-red-500"
+                            onClick={() => {
+                              setSelectedDay(day);
+                              setSelectedShift(shifts[0]);
+                              setSelectedTimeOff("isTimeOff" in shifts[0] && shifts[0].isTimeOff ? shifts[0] : null);
+                              setConfirmDeleteDialogOpen(true);
+                              setShowCellPopover(false);
+                            }}
+                          >
+                            Delete shift
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </>
               ) : (
-                <div className="h-12" />
-              )}
-              
-              {/* Centered plus button that appears when this day is hovered and there's no content */}
-              {hoveredDay === day && !hasShifts && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="bg-white shadow-sm">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-48" side="bottom">
-                      <div className="flex flex-col space-y-2">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={() => {
-                            setSelectedDay(day);
-                            setShowAddSpecificShiftDialog(true);
-                          }}
-                        >
-                          Add specific shift
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={() => setShowSetRegularShiftDialog(true)}
-                        >
-                          Set regular shifts
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          onClick={() => {
-                            setSelectedDay(day);
-                            setShowAddTimeOffDialog(true);
-                          }}
-                        >
-                          Add time off
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                <div className="h-12 relative">
+                  {/* Centered plus button that appears when empty cell is hovered */}
+                  {isDayHovered && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="bg-white shadow-sm">
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48" side="bottom">
+                          <div className="flex flex-col space-y-2">
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                setSelectedDay(day);
+                                setShowAddSpecificShiftDialog(true);
+                              }}
+                            >
+                              Add specific shift
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => setShowSetRegularShiftDialog(true)}
+                            >
+                              Set regular shifts
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                setSelectedDay(day);
+                                setShowAddTimeOffDialog(true);
+                              }}
+                            >
+                              Add time off
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
                 </div>
               )}
             </td>
