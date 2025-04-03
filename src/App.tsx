@@ -18,10 +18,9 @@ import Auth from "./pages/Auth";
 import UnifiedScheduling from "./pages/customer/UnifiedScheduling";
 import BookingConfirmation from "./pages/customer/BookingConfirmation";
 import AdminBookings from "./pages/admin/AdminBookings";
-import Settings from "./pages/admin/settings/Settings";
+import Settings from "./pages/admin/Settings";
 import BusinessSetup from "./pages/admin/settings/BusinessSetup";
 import Sales from "./pages/admin/settings/Sales";
-import ThirdParty from "./pages/admin/settings/ThirdParty";
 import Reports from "./pages/admin/Reports";
 
 // Import DnD
@@ -77,7 +76,6 @@ export default function App() {
             <Route path="settings/business-setup/*" element={<BusinessSetup />} />
             <Route path="settings/sales" element={<Sales />} />
             <Route path="settings/sales/*" element={<Sales />} />
-            <Route path="settings/third-party" element={<ThirdParty />} />
           </Route>
         </Routes>
       </DndProvider>
