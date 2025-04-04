@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, Routes, Route, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -49,24 +50,20 @@ export default function ThirdParty() {
     const fetchTwilioConfig = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from("system_settings")
-          .select()
-          .eq("category", "twilio")
-          .maybeSingle();
-
+        
+        // Use the edge function to get Twilio config
+        const { data, error } = await supabase.functions.invoke("get-twilio-config");
+        
         if (error) {
           console.error("Error fetching Twilio config:", error);
           return;
         }
 
         if (data) {
-          const settings = data.settings || {};
-            
-          form.setValue("accountSid", settings.accountSid || "");
-          form.setValue("authToken", settings.authToken || "");
-          form.setValue("phoneNumber", settings.phoneNumber || "");
-          form.setValue("isActive", data.is_active || false);
+          form.setValue("accountSid", data.accountSid || "");
+          form.setValue("authToken", data.authToken || "");
+          form.setValue("phoneNumber", data.phoneNumber || "");
+          form.setValue("isActive", data.isActive || false);
         }
       } catch (error) {
         console.error("Error parsing Twilio config:", error);
