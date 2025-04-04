@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, Routes, Route, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -153,8 +152,12 @@ export default function ThirdParty() {
       
       const config = form.getValues();
       
+      // Check if we have required values before making test call
+      if (!config.accountSid || !config.authToken || !config.phoneNumber) {
+        throw new Error("Please fill in all required Twilio credentials");
+      }
+      
       // Call the send-whatsapp-otp function to test the connection
-      // This is a simplified test - we're just making sure the function runs without errors
       const { data, error } = await supabase.functions.invoke("send-whatsapp-otp", {
         body: { phoneNumber: config.phoneNumber },
       });
