@@ -23,9 +23,10 @@ serve(async (req) => {
     )
 
     // Verify admin role - only admins should be able to access this
-    const { data: { user } } = await supabaseClient.auth.getUser()
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     
-    if (!user) {
+    if (authError || !user) {
+      console.error("Authentication error:", authError);
       throw new Error('User not authenticated')
     }
     
@@ -34,9 +35,15 @@ serve(async (req) => {
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
       
-    if (profileError || !profileData || !['admin', 'superadmin'].includes(profileData.role)) {
+    if (profileError) {
+      console.error("Profile lookup error:", profileError);
+      throw new Error(`Failed to retrieve user profile: ${profileError.message}`)
+    }
+    
+    if (!profileData || !['admin', 'superadmin'].includes(profileData.role)) {
+      console.error("Unauthorized access attempt by:", user.id, "with role:", profileData?.role);
       throw new Error('Unauthorized: Admin access required')
     }
     
@@ -48,6 +55,7 @@ serve(async (req) => {
       .maybeSingle()
     
     if (error) {
+      console.error("Database error:", error);
       throw new Error(`Failed to retrieve Twilio configuration: ${error.message}`)
     }
     

@@ -34,6 +34,7 @@ export default function ThirdParty() {
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<TwilioConfig>({
@@ -50,12 +51,19 @@ export default function ThirdParty() {
     const fetchTwilioConfig = async () => {
       try {
         setIsLoading(true);
+        setAuthError(null);
         
         // Use the edge function to get Twilio config
         const { data, error } = await supabase.functions.invoke("get-twilio-config");
         
         if (error) {
           console.error("Error fetching Twilio config:", error);
+          
+          // Check if it's an authentication error
+          if (error.message?.includes("not authenticated") || error.message?.includes("Unauthorized")) {
+            setAuthError("Authentication error: You need to be logged in as an admin to access this page.");
+          }
+          
           return;
         }
 
@@ -178,6 +186,42 @@ export default function ThirdParty() {
       setIsTesting(false);
     }
   };
+
+  // Display auth error if user is not authenticated or not an admin
+  if (authError) {
+    return (
+      <div className="container py-6 max-w-6xl">
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" size="sm" asChild className="mr-2">
+            <Link to="/admin/settings">
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back
+            </Link>
+          </Button>
+          <div className="text-sm text-muted-foreground">
+            Workspace settings • Third party configuration
+          </div>
+        </div>
+
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Authorization Required</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                {authError}
+              </AlertDescription>
+            </Alert>
+            <p className="mt-4">
+              Please ensure you are logged in with an admin account to access this page.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container py-6 max-w-6xl">
