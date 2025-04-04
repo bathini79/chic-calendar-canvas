@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,63 +13,143 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
-// Optional fallback Spinner
-const Spinner = () => (
-  <div className="flex justify-center py-6">
-    <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-  </div>
-);
-
-interface TwilioAccountDetails {
-  balance: string;
-  currency: string;
-  status: string;
-  account_type: string;
-  total_messages_sent: number;
-  last_billing_amount: string;
-  last_billing_start: string;
-  last_billing_end: string;
-  next_billing_date: string;
-  billing_url: string;
+interface TwilioConfig {
+  accountSid: string;
+  authToken: string;
+  phoneNumber: string;
+  isActive: boolean;
 }
 
 export default function ThirdParty() {
   const [isLoading, setIsLoading] = useState(true);
-  const [accountDetails, setAccountDetails] =
-    useState<TwilioAccountDetails | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [twilioConfig, setTwilioConfig] = useState<TwilioConfig>({
+    accountSid: '',
+    authToken: '',
+    phoneNumber: '',
+    isActive: false
+  });
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [activeSection, setActiveSection] = useState<string>("twilio");
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchTwilioAccountDetails = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
+    fetchTwilioConfig();
+  }, []);
 
-        const { data, error } = await supabase.functions.invoke(
-          "get-twilio-config"
+  const fetchTwilioConfig = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase.functions.invoke(
+        "get-twilio-config"
+      );
+
+      if (error) {
+        console.error("Error fetching Twilio config:", error);
+        setError(error.message || "Failed to fetch Twilio configuration");
+        throw new Error(error.message);
+      }
+
+      if (data) {
+        setTwilioConfig(data);
+      }
+    } catch (error: any) {
+      console.error("Error fetching Twilio config:", error);
+      setError("Failed to fetch Twilio configuration. Please ensure you have admin access.");
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveTwilioConfig = async () => {
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      // Update Twilio configuration in the system_settings table
+      const { data, error } = await supabase
+        .from('system_settings')
+        .upsert(
+          {
+            category: 'twilio',
+            settings: {
+              accountSid: twilioConfig.accountSid,
+              authToken: twilioConfig.authToken,
+              phoneNumber: twilioConfig.phoneNumber
+            },
+            is_active: twilioConfig.isActive
+          },
+          { onConflict: 'category' }
         );
 
-        if (error) throw new Error(error.message);
-
-        if (data) setAccountDetails(data);
-      } catch (error: any) {
-        console.error("Error fetching Twilio account details:", error);
-        setError("Failed to fetch Twilio account details. Please try again later.");
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+      if (error) {
+        console.error("Error saving Twilio config:", error);
+        setError(error.message || "Failed to save Twilio configuration");
+        throw error;
       }
-    };
 
-    fetchTwilioAccountDetails();
-  }, [toast]);
+      toast({
+        title: "Success",
+        description: "Twilio configuration saved successfully",
+      });
+      
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error("Error saving Twilio config:", error);
+      setError("Failed to save Twilio configuration");
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTwilioConfigChange = (field: keyof TwilioConfig, value: string | boolean) => {
+    setTwilioConfig({
+      ...twilioConfig,
+      [field]: value
+    });
+  };
+
+  const testWhatsAppConnection = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "send-whatsapp-otp",
+        {
+          body: { phoneNumber: twilioConfig.phoneNumber }
+        }
+      );
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "WhatsApp test message sent successfully"
+      });
+    } catch (error: any) {
+      console.error("Error testing WhatsApp connection:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send test message",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <div className="container py-6 max-w-6xl">
@@ -116,92 +197,112 @@ export default function ThirdParty() {
         <div className="md:col-span-3">
           {activeSection === "twilio" && (
             <Card>
-              <CardHeader>
-                <CardTitle>Twilio Account Details</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle>Twilio WhatsApp Configuration</CardTitle>
+                <div className="flex space-x-2">
+                  {!isEditing ? (
+                    <Button variant="outline" onClick={() => setIsEditing(true)}>
+                      Edit
+                    </Button>
+                  ) : (
+                    <>
+                      <Button variant="outline" onClick={() => setIsEditing(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={saveTwilioConfig} disabled={isSaving}>
+                        {isSaving ? "Saving..." : "Save"}
+                      </Button>
+                    </>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
+                {error && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
                 {isLoading ? (
                   <>
                     <Skeleton className="h-10 w-full mb-4 rounded-md" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[...Array(6)].map((_, i) => (
+                    <div className="grid grid-cols-1 gap-4">
+                      {[...Array(4)].map((_, i) => (
                         <Skeleton key={i} className="h-16 rounded-md" />
                       ))}
                     </div>
-                    <Skeleton className="h-8 w-40 mt-6" />
-                    <Spinner />
                   </>
-                ) : error ? (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                ) : accountDetails ? (
-                  <div className="space-y-6">
-                    {/* Status at top */}
-                    <div className="flex items-center space-x-2">
-                      <p className="text-sm font-medium">Status:</p>
-                      <p className="text-xs text-green-700 font-semibold">
-                      {accountDetails.status}
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Label htmlFor="twilio-active">Active</Label>
+                        <Switch
+                          id="twilio-active"
+                          checked={twilioConfig.isActive}
+                          onCheckedChange={(checked) => handleTwilioConfigChange('isActive', checked)}
+                          disabled={!isEditing}
+                        />
+                      </div>
+                      
+                      {twilioConfig.isActive && twilioConfig.accountSid && twilioConfig.authToken && twilioConfig.phoneNumber && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={testWhatsAppConnection}
+                          disabled={isSaving || isEditing}
+                        >
+                          Test Connection
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="account-sid">Account SID</Label>
+                      <Input
+                        id="account-sid"
+                        value={twilioConfig.accountSid}
+                        onChange={(e) => handleTwilioConfigChange('accountSid', e.target.value)}
+                        disabled={!isEditing}
+                        type={isEditing ? "text" : "password"}
+                        placeholder="Enter Twilio Account SID"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="auth-token">Auth Token</Label>
+                      <Input
+                        id="auth-token"
+                        value={twilioConfig.authToken}
+                        onChange={(e) => handleTwilioConfigChange('authToken', e.target.value)}
+                        disabled={!isEditing}
+                        type={isEditing ? "text" : "password"}
+                        placeholder="Enter Twilio Auth Token"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phone-number">WhatsApp Phone Number</Label>
+                      <Input
+                        id="phone-number"
+                        value={twilioConfig.phoneNumber}
+                        onChange={(e) => handleTwilioConfigChange('phoneNumber', e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Enter Twilio Phone Number (with country code)"
+                      />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Enter the phone number in E.164 format (e.g., +1234567890)
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Balance</p>
-                        <p className="font-medium">
-                          {accountDetails.balance} {accountDetails.currency}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Account Type</p>
-                        <p className="font-medium">{accountDetails.account_type}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Messages Sent</p>
-                        <p className="font-medium">
-                          {accountDetails.total_messages_sent}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Last Billing Amount
-                        </p>
-                        <p className="font-medium">
-                          {accountDetails.last_billing_amount}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Last Billing Period
-                        </p>
-                        <p className="font-medium">
-                          {accountDetails.last_billing_start} →{" "}
-                          {accountDetails.last_billing_end}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Next Billing Date
-                        </p>
-                        <p className="font-medium">
-                          {accountDetails.next_billing_date}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <a
-                        href={accountDetails.billing_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block mt-2 text-sm font-medium text-blue-600 hover:underline"
-                      >
-                        View Billing Details
-                      </a>
-                    </div>
+                    {twilioConfig.isActive && twilioConfig.accountSid && (
+                      <Alert className="mt-4">
+                        <AlertDescription>
+                          Twilio WhatsApp integration is active. The system will send appointment notifications via WhatsApp.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
-                ) : (
-                  <p>No account details available.</p>
                 )}
               </CardContent>
             </Card>
