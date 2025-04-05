@@ -47,6 +47,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTaxRates } from "@/hooks/use-tax-rates";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { cwd } from "process";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -658,50 +659,52 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                         </div>
                       </div>
                       {item.type === "package" && item.services && item.services.length > 0 && (
-                        <details className="group">
-                          <summary className="cursor-pointer py-2 text-sm font-medium text-muted-foreground hover:text-primary">
-                            View Package Details
-                          </summary>
-                          <div className="mt-2 space-y-2">
-                            {item.services.map(service => (
-                              <div key={service.id} className="py-1 border-b border-gray-200">
-                                <div className="flex justify-between">
-                                  <div>
-                                    <p className="text-sm font-medium">
-                                      {service.name}
-                                      {service.isCustomized && (
-                                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                                          Added
+                        <Accordion type="single" collapsible>
+                          <AccordionItem value="package-details">
+                            <AccordionTrigger className="text-sm font-medium text-muted-foreground hover:text-primary">
+                              View Package Details
+                            </AccordionTrigger>
+                            <AccordionContent className="mt-2 space-y-4 pl-4 border-l-2 border-gray-200">
+                              {item.services.map(service => (
+                                <div key={service.id} className="py-2">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <p className="text-sm font-medium">
+                                        {service.name}
+                                        {service.isCustomized && (
+                                          <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                            Added
+                                          </span>
+                                        )}
+                                      </p>
+                                      <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
+                                        <span>{formatDuration(service.duration)}</span>
+                                        {service.stylistName && (
+                                          <div className="flex items-center">
+                                            <User className="mr-1 h-3 w-3" />
+                                            {service.stylistName}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="text-sm flex flex-col items-end">
+                                      {service.price !== service.adjustedPrice && (
+                                        <span className="text-xs line-through text-muted-foreground">
+                                          <IndianRupee className="inline h-3 w-3" />
+                                          {service.price.toFixed(2)}
                                         </span>
                                       )}
-                                    </p>
-                                    <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
-                                      <span>{formatDuration(service.duration)}</span>
-                                      {service.stylistName && (
-                                        <div className="flex items-center">
-                                          <User className="mr-1 h-3 w-3" />
-                                          {service.stylistName}
-                                        </div>
-                                      )}
+                                      <span className={service.price !== service.adjustedPrice ? "text-green-600" : ""}>
+                                        <IndianRupee className="inline h-3 w-3" />
+                                        {service.adjustedPrice.toFixed(2)}
+                                      </span>
                                     </div>
                                   </div>
-                                  <div className="text-sm flex flex-col items-end">
-                                    {service.price !== service.adjustedPrice && (
-                                      <span className="text-xs line-through text-muted-foreground">
-                                        <IndianRupee className="inline h-3 w-3" />
-                                        {service.price.toFixed(2)}
-                                      </span>
-                                    )}
-                                    <span className={service.price !== service.adjustedPrice ? "text-green-600" : ""}>
-                                      <IndianRupee className="inline h-3 w-3" />
-                                      {service.adjustedPrice.toFixed(2)}
-                                    </span>
-                                  </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        </details>
+                              ))}
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
                       )}
                     </div>
                   )
