@@ -18,8 +18,8 @@ serve(async (req) => {
     // Parse request body
     const { email, phone, password, employeeId, name } = await req.json()
     
-    if (!email || !phone || !password || !employeeId) {
-      throw new Error('Email, phone, password and employee ID are required')
+    if (!phone || !password || !employeeId) {
+      throw new Error('Phone, password and employee ID are required')
     }
     
     // Create Supabase client with admin privileges
@@ -30,7 +30,7 @@ serve(async (req) => {
     
     // Create user in auth
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: email || undefined,
       phone,
       password,
       email_confirm: true,

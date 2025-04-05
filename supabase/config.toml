@@ -96,4 +96,3 @@ verify_jwt = true
 verify_jwt = true
 [functions.handle-whatsapp-webhook]
 verify_jwt = false
-

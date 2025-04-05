@@ -60,6 +60,7 @@ serve(async (req) => {
   }
 
   try {
+    // Check if Twilio credentials are available
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
       console.error('Twilio credentials missing:', {
         ACCOUNT_SID_EXISTS: !!TWILIO_ACCOUNT_SID,
@@ -79,13 +80,25 @@ serve(async (req) => {
     // Generate OTP
     const otp = generateOTP()
     
-    // Store OTP in database for verification
+    // Create Supabase client with admin privileges
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') as string,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
     )
       
-    // First, delete any existing OTP for this employee
+    // First, check if the employee exists
+    const { data: employeeData, error: employeeError } = await supabaseClient
+      .from('employees')
+      .select('id, name')
+      .eq('id', employeeId)
+      .single()
+    
+    if (employeeError || !employeeData) {
+      console.error('Employee not found:', employeeError)
+      throw new Error('Employee not found with the provided ID')
+    }
+    
+    // Delete any existing OTP for this employee
     await supabaseClient
       .from('employee_verification_codes')
       .delete()
@@ -95,22 +108,21 @@ serve(async (req) => {
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 1)
     
-    const { error } = await supabaseClient
+    const { error: insertError } = await supabaseClient
       .from('employee_verification_codes')
       .insert({
         employee_id: employeeId,
         code: otp,
-        expires_at: expiresAt.toISOString(),
-        created_at: new Date().toISOString()
+        expires_at: expiresAt.toISOString()
       })
       
-    if (error) {
-      console.error('Error storing OTP in database:', error)
-      throw new Error(`Failed to store OTP: ${error.message}`)
+    if (insertError) {
+      console.error('Error storing OTP in database:', insertError)
+      throw new Error(`Failed to store OTP: ${insertError.message}`)
     }
     
     // Send OTP via WhatsApp
-    await sendWhatsAppOTP(phoneNumber, otp, name)
+    await sendWhatsAppOTP(phoneNumber, otp, name || employeeData.name)
     
     return new Response(
       JSON.stringify({ 

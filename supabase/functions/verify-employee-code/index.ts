@@ -41,7 +41,7 @@ serve(async (req) => {
     
     const employeeId = employeeData.id
     
-    // Verify OTP from database
+    // Verify code from database
     const { data: otpData, error: otpError } = await supabaseAdmin
       .from('employee_verification_codes')
       .select('*')
@@ -53,7 +53,7 @@ serve(async (req) => {
       throw new Error('Invalid verification code')
     }
     
-    // Check if OTP has expired
+    // Check if code has expired
     const expiresAt = new Date(otpData.expires_at)
     const currentTime = new Date()
     
@@ -84,7 +84,7 @@ serve(async (req) => {
         .eq('phone_number', phoneNumber)
     }
     
-    // Delete the used OTP
+    // Delete the used verification code
     await supabaseAdmin
       .from('employee_verification_codes')
       .delete()
@@ -117,7 +117,7 @@ serve(async (req) => {
           ...corsHeaders, 
           'Content-Type': 'application/json' 
         },
-        status: 200
+        status: 200 
       }
     )
   }
