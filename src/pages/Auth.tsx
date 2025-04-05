@@ -269,6 +269,22 @@ const Auth = () => {
           
           console.log("Sign in successful, session created:", data.session);
           
+          // Update profile phone number directly as a fallback
+          if (data.user) {
+            try {
+              const { error: profileError } = await supabase
+                .from('profiles')
+                .update({ phone_number: fullPhoneNumber })
+                .eq('id', data.user.id);
+                
+              if (profileError) {
+                console.error("Error updating profile phone:", profileError);
+              }
+            } catch (updateError) {
+              console.error("Profile update error:", updateError);
+            }
+          }
+          
           // Session will be handled by the auth state change listener
           toast.success(response.data.isNewUser ? 
             "Registration successful! Welcome!" : 

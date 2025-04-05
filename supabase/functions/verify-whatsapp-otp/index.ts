@@ -21,6 +21,8 @@ serve(async (req) => {
       throw new Error('Phone number and verification code are required')
     }
     
+    console.log("Request received:", { phoneNumber, code, fullName, lead_source });
+    
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -76,13 +78,13 @@ serve(async (req) => {
       )
     }
     
-    // Step 2: Check if user exists
+    // Step 2: Check if user exists by phone number
     let existingUserQuery = supabaseAdmin
       .from('profiles')
       .select('id')
       .eq('phone_number', phoneNumber);
     
-    const { data: existingUser, error: userError } = await existingUserQuery.single();
+    const { data: existingUser, error: userError } = await existingUserQuery.maybeSingle();
     
     let userId = null
     let isNewUser = false
@@ -128,7 +130,8 @@ serve(async (req) => {
           email_confirm: true,
           user_metadata: { 
             full_name: fullName,
-            phone_verified: true
+            phone_verified: true,
+            phone: phoneNumber  // Add phone to metadata explicitly
           }
         })
         
@@ -159,7 +162,13 @@ serve(async (req) => {
               const tempPassword = crypto.randomUUID();
               
               // Update password to allow login
-              await supabaseAdmin.auth.admin.updateUserById(userId, { password: tempPassword });
+              await supabaseAdmin.auth.admin.updateUserById(userId, { 
+                password: tempPassword,
+                user_metadata: {
+                  ...authUser.user.user_metadata,
+                  phone: phoneNumber  // Ensure phone is in metadata
+                }
+              });
               
               // Set credentials for frontend login
               credentials = {
@@ -210,7 +219,7 @@ serve(async (req) => {
         
         userId = newUser.user.id
         
-        // Create profile
+        // Explicitly create profile in case the trigger doesn't work
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
@@ -224,6 +233,21 @@ serve(async (req) => {
           
         if (profileError) {
           console.error('Error creating profile:', profileError)
+          
+          // Try to update if insert failed due to existing record
+          const { error: updateError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+              phone_number: phoneNumber,
+              phone_verified: true,
+              full_name: fullName,
+              lead_source: lead_source || null
+            })
+            .eq('id', userId);
+            
+          if (updateError) {
+            console.error('Error updating profile:', updateError)
+          }
         }
         
         // Return credentials for frontend to create session
@@ -272,10 +296,16 @@ serve(async (req) => {
       // Generate a one-time password for this login
       const tempPassword = crypto.randomUUID()
       
-      // Update the user's password
+      // Update the user's password and ensure phone is in metadata
       const { error: passwordUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
         userId,
-        { password: tempPassword }
+        { 
+          password: tempPassword,
+          user_metadata: {
+            ...userData.user.user_metadata,
+            phone: phoneNumber  // Ensure phone is in metadata
+          }
+        }
       )
       
       if (passwordUpdateError) {
@@ -290,6 +320,16 @@ serve(async (req) => {
             status: 200
           }
         )
+      }
+      
+      // Also update profile phone number in case it's missing
+      const { error: profileUpdateError } = await supabaseAdmin
+        .from('profiles')
+        .update({ phone_number: phoneNumber })
+        .eq('id', userId);
+        
+      if (profileUpdateError) {
+        console.error('Error updating profile phone:', profileUpdateError);
       }
       
       // Return credentials for frontend to create session
