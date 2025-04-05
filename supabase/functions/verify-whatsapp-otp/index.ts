@@ -155,7 +155,7 @@ serve(async (req) => {
           // the profile might be created by a trigger
         }
         
-        // Create a session JWT for the new user
+        // Generate a JWT token for the new user
         const { data: tokenData, error: tokenError } = await supabaseAdmin.auth.admin.generateLink({
           type: 'magiclink',
           email: `${userId}@placeholder.com`, // Using a placeholder since we need some email
@@ -190,7 +190,7 @@ serve(async (req) => {
     } else {
       userId = existingUser.id
       
-      // Create a session JWT for existing user
+      // Generate a JWT token for the existing user
       const { data: tokenData, error: tokenError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'magiclink',
         email: `${userId}@placeholder.com`, // Using a placeholder since we need some email

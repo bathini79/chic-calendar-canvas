@@ -230,21 +230,35 @@ const Auth = () => {
         return;
       }
 
-      // If we have a session in the response, update it
+      // If we have a session in the response, set it
       if (response.data && response.data.session) {
-        // Store the session
-        await supabase.auth.setSession({
+        console.log("Setting session from response", response.data.session);
+        
+        // Apply the session
+        const { error: sessionError } = await supabase.auth.setSession({
           access_token: response.data.session.access_token,
           refresh_token: response.data.session.refresh_token
         });
+        
+        if (sessionError) {
+          console.error("Error setting session:", sessionError);
+          toast.error("Error logging in. Please try again.");
+          setIsLoading(false);
+          return;
+        }
+        
+        // Invalidate session query to trigger app update
+        await queryClient.invalidateQueries({ queryKey: ["session"] });
+        
+        toast.success(response.data.isNewUser ? 
+          "Registration successful! Welcome!" : 
+          "Login successful!");
+          
+        navigate("/");
+      } else {
+        console.error("No session data in response:", response.data);
+        toast.error("Authentication response missing session data");
       }
-
-      toast.success(response.data.isNewUser ? 
-        "Registration successful! Logging in..." : 
-        "Login successful!");
-      
-      await queryClient.invalidateQueries({ queryKey: ["session"] });
-      navigate("/");
     } catch (error: any) {
       console.error("OTP verification error:", error);
       const errorMessage = "Connection error. Please try again.";
