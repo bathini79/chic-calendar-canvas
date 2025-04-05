@@ -1,3 +1,4 @@
+
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,12 +73,12 @@ const Auth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
         await queryClient.invalidateQueries({ queryKey: ["session"] });
-        navigate("/");
+        navigate("/services");
       }
     });
 
     if (session) {
-      navigate("/");
+      navigate("/services");
     }
 
     return () => subscription.unsubscribe();
@@ -239,7 +240,7 @@ const Auth = () => {
         
         try {
           // Sign in with the credentials
-          const { error: signInError } = await supabase.auth.signInWithPassword({
+          const { data, error: signInError } = await supabase.auth.signInWithPassword({
             email: response.data.credentials.email,
             password: response.data.credentials.password
           });
@@ -251,10 +252,17 @@ const Auth = () => {
             return;
           }
           
+          console.log("Sign in successful, session created:", data.session);
+          
           // Session will be handled by the auth state change listener
           toast.success(response.data.isNewUser ? 
             "Registration successful! Welcome!" : 
             "Login successful!");
+            
+          // Explicitly navigate after successful login
+          if (data.session) {
+            navigate("/services");
+          }
         } catch (signInError: any) {
           console.error("Error signing in:", signInError);
           toast.error("Error during authentication: " + signInError.message);
