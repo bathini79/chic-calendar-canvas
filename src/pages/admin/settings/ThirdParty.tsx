@@ -36,6 +36,8 @@ export default function ThirdParty() {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [activeSection, setActiveSection] = useState<string>("twilio");
+  const [isTesting, setIsTesting] = useState(false);
+  const [testCustomerId, setTestCustomerId] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -128,6 +130,8 @@ export default function ThirdParty() {
 
   const testWhatsAppConnection = async () => {
     try {
+      setIsTesting(true);
+      
       const { data, error } = await supabase.functions.invoke(
         "send-whatsapp-otp",
         {
@@ -148,6 +152,57 @@ export default function ThirdParty() {
         description: error.message || "Failed to send test message",
         variant: "destructive"
       });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const testAppointmentNotification = async () => {
+    try {
+      setIsTesting(true);
+      
+      // First get a recent appointment to use for testing
+      const { data: appointments, error: appointmentsError } = await supabase
+        .from('appointments')
+        .select('id, customer_id')
+        .limit(1)
+        .order('created_at', { ascending: false });
+      
+      if (appointmentsError) throw appointmentsError;
+      
+      if (!appointments || appointments.length === 0) {
+        throw new Error("No appointments found for testing");
+      }
+      
+      const appointmentId = appointments[0].id;
+      
+      // Send test notification
+      const { data, error } = await supabase.functions.invoke(
+        "send-appointment-notification",
+        {
+          body: { appointmentId }
+        }
+      );
+
+      if (error) throw error;
+      
+      if (data && data.error) {
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: "Success",
+        description: "Appointment notification sent successfully"
+      });
+    } catch (error: any) {
+      console.error("Error sending test notification:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send test notification",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -246,14 +301,25 @@ export default function ThirdParty() {
                       </div>
                       
                       {twilioConfig.isActive && twilioConfig.accountSid && twilioConfig.authToken && twilioConfig.phoneNumber && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={testWhatsAppConnection}
-                          disabled={isSaving || isEditing}
-                        >
-                          Test Connection
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={testWhatsAppConnection}
+                            disabled={isTesting || isSaving || isEditing}
+                          >
+                            {isTesting ? "Testing..." : "Test WhatsApp"}
+                          </Button>
+                          
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={testAppointmentNotification}
+                            disabled={isTesting || isSaving || isEditing}
+                          >
+                            {isTesting ? "Testing..." : "Test Notification"}
+                          </Button>
+                        </div>
                       )}
                     </div>
 
