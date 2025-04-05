@@ -1,17 +1,31 @@
+
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Send } from "lucide-react";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Input } from "@/components/ui/input";
 
 // Optional fallback Spinner
 const Spinner = () => (
@@ -33,13 +47,37 @@ interface TwilioAccountDetails {
   billing_url: string;
 }
 
+// Schema for test notification form
+const testNotificationSchema = z.object({
+  appointmentId: z.string().min(1, "Appointment ID is required"),
+  notificationType: z.enum([
+    "booking_confirmation",
+    "appointment_confirmed",
+    "reminder_1hr",
+    "reminder_4hr",
+    "appointment_completed"
+  ]),
+});
+
+type TestNotificationValues = z.infer<typeof testNotificationSchema>;
+
 export default function ThirdParty() {
   const [isLoading, setIsLoading] = useState(true);
   const [accountDetails, setAccountDetails] =
     useState<TwilioAccountDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<string>("twilio");
+  const [showTestDialog, setShowTestDialog] = useState(false);
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
   const { toast } = useToast();
+
+  const testNotificationForm = useForm<TestNotificationValues>({
+    resolver: zodResolver(testNotificationSchema),
+    defaultValues: {
+      appointmentId: "",
+      notificationType: "appointment_confirmed",
+    },
+  });
 
   useEffect(() => {
     const fetchTwilioAccountDetails = async () => {
@@ -69,6 +107,40 @@ export default function ThirdParty() {
 
     fetchTwilioAccountDetails();
   }, [toast]);
+
+  const handleSendTestNotification = async (values: TestNotificationValues) => {
+    try {
+      setIsSendingNotification(true);
+
+      const { error } = await supabase.functions.invoke(
+        "send-appointment-notification", 
+        { 
+          body: { 
+            appointmentId: values.appointmentId,
+            notificationType: values.notificationType,
+          } 
+        }
+      );
+
+      if (error) throw new Error(error.message);
+
+      toast({
+        title: "Success",
+        description: `${values.notificationType} notification sent successfully`,
+      });
+      
+      setShowTestDialog(false);
+    } catch (error: any) {
+      console.error("Error sending test notification:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send test notification",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingNotification(false);
+    }
+  };
 
   return (
     <div className="container py-6 max-w-6xl">
@@ -204,6 +276,16 @@ export default function ThirdParty() {
                   <p>No account details available.</p>
                 )}
               </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowTestDialog(true)}
+                  disabled={isLoading || !accountDetails}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  Test Notification
+                </Button>
+              </CardFooter>
             </Card>
           )}
 
@@ -222,6 +304,54 @@ export default function ThirdParty() {
           )}
         </div>
       </div>
+
+      {/* Test Notification Dialog */}
+      <FormDialog
+        open={showTestDialog}
+        onOpenChange={setShowTestDialog}
+        title="Send Test Notification"
+        description="Test WhatsApp notifications for different appointment stages."
+        form={testNotificationForm}
+        onSubmit={handleSendTestNotification}
+        submitLabel={isSendingNotification ? "Sending..." : "Send Test Notification"}
+        cancelLabel="Cancel"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Notification Type</label>
+            <Select
+              onValueChange={(value) => 
+                testNotificationForm.setValue('notificationType', value as any)
+              }
+              defaultValue={testNotificationForm.getValues('notificationType')}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select notification type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="booking_confirmation">Booking Confirmation</SelectItem>
+                <SelectItem value="appointment_confirmed">Appointment Confirmed</SelectItem>
+                <SelectItem value="reminder_1hr">1 Hour Reminder</SelectItem>
+                <SelectItem value="reminder_4hr">4 Hour Reminder</SelectItem>
+                <SelectItem value="appointment_completed">Appointment Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Appointment ID</label>
+            <Input
+              placeholder="Enter appointment ID"
+              {...testNotificationForm.register('appointmentId')}
+            />
+            {testNotificationForm.formState.errors.appointmentId && (
+              <p className="text-sm text-red-500">
+                {testNotificationForm.formState.errors.appointmentId.message}
+              </p>
+            )}
+          </div>
+        </div>
+      </FormDialog>
     </div>
   );
 }

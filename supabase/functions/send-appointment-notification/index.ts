@@ -9,6 +9,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Notification types
+type NotificationType = 'booking_confirmation' | 'appointment_confirmed' | 'reminder_1hr' | 'reminder_4hr' | 'appointment_completed';
+
+// Message templates for different notification types
+const messageTemplates: Record<NotificationType, (customerName: string, serviceName: string, location: string, date: string, time: string) => string> = {
+  booking_confirmation: (name, service, location, date, time) => 
+    `Hello ${name},\n\nThank you for booking an appointment at ${location} on ${date} at ${time}.\n\nService(s): ${service}\n\nWe'll confirm your appointment shortly.`,
+  
+  appointment_confirmed: (name, service, location, date, time) => 
+    `Hello ${name},\n\nYour appointment at ${location} on ${date} at ${time} has been confirmed.\n\nService(s): ${service}\n\nWe look forward to seeing you!`,
+  
+  reminder_1hr: (name, service, location, date, time) => 
+    `Hello ${name},\n\nThis is a reminder that your appointment at ${location} is in 1 hour (${time}).\n\nService(s): ${service}\n\nSee you soon!`,
+  
+  reminder_4hr: (name, service, location, date, time) => 
+    `Hello ${name},\n\nThis is a reminder that your appointment at ${location} is in 4 hours today (${date} at ${time}).\n\nService(s): ${service}\n\nSee you soon!`,
+  
+  appointment_completed: (name, service, location, date, time) => 
+    `Hello ${name},\n\nThank you for visiting ${location} today.\n\nWe hope you enjoyed your ${service}. We look forward to seeing you again soon!`
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -17,10 +38,14 @@ serve(async (req) => {
 
   try {
     // Parse request body
-    const { appointmentId } = await req.json()
+    const { appointmentId, notificationType = 'appointment_confirmed' } = await req.json()
     
     if (!appointmentId) {
       throw new Error('Appointment ID is required')
+    }
+    
+    if (!Object.keys(messageTemplates).includes(notificationType)) {
+      throw new Error(`Invalid notification type: ${notificationType}. Valid types are: ${Object.keys(messageTemplates).join(', ')}`)
     }
     
     // Initialize Supabase client
@@ -103,24 +128,21 @@ serve(async (req) => {
       throw new Error('Customer has no phone number registered')
     }
 
-    // Get Twilio configuration from system_settings
+    // Get Twilio configuration using edge function without storing in DB
     const serviceRoleClient = createClient(supabaseUrl, supabaseServiceRoleKey)
     const { data: twilioConfig, error: twilioConfigError } = await serviceRoleClient
-      .from('system_settings')
-      .select('settings, is_active')
-      .eq('category', 'twilio')
-      .single()
+      .functions.invoke('get-twilio-config')
     
-    if (twilioConfigError || !twilioConfig) {
+    if (twilioConfigError) {
       console.error("Twilio config error:", twilioConfigError)
-      throw new Error('Twilio is not configured')
+      throw new Error('Failed to get Twilio configuration')
     }
 
-    if (!twilioConfig.is_active) {
+    if (!twilioConfig.isActive) {
       throw new Error('Twilio integration is not active')
     }
 
-    const { accountSid, authToken, phoneNumber } = twilioConfig.settings
+    const { accountSid, authToken, phoneNumber } = twilioConfig
 
     if (!accountSid || !authToken || !phoneNumber) {
       throw new Error('Incomplete Twilio configuration')
@@ -145,23 +167,31 @@ serve(async (req) => {
       minute: '2-digit'
     })
 
-    // Compose WhatsApp message
-    const message = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder about your upcoming appointment at ${appointment.location} on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe look forward to seeing you!`
+    // Get the appropriate message template for this notification type
+    const messageText = messageTemplates[notificationType as NotificationType](
+      appointment.profiles.full_name,
+      servicesText,
+      appointment.location || 'our salon',
+      formattedDate,
+      formattedTime
+    )
 
     // Initialize Twilio client
     const twilio = new Twilio(accountSid, authToken)
     
     // Send WhatsApp message through Twilio
     await twilio.messages.create({
-      body: message,
+      body: messageText,
       from: `whatsapp:${phoneNumber}`,
       to: `whatsapp:${appointment.profiles.phone_number}`
     })
 
+    console.log(`Successfully sent ${notificationType} notification for appointment ${appointmentId}`)
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Appointment notification sent successfully' 
+        message: `${notificationType} notification sent successfully` 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
