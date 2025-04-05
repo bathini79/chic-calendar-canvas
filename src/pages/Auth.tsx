@@ -242,7 +242,13 @@ const Auth = () => {
           // Sign in with the credentials
           const { data, error: signInError } = await supabase.auth.signInWithPassword({
             email: response.data.credentials.email,
-            password: response.data.credentials.password
+            password: response.data.credentials.password,
+            options: {
+              data: {
+                phone: fullPhoneNumber,
+                full_name: fullName || response.data.fullName
+              }
+            }
           });
           
           if (signInError) {
