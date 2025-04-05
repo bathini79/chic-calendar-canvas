@@ -156,13 +156,13 @@ serve(async (req) => {
         }
         
         // Create session for the new user
-        const { data: sessionData, error: signInError } = await supabaseAdmin.auth.admin.signInWithPhone({
-          phone: phoneNumber,
+        // Fixed: Using createSession instead of signInWithPhone
+        const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
           user_id: userId
         })
         
-        if (signInError) {
-          console.error('Error signing in new user:', signInError)
+        if (sessionError) {
+          console.error('Error creating session for new user:', sessionError)
         } else {
           session = sessionData
         }
@@ -184,19 +184,19 @@ serve(async (req) => {
     } else {
       userId = existingUser.id
       
-      // Sign in existing user
-      const { data: sessionData, error: signInError } = await supabaseAdmin.auth.admin.signInWithPhone({
-        phone: phoneNumber,
+      // Create session for existing user
+      // Fixed: Using createSession instead of signInWithPhone
+      const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
         user_id: userId
       })
       
-      if (signInError) {
-        console.error('Error signing in existing user:', signInError)
+      if (sessionError) {
+        console.error('Error creating session for existing user:', sessionError)
         return new Response(
           JSON.stringify({ 
             error: "signin_failed",
             message: "Failed to sign in user",
-            details: signInError.message
+            details: sessionError.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
