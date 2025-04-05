@@ -155,35 +155,42 @@ serve(async (req) => {
           // the profile might be created by a trigger
         }
         
-        // Create a JWT token for the new user
-        const { data: tokenData, error: tokenError } = await supabaseAdmin.auth.admin.createUser({
+        // Generate a random password for signing in
+        const randomPassword = `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`
+        
+        // Sign in with phone number as username and random password
+        const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
           phone: phoneNumber,
-          email: `${userId}@placeholder.com`, // Using a placeholder since we need some email for token creation
-          user_metadata: { 
-            full_name: fullName,
-            phone_verified: true
-          },
-          password: `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`, // Random secure password
-          email_confirm: true,
-          phone_confirm: true
+          password: randomPassword
         })
         
-        if (tokenError) {
-          console.error('Error generating token for new user:', tokenError)
-        } else {
-          // Sign in the user to get a session
-          const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-            email: `${userId}@placeholder.com`,
-            password: tokenData.user.user_metadata.password
+        if (signInError) {
+          console.error('Error signing in new user:', signInError)
+          
+          // If signing in fails, create a session directly
+          const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'magiclink',
+            email: `${userId}@temporary.com`, // Use a temporary email
+            options: {
+              redirectTo: `${supabaseUrl}`
+            }
           })
           
-          if (signInError) {
-            console.error('Error signing in:', signInError)
-          } else if (signInData && signInData.session) {
+          if (sessionError) {
+            console.error('Error generating session for new user:', sessionError)
+            throw sessionError
+          }
+          
+          if (sessionData && sessionData.properties) {
             token = {
-              access_token: signInData.session.access_token,
-              refresh_token: signInData.session.refresh_token
+              access_token: sessionData.properties.access_token,
+              refresh_token: sessionData.properties.refresh_token
             }
+          }
+        } else if (signInData && signInData.session) {
+          token = {
+            access_token: signInData.session.access_token,
+            refresh_token: signInData.session.refresh_token
           }
         }
         
@@ -205,71 +212,57 @@ serve(async (req) => {
       userId = existingUser.id
       
       // Get existing user details
-      const { data: userData, error: userDataError } = await supabaseAdmin
+      const { data: userData } = await supabaseAdmin
         .from('profiles')
-        .select('full_name')
+        .select('*')
         .eq('id', userId)
         .single()
+      
+      // Create a session for the existing user
+      try {
+        // Sign in with just the user ID
+        const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'recovery',
+          email: userData?.email || `${userId}@temporary.com`,
+          options: {
+            redirectTo: `${supabaseUrl}`
+          }
+        })
         
-      const userName = userData?.full_name || 'User'
-      
-      // Create a temporary password for authentication
-      const tempPassword = `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`
-      
-      // Create a login email (we'll use the user ID as the email with a placeholder domain)
-      const loginEmail = `${userId}@placeholder.com`
-      
-      // Update the user with the temporary credentials
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-        userId,
-        {
-          email: loginEmail,
-          password: tempPassword,
-          email_confirm: true
+        if (sessionError) {
+          console.error('Error generating session for existing user:', sessionError)
+          return new Response(
+            JSON.stringify({ 
+              error: "signin_failed",
+              message: "Failed to sign in user",
+              details: sessionError.message
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200
+            }
+          )
         }
-      )
-      
-      if (updateError) {
-        console.error('Error updating user credentials:', updateError)
+        
+        if (sessionData && sessionData.properties) {
+          token = {
+            access_token: sessionData.properties.access_token,
+            refresh_token: sessionData.properties.refresh_token
+          }
+        }
+      } catch (error) {
+        console.error('Exception during session creation:', error)
         return new Response(
           JSON.stringify({ 
-            error: "signin_failed",
-            message: "Failed to sign in user",
-            details: updateError.message
+            error: "signin_exception",
+            message: "Exception during sign in",
+            details: error.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 // Using 200 to avoid non-2xx handling issues
+            status: 200
           }
         )
-      }
-      
-      // Sign in the user with the temporary password to get a session
-      const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-        email: loginEmail,
-        password: tempPassword
-      })
-      
-      if (signInError) {
-        console.error('Error signing in:', signInError)
-        return new Response(
-          JSON.stringify({ 
-            error: "signin_failed",
-            message: "Failed to sign in user",
-            details: signInError.message
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 // Using 200 to avoid non-2xx handling issues
-          }
-        )
-      }
-      
-      if (signInData && signInData.session) {
-        token = {
-          access_token: signInData.session.access_token,
-          refresh_token: signInData.session.refresh_token
-        }
       }
     }
     

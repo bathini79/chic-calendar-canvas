@@ -205,6 +205,8 @@ const Auth = () => {
     try {
       const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
       
+      console.log("Verifying OTP:", fullPhoneNumber, otp, needsFullName ? fullName : undefined);
+      
       const response = await supabase.functions.invoke('verify-whatsapp-otp', {
         body: { 
           phoneNumber: fullPhoneNumber, 
@@ -213,6 +215,8 @@ const Auth = () => {
           lead_source: referralSource || undefined
         },
       });
+
+      console.log("OTP verification response:", response);
 
       if (response.data && response.data.error) {
         if (response.data.error === "new_user_requires_name") {
@@ -234,27 +238,32 @@ const Auth = () => {
       if (response.data && response.data.session) {
         console.log("Setting session from response", response.data.session);
         
-        // Apply the session
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: response.data.session.access_token,
-          refresh_token: response.data.session.refresh_token
-        });
-        
-        if (sessionError) {
-          console.error("Error setting session:", sessionError);
-          toast.error("Error logging in. Please try again.");
-          setIsLoading(false);
-          return;
-        }
-        
-        // Invalidate session query to trigger app update
-        await queryClient.invalidateQueries({ queryKey: ["session"] });
-        
-        toast.success(response.data.isNewUser ? 
-          "Registration successful! Welcome!" : 
-          "Login successful!");
+        try {
+          // Apply the session using setSession
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: response.data.session.access_token,
+            refresh_token: response.data.session.refresh_token
+          });
           
-        navigate("/");
+          if (sessionError) {
+            console.error("Error setting session:", sessionError);
+            toast.error("Error logging in: " + sessionError.message);
+            setIsLoading(false);
+            return;
+          }
+          
+          // Invalidate session query to trigger app update
+          await queryClient.invalidateQueries({ queryKey: ["session"] });
+          
+          toast.success(response.data.isNewUser ? 
+            "Registration successful! Welcome!" : 
+            "Login successful!");
+            
+          navigate("/");
+        } catch (sessionError: any) {
+          console.error("Error setting session:", sessionError);
+          toast.error("Error during authentication: " + sessionError.message);
+        }
       } else {
         console.error("No session data in response:", response.data);
         toast.error("Authentication response missing session data");
