@@ -85,7 +85,7 @@ serve(async (req) => {
     
     let userId = null
     let newUser = false
-    let session = null
+    let token = null
     
     if (userError || !existingUser) {
       // Creating a new user requires a full name
@@ -155,21 +155,35 @@ serve(async (req) => {
           // the profile might be created by a trigger
         }
         
-        // Generate a JWT token for the new user
-        const { data: tokenData, error: tokenError } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'magiclink',
-          email: `${userId}@placeholder.com`, // Using a placeholder since we need some email
-          options: {
-            redirectTo: '/'
-          }
+        // Create a JWT token for the new user
+        const { data: tokenData, error: tokenError } = await supabaseAdmin.auth.admin.createUser({
+          phone: phoneNumber,
+          email: `${userId}@placeholder.com`, // Using a placeholder since we need some email for token creation
+          user_metadata: { 
+            full_name: fullName,
+            phone_verified: true
+          },
+          password: `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`, // Random secure password
+          email_confirm: true,
+          phone_confirm: true
         })
         
         if (tokenError) {
-          console.error('Error generating session for new user:', tokenError)
-        } else if (tokenData && tokenData.properties) {
-          session = {
-            access_token: tokenData.properties.access_token,
-            refresh_token: tokenData.properties.refresh_token
+          console.error('Error generating token for new user:', tokenError)
+        } else {
+          // Sign in the user to get a session
+          const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+            email: `${userId}@placeholder.com`,
+            password: tokenData.user.user_metadata.password
+          })
+          
+          if (signInError) {
+            console.error('Error signing in:', signInError)
+          } else if (signInData && signInData.session) {
+            token = {
+              access_token: signInData.session.access_token,
+              refresh_token: signInData.session.refresh_token
+            }
           }
         }
         
@@ -190,22 +204,38 @@ serve(async (req) => {
     } else {
       userId = existingUser.id
       
-      // Generate a JWT token for the existing user
-      const { data: tokenData, error: tokenError } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'magiclink',
-        email: `${userId}@placeholder.com`, // Using a placeholder since we need some email
-        options: {
-          redirectTo: '/'
-        }
-      })
+      // Get existing user details
+      const { data: userData, error: userDataError } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single()
+        
+      const userName = userData?.full_name || 'User'
       
-      if (tokenError) {
-        console.error('Error generating session for existing user:', tokenError)
+      // Create a temporary password for authentication
+      const tempPassword = `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`
+      
+      // Create a login email (we'll use the user ID as the email with a placeholder domain)
+      const loginEmail = `${userId}@placeholder.com`
+      
+      // Update the user with the temporary credentials
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        {
+          email: loginEmail,
+          password: tempPassword,
+          email_confirm: true
+        }
+      )
+      
+      if (updateError) {
+        console.error('Error updating user credentials:', updateError)
         return new Response(
           JSON.stringify({ 
             error: "signin_failed",
             message: "Failed to sign in user",
-            details: tokenError.message
+            details: updateError.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -214,10 +244,31 @@ serve(async (req) => {
         )
       }
       
-      if (tokenData && tokenData.properties) {
-        session = {
-          access_token: tokenData.properties.access_token,
-          refresh_token: tokenData.properties.refresh_token
+      // Sign in the user with the temporary password to get a session
+      const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+        email: loginEmail,
+        password: tempPassword
+      })
+      
+      if (signInError) {
+        console.error('Error signing in:', signInError)
+        return new Response(
+          JSON.stringify({ 
+            error: "signin_failed",
+            message: "Failed to sign in user",
+            details: signInError.message
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 // Using 200 to avoid non-2xx handling issues
+          }
+        )
+      }
+      
+      if (signInData && signInData.session) {
+        token = {
+          access_token: signInData.session.access_token,
+          refresh_token: signInData.session.refresh_token
         }
       }
     }
@@ -233,12 +284,28 @@ serve(async (req) => {
       // Not failing on this error, just logging
     }
     
+    if (!token) {
+      return new Response(
+        JSON.stringify({ 
+          error: "token_creation_failed",
+          message: "Failed to create authentication token" 
+        }),
+        { 
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json' 
+          },
+          status: 200 
+        }
+      )
+    }
+    
     return new Response(
       JSON.stringify({ 
         message: newUser ? 'Registration successful' : 'Login successful',
         isNewUser: newUser,
         user: { id: userId, phone_number: phoneNumber },
-        session: session
+        session: token
       }),
       { 
         headers: { 
