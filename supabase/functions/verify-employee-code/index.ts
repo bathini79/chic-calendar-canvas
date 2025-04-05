@@ -16,10 +16,14 @@ serve(async (req) => {
 
   try {
     // Parse request body
-    const { code, phoneNumber } = await req.json()
+    const { code, phoneNumber, token } = await req.json()
     
-    if (!code || !phoneNumber) {
-      throw new Error('Verification code and phone number are required')
+    if (!code && !token) {
+      throw new Error('Either verification code or token is required')
+    }
+    
+    if (!phoneNumber) {
+      throw new Error('Phone number is required')
     }
     
     // Create Supabase client with admin privileges
@@ -40,25 +44,66 @@ serve(async (req) => {
     }
     
     const employeeId = employeeData.id
+    let isVerified = false
     
-    // Verify code from database
-    const { data: otpData, error: otpError } = await supabaseAdmin
-      .from('employee_verification_codes')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .eq('code', code)
-      .single()
+    // If token provided, verify with token
+    if (token) {
+      const { data: tokenData, error: tokenError } = await supabaseAdmin
+        .from('employee_verification_links')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('verification_token', token)
+        .eq('used', false)
+        .single()
       
-    if (otpError || !otpData) {
-      throw new Error('Invalid verification code')
+      if (tokenError || !tokenData) {
+        throw new Error('Invalid or expired verification link')
+      }
+      
+      // Check if token has expired
+      const expiresAt = new Date(tokenData.expires_at)
+      const currentTime = new Date()
+      
+      if (currentTime > expiresAt) {
+        throw new Error('Verification link has expired')
+      }
+      
+      // Mark the token as used
+      await supabaseAdmin
+        .from('employee_verification_links')
+        .update({ used: true })
+        .eq('id', tokenData.id)
+      
+      isVerified = true
     }
     
-    // Check if code has expired
-    const expiresAt = new Date(otpData.expires_at)
-    const currentTime = new Date()
+    // If code provided, verify code
+    if (code && !isVerified) {
+      // Verify code from database
+      const { data: otpData, error: otpError } = await supabaseAdmin
+        .from('employee_verification_codes')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('code', code)
+        .single()
+        
+      if (otpError || !otpData) {
+        throw new Error('Invalid verification code')
+      }
+      
+      // Check if code has expired
+      const expiresAt = new Date(otpData.expires_at)
+      const currentTime = new Date()
+      
+      if (currentTime > expiresAt) {
+        throw new Error('Verification code has expired')
+      }
+      
+      isVerified = true
+    }
     
-    if (currentTime > expiresAt) {
-      throw new Error('Verification code has expired')
+    if (!isVerified) {
+      throw new Error('Verification failed')
     }
     
     // Update employee status to active

@@ -37,11 +37,15 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
 
   const sendWhatsAppVerification = async (phoneNumber: string, employeeId: string, name: string) => {
     try {
+      // Get the current window location to create the verification link
+      const baseUrl = window.location.origin;
+      
       const { data, error } = await supabase.functions.invoke('verify-employee-otp', {
         body: { 
           phoneNumber,
           employeeId,
-          name
+          name,
+          baseUrl
         }
       });
       

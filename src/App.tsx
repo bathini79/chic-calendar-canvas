@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { AdminRoute } from "@/components/auth/AdminRoute";
@@ -23,8 +22,8 @@ import BusinessSetup from "./pages/admin/settings/BusinessSetup";
 import Sales from "./pages/admin/settings/Sales";
 import ThirdParty from "./pages/admin/settings/ThirdParty";
 import Reports from "./pages/admin/Reports";
+import VerifyEmployeePage from "./pages/verify";
 
-// Import DnD
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { UserStatus } from "./components/auth/UserStatus";
@@ -80,6 +79,11 @@ export default function App() {
             <Route path="settings/third-party" element={<ThirdParty />} />
             <Route path="settings/third-party/*" element={<ThirdParty />} />
           </Route>
+
+          {
+            path: "/verify",
+            element: <VerifyEmployeePage />,
+          }
         </Routes>
       </DndProvider>
     </BrowserRouter>

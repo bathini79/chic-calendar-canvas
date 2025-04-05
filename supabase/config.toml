@@ -96,3 +96,5 @@ verify_jwt = true
 verify_jwt = true
 [functions.handle-whatsapp-webhook]
 verify_jwt = false
+[functions.delete-auth-user]
+verify_jwt = true

@@ -28,6 +28,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
     )
     
+    // Check if employee exists
+    const { data: employeeData, error: employeeCheckError } = await supabaseAdmin
+      .from('employees')
+      .select('id')
+      .eq('id', employeeId)
+      .single()
+      
+    if (employeeCheckError || !employeeData) {
+      throw new Error(`Employee with ID ${employeeId} not found`)
+    }
+    
     // Create user in auth
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email || undefined,

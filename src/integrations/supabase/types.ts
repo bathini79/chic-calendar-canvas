@@ -700,6 +700,41 @@ export type Database = {
           },
         ]
       }
+      employee_verification_links: {
+        Row: {
+          created_at: string
+          employee_id: string
+          expires_at: string
+          id: string
+          used: boolean
+          verification_token: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          expires_at: string
+          id?: string
+          used?: boolean
+          verification_token: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          expires_at?: string
+          id?: string
+          used?: boolean
+          verification_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_verification_links_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           created_at: string

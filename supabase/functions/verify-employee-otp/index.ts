@@ -16,16 +16,26 @@ function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-async function sendWhatsAppOTP(phoneNumber: string, otp: string, name: string) {
+function generateVerificationToken() {
+  // Generate a random string of 32 characters
+  return Array.from(crypto.getRandomValues(new Uint8Array(24)))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function sendWhatsAppOTP(phoneNumber: string, otp: string, name: string, verificationToken: string, baseUrl: string) {
   // Make sure the phone number is in E.164 format
   const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber.replace(/\s/g, '')}`
   
   const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
   
+  // Create the verification link
+  const verificationLink = `${baseUrl}/verify?token=${verificationToken}&code=${otp}`;
+  
   const formData = new URLSearchParams()
   formData.append('From', `whatsapp:${TWILIO_PHONE_NUMBER}`)
   formData.append('To', `whatsapp:${formattedPhone}`)
-  formData.append('Body', `Hello ${name}, your verification code to activate your staff account is: ${otp}. Please respond with this code to confirm.`)
+  formData.append('Body', `Hello ${name}, your verification code to activate your staff account is: ${otp}. Click on this link to verify: ${verificationLink}`)
 
   const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)
   
@@ -71,14 +81,20 @@ serve(async (req) => {
     }
     
     // Parse request body
-    const { phoneNumber, employeeId, name } = await req.json()
+    const { phoneNumber, employeeId, name, baseUrl } = await req.json()
     
     if (!phoneNumber || !employeeId) {
       throw new Error('Phone number and employee ID are required')
     }
+
+    // Base URL is required to generate verification links
+    if (!baseUrl) {
+      throw new Error('Base URL is required for verification links')
+    }
     
-    // Generate OTP
+    // Generate OTP and verification token
     const otp = generateOTP()
+    const verificationToken = generateVerificationToken()
     
     // Create Supabase client with admin privileges
     const supabaseClient = createClient(
@@ -104,16 +120,40 @@ serve(async (req) => {
       .delete()
       .eq('employee_id', employeeId)
     
-    // Then store the new OTP with expiration (1 hour)
+    // Delete any existing verification links for this employee
+    await supabaseClient
+      .from('employee_verification_links')
+      .delete()
+      .eq('employee_id', employeeId)
+    
+    // Store the verification token
     const expiresAt = new Date()
-    expiresAt.setHours(expiresAt.getHours() + 1)
+    expiresAt.setHours(expiresAt.getHours() + 24) // 24 hour expiration for links
+    
+    const { error: tokenError } = await supabaseClient
+      .from('employee_verification_links')
+      .insert({
+        employee_id: employeeId,
+        verification_token: verificationToken,
+        expires_at: expiresAt.toISOString(),
+        used: false
+      })
+      
+    if (tokenError) {
+      console.error('Error storing verification token:', tokenError)
+      throw new Error(`Failed to store verification token: ${tokenError.message}`)
+    }
+    
+    // Then store the new OTP with expiration (1 hour)
+    const otpExpiresAt = new Date()
+    otpExpiresAt.setHours(otpExpiresAt.getHours() + 1)
     
     const { error: insertError } = await supabaseClient
       .from('employee_verification_codes')
       .insert({
         employee_id: employeeId,
         code: otp,
-        expires_at: expiresAt.toISOString()
+        expires_at: otpExpiresAt.toISOString()
       })
       
     if (insertError) {
@@ -121,14 +161,15 @@ serve(async (req) => {
       throw new Error(`Failed to store OTP: ${insertError.message}`)
     }
     
-    // Send OTP via WhatsApp
-    await sendWhatsAppOTP(phoneNumber, otp, name || employeeData.name)
+    // Send OTP via WhatsApp with verification link
+    await sendWhatsAppOTP(phoneNumber, otp, name || employeeData.name, verificationToken, baseUrl)
     
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'Verification code sent successfully',
-        employeeId: employeeId
+        employeeId: employeeId,
+        verificationToken: verificationToken
       }),
       { 
         headers: { 
