@@ -1,3 +1,4 @@
+
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,11 +26,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { CountryCodeDropdown } from "@/components/ui/country-code-dropdown";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().optional(),
+  email: z.string().email("Invalid email address").optional().or(z.literal('')),
+  phone: z.string().min(10, "Phone number must be at least 10 digits"),
   photo_url: z.string().optional(),
   status: z.enum(['active', 'inactive']).default('active'),
   employment_type: z.enum(['stylist', 'operations']).default('stylist'),
@@ -50,7 +53,12 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
   const [images, setImages] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isPhoneCheckLoading, setIsPhoneCheckLoading] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<{ name: string; code: string; flag: string }>({ 
+    name: "India", 
+    code: "+91", 
+    flag: "🇮🇳" 
+  });
 
   const form = useForm<StaffFormData>({
     resolver: zodResolver(formSchema),
@@ -87,7 +95,7 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
       form.reset({
         name: initialData.name || '',
         email: initialData.email || '',
-        phone: initialData.phone || '',
+        phone: initialData.phone ? initialData.phone.replace(/^\+\d+\s/, '') : '', // Remove country code if present
         photo_url: initialData.photo_url || '',
         status: initialData.status || 'active',
         employment_type: initialData.employment_type || 'stylist',
@@ -114,11 +122,60 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
     form.setValue('skills', selectedSkills);
   }, [selectedSkills, form]);
 
-  const handleFormSubmit = (data: StaffFormData) => {
+  const checkPhoneExists = async (phone: string) => {
+    if (!phone || phone.length < 10) return false;
+    
+    const formattedPhone = `${selectedCountry.code} ${phone}`;
+    
+    try {
+      setIsPhoneCheckLoading(true);
+      
+      // Check if phone exists in employees table
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('phone', formattedPhone);
+      
+      if (employeeError) throw employeeError;
+      
+      // Check if phone exists in profiles table
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone_number', formattedPhone);
+      
+      if (profileError) throw profileError;
+      
+      // Only consider it a duplicate if it's not the current employee being edited
+      const employeeExists = employeeData.some(e => e.id !== employeeId);
+      const profileExists = profileData.length > 0;
+      
+      if (employeeExists || profileExists) {
+        toast.error("Phone number already exists in the system");
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("Error checking phone existence:", error);
+      return false;
+    } finally {
+      setIsPhoneCheckLoading(false);
+    }
+  };
+
+  const handleFormSubmit = async (data: StaffFormData) => {
+    const phoneExists = await checkPhoneExists(data.phone);
+    if (phoneExists) {
+      return;
+    }
+    
     const updatedData = {
       ...data,
       photo_url: images[0] || null,
+      phone: `${selectedCountry.code} ${data.phone}`
     };
+    
     onSubmit(updatedData);
   };
 
@@ -130,6 +187,11 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
         return [...prev, locationId];
       }
     });
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    form.setValue('phone', value);
   };
 
   return (
@@ -154,7 +216,7 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email *</FormLabel>
+              <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input type="email" {...field} />
               </FormControl>
@@ -168,9 +230,22 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
           name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Phone</FormLabel>
+              <FormLabel>Phone *</FormLabel>
               <FormControl>
-                <Input {...field} />
+                <div className="flex">
+                  <CountryCodeDropdown
+                    value={selectedCountry}
+                    onChange={setSelectedCountry}
+                    className="w-[120px]"
+                  />
+                  <Input 
+                    className="flex-1" 
+                    {...field} 
+                    onChange={handlePhoneChange} 
+                    maxLength={10}
+                    placeholder="Phone Number" 
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -286,7 +361,7 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit">
+          <Button type="submit" disabled={isPhoneCheckLoading}>
             {employeeId ? 'Update Staff Member' : 'Create Staff Member'}
           </Button>
         </div>

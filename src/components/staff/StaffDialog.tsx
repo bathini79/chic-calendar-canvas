@@ -4,6 +4,7 @@ import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { generateStrongPassword } from "@/lib/utils";
 
 interface StaffDialogProps {
   open: boolean;
@@ -33,6 +34,63 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
     },
     enabled: !!employeeId
   });
+
+  const sendWhatsAppVerification = async (phoneNumber: string, employeeId: string, name: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-employee-otp', {
+        body: { 
+          phoneNumber,
+          employeeId,
+          name
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success) {
+        toast.success("Verification message sent to WhatsApp");
+        return true;
+      } else {
+        toast.error(data.message || "Failed to send verification");
+        return false;
+      }
+    } catch (error: any) {
+      console.error("Error sending WhatsApp verification:", error);
+      toast.error(error.message || "Failed to send verification");
+      return false;
+    }
+  };
+
+  const createAuthUser = async (data: any, employeeId: string) => {
+    try {
+      // Generate email from phone if not provided
+      const email = data.email || `${data.phone.replace(/\D/g, '')}@staff.internal`;
+      const password = generateStrongPassword();
+      
+      // Create user in auth
+      const { data: authData, error: authError } = await supabase.functions.invoke('create-employee-auth', {
+        body: {
+          email,
+          phone: data.phone,
+          password,
+          employeeId,
+          name: data.name,
+        }
+      });
+      
+      if (authError) throw authError;
+      
+      if (!authData.success) {
+        throw new Error(authData.message || "Failed to create employee account");
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error("Error creating auth user:", error);
+      toast.error(error.message || "Failed to create employee account");
+      return false;
+    }
+  };
 
   const handleFormSubmit = async (data: any) => {
     try {
@@ -70,7 +128,7 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
           
         if (locationsDeleteError) throw locationsDeleteError;
       } 
-      // If creating new, insert employee record
+      // If creating new, insert employee record with inactive status initially
       else {
         const { data: newEmployee, error } = await supabase
           .from("employees")
@@ -79,7 +137,7 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
             email: data.email,
             phone: data.phone,
             photo_url: data.photo_url,
-            status: data.status,
+            status: 'inactive', // Set as inactive until verified
             employment_type: data.employment_type,
           })
           .select()
@@ -87,6 +145,21 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
           
         if (error) throw error;
         id = newEmployee.id;
+        
+        // Create auth user for the employee
+        const authCreated = await createAuthUser(data, id);
+        if (!authCreated) {
+          // If auth creation fails, delete the employee record
+          await supabase.from("employees").delete().eq("id", id);
+          throw new Error("Failed to create employee account");
+        }
+        
+        // Send WhatsApp verification to the newly created employee
+        const verificationSent = await sendWhatsAppVerification(data.phone, id, data.name);
+        if (!verificationSent) {
+          // If verification sending fails, we continue but inform the user
+          toast.warning("Employee created but verification message could not be sent");
+        }
       }
       
       // Insert skills
@@ -117,7 +190,10 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
         if (locationsInsertError) throw locationsInsertError;
       }
       
-      toast.success(employeeId ? "Staff member updated successfully" : "Staff member created successfully");
+      toast.success(employeeId 
+        ? "Staff member updated successfully" 
+        : "Staff member created successfully. Verification sent to WhatsApp"
+      );
       onOpenChange(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to save staff member");
