@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,7 +31,6 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 import { 
   getTotalPrice, 
@@ -533,6 +532,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         toast.error("Please select a customer");
         return;
       }
+
+      if (!paymentMethod) {
+        toast.error("Please select a payment method");
+        return;
+      }
+
       const saveAppointmentParams = {
         appointmentId,
         appliedTaxId,
@@ -545,6 +550,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         total,
         adjustedPrices,
         couponName: availableCoupons?.filter(c => c.id === selectedCouponId)?.[0]?.code || null,
+        paymentMethod, // Include the payment method in the save parameters
       };
       
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
@@ -561,11 +567,19 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   };
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [selectedItems, subtotal, total]);
+
   return (
-    <div className="h-full w-full bg-gray-50 p-6">
-      <Card className="h-full">
+    <div className="h-full w-full bg-gray-50">
+      <Card className="h-[calc(100vh-100px)] overflow-hidden">
         <CardContent className="p-6 h-full flex flex-col">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Checkout Summary</h2>
             <Button
               variant="outline"
@@ -577,7 +591,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
             </Button>
           </div>
 
-          <div className="flex-1 space-y-6 overflow-hidden flex flex-col">
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto space-y-6 pr-2"
+          >
             {selectedItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full space-y-4">
                 <p className="text-muted-foreground text-center">
@@ -593,12 +610,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+              <div className="space-y-4">
                 {selectedItems.map((item) => (
                   item && (
                     <div
                       key={`${item.type}-${item.id}`}
-                      className="flex flex-col py-4 border-b border-gray-100"
+                      className="flex flex-col py-4 border-b border-gray-200"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="space-y-1">
@@ -661,12 +678,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       {item.type === "package" && item.services && item.services.length > 0 && (
                         <Accordion type="single" collapsible>
                           <AccordionItem value="package-details">
-                            <AccordionTrigger className="text-sm font-medium text-muted-foreground hover:text-primary">
+                            <AccordionTrigger className="text-sm font-medium text-muted-foreground hover:text-primary border-t border-gray-200 pt-2">
                               View Package Details
                             </AccordionTrigger>
-                            <AccordionContent className="mt-2 space-y-4 pl-4 border-l-2 border-gray-200">
+                            <AccordionContent className="mt-2 space-y-4 bg-gray-50 rounded-md p-4 border border-gray-200">
                               {item.services.map(service => (
-                                <div key={service.id} className="py-2">
+                                <div key={service.id} className="py-2 border-b last:border-b-0 border-gray-200">
                                   <div className="flex justify-between items-start">
                                     <div>
                                       <p className="text-sm font-medium">
@@ -711,92 +728,90 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 ))}
               </div>
             )}
+          </div>
 
-            <Separator />
+          <div className="space-y-3 mt-auto">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span>₹{subtotal}</span>
+            </div>
+            
+            <div className="flex justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Tax</span>
+                <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
+                  <SelectTrigger className="h-7 w-[120px]">
+                    <SelectValue placeholder="No Tax" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Tax</SelectItem>
+                    {taxRates.map(tax => (
+                      <SelectItem key={tax.id} value={tax.id}>
+                        {tax.name} ({tax.percentage}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <span>₹{taxAmount.toFixed(2)}</span>
+            </div>
+            
+            <div className="flex justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Coupon</span>
+                <Select value={selectedCouponId || "none"} onValueChange={handleCouponChange} disabled={isLoadingCoupons}>
+                  <SelectTrigger className="h-7 w-[120px]">
+                    <SelectValue placeholder="No Coupon" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Coupon</SelectItem>
+                    {availableCoupons.map(coupon => (
+                      <SelectItem key={coupon.id} value={coupon.id}>
+                        {coupon.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <span>{selectedCoupon ? `-₹${couponDiscount.toFixed(2)}` : "₹0.00"}</span>
+            </div>
+            
+            {selectedCoupon && (
+              <div className="flex justify-between text-xs text-green-600 -mt-2 ml-16">
+                <span>
+                  {selectedCoupon.discount_type === 'percentage' 
+                    ? `${selectedCoupon.discount_value}% off` 
+                    : `Fixed ₹${selectedCoupon.discount_value} off`}
+                </span>
+              </div>
+            )}
 
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>₹{subtotal}</span>
+            {membershipDiscount > 0 && membershipName && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span className="flex items-center">
+                  <Award className="mr-2 h-4 w-4" />
+                  Membership ({membershipName})
+                </span>
+                <span>-₹{membershipDiscount.toFixed(2)}</span>
               </div>
-              
-              <div className="flex justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Tax</span>
-                  <Select value={appliedTaxId || "none"} onValueChange={handleTaxChange}>
-                    <SelectTrigger className="h-7 w-[120px]">
-                      <SelectValue placeholder="No Tax" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Tax</SelectItem>
-                      {taxRates.map(tax => (
-                        <SelectItem key={tax.id} value={tax.id}>
-                          {tax.name} ({tax.percentage}%)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <span>₹{taxAmount.toFixed(2)}</span>
+            )}
+            
+            {discountType !== "none" && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span className="flex items-center">
+                  <Percent className="mr-2 h-4 w-4" />
+                  Discount
+                  {discountType === "percentage" && ` (${discountValue}%)`}
+                </span>
+                <span>-₹{(discountType === "percentage" 
+                  ? subtotal * (discountValue / 100) 
+                  : discountValue).toFixed(2)}</span>
               </div>
-              
-              <div className="flex justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Coupon</span>
-                  <Select value={selectedCouponId || "none"} onValueChange={handleCouponChange} disabled={isLoadingCoupons}>
-                    <SelectTrigger className="h-7 w-[120px]">
-                      <SelectValue placeholder="No Coupon" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Coupon</SelectItem>
-                      {availableCoupons.map(coupon => (
-                        <SelectItem key={coupon.id} value={coupon.id}>
-                          {coupon.code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <span>{selectedCoupon ? `-₹${couponDiscount.toFixed(2)}` : "₹0.00"}</span>
-              </div>
-              
-              {selectedCoupon && (
-                <div className="flex justify-between text-xs text-green-600 -mt-2 ml-16">
-                  <span>
-                    {selectedCoupon.discount_type === 'percentage' 
-                      ? `${selectedCoupon.discount_value}% off` 
-                      : `Fixed ₹${selectedCoupon.discount_value} off`}
-                  </span>
-                </div>
-              )}
-
-              {membershipDiscount > 0 && membershipName && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span className="flex items-center">
-                    <Award className="mr-2 h-4 w-4" />
-                    Membership ({membershipName})
-                  </span>
-                  <span>-₹{membershipDiscount.toFixed(2)}</span>
-                </div>
-              )}
-              
-              {discountType !== "none" && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span className="flex items-center">
-                    <Percent className="mr-2 h-4 w-4" />
-                    Discount
-                    {discountType === "percentage" && ` (${discountValue}%)`}
-                  </span>
-                  <span>-₹{(discountType === "percentage" 
-                    ? subtotal * (discountValue / 100) 
-                    : discountValue).toFixed(2)}</span>
-                </div>
-              )}
-              
-              <div className="flex justify-between text-lg font-bold pt-2">
-                <span>Total</span>
-                <span>₹{total.toFixed(2)}</span>
-              </div>
+            )}
+            
+            <div className="flex justify-between text-lg font-bold pt-2">
+              <span>Total</span>
+              <span>₹{total.toFixed(2)}</span>
             </div>
           </div>
 
@@ -806,7 +821,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               <Select 
                 value={paymentMethod} 
                 onValueChange={onPaymentMethodChange} 
-                defaultValue="cash"
+                defaultValue=""
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select payment method" />

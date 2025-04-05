@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -56,6 +55,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("booked");
   const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const { appointment, refetch: refetchAppointment } = useAppointmentDetails(
     existingAppointment?.id
@@ -112,7 +112,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         setCurrentScreen(SCREEN.SUMMARY);
         setNewAppointmentId(existingAppointment.id);
       } else {
-        setCurrentScreen(SCREEN.CHECKOUT);
+        setCurrentScreen(SCREEN.SERVICE_SELECTION);
       }
     }
   }, [selectedDate, selectedTime, existingAppointment]);
@@ -251,14 +251,27 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   });
 
   const handleProceedToCheckout = async () => {
+    setErrorMessage(null); // Clear any previous error messages
+
     if (!selectedCustomer) {
-      toast.error("Please select a customer");
+      setErrorMessage("Please select a customer.");
       return;
     }
     if (selectedServices.length === 0 && selectedPackages.length === 0) {
-      toast.error("Please select at least one service or package");
+      setErrorMessage("Please select at least one service or package.");
       return;
     }
+
+    // Check if all selected services have a stylist assigned
+    const unassignedServices = selectedServices.filter(
+      (serviceId) => !selectedStylists[serviceId]
+    );
+
+    if (unassignedServices.length > 0) {
+      setErrorMessage("Please assign a stylist to all selected services.");
+      return;
+    }
+
     setCurrentScreen(SCREEN.CHECKOUT);
   };
 
@@ -554,16 +567,23 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                     />
                   </div>
 
-                  <div className="p-6 border-t flex-shrink-0 flex justify-end gap-4 bg-white">
-                    <Button variant="outline" onClick={onHandleSaveAppointment}>
-                      Save Appointment
-                    </Button>
-                    <Button
-                      className="bg-black text-white"
-                      onClick={handleProceedToCheckout}
-                    >
-                      Checkout
-                    </Button>
+                  <div className="p-6 border-t flex-shrink-0 flex flex-col gap-4 bg-white">
+                    {errorMessage && (
+                      <div className="text-red-500 text-sm text-left">
+                        {errorMessage}
+                      </div>
+                    )}
+                    <div className="flex justify-end gap-4">
+                      <Button variant="outline" onClick={onHandleSaveAppointment}>
+                        Save Appointment
+                      </Button>
+                      <Button
+                        className="bg-black text-white"
+                        onClick={handleProceedToCheckout}
+                      >
+                        Checkout
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}
