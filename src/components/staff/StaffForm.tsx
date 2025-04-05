@@ -1,3 +1,4 @@
+
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,13 +29,14 @@ import { Label } from "@/components/ui/label";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().optional(),
+  email: z.string().email("Invalid email address").optional().or(z.literal('')),
+  phone: z.string().min(1, "Phone number is required"),
   photo_url: z.string().optional(),
   status: z.enum(['active', 'inactive']).default('active'),
   employment_type: z.enum(['stylist', 'operations']).default('stylist'),
   skills: z.array(z.string()).min(1, "At least one skill is required"),
   locations: z.array(z.string()).min(1, "At least one location is required"),
+  role: z.enum(['employee', 'manager', 'admin']).default('employee'),
 });
 
 type StaffFormData = z.infer<typeof formSchema>;
@@ -63,6 +65,7 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
       employment_type: 'stylist',
       skills: [],
       locations: [],
+      role: 'employee',
     },
   });
 
@@ -93,6 +96,7 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
         employment_type: initialData.employment_type || 'stylist',
         skills: initialData.employee_skills?.map((s: any) => s.service_id) || [],
         locations: initialData.employee_locations?.map((l: any) => l.location_id) || [],
+        role: initialData.role || 'employee',
       });
       
       if (initialData.photo_url) {
@@ -151,12 +155,12 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
 
         <FormField
           control={form.control}
-          name="email"
+          name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email *</FormLabel>
+              <FormLabel>Phone *</FormLabel>
               <FormControl>
-                <Input type="email" {...field} />
+                <Input {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -165,12 +169,12 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
 
         <FormField
           control={form.control}
-          name="phone"
+          name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Phone</FormLabel>
+              <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input {...field} />
+                <Input type="email" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -219,6 +223,29 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
                 <SelectContent>
                   <SelectItem value="stylist">Stylist</SelectItem>
                   <SelectItem value="operations">Operations</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="role"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Role</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />

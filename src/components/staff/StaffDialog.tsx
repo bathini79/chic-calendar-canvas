@@ -4,6 +4,7 @@ import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 interface StaffDialogProps {
   open: boolean;
@@ -12,6 +13,8 @@ interface StaffDialogProps {
 }
 
 export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps) {
+  const [isVerifying, setIsVerifying] = useState(false);
+
   // Fetch employee data if editing
   const { data: employeeData } = useQuery({
     queryKey: ['employee', employeeId],
@@ -34,9 +37,44 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
     enabled: !!employeeId
   });
 
+  const sendWhatsAppVerification = async (phoneNumber: string) => {
+    try {
+      setIsVerifying(true);
+      
+      // Call the function to send WhatsApp OTP
+      const response = await supabase.functions.invoke('send-whatsapp-otp', {
+        body: { phoneNumber }
+      });
+      
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to send verification code');
+      }
+      
+      toast.success("Verification code sent to WhatsApp");
+      return true;
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send verification code");
+      console.error("Error sending verification code:", error);
+      return false;
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const handleFormSubmit = async (data: any) => {
     try {
+      // Format phone number if needed
+      const phoneNumber = data.phone.startsWith('+') ? data.phone : `+${data.phone}`;
+      
       let id = employeeId;
+      
+      // If creating new employee, first try to send WhatsApp verification
+      if (!employeeId) {
+        const verificationSent = await sendWhatsAppVerification(phoneNumber);
+        if (!verificationSent) {
+          return; // Don't proceed if verification failed to send
+        }
+      }
       
       // If editing, update employee record
       if (employeeId) {
@@ -44,11 +82,12 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
           .from("employees")
           .update({
             name: data.name,
-            email: data.email,
-            phone: data.phone,
+            email: data.email || null,
+            phone: phoneNumber,
             photo_url: data.photo_url,
             status: data.status,
             employment_type: data.employment_type,
+            role: data.role,
           })
           .eq("id", employeeId);
           
@@ -70,23 +109,26 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
           
         if (locationsDeleteError) throw locationsDeleteError;
       } 
-      // If creating new, insert employee record
+      // If creating new, insert employee record with inactive status
       else {
         const { data: newEmployee, error } = await supabase
           .from("employees")
           .insert({
             name: data.name,
-            email: data.email,
-            phone: data.phone,
+            email: data.email || null,
+            phone: phoneNumber,
             photo_url: data.photo_url,
-            status: data.status,
+            status: 'inactive', // Set to inactive until verification
             employment_type: data.employment_type,
+            role: data.role,
           })
           .select()
           .single();
           
         if (error) throw error;
         id = newEmployee.id;
+
+        toast.info("Staff member created. They need to verify their phone number to activate their account.");
       }
       
       // Insert skills
@@ -117,7 +159,7 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
         if (locationsInsertError) throw locationsInsertError;
       }
       
-      toast.success(employeeId ? "Staff member updated successfully" : "Staff member created successfully");
+      toast.success(employeeId ? "Staff member updated successfully" : "Staff member registration initiated");
       onOpenChange(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to save staff member");
