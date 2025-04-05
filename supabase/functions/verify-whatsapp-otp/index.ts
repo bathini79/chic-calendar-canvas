@@ -155,16 +155,22 @@ serve(async (req) => {
           // the profile might be created by a trigger
         }
         
-        // Create session for the new user
-        // Fixed: Using createSession instead of signInWithPhone
-        const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
-          user_id: userId
+        // Create a session JWT for the new user
+        const { data: tokenData, error: tokenError } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: `${userId}@placeholder.com`, // Using a placeholder since we need some email
+          options: {
+            redirectTo: '/'
+          }
         })
         
-        if (sessionError) {
-          console.error('Error creating session for new user:', sessionError)
-        } else {
-          session = sessionData
+        if (tokenError) {
+          console.error('Error generating session for new user:', tokenError)
+        } else if (tokenData && tokenData.properties) {
+          session = {
+            access_token: tokenData.properties.access_token,
+            refresh_token: tokenData.properties.refresh_token
+          }
         }
         
       } catch (createError) {
@@ -184,19 +190,22 @@ serve(async (req) => {
     } else {
       userId = existingUser.id
       
-      // Create session for existing user
-      // Fixed: Using createSession instead of signInWithPhone
-      const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
-        user_id: userId
+      // Create a session JWT for existing user
+      const { data: tokenData, error: tokenError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: `${userId}@placeholder.com`, // Using a placeholder since we need some email
+        options: {
+          redirectTo: '/'
+        }
       })
       
-      if (sessionError) {
-        console.error('Error creating session for existing user:', sessionError)
+      if (tokenError) {
+        console.error('Error generating session for existing user:', tokenError)
         return new Response(
           JSON.stringify({ 
             error: "signin_failed",
             message: "Failed to sign in user",
-            details: sessionError.message
+            details: tokenError.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -205,7 +214,12 @@ serve(async (req) => {
         )
       }
       
-      session = sessionData
+      if (tokenData && tokenData.properties) {
+        session = {
+          access_token: tokenData.properties.access_token,
+          refresh_token: tokenData.properties.refresh_token
+        }
+      }
     }
     
     // Delete used OTP
