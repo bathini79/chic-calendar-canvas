@@ -277,14 +277,6 @@ const Auth = () => {
               <span>{verificationError}</span>
             </div>
           )}
-          {edgeFunctionError && (
-            <div className="bg-yellow-50 text-yellow-800 p-2 rounded-md text-sm flex items-start mt-2">
-              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-              <span>
-                <strong>Server Error:</strong> {edgeFunctionError}
-              </span>
-            </div>
-          )}
           <Button
             type="button"
             className="w-full"
@@ -342,14 +334,6 @@ const Auth = () => {
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
               <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>{verificationError}</span>
-            </div>
-          )}
-          {edgeFunctionError && (
-            <div className="bg-yellow-50 text-yellow-800 p-2 rounded-md text-sm flex items-start mt-2">
-              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-              <span>
-                <strong>Server Error:</strong> {edgeFunctionError}
-              </span>
             </div>
           )}
           <div className="flex space-x-2">
@@ -415,14 +399,6 @@ const Auth = () => {
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
               <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>{verificationError}</span>
-            </div>
-          )}
-          {edgeFunctionError && (
-            <div className="bg-yellow-50 text-yellow-800 p-2 rounded-md text-sm flex items-start mt-2">
-              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-              <span>
-                <strong>Server Error:</strong> {edgeFunctionError}
-              </span>
             </div>
           )}
           <div className="text-center mt-2">
