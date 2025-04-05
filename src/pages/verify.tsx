@@ -1,10 +1,10 @@
-
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { toast } from "sonner";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
@@ -12,18 +12,52 @@ export default function VerificationPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const code = searchParams.get("code");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const phone = searchParams.get("phone");
+  
+  const [phoneNumber, setPhoneNumber] = useState(phone || "");
+  const [countryCode, setCountryCode] = useState({ name: "India", code: "+91", flag: "🇮🇳" });
   const [verificationCode, setVerificationCode] = useState(code || "");
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // If token and code are provided in URL, auto-verify
-    if (token && code && phoneNumber) {
+    // Parse phone parameter to extract country code if provided
+    if (phone && phone.startsWith('+')) {
+      // Try to find the country code in the phone number
+      const countryCodeObj = parsePhoneCountryCode(phone);
+      if (countryCodeObj) {
+        setCountryCode(countryCodeObj);
+        // Extract the phone number without country code
+        const phoneWithoutCode = phone.substring(countryCodeObj.code.length);
+        setPhoneNumber(phoneWithoutCode);
+      }
+    }
+    
+    // Auto-verify if token or code and phone are provided in URL
+    if ((token || code) && phone) {
       handleVerify();
     }
-  }, [token, code, phoneNumber]);
+  }, [token, code, phone]);
+
+  // Function to parse phone number and find country code
+  const parsePhoneCountryCode = (fullPhone: string) => {
+    // Import country codes from phone-input component
+    const countryCodes = [
+      { name: "India", code: "+91", flag: "🇮🇳" },
+      { name: "United States", code: "+1", flag: "🇺🇸" },
+      { name: "United Kingdom", code: "+44", flag: "🇬🇧" },
+      // ... other country codes
+    ];
+    
+    // Find the matching country code (starting with the longest ones to avoid partial matches)
+    const sortedCodes = [...countryCodes].sort((a, b) => b.code.length - a.code.length);
+    return sortedCodes.find(country => fullPhone.startsWith(country.code));
+  };
+
+  const handleCountryChange = (country: {name: string, code: string, flag: string}) => {
+    setCountryCode(country);
+  };
 
   const handleVerify = async () => {
     if (!phoneNumber) {
@@ -40,10 +74,12 @@ export default function VerificationPage() {
     setError("");
 
     try {
+      const fullPhoneNumber = `${countryCode.code}${phoneNumber.replace(/\s/g, '')}`;
+      
       const { data, error } = await supabase.functions.invoke("verify-employee-code", {
         body: {
           code: verificationCode,
-          phoneNumber,
+          phoneNumber: fullPhoneNumber,
           token
         }
       });
@@ -80,11 +116,12 @@ export default function VerificationPage() {
                 <label htmlFor="phone" className="text-sm font-medium">
                   Your Phone Number
                 </label>
-                <Input
+                <PhoneInput
                   id="phone"
-                  placeholder="Enter phone number"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={(value) => setPhoneNumber(value)}
+                  selectedCountry={countryCode}
+                  onCountryChange={handleCountryChange}
                   disabled={loading}
                 />
                 <p className="text-xs text-slate-500">

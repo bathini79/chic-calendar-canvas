@@ -1,57 +1,10 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
-
-const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
-const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
-const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')
 
 // Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function generateOTP() {
-  // Generate a 6-digit OTP
-  return Math.floor(100000 + Math.random() * 900000).toString()
-}
-
-async function sendWhatsAppOTP(phoneNumber: string, otp: string) {
-  // Make sure the phone number is in E.164 format
-  const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`
-  
-  const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
-  
-  const formData = new URLSearchParams()
-  formData.append('From', `whatsapp:${TWILIO_PHONE_NUMBER}`)
-  formData.append('To', `whatsapp:${formattedPhone}`)
-  formData.append('Body', `Your verification code is: ${otp}`)
-
-  const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)
-  
-  try {
-    const response = await fetch(twilioUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${auth}`
-      },
-      body: formData
-    })
-    
-    const responseData = await response.json()
-    
-    if (!response.ok) {
-      console.error('Error from Twilio:', responseData)
-      throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || JSON.stringify(responseData)}`)
-    }
-    
-    return responseData
-  } catch (error) {
-    console.error('Failed to send WhatsApp message:', error)
-    throw error
-  }
 }
 
 serve(async (req) => {
@@ -61,74 +14,213 @@ serve(async (req) => {
   }
 
   try {
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-      console.error('Twilio credentials missing:', {
-        ACCOUNT_SID_EXISTS: !!TWILIO_ACCOUNT_SID,
-        AUTH_TOKEN_EXISTS: !!TWILIO_AUTH_TOKEN,
-        PHONE_NUMBER_EXISTS: !!TWILIO_PHONE_NUMBER
-      })
-      throw new Error('Twilio credentials not configured')
-    }
-    
     // Parse request body
-    const { phoneNumber } = await req.json()
+    const { phoneNumber, employeeId, method = 'whatsapp', fullName } = await req.json()
     
     if (!phoneNumber) {
       throw new Error('Phone number is required')
     }
+
+    // Get base URL for verification links
+    const baseUrl = Deno.env.get('SITE_URL') || 'http://localhost:3000'
     
-    // Generate OTP
-    const otp = generateOTP()
+    // Initialize Supabase client with service role key for admin operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') as string,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
+    )
     
-    // Store OTP in database for verification
-    const supabaseClient = Deno.env.get('SUPABASE_URL') && Deno.env.get('SUPABASE_ANON_KEY')
-      ? createClient(
-          Deno.env.get('SUPABASE_URL') as string,
-          Deno.env.get('SUPABASE_ANON_KEY') as string,
-          { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-        )
-      : null
-      
-    if (supabaseClient) {
-      try {
-        // First, delete any existing OTP for this phone number
-        await supabaseClient
-          .from('phone_auth_codes')
-          .delete()
-          .eq('phone_number', phoneNumber);
-        
-        // Then store the new OTP with expiration (10 minutes)
-        const expiresAt = new Date()
-        expiresAt.setMinutes(expiresAt.getMinutes() + 10)
-        
-        const { error } = await supabaseClient
-          .from('phone_auth_codes')
-          .insert({
-            phone_number: phoneNumber,
-            code: otp,
-            expires_at: expiresAt.toISOString(),
-            created_at: new Date().toISOString()
-          })
-          
-        if (error) {
-          console.error('Error storing OTP in database:', error)
-          throw new Error(`Failed to store OTP: ${error.message}`)
-        }
-        
-      } catch (error: any) {
-        console.error('Database operation failed:', error)
-        throw new Error(`Failed to store OTP: ${error.message}`)
-      }
-    } else {
-      console.error('Supabase client could not be initialized')
-      throw new Error('Database connection error')
+    // Generate a random 6-digit OTP code
+    const generateOTP = () => {
+      return Math.floor(100000 + Math.random() * 900000).toString()
     }
     
-    // Send OTP via WhatsApp
-    await sendWhatsAppOTP(phoneNumber, otp)
+    const otp = generateOTP()
+    const expiresInMinutes = 15
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000)
     
+    // Load Twilio configuration
+    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
+    const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
+    const twilioWhatsappNumber = Deno.env.get('TWILIO_WHATSAPP_NUMBER')
+    
+    if (!accountSid || !authToken || !twilioPhoneNumber) {
+      throw new Error('Twilio credentials are not configured')
+    }
+    
+    let messageResponse
+    let storedEntity
+
+    // Handle employee verification flow
+    if (employeeId) {
+      // Store OTP in database for later verification
+      const { error: otpError } = await supabaseAdmin
+        .from('employee_verification_codes')
+        .insert({
+          employee_id: employeeId,
+          code: otp,
+          expires_at: expiresAt.toISOString()
+        })
+        
+      if (otpError) {
+        throw new Error(`Failed to store verification code: ${otpError.message}`)
+      }
+      
+      // Create a verification token for a clickable link
+      const verificationToken = crypto.randomUUID()
+      
+      // Store verification token
+      const { error: tokenError } = await supabaseAdmin
+        .from('employee_verification_links')
+        .insert({
+          employee_id: employeeId,
+          verification_token: verificationToken,
+          expires_at: expiresAt.toISOString()
+        })
+        
+      if (tokenError) {
+        console.error('Failed to store verification token:', tokenError)
+      }
+      
+      // Create verification link with token
+      const verificationLink = `${baseUrl}/verify?token=${verificationToken}&phone=${encodeURIComponent(phoneNumber)}`
+      
+      // Create verification link with code
+      const codeVerificationLink = `${baseUrl}/verify?code=${otp}&phone=${encodeURIComponent(phoneNumber)}`
+      
+      // Compose message with verification link
+      let message
+      
+      if (fullName) {
+        message = `Hello ${fullName}, 
+
+Your verification code is: *${otp}*
+
+Click the link below to verify your account:
+${verificationLink}
+
+This code will expire in ${expiresInMinutes} minutes.
+
+Thank you for joining our team!`
+      } else {
+        message = `Hello, 
+
+Your verification code is: *${otp}*
+
+Click the link below to verify your account:
+${verificationLink}
+
+This code will expire in ${expiresInMinutes} minutes.
+
+Thank you for joining our team!`
+      }
+      
+      // Send message using Twilio
+      const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
+      
+      if (method === 'whatsapp') {
+        // Send via WhatsApp
+        const body = new URLSearchParams({
+          To: `whatsapp:${phoneNumber}`,
+          From: `whatsapp:${twilioWhatsappNumber}`,
+          Body: message
+        }).toString()
+
+        messageResponse = await fetch(twilioEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body
+        })
+      } else {
+        // Send via SMS
+        const body = new URLSearchParams({
+          To: phoneNumber,
+          From: twilioPhoneNumber,
+          Body: `Your verification code is: ${otp}. This code will expire in ${expiresInMinutes} minutes.`
+        }).toString()
+
+        messageResponse = await fetch(twilioEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body
+        })
+      }
+      
+      storedEntity = 'employee'
+    } else {
+      // Regular user auth flow - store in phone_auth_codes table
+      const { error: otpError } = await supabaseAdmin
+        .from('phone_auth_codes')
+        .insert({
+          phone_number: phoneNumber,
+          code: otp,
+          expires_at: expiresAt.toISOString()
+        })
+        
+      if (otpError) {
+        throw new Error(`Failed to store verification code: ${otpError.message}`)
+      }
+      
+      // Send message using Twilio
+      const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
+      
+      if (method === 'whatsapp') {
+        // Send via WhatsApp
+        const body = new URLSearchParams({
+          To: `whatsapp:${phoneNumber}`,
+          From: `whatsapp:${twilioWhatsappNumber}`,
+          Body: `Your verification code is: *${otp}*. This code will expire in ${expiresInMinutes} minutes.`
+        }).toString()
+
+        messageResponse = await fetch(twilioEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body
+        })
+      } else {
+        // Send via SMS
+        const body = new URLSearchParams({
+          To: phoneNumber,
+          From: twilioPhoneNumber,
+          Body: `Your verification code is: ${otp}. This code will expire in ${expiresInMinutes} minutes.`
+        }).toString()
+
+        messageResponse = await fetch(twilioEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body
+        })
+      }
+      
+      storedEntity = 'user'
+    }
+    
+    // Check if message was sent successfully
+    if (!messageResponse.ok) {
+      const errorData = await messageResponse.json()
+      throw new Error(`Failed to send message: ${JSON.stringify(errorData)}`)
+    }
+    
+    // Return success response
     return new Response(
-      JSON.stringify({ message: 'OTP sent successfully' }),
+      JSON.stringify({ 
+        success: true,
+        message: `Verification code sent to ${phoneNumber}`,
+        entity: storedEntity
+      }),
       { 
         headers: { 
           ...corsHeaders,
@@ -141,13 +233,16 @@ serve(async (req) => {
     console.error('Error sending OTP:', error)
     
     return new Response(
-      JSON.stringify({ error: error.message || "Unknown error occurred" }),
+      JSON.stringify({ 
+        success: false,
+        error: error.message || "Unknown error occurred" 
+      }),
       { 
         headers: { 
           ...corsHeaders, 
           'Content-Type': 'application/json' 
         },
-        status: 400 
+        status: 200 
       }
     )
   }

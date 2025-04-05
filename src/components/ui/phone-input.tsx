@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, ChevronDown, Globe } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -16,62 +16,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-
-// Country codes data
-const countryCodes = [
-  { name: "India", code: "+91", flag: "🇮🇳" },
-  { name: "United States", code: "+1", flag: "🇺🇸" },
-  { name: "United Kingdom", code: "+44", flag: "🇬🇧" },
-  { name: "Canada", code: "+1", flag: "🇨🇦" },
-  { name: "Australia", code: "+61", flag: "🇦🇺" },
-  { name: "Afghanistan", code: "+93", flag: "🇦🇫" },
-  { name: "Albania", code: "+355", flag: "🇦🇱" },
-  { name: "Algeria", code: "+213", flag: "🇩🇿" },
-  { name: "Argentina", code: "+54", flag: "🇦🇷" },
-  { name: "Austria", code: "+43", flag: "🇦🇹" },
-  { name: "Bahrain", code: "+973", flag: "🇧🇭" },
-  { name: "Bangladesh", code: "+880", flag: "🇧🇩" },
-  { name: "Belgium", code: "+32", flag: "🇧🇪" },
-  { name: "Brazil", code: "+55", flag: "🇧🇷" },
-  { name: "China", code: "+86", flag: "🇨🇳" },
-  { name: "Egypt", code: "+20", flag: "🇪🇬" },
-  { name: "France", code: "+33", flag: "🇫🇷" },
-  { name: "Germany", code: "+49", flag: "🇩🇪" },
-  { name: "Indonesia", code: "+62", flag: "🇮🇩" },
-  { name: "Iran", code: "+98", flag: "🇮🇷" },
-  { name: "Iraq", code: "+964", flag: "🇮🇶" },
-  { name: "Ireland", code: "+353", flag: "🇮🇪" },
-  { name: "Italy", code: "+39", flag: "🇮🇹" },
-  { name: "Japan", code: "+81", flag: "🇯🇵" },
-  { name: "Kuwait", code: "+965", flag: "🇰🇼" },
-  { name: "Malaysia", code: "+60", flag: "🇲🇾" },
-  { name: "Mexico", code: "+52", flag: "🇲🇽" },
-  { name: "Netherlands", code: "+31", flag: "🇳🇱" },
-  { name: "New Zealand", code: "+64", flag: "🇳🇿" },
-  { name: "Norway", code: "+47", flag: "🇳🇴" },
-  { name: "Oman", code: "+968", flag: "🇴🇲" },
-  { name: "Pakistan", code: "+92", flag: "🇵🇰" },
-  { name: "Philippines", code: "+63", flag: "🇵🇭" },
-  { name: "Qatar", code: "+974", flag: "🇶🇦" },
-  { name: "Russia", code: "+7", flag: "🇷🇺" },
-  { name: "Saudi Arabia", code: "+966", flag: "🇸🇦" },
-  { name: "Singapore", code: "+65", flag: "🇸🇬" },
-  { name: "South Africa", code: "+27", flag: "🇿🇦" },
-  { name: "South Korea", code: "+82", flag: "🇰🇷" },
-  { name: "Spain", code: "+34", flag: "🇪🇸" },
-  { name: "Sweden", code: "+46", flag: "🇸🇪" },
-  { name: "Switzerland", code: "+41", flag: "🇨🇭" },
-  { name: "Syria", code: "+963", flag: "🇸🇾" },
-  { name: "Thailand", code: "+66", flag: "🇹🇭" },
-  { name: "Turkey", code: "+90", flag: "🇹🇷" },
-  { name: "United Arab Emirates", code: "+971", flag: "🇦🇪" },
-  { name: "Vietnam", code: "+84", flag: "🇻🇳" },
-];
+import { countryCodes, CountryCode } from "@/lib/country-codes";
 
 export interface PhoneInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
   onChange?: (value: string) => void;
-  onCountryChange?: (country: {name: string, code: string, flag: string}) => void;
-  selectedCountry?: {name: string, code: string, flag: string};
+  onCountryChange?: (country: CountryCode) => void;
+  selectedCountry?: CountryCode;
 }
 
 const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
@@ -79,7 +29,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     const [country, setCountry] = React.useState(selectedCountry || countryCodes[0]);
     const [open, setOpen] = React.useState(false);
 
-    const handleCountrySelect = (selectedCountry: typeof country) => {
+    const handleCountrySelect = (selectedCountry: CountryCode) => {
       setCountry(selectedCountry);
       setOpen(false);
       if (onCountryChange) {
