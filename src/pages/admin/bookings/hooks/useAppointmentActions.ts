@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { Appointment, RefundData, TransactionDetails } from '../types';
 import { useAppointmentNotifications, NOTIFICATION_TYPES } from '@/hooks/use-appointment-notifications';
 
-// Define the RefundReason type to match what's expected in the database
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
 
 interface SelectedItem {
@@ -28,7 +27,6 @@ export const useAppointmentActions = () => {
     try {
       setIsLoading(true);
 
-      // First fetch the appointment
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
         .select(`
@@ -46,14 +44,12 @@ export const useAppointmentActions = () => {
 
       if (appointmentError) throw appointmentError;
 
-      // Cast the data to match our expected types
       const typedAppointment = {
         ...appointment,
         discount_type: appointment.discount_type as Appointment['discount_type'],
-        location_id: appointment.location,  // Map location to location_id for compatibility
+        location_id: appointment.location,
       } as unknown as Appointment;
 
-      // If this is a refund, get the original sale
       if (typedAppointment.transaction_type === 'refund') {
         const { data: originalSale, error: originalError } = await supabase
           .from('appointments')
@@ -72,14 +68,12 @@ export const useAppointmentActions = () => {
 
         if (originalError) throw originalError;
 
-        // Cast the original sale data
         const typedOriginalSale = {
           ...originalSale,
           discount_type: originalSale.discount_type as Appointment['discount_type'],
-          location_id: originalSale.location, // Map location to location_id
+          location_id: originalSale.location,
         } as unknown as Appointment;
 
-        // Get all refunds for this original sale
         const { data: refunds, error: refundsError } = await supabase
           .from('appointments')
           .select(`
@@ -97,14 +91,12 @@ export const useAppointmentActions = () => {
 
         if (refundsError) throw refundsError;
 
-        // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
           discount_type: refund.discount_type as Appointment['discount_type'],
-          location_id: refund.location, // Map location to location_id
+          location_id: refund.location,
         })) as unknown as Appointment[];
 
-        // Create TransactionDetails with all required properties
         return {
           id: typedOriginalSale.id,
           amount: typedOriginalSale.total_price,
@@ -115,7 +107,6 @@ export const useAppointmentActions = () => {
           refunds: typedRefunds || []
         };
       } else {
-        // This is the original sale, get all its refunds
         const { data: refunds, error: refundsError } = await supabase
           .from('appointments')
           .select(`
@@ -133,14 +124,12 @@ export const useAppointmentActions = () => {
 
         if (refundsError) throw refundsError;
 
-        // Cast the refunds data
         const typedRefunds = refunds?.map(refund => ({
           ...refund,
           discount_type: refund.discount_type as Appointment['discount_type'],
-          location_id: refund.location, // Map location to location_id
+          location_id: refund.location,
         })) as unknown as Appointment[];
 
-        // Create TransactionDetails with all required properties
         return {
           id: typedAppointment.id,
           amount: typedAppointment.total_price,
@@ -168,7 +157,6 @@ export const useAppointmentActions = () => {
     try {
       setIsLoading(true);
 
-      // First get the original appointment details
       const { data: originalAppointment, error: appointmentError } = await supabase
         .from('appointments')
         .select('*, tax:tax_rates(*)')
@@ -177,14 +165,13 @@ export const useAppointmentActions = () => {
 
       if (appointmentError) throw appointmentError;
 
-      // Map refund reason to allowed values
       let mappedRefundReason: RefundReason = "other";
       if (refundData.reason === "booking_error") {
-        mappedRefundReason = "scheduling_error"; // Map booking_error to scheduling_error
+        mappedRefundReason = "scheduling_error";
       } else if (refundData.reason === "service_unavailable") {
-        mappedRefundReason = "service_quality_issue"; // Map service_unavailable to service_quality_issue
+        mappedRefundReason = "service_quality_issue";
       } else if (refundData.reason === "customer_emergency" || refundData.reason === "customer_no_show") {
-        mappedRefundReason = "other"; // Map customer reasons to other
+        mappedRefundReason = "other";
       } else if (
         ["customer_dissatisfaction", "service_quality_issue", "scheduling_error", 
          "health_concern", "price_dispute", "other"].includes(refundData.reason as string)
@@ -192,7 +179,6 @@ export const useAppointmentActions = () => {
         mappedRefundReason = refundData.reason as RefundReason;
       }
 
-      // Get all bookings for this appointment to calculate refund amount
       const { data: allBookings, error: bookingsError } = await supabase
         .from('bookings')
         .select('id, status, price_paid, appointment_id')
@@ -200,25 +186,20 @@ export const useAppointmentActions = () => {
 
       if (bookingsError) throw bookingsError;
 
-      // Calculate total refund amount for selected bookings
       const refundAmount = allBookings
         ?.filter(booking => bookingIds.includes(booking.id))
         .reduce((total, booking) => total + (booking.price_paid || 0), 0) || 0;
         
-      // Calculate proportion of total being refunded
       const totalBookingsAmount = allBookings?.reduce((total, booking) => 
         total + (booking.price_paid || 0), 0) || 0;
       
       const refundProportion = totalBookingsAmount > 0 ? refundAmount / totalBookingsAmount : 0;
       
-      // Calculate tax amount to refund proportionally
       const taxAmount = originalAppointment.tax_amount || 0;
       const taxToRefund = taxAmount * refundProportion;
       
-      // Total refund including tax
       const totalRefundAmount = refundAmount + taxToRefund;
 
-      // Create a refund transaction
       const { data: refundAppointment, error: refundError } = await supabase
         .from('appointments')
         .insert({
@@ -229,9 +210,9 @@ export const useAppointmentActions = () => {
           refunded_by: refundData.refundedBy,
           refund_reason: mappedRefundReason,
           refund_notes: refundData.notes,
-          total_price: -totalRefundAmount, // Negative amount to indicate refund
-          tax_amount: -taxToRefund, // Negative tax amount for the refund
-          tax_id: originalAppointment.tax_id, // Keep the same tax ID for reference
+          total_price: -totalRefundAmount,
+          tax_amount: -taxToRefund,
+          tax_id: originalAppointment.tax_id,
           start_time: originalAppointment.start_time,
           end_time: originalAppointment.end_time,
           discount_type: originalAppointment.discount_type,
@@ -243,14 +224,13 @@ export const useAppointmentActions = () => {
           coupon_id: originalAppointment.coupon_id,
           coupon_name: originalAppointment.coupon_name,
           coupon_amount: originalAppointment.coupon_amount,
-          location: originalAppointment.location // Preserve the same location for the refund
+          location: originalAppointment.location
         })
         .select()
         .single();
 
       if (refundError) throw refundError;
 
-      // Update the original bookings
       const { error: bookingUpdateError } = await supabase
         .from('bookings')
         .update({
@@ -264,12 +244,10 @@ export const useAppointmentActions = () => {
 
       if (bookingUpdateError) throw bookingUpdateError;
 
-      // Check if all bookings are now refunded
       const isFullRefund = allBookings?.every(booking => 
         booking.status === 'refunded' || bookingIds.includes(booking.id)
       );
 
-      // Clone the selected bookings for the refund transaction with negative amounts
       for (const bookingId of bookingIds) {
         const originalBooking = allBookings?.find(b => b.id === bookingId);
         if (originalBooking) {
@@ -281,7 +259,6 @@ export const useAppointmentActions = () => {
             
           if (detailsError) throw detailsError;
             
-          // Create a new booking record for the refund with negative price
           await supabase
             .from('bookings')
             .insert({
@@ -289,7 +266,7 @@ export const useAppointmentActions = () => {
               service_id: bookingDetails.service_id,
               package_id: bookingDetails.package_id,
               employee_id: bookingDetails.employee_id,
-              price_paid: -bookingDetails.price_paid, // Negative price for refund
+              price_paid: -bookingDetails.price_paid,
               original_price: bookingDetails.original_price,
               status: 'refunded',
               start_time: bookingDetails.start_time,
@@ -298,7 +275,6 @@ export const useAppointmentActions = () => {
         }
       }
 
-      // Update the original appointment status
       const { error: originalAppointmentError } = await supabase
         .from('appointments')
         .update({
@@ -308,7 +284,6 @@ export const useAppointmentActions = () => {
 
       if (originalAppointmentError) throw originalAppointmentError;
 
-      // Refresh the selected items after refund
       await fetchAppointmentDetails(appointmentId);
 
       toast.success('Refund processed successfully');
@@ -330,7 +305,6 @@ export const useAppointmentActions = () => {
     try {
       setIsLoading(true);
 
-      // First update the appointment status
       const { error: appointmentError } = await supabase
         .from('appointments')
         .update({ 
@@ -341,7 +315,6 @@ export const useAppointmentActions = () => {
 
       if (appointmentError) throw appointmentError;
 
-      // Then update all associated bookings
       const { error: bookingsError } = await supabase
         .from('bookings')
         .update({ 
@@ -352,7 +325,6 @@ export const useAppointmentActions = () => {
 
       if (bookingsError) throw bookingsError;
 
-      // Send appropriate notification based on status
       try {
         if (status === 'confirmed') {
           await sendNotification(appointmentId, 'APPOINTMENT_CONFIRMED');
@@ -361,7 +333,6 @@ export const useAppointmentActions = () => {
         }
       } catch (notificationError) {
         console.error('Error sending notification:', notificationError);
-        // We don't want to fail the status update if notification fails
       }
 
       let message = '';
@@ -402,9 +373,7 @@ export const useAppointmentActions = () => {
     }
   };
 
-  // Add convenience methods for common status updates
   const cancelAppointment = async (appointmentId: string, bookingIds: string[] = []) => {
-    // If no specific booking IDs provided, get all bookings for the appointment
     if (bookingIds.length === 0) {
       const { data, error } = await supabase
         .from('bookings')
@@ -430,7 +399,6 @@ export const useAppointmentActions = () => {
     return updateAppointmentStatus(appointmentId, status, bookingIds);
   };
 
-  // New function to send a booking confirmation notification
   const sendBookingConfirmation = async (appointmentId: string) => {
     try {
       setIsLoading(true);
@@ -445,7 +413,6 @@ export const useAppointmentActions = () => {
     }
   };
 
-  // New function to send a reminder notification
   const sendReminderNotification = async (appointmentId: string, hoursBeforeAppointment: 1 | 4) => {
     try {
       setIsLoading(true);

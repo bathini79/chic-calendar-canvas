@@ -70,16 +70,13 @@ export default function useSaveAppointment({
     try {
       setIsLoading(true);
       
-      // Extract appointment ID if it was passed as first parameter (backward compatibility)
       let appointmentId: string | undefined;
       let summaryParams: any = {};
       
       if (params) {
         if (typeof params === 'string') {
-          // If params is a string, it's an appointmentId from the old function signature
           appointmentId = params;
         } else if (typeof params === 'object') {
-          // If params is an object, it contains summary values AND might contain appointmentId
           summaryParams = params;
           
           if (params.appointmentId) {
@@ -103,7 +100,6 @@ export default function useSaveAppointment({
         return;
       }
 
-      // Parse the time string and combine it with the selected date
       const timeComponents = selectedTime.split(':');
       const hours = parseInt(timeComponents[0], 10);
       const minutes = parseInt(timeComponents[1], 10);
@@ -111,7 +107,6 @@ export default function useSaveAppointment({
       const startTime = new Date(selectedDate);
       startTime.setHours(hours, minutes, 0, 0);
 
-      // Get all selected services and packages
       const selectedServiceObjects = selectedServices.map(id => 
         services.find(s => s.id === id)
       ).filter(Boolean);
@@ -120,11 +115,9 @@ export default function useSaveAppointment({
         packages.find(p => p.id === id)
       ).filter(Boolean);
 
-      // Calculate total duration and end time
       const totalDuration = getTotalDuration(selectedServiceObjects, selectedPackageObjects);
       const endTime = addMinutes(startTime, totalDuration);
 
-      // Extract values from summary params or use defaults
       const calculatedTaxAmount = summaryParams.taxAmount !== undefined ? 
         summaryParams.taxAmount : 
         taxAmount;
@@ -133,22 +126,18 @@ export default function useSaveAppointment({
         summaryParams.couponDiscount : 
         couponDiscount;
         
-      // Use provided summary total price or calculate it
       const totalPrice = summaryParams.total !== undefined ? 
         summaryParams.total : 
         getTotalPrice(selectedServiceObjects, selectedPackageObjects, discountType, discountValue) - calculatedCouponDiscount + calculatedTaxAmount;
       
-      // Use provided tax and coupon IDs or fall back to props
       const usedTaxId = summaryParams.appliedTaxId !== undefined ? 
         (typeof summaryParams.appliedTaxId === 'object' && summaryParams.appliedTaxId !== null ? 
           summaryParams.appliedTaxId.id || summaryParams.appliedTaxId : summaryParams.appliedTaxId) : 
         appliedTaxId;
         
-      // Create or update appointment with properly typed status
       const appointmentStatus: AppointmentStatus = 
         status || (currentScreen === SCREEN.CHECKOUT ? 'completed' : 'booked');
 
-      // If we're updating an existing appointment, first fetch its current data to preserve values
       let existingAppointmentLocation;
       if (appointmentId) {
         const { data: existingAppointment, error } = await supabase
@@ -166,7 +155,7 @@ export default function useSaveAppointment({
         customer_id: selectedCustomer.id,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
-        location: locationId || existingAppointmentLocation || null, // Preserve location or use provided locationId
+        location: locationId || existingAppointmentLocation || null,
         notes: notes,
         status: appointmentStatus,
         total_price: totalPrice,
@@ -187,7 +176,6 @@ export default function useSaveAppointment({
       let isNewAppointment = false;
 
       if (appointmentId) {
-        // Update existing appointment
         const { error } = await supabase
           .from('appointments')
           .update(appointmentData)
@@ -196,7 +184,6 @@ export default function useSaveAppointment({
         if (error) throw error;
         createdAppointmentId = appointmentId;
 
-        // Delete existing bookings
         const { error: deleteError } = await supabase
           .from('bookings')
           .delete()
@@ -204,7 +191,6 @@ export default function useSaveAppointment({
 
         if (deleteError) throw deleteError;
       } else {
-        // Create new appointment
         const { data, error } = await supabase
           .from('appointments')
           .insert(appointmentData)
@@ -216,7 +202,6 @@ export default function useSaveAppointment({
         isNewAppointment = true;
       }
 
-      // Create bookings for each service with properly typed status
       for (const serviceId of selectedServices) {
         const service = services.find(s => s.id === serviceId);
         if (!service) continue;
@@ -225,7 +210,6 @@ export default function useSaveAppointment({
         const bookingStatus: AppointmentStatus = 
           currentScreen === SCREEN.CHECKOUT ? 'completed' : 'booked';
           
-        // Use adjusted price if available, otherwise use original price
         const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[serviceId] !== undefined
           ? summaryParams.adjustedPrices[serviceId]
           : service.selling_price;
@@ -248,12 +232,10 @@ export default function useSaveAppointment({
         if (error) throw error;
       }
 
-      // Create bookings for each package
       for (const packageId of selectedPackages) {
         const pkg = packages.find(p => p.id === packageId);
         if (!pkg) continue;
 
-        // For each service in the package
         const packageServiceIds = pkg.package_services?.map((ps: any) => ps.service.id) || [];
         
         for (const packageServiceId of packageServiceIds) {
@@ -262,10 +244,9 @@ export default function useSaveAppointment({
 
           const packageServiceStartTime = new Date(startTime);
           
-          // Use adjusted price if available
           const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[packageServiceId] !== undefined
             ? summaryParams.adjustedPrices[packageServiceId]
-            : 0; // Package services typically don't have individual prices
+            : 0;
 
           const bookingData = {
             appointment_id: createdAppointmentId,
@@ -286,7 +267,6 @@ export default function useSaveAppointment({
           if (error) throw error;
         }
 
-        // Add any customized services for this package
         const customServiceIds = customizedServices[packageId] || [];
         for (const customServiceId of customServiceIds) {
           const customService = services.find(s => s.id === customServiceId);
@@ -294,11 +274,9 @@ export default function useSaveAppointment({
 
           const customServiceStartTime = new Date(startTime);
           
-          // Check if this service is already in the package
           const isInPackage = packageServiceIds.includes(customServiceId);
-          if (isInPackage) continue; // Skip if already handled above
-          
-          // Use adjusted price if available
+          if (isInPackage) continue;
+
           const pricePaid = summaryParams.adjustedPrices && summaryParams.adjustedPrices[customServiceId] !== undefined
             ? summaryParams.adjustedPrices[customServiceId]
             : customService.selling_price;
@@ -323,7 +301,6 @@ export default function useSaveAppointment({
         }
       }
 
-      // Update the appointment with the number of bookings
       const { count, error: countError } = await supabase
         .from('bookings')
         .select('id', { count: 'exact' })
@@ -338,21 +315,17 @@ export default function useSaveAppointment({
 
       if (updateError) throw updateError;
 
-      // Send booking confirmation notification for new appointments
       if (isNewAppointment && createdAppointmentId) {
         try {
           await sendNotification(createdAppointmentId, 'BOOKING_CONFIRMATION');
         } catch (notificationError) {
           console.error('Failed to send booking notification:', notificationError);
-          // Don't fail the appointment creation if notification fails
         }
       } else if (appointmentStatus === 'completed' && createdAppointmentId) {
-        // Send completed notification when appointment is marked as completed
         try {
           await sendNotification(createdAppointmentId, 'APPOINTMENT_COMPLETED');
         } catch (notificationError) {
           console.error('Failed to send completion notification:', notificationError);
-          // Don't fail the appointment update if notification fails
         }
       }
 
