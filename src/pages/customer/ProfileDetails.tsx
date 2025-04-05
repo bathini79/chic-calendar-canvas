@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -59,9 +58,11 @@ const ProfileDetails = () => {
   
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const { customerMemberships, fetchCustomerMemberships } = useCustomerMemberships();
+  const { customerMemberships } = useCustomerMemberships();
   const [hasMembership, setHasMembership] = useState(false);
+  const [profileFetched, setProfileFetched] = useState(false);
 
+  // Get session data using React Query
   const { data: session } = useQuery({
     queryKey: ["session"],
     queryFn: async () => {
@@ -70,16 +71,19 @@ const ProfileDetails = () => {
     },
   });
 
+  const userId = session?.user?.id;
+
+  // Fetch user profile once when userId is available
   useEffect(() => {
+    if (!userId || profileFetched) return;
+    
     const fetchUserProfile = async () => {
-      if (!session?.user?.id) return;
-      
       setIsLoading(true);
       try {
         const { data, error } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", session.user.id)
+          .eq("id", userId)
           .single();
         
         if (error) throw error;
@@ -99,10 +103,8 @@ const ProfileDetails = () => {
             avatar_url: data.avatar_url || "",
             lead_source: data.lead_source || "",
           });
+          setProfileFetched(true);
         }
-        
-        // Check if user has any memberships
-        await fetchCustomerMemberships(session.user.id);
       } catch (error) {
         console.error("Error fetching profile:", error);
         toast.error("Failed to load profile data");
@@ -112,19 +114,18 @@ const ProfileDetails = () => {
     };
 
     fetchUserProfile();
-  }, [session, fetchCustomerMemberships]);
+  }, [userId, profileFetched]);
 
-  // Check if the user has an active membership
+  // Check if user has active memberships
   useEffect(() => {
-    if (customerMemberships && customerMemberships.length > 0) {
-      const now = new Date();
-      const activeMemberships = customerMemberships.filter(membership => 
-        new Date(membership.end_date) > now
-      );
-      setHasMembership(activeMemberships.length > 0);
-    } else {
-      setHasMembership(false);
-    }
+    if (!customerMemberships) return;
+    
+    const now = new Date();
+    const activeMemberships = customerMemberships.filter(
+      (membership) => new Date(membership.end_date) > now
+    );
+
+    setHasMembership(activeMemberships.length > 0);
   }, [customerMemberships]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -215,22 +216,6 @@ const ProfileDetails = () => {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium">
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  name="email"
-                  value={formData.email || ""}
-                  disabled
-                  className="bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Email cannot be changed
-                </p>
-              </div>
-
-              <div className="space-y-2">
                 <label htmlFor="phone_number" className="text-sm font-medium">
                   Phone Number
                 </label>
@@ -276,89 +261,7 @@ const ProfileDetails = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
-              {!hasMembership && (
-                <div className="space-y-2">
-                  <label htmlFor="lead_source" className="text-sm font-medium">
-                    How did you hear about us?
-                  </label>
-                  <Select
-                    value={formData.lead_source || ""}
-                    onValueChange={(value) => handleSelectChange("lead_source", value)}
-                  >
-                    <SelectTrigger id="lead_source">
-                      <SelectValue placeholder="Select an option" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {referralSources.map((source) => (
-                        <SelectItem key={source.value} value={source.value}>
-                          {source.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
-
-            {!hasMembership && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Social Media</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label htmlFor="linkedin_url" className="text-sm font-medium">
-                      LinkedIn
-                    </label>
-                    <Input
-                      id="linkedin_url"
-                      name="linkedin_url"
-                      value={formData.linkedin_url || ""}
-                      onChange={handleInputChange}
-                      placeholder="https://linkedin.com/in/yourprofile"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="twitter_url" className="text-sm font-medium">
-                      Twitter
-                    </label>
-                    <Input
-                      id="twitter_url"
-                      name="twitter_url"
-                      value={formData.twitter_url || ""}
-                      onChange={handleInputChange}
-                      placeholder="https://twitter.com/yourusername"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="instagram_url" className="text-sm font-medium">
-                      Instagram
-                    </label>
-                    <Input
-                      id="instagram_url"
-                      name="instagram_url"
-                      value={formData.instagram_url || ""}
-                      onChange={handleInputChange}
-                      placeholder="https://instagram.com/yourusername"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="facebook_url" className="text-sm font-medium">
-                      Facebook
-                    </label>
-                    <Input
-                      id="facebook_url"
-                      name="facebook_url"
-                      value={formData.facebook_url || ""}
-                      onChange={handleInputChange}
-                      placeholder="https://facebook.com/yourusername"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="flex justify-end">
               <Button type="submit" disabled={isSaving}>

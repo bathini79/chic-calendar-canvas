@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from "react";
-import { Star, StarHalf, Calendar } from "lucide-react";
+import { Star, Calendar } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,15 +13,21 @@ interface MembershipDetailsCardProps {
 export function MembershipDetailsCard({ customerId }: MembershipDetailsCardProps) {
   const { customerMemberships, fetchCustomerMemberships } = useCustomerMemberships();
   const [loading, setLoading] = useState(true);
+  const [hasFetched, setHasFetched] = useState(false); // Add state to track if we've already fetched
 
   useEffect(() => {
-    if (customerId) {
+    // Only fetch if we haven't already and we have a customerId
+    if (customerId && !hasFetched) {
       setLoading(true);
-      fetchCustomerMemberships(customerId).finally(() => {
-        setLoading(false);
-      });
+      fetchCustomerMemberships(customerId)
+        .then(() => {
+          setHasFetched(true); // Mark as fetched after successful completion
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }
-  }, [customerId, fetchCustomerMemberships]);
+  }, [customerId, fetchCustomerMemberships, hasFetched]);
 
   if (loading) {
     return (
@@ -41,7 +46,7 @@ export function MembershipDetailsCard({ customerId }: MembershipDetailsCardProps
     );
   }
 
-  if (!customerMemberships.length) {
+  if (!customerMemberships?.length) {
     return null;
   }
 

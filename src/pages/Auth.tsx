@@ -221,8 +221,6 @@ const Auth = () => {
       if (response.data && response.data.error) {
         if (response.data.error === "new_user_requires_name") {
           setNeedsFullName(true);
-          setVerificationError("Please enter your full name to complete registration");
-          setEdgeFunctionError("New user registration requires a full name");
           toast.info("New user detected. Please enter your full name to complete registration.");
           setIsLoading(false);
           return;
