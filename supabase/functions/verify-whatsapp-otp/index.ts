@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
@@ -84,7 +85,7 @@ serve(async (req) => {
     
     let userId = null
     let isNewUser = false
-    let session = null
+    let credentials = null
     
     // Step 3: Handle authentication based on whether user exists
     if (userError || !existingUser) {
@@ -105,11 +106,16 @@ serve(async (req) => {
         )
       }
       
+      // Create a unique email based on phone number
+      const email = `${phoneNumber.replace(/[^0-9]/g, '')}@phone.user`
+      // Generate a random password
+      const password = crypto.randomUUID()
+      
       // Create new user with phone as unique identifier
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         phone: phoneNumber,
-        email: `${phoneNumber.replace(/[^0-9]/g, '')}@phone.user`, // Create a virtual email
-        password: crypto.randomUUID(), // Random password as it's passwordless
+        email: email,
+        password: password,
         phone_confirm: true,
         email_confirm: true,
         user_metadata: { 
@@ -151,26 +157,11 @@ serve(async (req) => {
         console.error('Error creating profile:', profileError)
       }
       
-      // Create session
-      const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
-        user_id: userId
-      })
-      
-      if (sessionError) {
-        console.error('Error creating session:', sessionError)
-        return new Response(
-          JSON.stringify({ 
-            error: "session_creation_failed",
-            message: "Created account but failed to sign in automatically"
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200
-          }
-        )
+      // Return credentials for frontend to create session
+      credentials = {
+        email: email,
+        password: password
       }
-      
-      session = sessionData.session
     } else {
       // Existing user - direct sign in
       userId = existingUser.id
@@ -192,17 +183,24 @@ serve(async (req) => {
         )
       }
       
-      // Create session for existing user
-      const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
-        user_id: userId
-      })
+      // Extract email from user data
+      const email = userData.user.email
       
-      if (sessionError) {
-        console.error('Error creating session:', sessionError)
+      // Generate a one-time password for this login
+      const tempPassword = crypto.randomUUID()
+      
+      // Update the user's password
+      const { error: passwordUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        { password: tempPassword }
+      )
+      
+      if (passwordUpdateError) {
+        console.error('Error updating user password:', passwordUpdateError)
         return new Response(
           JSON.stringify({ 
-            error: "session_creation_failed",
-            message: "Failed to sign in user"
+            error: "password_update_failed",
+            message: "Failed to update user credentials"
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -211,7 +209,11 @@ serve(async (req) => {
         )
       }
       
-      session = sessionData.session
+      // Return credentials for frontend to create session
+      credentials = {
+        email: email,
+        password: tempPassword
+      }
     }
     
     // Delete used OTP
@@ -220,16 +222,14 @@ serve(async (req) => {
       .delete()
       .eq('phone_number', phoneNumber)
     
-    // Return session data
+    // Return user data and credentials
     return new Response(
       JSON.stringify({ 
         message: isNewUser ? 'Registration successful' : 'Login successful',
         isNewUser: isNewUser,
-        user: { id: userId, phone_number: phoneNumber },
-        session: {
-          access_token: session.access_token,
-          refresh_token: session.refresh_token
-        }
+        userId: userId,
+        phoneNumber: phoneNumber,
+        credentials: credentials
       }),
       { 
         headers: { 

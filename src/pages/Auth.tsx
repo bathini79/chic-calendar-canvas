@@ -1,4 +1,3 @@
-
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -234,39 +233,35 @@ const Auth = () => {
         return;
       }
 
-      // If we have a session in the response, set it
-      if (response.data && response.data.session) {
-        console.log("Setting session from response", response.data.session);
+      // If we have credentials in the response, sign in with them
+      if (response.data && response.data.credentials) {
+        console.log("Signing in with credentials from OTP verification");
         
         try {
-          // Apply the session using setSession
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: response.data.session.access_token,
-            refresh_token: response.data.session.refresh_token
+          // Sign in with the credentials
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: response.data.credentials.email,
+            password: response.data.credentials.password
           });
           
-          if (sessionError) {
-            console.error("Error setting session:", sessionError);
-            toast.error("Error logging in: " + sessionError.message);
+          if (signInError) {
+            console.error("Error signing in with credentials:", signInError);
+            toast.error("Error signing in: " + signInError.message);
             setIsLoading(false);
             return;
           }
           
-          // Invalidate session query to trigger app update
-          await queryClient.invalidateQueries({ queryKey: ["session"] });
-          
+          // Session will be handled by the auth state change listener
           toast.success(response.data.isNewUser ? 
             "Registration successful! Welcome!" : 
             "Login successful!");
-            
-          navigate("/");
-        } catch (sessionError: any) {
-          console.error("Error setting session:", sessionError);
-          toast.error("Error during authentication: " + sessionError.message);
+        } catch (signInError: any) {
+          console.error("Error signing in:", signInError);
+          toast.error("Error during authentication: " + signInError.message);
         }
       } else {
-        console.error("No session data in response:", response.data);
-        toast.error("Authentication response missing session data");
+        console.error("No credentials in response:", response.data);
+        toast.error("Authentication response missing credentials");
       }
     } catch (error: any) {
       console.error("OTP verification error:", error);
