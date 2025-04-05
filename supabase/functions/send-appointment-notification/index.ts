@@ -9,6 +9,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Define notification types
+const NOTIFICATION_TYPES = {
+  BOOKING_CONFIRMATION: 'booking_confirmation',
+  APPOINTMENT_CONFIRMED: 'appointment_confirmed',
+  REMINDER_1_HOUR: 'reminder_1_hour',
+  REMINDER_4_HOURS: 'reminder_4_hours',
+  APPOINTMENT_COMPLETED: 'appointment_completed'
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -17,10 +26,14 @@ serve(async (req) => {
 
   try {
     // Parse request body
-    const { appointmentId } = await req.json()
+    const { appointmentId, notificationType = NOTIFICATION_TYPES.BOOKING_CONFIRMATION } = await req.json()
     
     if (!appointmentId) {
       throw new Error('Appointment ID is required')
+    }
+    
+    if (!Object.values(NOTIFICATION_TYPES).includes(notificationType)) {
+      throw new Error(`Invalid notification type. Must be one of: ${Object.values(NOTIFICATION_TYPES).join(', ')}`)
     }
     
     // Initialize Supabase client
@@ -145,8 +158,51 @@ serve(async (req) => {
       minute: '2-digit'
     })
 
-    // Compose WhatsApp message
-    const message = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder about your upcoming appointment at ${appointment.location} on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe look forward to seeing you!`
+    // Get location name if available
+    let locationName = appointment.location || 'our salon';
+    if (appointment.location) {
+      try {
+        const { data: locationData } = await supabaseClient
+          .from('locations')
+          .select('name')
+          .eq('id', appointment.location)
+          .single();
+          
+        if (locationData?.name) {
+          locationName = locationData.name;
+        }
+      } catch (error) {
+        console.error("Error fetching location:", error);
+      }
+    }
+
+    // Compose WhatsApp message based on notification type
+    let message = '';
+    
+    switch (notificationType) {
+      case NOTIFICATION_TYPES.BOOKING_CONFIRMATION:
+        message = `Hello ${appointment.profiles.full_name},\n\nThank you for booking with us! Your appointment has been scheduled at ${locationName} on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe look forward to seeing you!`;
+        break;
+        
+      case NOTIFICATION_TYPES.APPOINTMENT_CONFIRMED:
+        message = `Hello ${appointment.profiles.full_name},\n\nYour appointment at ${locationName} has been confirmed for ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nSee you soon!`;
+        break;
+        
+      case NOTIFICATION_TYPES.REMINDER_1_HOUR:
+        message = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder that your appointment at ${locationName} is in 1 hour, at ${formattedTime} today.\n\nService(s): ${servicesText}\n\nWe're looking forward to seeing you soon!`;
+        break;
+        
+      case NOTIFICATION_TYPES.REMINDER_4_HOURS:
+        message = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder that your appointment at ${locationName} is coming up in 4 hours on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe're looking forward to seeing you!`;
+        break;
+        
+      case NOTIFICATION_TYPES.APPOINTMENT_COMPLETED:
+        message = `Hello ${appointment.profiles.full_name},\n\nThank you for visiting us today at ${locationName}. We hope you enjoyed your ${servicesText}.\n\nWe appreciate your business and look forward to seeing you again soon!`;
+        break;
+        
+      default:
+        message = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder about your upcoming appointment at ${locationName} on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe look forward to seeing you!`;
+    }
 
     // Initialize Twilio client
     const twilio = new Twilio(accountSid, authToken)
@@ -161,7 +217,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Appointment notification sent successfully' 
+        message: 'Appointment notification sent successfully',
+        notificationType
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,9 +1,9 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { addMinutes } from "date-fns";
 import { SCREEN, AppointmentStatus } from "../types";
+import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 
 interface SaveAppointmentProps {
   selectedDate: Date | null;
@@ -64,6 +64,7 @@ export default function useSaveAppointment({
   coupon_amount
 }: SaveAppointmentProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { sendNotification } = useAppointmentNotifications();
 
   const handleSaveAppointment = async (params?: any): Promise<string | undefined> => {
     try {
@@ -183,6 +184,7 @@ export default function useSaveAppointment({
       };
 
       let createdAppointmentId;
+      let isNewAppointment = false;
 
       if (appointmentId) {
         // Update existing appointment
@@ -211,6 +213,7 @@ export default function useSaveAppointment({
 
         if (error) throw error;
         createdAppointmentId = data.id;
+        isNewAppointment = true;
       }
 
       // Create bookings for each service with properly typed status
@@ -334,6 +337,24 @@ export default function useSaveAppointment({
         .eq('id', createdAppointmentId);
 
       if (updateError) throw updateError;
+
+      // Send booking confirmation notification for new appointments
+      if (isNewAppointment && createdAppointmentId) {
+        try {
+          await sendNotification(createdAppointmentId, 'BOOKING_CONFIRMATION');
+        } catch (notificationError) {
+          console.error('Failed to send booking notification:', notificationError);
+          // Don't fail the appointment creation if notification fails
+        }
+      } else if (appointmentStatus === 'completed' && createdAppointmentId) {
+        // Send completed notification when appointment is marked as completed
+        try {
+          await sendNotification(createdAppointmentId, 'APPOINTMENT_COMPLETED');
+        } catch (notificationError) {
+          console.error('Failed to send completion notification:', notificationError);
+          // Don't fail the appointment update if notification fails
+        }
+      }
 
       toast.success(appointmentId ? "Appointment updated" : "Appointment created");
       return createdAppointmentId;
