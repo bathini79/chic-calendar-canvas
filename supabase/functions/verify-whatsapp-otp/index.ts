@@ -35,6 +35,7 @@ serve(async (req) => {
         persistSession: false
       }
     })    
+    
     // Verify OTP from database
     const { data, error } = await supabaseAdmin
       .from('phone_auth_codes')
@@ -52,7 +53,7 @@ serve(async (req) => {
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 // Using 200 even for errors to avoid non-2xx handling issues
+          status: 200 // Using 200 to avoid non-2xx handling issues
         }
       )
     }
@@ -70,7 +71,7 @@ serve(async (req) => {
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 // Using 200 even for errors to avoid non-2xx handling issues
+          status: 200 // Using 200 to avoid non-2xx handling issues
         }
       )
     }
@@ -84,6 +85,7 @@ serve(async (req) => {
     
     let userId = null
     let newUser = false
+    let session = null
     
     if (userError || !existingUser) {
       // Creating a new user requires a full name
@@ -134,12 +136,13 @@ serve(async (req) => {
         
         userId = newAuthUser.user.id
         newUser = true        
+        
         // Manually create profile since the trigger might not work in all cases
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
             id: userId,
-            phone_number: phoneNumber,
+            phone_number: phoneNumber, // Ensure phone number is saved in profile
             phone_verified: true,
             full_name: fullName,
             lead_source: lead_source || null,
@@ -150,7 +153,20 @@ serve(async (req) => {
           console.error('Error creating profile:', profileError)
           // We don't fail here since the auth user was already created,
           // the profile might be created by a trigger
-        } 
+        }
+        
+        // Create session for the new user
+        const { data: sessionData, error: signInError } = await supabaseAdmin.auth.admin.signInWithPhone({
+          phone: phoneNumber,
+          user_id: userId
+        })
+        
+        if (signInError) {
+          console.error('Error signing in new user:', signInError)
+        } else {
+          session = sessionData
+        }
+        
       } catch (createError) {
         console.error('Exception during user creation:', createError)
         return new Response(
@@ -167,30 +183,29 @@ serve(async (req) => {
       }
     } else {
       userId = existingUser.id
-    }
-    
-    // Sign in the user and get session
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: `${userId}@phone.auth`, // Create a fake email for phone auth
-      options: {
-        redirectTo: 'http://localhost:3000/',
+      
+      // Sign in existing user
+      const { data: sessionData, error: signInError } = await supabaseAdmin.auth.admin.signInWithPhone({
+        phone: phoneNumber,
+        user_id: userId
+      })
+      
+      if (signInError) {
+        console.error('Error signing in existing user:', signInError)
+        return new Response(
+          JSON.stringify({ 
+            error: "signin_failed",
+            message: "Failed to sign in user",
+            details: signInError.message
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 // Using 200 to avoid non-2xx handling issues
+          }
+        )
       }
-    })
-    
-    if (sessionError || !sessionData) {
-      console.error('Error generating auth link:', sessionError)
-      return new Response(
-        JSON.stringify({ 
-          error: "signin_failed",
-          message: "Failed to sign in user",
-          details: sessionError?.message || "No session data returned"
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 // Using 200 to avoid non-2xx handling issues
-        }
-      )
+      
+      session = sessionData
     }
     
     // Delete used OTP
@@ -209,10 +224,7 @@ serve(async (req) => {
         message: newUser ? 'Registration successful' : 'Login successful',
         isNewUser: newUser,
         user: { id: userId, phone_number: phoneNumber },
-        properties: {
-          hashed_token: sessionData.properties.hashed_token,
-          action_link: sessionData.properties.action_link
-        }
+        session: session
       }),
       { 
         headers: { 

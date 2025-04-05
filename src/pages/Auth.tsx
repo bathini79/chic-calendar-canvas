@@ -230,6 +230,15 @@ const Auth = () => {
         return;
       }
 
+      // If we have a session in the response, update it
+      if (response.data && response.data.session) {
+        // Store the session
+        await supabase.auth.setSession({
+          access_token: response.data.session.access_token,
+          refresh_token: response.data.session.refresh_token
+        });
+      }
+
       toast.success(response.data.isNewUser ? 
         "Registration successful! Logging in..." : 
         "Login successful!");
