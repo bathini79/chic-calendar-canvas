@@ -627,42 +627,51 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                               {item.price}
                             </p>
                           )}
-                           {item.type === "package" && item.services && item.services.length > 0 && (
+                        {item.type === "package" && item.services && item.services.length > 0 && (
                         <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
                           {item.services.map(service => (
-                            <div key={service.id} className="flex items-center justify-between py-1">
+                          <div key={service.id} className="py-1">
+                            <details open className="group">
+                            <summary className="flex items-center justify-between cursor-pointer py-1">
                               <div className="space-y-1">
-                                <p className="text-sm font-medium">
-                                  {service.name}
-                                  {service.isCustomized && (
-                                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                                      Added
-                                    </span>
-                                  )}
-                                </p>
-                                <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
-                                  <span>{formatDuration(service.duration)}</span>
-                                  {service.stylistName && (
-                                    <div className="flex items-center">
-                                      <User className="mr-1 h-3 w-3" />
-                                      {service.stylistName}
-                                    </div>
-                                  )}
+                              <p className="text-sm font-medium">
+                                {service.name}
+                                {service.isCustomized && (
+                                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                  Added
+                                </span>
+                                )}
+                              </p>
+                              <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
+                                <span>{formatDuration(service.duration)}</span>
+                                {service.stylistName && (
+                                <div className="flex items-center">
+                                  <User className="mr-1 h-3 w-3" />
+                                  {service.stylistName}
                                 </div>
+                                )}
+                              </div>
                               </div>
                               <div className="text-sm flex flex-col items-end">
-                                {service.price !== service.adjustedPrice && (
-                                  <span className="text-xs line-through text-muted-foreground">
-                                    <IndianRupee className="inline h-3 w-3" />
-                                    {service.price.toFixed(2)}
-                                  </span>
-                                )}
-                                <span className={service.price !== service.adjustedPrice ? "text-green-600" : ""}>
-                                  <IndianRupee className="inline h-3 w-3" />
-                                  {service.adjustedPrice.toFixed(2)}
+                              {service.price !== service.adjustedPrice && (
+                                <span className="text-xs line-through text-muted-foreground">
+                                <IndianRupee className="inline h-3 w-3" />
+                                {service.price.toFixed(2)}
                                 </span>
+                              )}
+                              <span className={service.price !== service.adjustedPrice ? "text-green-600" : ""}>
+                                <IndianRupee className="inline h-3 w-3" />
+                                {service.adjustedPrice.toFixed(2)}
+                              </span>
                               </div>
+                            </summary>
+                            <div className="pl-4 border-l-2 border-gray-200">
+                              <p className="text-xs text-muted-foreground">
+                              Additional details about the service can go here.
+                              </p>
                             </div>
+                            </details>
+                          </div>
                           ))}
                         </div>
                       )}

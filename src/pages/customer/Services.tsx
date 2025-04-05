@@ -198,6 +198,15 @@ export default function Services() {
   });
 
   const handleBookNow = async (serviceId?: string, packageId?: string) => {
+    const { data: session } = await supabase.auth.getSession(); // Retrieve session
+    const user = session?.session?.user; // Extract user from session
+    console.log("user",user)
+    if (!user) {
+      toast.error("You need to log in to book a service or package.");
+      navigate("/auth"); // Redirect to the authentication page
+      return;
+    }
+    
     try {
       if (serviceId) {
         const service = services?.find(s => s.id === serviceId);

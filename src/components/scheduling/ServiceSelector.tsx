@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronUp, Package, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCart } from "@/components/cart/CartContext";
 
 interface Service {
   id: string;
@@ -52,7 +53,6 @@ interface ServiceSelectorProps {
 export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
   const [expandedPackages, setExpandedPackages] = useState<Record<string, boolean>>({});
   const [expandedIndividualServices, setExpandedIndividualServices] = useState(false);
-  const { useCart } = require("@/components/cart/CartContext");
   const { selectedLocation } = useCart();
 
   // Query for additional services that might be customized in packages

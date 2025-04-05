@@ -1,4 +1,3 @@
-
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -269,21 +268,21 @@ const Auth = () => {
           
           console.log("Sign in successful, session created:", data.session);
           
-          // Update profile phone number directly as a fallback
-          if (data.user) {
-            try {
-              const { error: profileError } = await supabase
-                .from('profiles')
-                .update({ phone_number: fullPhoneNumber })
-                .eq('id', data.user.id);
+          // // Update profile phone number directly as a fallback
+          // if (data.user) {
+          //   try {
+          //     const { error: profileError } = await supabase
+          //       .from('profiles')
+          //       .update({ phone_number: fullPhoneNumber })
+          //       .eq('id', data.user.id);
                 
-              if (profileError) {
-                console.error("Error updating profile phone:", profileError);
-              }
-            } catch (updateError) {
-              console.error("Profile update error:", updateError);
-            }
-          }
+          //     if (profileError) {
+          //       console.error("Error updating profile phone:", profileError);
+          //     }
+          //   } catch (updateError) {
+          //     console.error("Profile update error:", updateError);
+          //   }
+          // }
           
           // Session will be handled by the auth state change listener
           toast.success(response.data.isNewUser ? 
@@ -492,7 +491,8 @@ const Auth = () => {
             className="w-1/2"
             onClick={() => {
               setOtpSent(false);
-              setOtp("");
+              setOtp(""); // Clear the OTP state
+              document.querySelectorAll("input[data-otp-slot]").forEach(input => input.value = ""); // Clear OTP input fields
               setVerificationError(null);
               setEdgeFunctionError(null);
             }}

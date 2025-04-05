@@ -74,7 +74,7 @@ export function ProfileMenu() {
       toast.error("Error signing out");
     } else {
       toast.success("Signed out successfully");
-      navigate("/");
+      navigate("/auth");
     }
   };
 
@@ -97,7 +97,7 @@ export function ProfileMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{profile?.full_name || 'User'}</p>
-            <p className="text-xs leading-none text-muted-foreground">{profile?.email || session.user.email}</p>
+            <p className="text-xs leading-none text-muted-foreground">{profile?.phone_number || session.user.phone_number}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

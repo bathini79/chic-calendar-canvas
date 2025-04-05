@@ -1527,7 +1527,6 @@ export type Database = {
           twitter_url: string | null
           updated_at: string
           wallet_balance: number | null
-          whatsapp_number: string | null
         }
         Insert: {
           admin_created?: boolean | null
@@ -1549,7 +1548,6 @@ export type Database = {
           twitter_url?: string | null
           updated_at?: string
           wallet_balance?: number | null
-          whatsapp_number?: string | null
         }
         Update: {
           admin_created?: boolean | null
@@ -1571,7 +1569,6 @@ export type Database = {
           twitter_url?: string | null
           updated_at?: string
           wallet_balance?: number | null
-          whatsapp_number?: string | null
         }
         Relationships: []
       }
