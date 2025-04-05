@@ -21,7 +21,6 @@ async function sendWhatsAppOTP(phoneNumber: string, otp: string) {
   // Make sure the phone number is in E.164 format
   const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`
   
-  
   const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
   
   const formData = new URLSearchParams()
@@ -77,7 +76,6 @@ serve(async (req) => {
     if (!phoneNumber) {
       throw new Error('Phone number is required')
     }
-
     
     // Generate OTP
     const otp = generateOTP()
