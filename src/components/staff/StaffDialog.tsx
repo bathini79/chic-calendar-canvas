@@ -37,6 +37,22 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
     enabled: !!employeeId
   });
 
+  const checkPhoneExists = async (phoneNumber: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone_number', phoneNumber)
+        .limit(1);
+        
+      if (error) throw error;
+      return data && data.length > 0;
+    } catch (error) {
+      console.error("Error checking phone:", error);
+      return false;
+    }
+  };
+
   const sendWhatsAppVerification = async (phoneNumber: string) => {
     try {
       setIsVerifying(true);
@@ -63,8 +79,17 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
 
   const handleFormSubmit = async (data: any) => {
     try {
-      // Format phone number if needed
-      const phoneNumber = data.phone.startsWith('+') ? data.phone : `+${data.phone}`;
+      // Format phone number with country code
+      const phoneNumber = data.phone.startsWith('+') ? data.phone : `+${data.country.code.substring(1)}${data.phone}`;
+      
+      // Check if phone already exists in profiles
+      if (!employeeId) {
+        const phoneExists = await checkPhoneExists(phoneNumber);
+        if (phoneExists) {
+          toast.error("This phone number is already registered with another user");
+          return;
+        }
+      }
       
       let id = employeeId;
       
