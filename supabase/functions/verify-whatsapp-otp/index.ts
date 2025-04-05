@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
@@ -36,16 +35,16 @@ serve(async (req) => {
       }
     })    
     
-    // Verify OTP from database
-    const { data, error } = await supabaseAdmin
+    // Step 1: Verify OTP from database
+    const { data: otpData, error: otpError } = await supabaseAdmin
       .from('phone_auth_codes')
       .select('*')
       .eq('phone_number', phoneNumber)
       .eq('code', code)
       .single()
       
-    if (error || !data) {
-      console.error('OTP verification error:', error)
+    if (otpError || !otpData) {
+      console.error('OTP verification error:', otpError)
       return new Response(
         JSON.stringify({ 
           error: 'invalid_code',
@@ -59,7 +58,7 @@ serve(async (req) => {
     }
     
     // Check if OTP has expired
-    const expiresAt = new Date(data.expires_at)
+    const expiresAt = new Date(otpData.expires_at)
     const currentTime = new Date()
     
     if (currentTime > expiresAt) {
@@ -71,12 +70,12 @@ serve(async (req) => {
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 // Using 200 to avoid non-2xx handling issues
+          status: 200
         }
       )
     }
     
-    // Check if user exists
+    // Step 2: Check if user exists
     const { data: existingUser, error: userError } = await supabaseAdmin
       .from('profiles')
       .select('id')
@@ -84,13 +83,16 @@ serve(async (req) => {
       .single()
     
     let userId = null
-    let newUser = false
-    let token = null
+    let isNewUser = false
+    let session = null
     
+    // Step 3: Handle authentication based on whether user exists
     if (userError || !existingUser) {
-      // Creating a new user requires a full name
+      // New user registration
+      isNewUser = true
+      
+      // New user requires fullName
       if (!fullName) {
-        // Return specific error for missing name but with 200 status code
         return new Response(
           JSON.stringify({ 
             error: "new_user_requires_name",
@@ -98,165 +100,31 @@ serve(async (req) => {
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 // Using 200 to avoid non-2xx handling issues
+            status: 200
           }
         )
       }
       
-      try {
-        // First create the auth user
-        const { data: newAuthUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-          phone: phoneNumber,
-          phone_confirm: true,
-          email_confirm: true,
-          user_metadata: { 
-            full_name: fullName,
-            phone_verified: true
-          }
-        })
-        
-        if (createUserError) {
-          console.error('Error creating auth user:', createUserError)
-          return new Response(
-            JSON.stringify({ 
-              error: "user_creation_failed",
-              message: "Failed to create user account",
-              details: createUserError.message
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200 // Using 200 to avoid non-2xx handling issues
-            }
-          )
+      // Create new user with phone as unique identifier
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        phone: phoneNumber,
+        email: `${phoneNumber.replace(/[^0-9]/g, '')}@phone.user`, // Create a virtual email
+        password: crypto.randomUUID(), // Random password as it's passwordless
+        phone_confirm: true,
+        email_confirm: true,
+        user_metadata: { 
+          full_name: fullName,
+          phone_verified: true
         }
-        
-        if (!newAuthUser || !newAuthUser.user) {
-          throw new Error('User creation returned no user data')
-        }
-        
-        userId = newAuthUser.user.id
-        newUser = true        
-        
-        // Manually create profile since the trigger might not work in all cases
-        const { error: profileError } = await supabaseAdmin
-          .from('profiles')
-          .insert({
-            id: userId,
-            phone_number: phoneNumber, // Ensure phone number is saved in profile
-            phone_verified: true,
-            full_name: fullName,
-            lead_source: lead_source || null,
-            role: 'customer'
-          })
-          
-        if (profileError) {
-          console.error('Error creating profile:', profileError)
-          // We don't fail here since the auth user was already created,
-          // the profile might be created by a trigger
-        }
-        
-        // Generate a random password for signing in
-        const randomPassword = `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`
-        
-        // Sign in with phone number as username and random password
-        const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-          phone: phoneNumber,
-          password: randomPassword
-        })
-        
-        if (signInError) {
-          console.error('Error signing in new user:', signInError)
-          
-          // If signing in fails, create a session directly
-          const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
-            type: 'magiclink',
-            email: `${userId}@temporary.com`, // Use a temporary email
-            options: {
-              redirectTo: `${supabaseUrl}`
-            }
-          })
-          
-          if (sessionError) {
-            console.error('Error generating session for new user:', sessionError)
-            throw sessionError
-          }
-          
-          if (sessionData && sessionData.properties) {
-            token = {
-              access_token: sessionData.properties.access_token,
-              refresh_token: sessionData.properties.refresh_token
-            }
-          }
-        } else if (signInData && signInData.session) {
-          token = {
-            access_token: signInData.session.access_token,
-            refresh_token: signInData.session.refresh_token
-          }
-        }
-        
-      } catch (createError) {
-        console.error('Exception during user creation:', createError)
+      })
+      
+      if (createError) {
+        console.error('Error creating user:', createError)
         return new Response(
           JSON.stringify({ 
-            error: "user_creation_exception",
-            message: "Failed to create user account due to an exception",
+            error: "user_creation_failed",
+            message: "Failed to create user account",
             details: createError.message
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 // Using 200 to avoid non-2xx handling issues
-          }
-        )
-      }
-    } else {
-      userId = existingUser.id
-      
-      // Get existing user details
-      const { data: userData } = await supabaseAdmin
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-      
-      // Create a session for the existing user
-      try {
-        // Sign in with just the user ID
-        const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'recovery',
-          email: userData?.email || `${userId}@temporary.com`,
-          options: {
-            redirectTo: `${supabaseUrl}`
-          }
-        })
-        
-        if (sessionError) {
-          console.error('Error generating session for existing user:', sessionError)
-          return new Response(
-            JSON.stringify({ 
-              error: "signin_failed",
-              message: "Failed to sign in user",
-              details: sessionError.message
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200
-            }
-          )
-        }
-        
-        if (sessionData && sessionData.properties) {
-          token = {
-            access_token: sessionData.properties.access_token,
-            refresh_token: sessionData.properties.refresh_token
-          }
-        }
-      } catch (error) {
-        console.error('Exception during session creation:', error)
-        return new Response(
-          JSON.stringify({ 
-            error: "signin_exception",
-            message: "Exception during sign in",
-            details: error.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -264,41 +132,104 @@ serve(async (req) => {
           }
         )
       }
+      
+      userId = newUser.user.id
+      
+      // Create profile
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          id: userId,
+          phone_number: phoneNumber,
+          phone_verified: true,
+          full_name: fullName,
+          lead_source: lead_source || null,
+          role: 'customer'
+        })
+        
+      if (profileError) {
+        console.error('Error creating profile:', profileError)
+      }
+      
+      // Create session
+      const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
+        user_id: userId
+      })
+      
+      if (sessionError) {
+        console.error('Error creating session:', sessionError)
+        return new Response(
+          JSON.stringify({ 
+            error: "session_creation_failed",
+            message: "Created account but failed to sign in automatically"
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          }
+        )
+      }
+      
+      session = sessionData.session
+    } else {
+      // Existing user - direct sign in
+      userId = existingUser.id
+      
+      // Get user from auth
+      const { data: userData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId)
+      
+      if (authUserError) {
+        console.error('Error fetching user:', authUserError)
+        return new Response(
+          JSON.stringify({ 
+            error: "user_not_found",
+            message: "User exists in profiles but not in auth"
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          }
+        )
+      }
+      
+      // Create session for existing user
+      const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
+        user_id: userId
+      })
+      
+      if (sessionError) {
+        console.error('Error creating session:', sessionError)
+        return new Response(
+          JSON.stringify({ 
+            error: "session_creation_failed",
+            message: "Failed to sign in user"
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          }
+        )
+      }
+      
+      session = sessionData.session
     }
     
     // Delete used OTP
-    const { error: deleteError } = await supabaseAdmin
+    await supabaseAdmin
       .from('phone_auth_codes')
       .delete()
       .eq('phone_number', phoneNumber)
-      
-    if (deleteError) {
-      console.warn('Error deleting used OTP:', deleteError)
-      // Not failing on this error, just logging
-    }
     
-    if (!token) {
-      return new Response(
-        JSON.stringify({ 
-          error: "token_creation_failed",
-          message: "Failed to create authentication token" 
-        }),
-        { 
-          headers: { 
-            ...corsHeaders,
-            'Content-Type': 'application/json' 
-          },
-          status: 200 
-        }
-      )
-    }
-    
+    // Return session data
     return new Response(
       JSON.stringify({ 
-        message: newUser ? 'Registration successful' : 'Login successful',
-        isNewUser: newUser,
+        message: isNewUser ? 'Registration successful' : 'Login successful',
+        isNewUser: isNewUser,
         user: { id: userId, phone_number: phoneNumber },
-        session: token
+        session: {
+          access_token: session.access_token,
+          refresh_token: session.refresh_token
+        }
       }),
       { 
         headers: { 
@@ -314,15 +245,14 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: "unknown_error", 
-        message: error.message || "Unknown error occurred",
-        details: error.stack
+        message: error.message || "Unknown error occurred"
       }),
       { 
         headers: { 
           ...corsHeaders, 
           'Content-Type': 'application/json' 
         },
-        status: 200 // Using 200 to avoid non-2xx handling issues
+        status: 200
       }
     )
   }
