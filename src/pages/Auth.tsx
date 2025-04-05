@@ -227,6 +227,17 @@ const Auth = () => {
           setIsLoading(false);
           return;
         }
+        
+        if (response.data.error === "user_creation_failed") {
+          console.error("User creation failed:", response.data);
+          const errorDetails = response.data.details || "Database error";
+          setVerificationError(`User registration failed: ${errorDetails}`);
+          setEdgeFunctionError(response.data.error);
+          toast.error(`Registration failed: ${errorDetails}`);
+          setIsLoading(false);
+          return;
+        }
+        
         setVerificationError(response.data.message || "Verification failed");
         setEdgeFunctionError(response.data.error);
         toast.error(response.data.message || "Verification failed");
@@ -279,7 +290,7 @@ const Auth = () => {
       }
     } catch (error: any) {
       console.error("OTP verification error:", error);
-      const errorMessage = "Connection error. Please try again.";
+      const errorMessage = error.message || "Connection error. Please try again.";
       toast.error(errorMessage);
       setVerificationError(errorMessage);
       setEdgeFunctionError("Network or server error occurred");
