@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { AdminRoute } from "@/components/auth/AdminRoute";
@@ -80,10 +81,7 @@ export default function App() {
             <Route path="settings/third-party/*" element={<ThirdParty />} />
           </Route>
 
-          {
-            path: "/verify",
-            element: <VerifyEmployeePage />,
-          }
+          <Route path="/verify" element={<VerifyEmployeePage />} />
         </Routes>
       </DndProvider>
     </BrowserRouter>
