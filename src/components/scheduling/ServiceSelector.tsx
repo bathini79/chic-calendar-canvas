@@ -1,11 +1,11 @@
 
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronUp, Package, Scissors } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 interface Service {
@@ -52,6 +52,8 @@ interface ServiceSelectorProps {
 export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
   const [expandedPackages, setExpandedPackages] = useState<Record<string, boolean>>({});
   const [expandedIndividualServices, setExpandedIndividualServices] = useState(false);
+  const { useCart } = require("@/components/cart/CartContext");
+  const { selectedLocation } = useCart();
 
   // Query for additional services that might be customized in packages
   const { data: services } = useQuery({
@@ -67,18 +69,93 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     enabled: items.some(item => item.customized_services?.length > 0)
   });
 
-  const { data: employees } = useQuery({
-    queryKey: ['employees'],
+  // Fetch employees that are assigned to the current location and the specific services
+  const { data: employees, isLoading: isLoadingEmployees } = useQuery({
+    queryKey: ['employees-for-services', selectedLocation, items],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('employment_type', 'stylist')
-        .eq('status', 'active');
+      // Extract all service IDs from cart items (both individual services and from packages)
+      const serviceIds: string[] = [];
       
-      if (error) throw error;
-      return data;
+      items.forEach(item => {
+        // Add individual service IDs
+        if (item.service_id) {
+          serviceIds.push(item.service_id);
+        }
+        
+        // Add service IDs from packages
+        if (item.package?.package_services) {
+          item.package.package_services.forEach(ps => {
+            if (ps.service.id) {
+              serviceIds.push(ps.service.id);
+            }
+          });
+        }
+        
+        // Add customized service IDs
+        if (item.customized_services?.length) {
+          serviceIds.push(...item.customized_services);
+        }
+      });
+      
+      // If no services or no location, return empty array
+      if (serviceIds.length === 0 || !selectedLocation) {
+        return [];
+      }
+      
+      // First get employees assigned to the location
+      const { data: locationEmployees, error: locationError } = await supabase
+        .from('employees')
+        .select(`
+          *,
+          employee_locations!inner(*)
+        `)
+        .eq('employment_type', 'stylist')
+        .eq('status', 'active')
+        .eq('employee_locations.location_id', selectedLocation);
+        
+      if (locationError) throw locationError;
+      if (!locationEmployees?.length) return [];
+      
+      // Get employee IDs
+      const employeeIds = locationEmployees.map(emp => emp.id);
+      
+      // Then get employees who have skills for these services
+      const { data: skillsData, error: skillsError } = await supabase
+        .from('employee_skills')
+        .select('employee_id, service_id')
+        .in('employee_id', employeeIds)
+        .in('service_id', serviceIds);
+        
+      if (skillsError) throw skillsError;
+      
+      // Create a map of service_id -> employee_ids who can perform that service
+      const serviceEmployeeMap: Record<string, string[]> = {};
+      
+      skillsData?.forEach(skill => {
+        if (!serviceEmployeeMap[skill.service_id]) {
+          serviceEmployeeMap[skill.service_id] = [];
+        }
+        serviceEmployeeMap[skill.service_id].push(skill.employee_id);
+      });
+      
+      // Create a map of employee_id -> services they can perform
+      const employeeServiceMap: Record<string, string[]> = {};
+      
+      skillsData?.forEach(skill => {
+        if (!employeeServiceMap[skill.employee_id]) {
+          employeeServiceMap[skill.employee_id] = [];
+        }
+        employeeServiceMap[skill.employee_id].push(skill.service_id);
+      });
+      
+      // Return all employees that are assigned to the location,
+      // with a new property showing which services they can perform
+      return locationEmployees.map(emp => ({
+        ...emp,
+        services: employeeServiceMap[emp.id] || []
+      }));
     },
+    enabled: !!selectedLocation && items.length > 0
   });
 
   // Group items by package and standalone services
@@ -162,6 +239,19 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     return `${remainingMinutes}m`;
   };
 
+  // Get employees who can perform a specific service
+  const getEmployeesForService = (serviceId: string) => {
+    if (!employees || !serviceId) return [];
+    
+    // If we have skills data, filter employees who can perform this service
+    return employees.filter(emp => 
+      // Either the employee has the skill for this service
+      emp.services.includes(serviceId) ||
+      // Or the employee has no specific skill assignments (can do everything)
+      emp.services.length === 0
+    );
+  };
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -208,6 +298,9 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
                   // Calculate the display price
                   const displayPrice = getServicePrice(ps.service, basePackageService);
                   
+                  // Get available employees for this service
+                  const availableEmployees = getEmployeesForService(ps.service.id);
+                  
                   return (
                     <div 
                       key={`${packageData.cartItemId}-${ps.service.id}`}
@@ -228,7 +321,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="any">Any Available Stylist</SelectItem>
-                          {employees?.map((employee) => (
+                          {availableEmployees.map((employee) => (
                             <SelectItem key={employee.id} value={employee.id}>
                               {employee.name}
                             </SelectItem>
@@ -270,35 +363,40 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
             
             {expandedIndividualServices && (
               <div className="space-y-3 pl-4">
-                {groupedItems.services.map(({ cartItemId, service }) => (
-                  <div 
-                    key={cartItemId}
-                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{service.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDuration(service.duration)} • ₹{service.selling_price}
-                      </p>
-                    </div>
-                    <Select 
-                      value={selectedStylists[service.id] || ''} 
-                      onValueChange={(value) => onStylistSelect(service.id, value)}
+                {groupedItems.services.map(({ cartItemId, service }) => {
+                  // Get available employees for this service
+                  const availableEmployees = getEmployeesForService(service.id);
+                  
+                  return (
+                    <div 
+                      key={cartItemId}
+                      className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
                     >
-                      <SelectTrigger className="w-full sm:w-[200px]">
-                        <SelectValue placeholder="Select stylist" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="any">Any Available Stylist</SelectItem>
-                        {employees?.map((employee) => (
-                          <SelectItem key={employee.id} value={employee.id}>
-                            {employee.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{service.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDuration(service.duration)} • ₹{service.selling_price}
+                        </p>
+                      </div>
+                      <Select 
+                        value={selectedStylists[service.id] || ''} 
+                        onValueChange={(value) => onStylistSelect(service.id, value)}
+                      >
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                          <SelectValue placeholder="Select stylist" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="any">Any Available Stylist</SelectItem>
+                          {availableEmployees.map((employee) => (
+                            <SelectItem key={employee.id} value={employee.id}>
+                              {employee.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
