@@ -12,7 +12,25 @@ export const NOTIFICATION_TYPES = {
   APPOINTMENT_COMPLETED: 'appointment_completed'
 };
 
-export type NotificationType = keyof typeof NOTIFICATION_TYPES;
+export type NotificationType = 
+  | 'BOOKING_CONFIRMATION'
+  | 'APPOINTMENT_CONFIRMED'
+  | 'REMINDER_1_HOUR'
+  | 'REMINDER_4_HOURS'
+  | 'APPOINTMENT_COMPLETED';
+
+// Define type for notification queue items
+interface NotificationQueueItem {
+  id: string;
+  appointment_id: string;
+  notification_type: string;
+  recipient_number: string;
+  message_content: string;
+  status: 'pending' | 'sent' | 'failed';
+  created_at: string;
+  processed_at: string | null;
+  error_message: string | null;
+}
 
 /**
  * Hook for sending appointment notifications through WhatsApp
@@ -175,6 +193,7 @@ export const useAppointmentNotifications = () => {
       }
 
       if (!pendingNotifications || pendingNotifications.length === 0) {
+        toast.info('No pending notifications to process');
         return true; // No pending notifications
       }
 
@@ -215,6 +234,10 @@ export const useAppointmentNotifications = () => {
       
       if (successCount > 0) {
         toast.success(`Processed ${successCount} notification(s) successfully`);
+      }
+      
+      if (successCount < pendingNotifications.length) {
+        toast.warning(`Failed to process ${pendingNotifications.length - successCount} notification(s)`);
       }
       
       return successCount === pendingNotifications.length;

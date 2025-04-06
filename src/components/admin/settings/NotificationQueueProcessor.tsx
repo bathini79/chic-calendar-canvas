@@ -15,8 +15,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 
+// Define type for notification queue items
+interface NotificationQueueItem {
+  id: string;
+  appointment_id: string;
+  notification_type: string;
+  recipient_number: string;
+  message_content: string;
+  status: 'pending' | 'sent' | 'failed';
+  created_at: string;
+  processed_at: string | null;
+  error_message: string | null;
+}
+
 export function NotificationQueueProcessor() {
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<NotificationQueueItem[]>([]);
   const [processing, setProcessing] = useState(false);
   const { processPendingNotifications, isLoading } = useAppointmentNotifications();
 
@@ -29,7 +42,7 @@ export function NotificationQueueProcessor() {
       .limit(20);
 
     if (!error && data) {
-      setNotifications(data);
+      setNotifications(data as NotificationQueueItem[]);
     }
   };
 
