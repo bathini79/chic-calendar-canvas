@@ -2380,6 +2380,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      remove_old_verification_codes: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       set_claim: {
         Args: {
           uid: string

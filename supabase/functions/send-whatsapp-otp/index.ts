@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
@@ -43,11 +44,19 @@ serve(async (req) => {
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
     const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
-    const twilioWhatsappNumber = Deno.env.get('TWILIO_WHATSAPP_NUMBER')
+    const twilioWhatsappNumber = Deno.env.get('TWILIO_PHONE_NUMBER') // Use the regular phone number if WhatsApp number isn't set
     
     if (!accountSid || !authToken || !twilioPhoneNumber) {
       throw new Error('Twilio credentials are not configured')
     }
+
+    // Log the Twilio configuration for debugging
+    console.log('Twilio configuration:', {
+      accountSid: accountSid ? 'Configured' : 'Missing',
+      authToken: authToken ? 'Configured' : 'Missing',
+      twilioPhoneNumber,
+      twilioWhatsappNumber
+    })
     
     let messageResponse
     let storedEntity
@@ -119,13 +128,15 @@ Thank you for joining our team!`
       // Send message using Twilio
       const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
       
-      if (method === 'whatsapp') {
+      if (method === 'whatsapp' && twilioWhatsappNumber) {
         // Send via WhatsApp
         const body = new URLSearchParams({
           To: `whatsapp:${phoneNumber}`,
           From: `whatsapp:${twilioWhatsappNumber}`,
           Body: message
         }).toString()
+
+        console.log(`Sending WhatsApp message to: whatsapp:${phoneNumber} from: whatsapp:${twilioWhatsappNumber}`);
 
         messageResponse = await fetch(twilioEndpoint, {
           method: 'POST',
@@ -136,7 +147,9 @@ Thank you for joining our team!`
           body
         })
       } else {
-        // Send via SMS
+        // Send via SMS as fallback
+        console.log(`Sending SMS message to: ${phoneNumber} from: ${twilioPhoneNumber}`);
+        
         const body = new URLSearchParams({
           To: phoneNumber,
           From: twilioPhoneNumber,
@@ -171,13 +184,15 @@ Thank you for joining our team!`
       // Send message using Twilio
       const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
       
-      if (method === 'whatsapp') {
+      if (method === 'whatsapp' && twilioWhatsappNumber) {
         // Send via WhatsApp
         const body = new URLSearchParams({
           To: `whatsapp:${phoneNumber}`,
           From: `whatsapp:${twilioWhatsappNumber}`,
           Body: `Your verification code is: *${otp}*. This code will expire in ${expiresInMinutes} minutes.`
         }).toString()
+
+        console.log(`Sending WhatsApp message to: whatsapp:${phoneNumber} from: whatsapp:${twilioWhatsappNumber}`);
 
         messageResponse = await fetch(twilioEndpoint, {
           method: 'POST',
@@ -188,7 +203,9 @@ Thank you for joining our team!`
           body
         })
       } else {
-        // Send via SMS
+        // Send via SMS as fallback
+        console.log(`Sending SMS message to: ${phoneNumber} from: ${twilioPhoneNumber}`);
+        
         const body = new URLSearchParams({
           To: phoneNumber,
           From: twilioPhoneNumber,
