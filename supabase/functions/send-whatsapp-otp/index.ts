@@ -161,14 +161,23 @@ Thank you for joining our team!`
         
         console.log(`Sending WhatsApp message to: ${formattedPhone} from: ${gupshupSourceMobile}`);
 
-        // Send message using GupShup
-        messageResponse = await fetch(gupshupEndpoint, {
-          method: 'POST',
-          headers: {
-            'apikey': gupshupApiKey
-          },
-          body: formData
-        });
+        try {
+          // Send message using GupShup
+          messageResponse = await fetch(gupshupEndpoint, {
+            method: 'POST',
+            headers: {
+              'apikey': gupshupApiKey
+            },
+            body: formData
+          });
+          
+          // Log status and headers for debugging
+          console.log('GupShup response status:', messageResponse.status);
+          console.log('GupShup response headers:', Object.fromEntries(messageResponse.headers.entries()));
+        } catch (fetchError) {
+          console.error('Error making GupShup API request:', fetchError);
+          throw new Error(`GupShup API request failed: ${fetchError.message}`);
+        }
       } else {
         // Send via SMS as fallback (still using GupShup)
         console.log(`Sending SMS message to: ${formattedPhone} from: ${gupshupSourceMobile}`);
@@ -183,14 +192,22 @@ Thank you for joining our team!`
         formData.append('message', smsMessage);
         formData.append('app', gupshupAppId);
         
-        // Send SMS using GupShup
-        messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
-          method: 'POST',
-          headers: {
-            'apikey': gupshupApiKey
-          },
-          body: formData
-        });
+        try {
+          // Send SMS using GupShup
+          messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
+            method: 'POST',
+            headers: {
+              'apikey': gupshupApiKey
+            },
+            body: formData
+          });
+          
+          // Log status and headers for debugging
+          console.log('GupShup SMS response status:', messageResponse.status);
+        } catch (fetchError) {
+          console.error('Error making GupShup SMS API request:', fetchError);
+          throw new Error(`GupShup SMS API request failed: ${fetchError.message}`);
+        }
       }
       
       storedEntity = 'employee'
@@ -228,14 +245,23 @@ Thank you for joining our team!`
         }));
         formData.append('app', gupshupAppId);
         
-        // Send message using GupShup
-        messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
-          method: 'POST',
-          headers: {
-            'apikey': gupshupApiKey
-          },
-          body: formData
-        });
+        try {
+          // Send message using GupShup
+          messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
+            method: 'POST',
+            headers: {
+              'apikey': gupshupApiKey
+            },
+            body: formData
+          });
+          
+          // Log status and headers for debugging
+          console.log('GupShup response status:', messageResponse.status);
+          console.log('GupShup response headers:', Object.fromEntries(messageResponse.headers.entries()));
+        } catch (fetchError) {
+          console.error('Error making GupShup API request:', fetchError);
+          throw new Error(`GupShup API request failed: ${fetchError.message}`);
+        }
       } else {
         // Send via SMS as fallback (still using GupShup)
         console.log(`Sending SMS message to: ${formattedPhone} from: ${gupshupSourceMobile}`);
@@ -250,23 +276,73 @@ Thank you for joining our team!`
         formData.append('message', smsMessage);
         formData.append('app', gupshupAppId);
         
-        // Send SMS using GupShup
-        messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
-          method: 'POST',
-          headers: {
-            'apikey': gupshupApiKey
-          },
-          body: formData
-        });
+        try {
+          // Send SMS using GupShup
+          messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
+            method: 'POST',
+            headers: {
+              'apikey': gupshupApiKey
+            },
+            body: formData
+          });
+          
+          // Log status and headers for debugging
+          console.log('GupShup SMS response status:', messageResponse.status);
+        } catch (fetchError) {
+          console.error('Error making GupShup SMS API request:', fetchError);
+          throw new Error(`GupShup SMS API request failed: ${fetchError.message}`);
+        }
       }
       
       storedEntity = 'user'
     }
     
-    // Check if message was sent successfully
+    // Check if message was sent successfully by status code, not by trying to parse the response as JSON
     if (!messageResponse.ok) {
-      const errorData = await messageResponse.json()
-      throw new Error(`Failed to send message: ${JSON.stringify(errorData)}`)
+      try {
+        // Try to parse the error response as JSON
+        const errorText = await messageResponse.text();
+        console.error('GupShup error response:', errorText);
+        
+        // Try to parse the error text as JSON if it looks like JSON
+        let errorData;
+        if (errorText.trim().startsWith('{') || errorText.trim().startsWith('[')) {
+          try {
+            errorData = JSON.parse(errorText);
+          } catch (parseError) {
+            // If JSON parsing fails, use the raw text
+            errorData = { error: errorText };
+          }
+        } else {
+          // If it's not JSON, just use the text
+          errorData = { error: errorText };
+        }
+        
+        throw new Error(`Failed to send message: ${errorData.error || errorText}`);
+      } catch (parseError) {
+        // If we can't even parse the error, return a generic error
+        console.error('Error parsing GupShup error response:', parseError);
+        throw new Error(`Failed to send message: Status ${messageResponse.status}`);
+      }
+    }
+
+    // Get the text response to log it, but don't try to parse it as JSON unless necessary
+    const responseText = await messageResponse.text();
+    console.log('GupShup raw response:', responseText);
+    
+    let responseData;
+    // Only try to parse as JSON if it looks like JSON
+    if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('GupShup parsed response:', responseData);
+      } catch (parseError) {
+        console.log('Could not parse response as JSON, using text response');
+        responseData = { message: responseText };
+      }
+    } else {
+      console.log('Response is not JSON, using as text');
+      responseData = { message: responseText };
     }
     
     // Return success response
