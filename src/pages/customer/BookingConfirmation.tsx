@@ -32,6 +32,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
 import confetti from "canvas-confetti";
 import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
+import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 
 export default function BookingConfirmation() {
   const {
@@ -67,6 +68,7 @@ export default function BookingConfirmation() {
   const [membershipDiscount, setMembershipDiscount] = useState(0);
   const [activeMembership, setActiveMembership] = useState<any>(null);
   const [hasFetchedMemberships, setHasFetchedMemberships] = useState(false);
+  const { sendNotification } = useAppointmentNotifications();
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -629,7 +631,10 @@ export default function BookingConfirmation() {
       }
       
       try {
-        const notificationResult = await sendConfirmation(appointmentId);
+        const notificationResult = await sendConfirmation(
+          appointmentId,
+          sendNotification
+        );
         console.log("Notification sent:", notificationResult);
       } catch (notificationError) {
         console.error("Error sending confirmation:", notificationError);
@@ -981,13 +986,14 @@ export default function BookingConfirmation() {
   );
 }
 
-const sendConfirmation = async (appointmentId: string) => {
+
+const sendConfirmation = async (
+  appointmentId: string,
+  sendNotification: (appointmentId: string, type: string) => Promise<any>
+) => {
   try {
-    const { useAppointmentNotifications } = await import("@/hooks/use-appointment-notifications");
-    const { sendNotification } = useAppointmentNotifications();
-    
     if (sendNotification) {
-      return await sendNotification(appointmentId, 'booking_confirmation');
+      return await sendNotification(appointmentId, "booking_confirmation");
     }
     return null;
   } catch (error) {

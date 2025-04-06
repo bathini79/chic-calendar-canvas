@@ -24,6 +24,7 @@ export function GupshupConfig() {
   const [appId, setAppId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [sourceMobile, setSourceMobile] = useState("");
+  const [appName, setAppName] = useState(""); // New state for App Name
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -57,6 +58,7 @@ export function GupshupConfig() {
         setAppId(config.app_id || "");
         setApiKey(config.api_key || "");
         setSourceMobile(config.source_mobile || "");
+        setAppName(config.app_name || ""); // Fetch App Name
       }
     } catch (error: any) {
       console.error("Error fetching GupShup config:", error);
@@ -76,6 +78,7 @@ export function GupshupConfig() {
         app_id: appId,
         api_key: apiKey,
         source_mobile: sourceMobile,
+        app_name: appName, // Include App Name in configuration
         channel: "whatsapp"
       };
 
@@ -232,6 +235,17 @@ export function GupshupConfig() {
               onCheckedChange={setIsActive}
             />
             <Label htmlFor="gupshup-active">Enable GupShup Integration</Label>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="app-name">App Name</Label> {/* New App Name field */}
+            <Input
+              id="app-name"
+              placeholder="GupShup App Name"
+              value={appName}
+              onChange={(e) => setAppName(e.target.value)}
+              required
+            />
           </div>
 
           <div className="space-y-2">

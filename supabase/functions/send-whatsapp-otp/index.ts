@@ -36,7 +36,6 @@ serve(async (req)=>{
         }
       });
     }
-    const APP_NAME = "Salon1";
    
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
     // Generate a random 6-digit OTP code
@@ -70,6 +69,7 @@ serve(async (req)=>{
       "apikey": GUPSHUP_API_KEY
     };
     const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber;
+    const APP_NAME = config.app_name
     const formData = new URLSearchParams();
     formData.append("channel", "whatsapp");
     formData.append("source", SOURCE_NUMBER);
