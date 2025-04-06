@@ -30,7 +30,6 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey)
 
     // Process the webhook data based on type
-    // This is a simple implementation - expand as needed
     if (data.type === 'message') {
       // Handle incoming message
       const { app, payload, timestamp } = data

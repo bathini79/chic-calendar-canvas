@@ -51,9 +51,10 @@ export function GupshupConfig() {
 
       if (data) {
         setIsActive(data.is_active);
-        setAppId(data.configuration?.app_id || "");
-        setApiKey(data.configuration?.api_key || "");
-        setSourceMobile(data.configuration?.source_mobile || "");
+        const config = data.configuration || {};
+        setAppId(config.app_id || "");
+        setApiKey(config.api_key || "");
+        setSourceMobile(config.source_mobile || "");
       }
     } catch (error: any) {
       console.error("Error fetching GupShup config:", error);
@@ -90,8 +91,8 @@ export function GupshupConfig() {
         result = await supabase
           .from("messaging_providers")
           .update({
-            configuration,
-            is_active: isActive
+            is_active: isActive,
+            configuration
           })
           .eq("provider_name", "gupshup");
       } else {
@@ -100,8 +101,8 @@ export function GupshupConfig() {
           .from("messaging_providers")
           .insert({
             provider_name: "gupshup",
-            configuration,
-            is_active: isActive
+            is_active: isActive,
+            configuration
           });
       }
 

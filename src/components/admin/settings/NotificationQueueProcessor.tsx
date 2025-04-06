@@ -18,7 +18,7 @@ import { formatDistanceToNow } from "date-fns";
 // Define type for notification queue items
 interface NotificationQueueItem {
   id: string;
-  appointment_id: string;
+  appointment_id: string | null;
   notification_type: string;
   recipient_number: string;
   message_content: string;
@@ -51,7 +51,7 @@ export function NotificationQueueProcessor() {
   const handleProcessQueue = async () => {
     setProcessing(true);
     try {
-      await processPendingNotifications();
+      processPendingNotifications();
       await fetchQueue(); // Refresh the list
     } finally {
       setProcessing(false);

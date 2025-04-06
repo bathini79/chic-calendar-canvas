@@ -1,33 +1,29 @@
 
 import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export function useAppointmentNotifications() {
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Process pending notifications
   const processPendingNotifications = async () => {
-    setIsLoading(true);
     try {
-      // Get all pending notifications
+      setIsLoading(true);
+      
+      // Get pending notifications
       const { data: pendingNotifications, error: fetchError } = await supabase
         .from('notification_queue')
         .select('*')
         .eq('status', 'pending')
-        .order('created_at');
-
-      if (fetchError) {
-        throw new Error(`Failed to fetch pending notifications: ${fetchError.message}`);
-      }
-
+        .limit(10);
+      
+      if (fetchError) throw fetchError;
+      
       if (!pendingNotifications || pendingNotifications.length === 0) {
-        toast({
-          title: 'No pending notifications',
-          description: 'There are no pending notifications to process.',
-        });
-        return;
+        toast.info("No pending notifications found");
+        return { processed: 0 };
       }
 
       // Check if GupShup is configured and active
@@ -36,169 +32,87 @@ export function useAppointmentNotifications() {
         .select('*')
         .eq('provider_name', 'gupshup')
         .single();
-
-      if (configError) {
-        throw new Error(`Failed to fetch GupShup configuration: ${configError.message}`);
-      }
-
-      if (!gupshupConfig || !gupshupConfig.is_active) {
-        throw new Error('GupShup integration is not active. Please configure it first.');
-      }
-
-      if (!gupshupConfig.configuration?.app_id || !gupshupConfig.configuration?.api_key || !gupshupConfig.configuration?.source_mobile) {
-        throw new Error('GupShup configuration is incomplete. Please update the settings.');
-      }
-
-      // Process each notification
-      let processedCount = 0;
       
+      if (configError && configError.code !== 'PGRST116') throw configError;
+      
+      // If GupShup is not configured or not active, use Supabase edge function
+      const useGupshup = gupshupConfig && 
+                          gupshupConfig.is_active && 
+                          gupshupConfig.configuration?.api_key && 
+                          gupshupConfig.configuration?.app_id && 
+                          gupshupConfig.configuration?.source_mobile;
+      
+      const results = [];
+      
+      // Process each notification
       for (const notification of pendingNotifications) {
         try {
-          // Call the Edge Function to send the notification
-          const { error: sendError } = await supabase.functions.invoke('send-gupshup-notification', {
-            body: { notificationId: notification.id }
-          });
-
-          if (sendError) {
-            throw new Error(`Failed to send notification: ${sendError.message}`);
-          }
-
-          processedCount++;
-        } catch (error: any) {
-          console.error('Error processing notification:', error);
+          // Call the appropriate edge function based on configuration
+          const { data, error } = await supabase.functions.invoke(
+            useGupshup ? 'send-gupshup-notification' : 'send-appointment-notification',
+            {
+              body: { notificationId: notification.id }
+            }
+          );
           
-          // Update the notification status to failed
+          if (error) throw error;
+          
+          results.push({
+            id: notification.id,
+            success: true,
+            message: data?.message || 'Notification sent'
+          });
+          
+        } catch (error: any) {
+          console.error(`Error processing notification ${notification.id}:`, error);
+          
+          // Mark the notification as failed
           await supabase
             .from('notification_queue')
             .update({
               status: 'failed',
-              processed_at: new Date().toISOString(),
-              error_message: error.message || 'Unknown error'
+              error_message: error.message || 'Failed to send notification',
+              processed_at: new Date().toISOString()
             })
             .eq('id', notification.id);
+          
+          results.push({
+            id: notification.id,
+            success: false,
+            message: error.message
+          });
         }
       }
-
-      toast({
-        title: 'Notifications processed',
-        description: `Successfully processed ${processedCount} of ${pendingNotifications.length} notifications.`,
-      });
-
+      
+      // Refresh the notification queue data
+      queryClient.invalidateQueries({ queryKey: ['notification_queue'] });
+      
+      // Show success message
+      toast.success(`Processed ${results.length} notifications`);
+      
+      return {
+        processed: results.length,
+        results
+      };
+      
     } catch (error: any) {
-      console.error('Error in processPendingNotifications:', error);
-      toast({
-        title: 'Error processing notifications',
-        description: error.message || 'An unknown error occurred',
-        variant: 'destructive'
-      });
+      console.error('Error processing notifications:', error);
+      toast.error(error.message || 'Failed to process notifications');
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Send a single notification (for testing or manual sending)
-  const sendNotification = async (notificationId: string) => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.functions.invoke('send-gupshup-notification', {
-        body: { notificationId }
-      });
-
-      if (error) {
-        throw new Error(`Failed to send notification: ${error.message}`);
-      }
-
-      toast({
-        title: 'Notification sent',
-        description: 'The notification was sent successfully.',
-      });
-    } catch (error: any) {
-      console.error('Error sending notification:', error);
-      toast({
-        title: 'Error sending notification',
-        description: error.message || 'An unknown error occurred',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
+  const { mutate, isPending } = useMutation({
+    mutationFn: processPendingNotifications,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification_queue'] });
     }
-  };
-
-  // Create a notification for an appointment
-  const createAppointmentNotification = async (appointmentId: string, notificationType: string) => {
-    setIsLoading(true);
-    try {
-      // Get appointment details
-      const { data: appointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .select(`
-          *,
-          profiles:customer_id(*)
-        `)
-        .eq('id', appointmentId)
-        .single();
-
-      if (appointmentError) {
-        throw new Error(`Failed to fetch appointment details: ${appointmentError.message}`);
-      }
-
-      if (!appointment) {
-        throw new Error('Appointment not found');
-      }
-
-      // Check if the customer has a phone number
-      if (!appointment.profiles?.phone_number) {
-        throw new Error('Customer does not have a phone number');
-      }
-
-      // Create a message based on notification type
-      let message = '';
-      switch (notificationType) {
-        case 'appointment_reminder':
-          message = `Hello ${appointment.profiles.full_name || 'there'},\n\nThis is a reminder for your upcoming appointment on ${new Date(appointment.start_time).toLocaleString()}.\n\nWe look forward to seeing you!`;
-          break;
-        case 'appointment_confirmation':
-          message = `Hello ${appointment.profiles.full_name || 'there'},\n\nYour appointment has been scheduled for ${new Date(appointment.start_time).toLocaleString()}.\n\nWe look forward to seeing you!`;
-          break;
-        default:
-          message = `Hello ${appointment.profiles.full_name || 'there'},\n\nThis is a notification about your appointment on ${new Date(appointment.start_time).toLocaleString()}.`;
-      }
-
-      // Add the notification to the queue
-      const { error: insertError } = await supabase
-        .from('notification_queue')
-        .insert({
-          appointment_id: appointmentId,
-          notification_type: notificationType,
-          recipient_number: appointment.profiles.phone_number,
-          message_content: message,
-          status: 'pending'
-        });
-
-      if (insertError) {
-        throw new Error(`Failed to create notification: ${insertError.message}`);
-      }
-
-      toast({
-        title: 'Notification created',
-        description: 'The notification has been queued for sending.',
-      });
-    } catch (error: any) {
-      console.error('Error creating notification:', error);
-      toast({
-        title: 'Error creating notification',
-        description: error.message || 'An unknown error occurred',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  });
 
   return {
-    isLoading,
-    processPendingNotifications,
-    sendNotification,
-    createAppointmentNotification
+    processPendingNotifications: mutate,
+    isLoading: isPending
   };
 }

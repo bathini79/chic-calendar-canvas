@@ -60,7 +60,7 @@ serve(async (req) => {
       )
     }
 
-    // Get GupShup configuration from messaging_providers settings
+    // Get GupShup configuration from messaging_providers table
     const { data: gupshupConfig, error: configError } = await supabase
       .from('messaging_providers')
       .select('*')
@@ -75,7 +75,7 @@ serve(async (req) => {
       throw new Error('GupShup integration is not active')
     }
 
-    const { app_id, api_key, source_mobile } = gupshupConfig.configuration
+    const { app_id, api_key, source_mobile } = gupshupConfig.configuration || {}
 
     if (!app_id || !api_key || !source_mobile) {
       throw new Error('Incomplete GupShup configuration')
