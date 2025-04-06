@@ -204,7 +204,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             <h4 className="text-base font-semibold">
               {customer.full_name || 'No name provided'}
             </h4>
-            <p className="text-gray-600">{customer.email || 'No email provided'}</p>
             {customer.phone_number && (
               <p className="text-gray-600">{customer.phone_number}</p>
             )}
@@ -541,7 +540,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                     <h4 className="text-base font-semibold">
                       {transaction.customer?.full_name || 'No name provided'}
                     </h4>
-                    <p className="text-gray-600">{transaction.customer?.email || 'No email provided'}</p>
+                    <p className="text-gray-600">{transaction.customer?.phone_number}</p>
                   </div>
   
                   <div className="overflow-y-auto">

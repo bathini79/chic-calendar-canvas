@@ -131,7 +131,9 @@ const Auth = () => {
         toast.success("Logged in successfully!");
       }
     } catch (error: any) {
-      toast.error(error.message);
+      const errorMessage = error.message || "An unexpected error occurred. Please try again.";
+      toast.error(errorMessage);
+      setVerificationError(errorMessage); // Set error feedback
       console.error("Authentication error:", error);
     } finally {
       setIsLoading(false);
@@ -144,8 +146,9 @@ const Auth = () => {
 
   const sendWhatsAppOTP = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
-      toast.error("Please enter a valid phone number");
-      setVerificationError("Please enter a valid phone number");
+      const errorMessage = "Please enter a valid phone number";
+      toast.error(errorMessage);
+      setVerificationError(errorMessage); // Set error feedback
       return;
     }
 
@@ -174,9 +177,9 @@ const Auth = () => {
       setNeedsFullName(false);
       toast.success("OTP sent to your WhatsApp. Please check your messages.");
     } catch (error: any) {
-      const errorMessage = error.message || "Failed to send OTP";
+      const errorMessage = error.message || "Failed to send OTP. Please try again.";
       toast.error(errorMessage);
-      setVerificationError(errorMessage);
+      setVerificationError(errorMessage); // Set error feedback
       setEdgeFunctionError(errorMessage);
       console.error("OTP send error:", error);
     } finally {
@@ -186,14 +189,16 @@ const Auth = () => {
 
   const verifyWhatsAppOTP = async () => {
     if (!otp || otp.length !== 6) {
-      toast.error("Please enter a valid 6-digit OTP");
-      setVerificationError("Please enter a valid 6-digit OTP");
+      const errorMessage = "Please enter a valid 6-digit OTP";
+      toast.error(errorMessage);
+      setVerificationError(errorMessage); // Set error feedback
       return;
     }
 
     if (needsFullName && !fullName.trim()) {
-      toast.error("Full name is required for new registrations");
-      setVerificationError("Full name is required for new registrations");
+      const errorMessage = "Full name is required for new registrations";
+      toast.error(errorMessage);
+      setVerificationError(errorMessage); // Set error feedback
       return;
     }
 
@@ -235,9 +240,10 @@ const Auth = () => {
           return;
         }
         
-        setVerificationError(response.data.message || "Verification failed");
+        const errorMessage = response.data.message || "Verification failed. Please try again.";
+        toast.error(errorMessage);
+        setVerificationError(errorMessage); // Set error feedback
         setEdgeFunctionError(response.data.error);
-        toast.error(response.data.message || "Verification failed");
         setIsLoading(false);
         return;
       }
@@ -305,7 +311,7 @@ const Auth = () => {
       console.error("OTP verification error:", error);
       const errorMessage = error.message || "Connection error. Please try again.";
       toast.error(errorMessage);
-      setVerificationError(errorMessage);
+      setVerificationError(errorMessage); // Set error feedback
       setEdgeFunctionError("Network or server error occurred");
     } finally {
       setIsLoading(false);

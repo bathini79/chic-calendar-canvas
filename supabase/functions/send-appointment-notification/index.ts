@@ -6,10 +6,12 @@ const corsHeaders = {
 };
 const NOTIFICATION_TYPES = {
   BOOKING_CONFIRMATION: "booking_confirmation",
-  APPOINTMENT_CONFIRMED: "appointment_confirmed",
+  APPOINTMENT_CONFIRMED: "confirmed",
   REMINDER_1_HOUR: "reminder_1_hour",
   REMINDER_4_HOURS: "reminder_4_hours",
-  APPOINTMENT_COMPLETED: "appointment_completed"
+  APPOINTMENT_COMPLETED: "completed",
+  APPOINTMENT_NO_SHOW: "noshow",
+  APPOINTMENT_CANCELLED: "canceled"
 };
 serve(async (req)=>{
   if (req.method === "OPTIONS") {
@@ -88,6 +90,12 @@ serve(async (req)=>{
         break;
       case NOTIFICATION_TYPES.APPOINTMENT_COMPLETED:
         message += `Thanks for visiting ${locationName} today. We hope you enjoyed your ${servicesText}. See you again!`;
+        break;
+      case NOTIFICATION_TYPES.APPOINTMENT_NO_SHOW:
+        message += `We noticed you missed your appointment at ${locationName} on ${formattedDate}. If you’d like to reschedule, let us know!`;
+        break;
+      case NOTIFICATION_TYPES.APPOINTMENT_CANCELLED:
+        message += `Your appointment at ${locationName} on ${formattedDate} has been cancelled. We hope to see you soon.`;
         break;
       default:
         message += `Reminder for your upcoming appointment at ${locationName} on ${formattedDate} at ${formattedTime}.`;

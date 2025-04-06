@@ -7,17 +7,30 @@ import { SummaryView } from "./SummaryView";
 import { useAppointmentState } from "../hooks/useAppointmentState";
 import { useActiveServices } from "../hooks/useActiveServices";
 import { useActivePackages } from "../hooks/useActivePackages";
-import {useSaveAppointment} from "../hooks/useSaveAppointment";
+import  useSaveAppointment  from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
-import { Appointment, SCREEN, Service, Package, PaymentMethod, AppointmentStatus } from "../types";
+import {
+  Appointment,
+  SCREEN,
+  Service,
+  Package,
+  PaymentMethod,
+  AppointmentStatus,
+} from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 import { formatTime, formatTimeString } from "../utils/timeUtils";
 import { useAppointmentActions } from "../hooks/useAppointmentActions";
 import { useAppointmentDetails } from "../hooks/useAppointmentDetails";
 import { StatusBadge, getStatusBackgroundColor } from "./StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 
 interface AppointmentManagerProps {
   isOpen: boolean;
@@ -52,19 +66,24 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 }) => {
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
-  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("booked");
+  const [appointmentStatus, setAppointmentStatus] =
+    useState<AppointmentStatus>("booked");
   const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
+  const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(
+    null
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
+
   const { appointment, refetch: refetchAppointment } = useAppointmentDetails(
     existingAppointment?.id
   );
-  
-  const { cancelAppointment, markAppointmentAs, updateAppointmentStatus } = useAppointmentActions();
+
+  const { cancelAppointment, markAppointmentAs, updateAppointmentStatus } =
+    useAppointmentActions();
 
   const { data: services } = useActiveServices(locationId);
   const { data: packages } = useActivePackages(locationId);
+  const { sendNotification } = useAppointmentNotifications();
 
   const {
     selectedCustomer,
@@ -107,8 +126,12 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     if (existingAppointment) {
       processExistingAppointment(existingAppointment);
       setAppointmentStatus(existingAppointment.status || "booked");
-      
-      if (existingAppointment.status === "completed" || existingAppointment.status === "refunded" || existingAppointment.status === "partially_refunded") {
+
+      if (
+        existingAppointment.status === "completed" ||
+        existingAppointment.status === "refunded" ||
+        existingAppointment.status === "partially_refunded"
+      ) {
         setCurrentScreen(SCREEN.SUMMARY);
         setNewAppointmentId(existingAppointment.id);
       } else {
@@ -180,9 +203,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setSelectedPackages(packages);
     setSelectedStylists(stylists);
     setCustomizedServices(customizedServicesMap);
-    setPaymentMethod(
-      (appointment.payment_method as PaymentMethod) || "cash"
-    );
+    setPaymentMethod((appointment.payment_method as PaymentMethod) || "cash");
     setDiscountType(
       (appointment.discount_type as "none" | "percentage" | "fixed") || "none"
     );
@@ -336,21 +357,24 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       // Update status to completed when payment is done
       try {
         const { data: bookings } = await supabase
-          .from('bookings')
-          .select('id')
-          .eq('appointment_id', appointmentId);
-          
+          .from("bookings")
+          .select("id")
+          .eq("appointment_id", appointmentId);
+
         if (bookings) {
-          const bookingIds = bookings.map(booking => booking.id);
-          await updateAppointmentStatus(appointmentId, 'completed', bookingIds);
+          const bookingIds = bookings.map((booking) => booking.id);
+          await updateAppointmentStatus(appointmentId, "completed", bookingIds);
           // Update local state to reflect the change
-          setAppointmentStatus('completed');
+          setAppointmentStatus("completed");
         }
       } catch (error) {
-        console.error("Error updating appointment status after payment:", error);
+        console.error(
+          "Error updating appointment status after payment:",
+          error
+        );
       }
     }
-    
+
     setNewAppointmentId(appointmentId || null);
     setCurrentScreen(SCREEN.SUMMARY);
 
@@ -372,28 +396,11 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
-  const handleCancelAppointment = async () => {
-    if (existingAppointment?.id) {
-      try {
-        await cancelAppointment(existingAppointment.id);
-        toast.success("Appointment canceled successfully");
-        setAppointmentStatus('canceled');
-        onClose();
-        if (onAppointmentSaved) {
-          onAppointmentSaved();
-        }
-      } catch (error) {
-        console.error("Error canceling appointment:", error);
-        toast.error("Failed to cancel appointment");
-      }
-    }
-  };
-
   const handleMarkAs = async (status: "noshow" | "completed") => {
     if (existingAppointment?.id) {
       try {
         await markAppointmentAs(existingAppointment.id, status);
-        toast.success(`Appointment marked as ${status}`);
+        toast.success(`Appointmentz marked as ${status}`);
         setAppointmentStatus(status);
         if (status === "completed") {
           // If marked as completed, show the summary screen
@@ -422,22 +429,17 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   const applyStatusChange = async (status: AppointmentStatus) => {
     if (existingAppointment?.id) {
       try {
-        const bookingIds = existingAppointment.bookings?.map(booking => booking.id) || [];
-        
+        const bookingIds =
+          existingAppointment.bookings?.map((booking) => booking.id) || [];
+
         const success = await updateAppointmentStatus(
           existingAppointment.id,
           status,
           bookingIds
         );
-        
+
         if (success) {
           toast.success(`Appointment status updated to ${status}`);
-          
-          if (status === "completed") {
-            setNewAppointmentId(existingAppointment.id);
-            setCurrentScreen(SCREEN.SUMMARY);
-          }
-          
           // Refetch to ensure UI reflects changes
           if (refetchAppointment) {
             refetchAppointment();
@@ -446,6 +448,18 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       } catch (error) {
         console.error("Error updating appointment status:", error);
         toast.error("Failed to update appointment status");
+      }
+      try {
+        if (
+          status === "canceled" ||
+          status === "noshow"
+        ) {
+          onClose()
+          await sendNotification(existingAppointment.id, status);
+        }
+      } catch (notificationError) {
+        console.error("Error sending confirmation:", notificationError);
+        // Don't fail the booking if notification fails
       }
     }
   };
@@ -459,15 +473,23 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
-  const isCompleted = appointmentStatus === "completed" || 
-                      appointmentStatus === "refunded" || 
-                      appointmentStatus === "partially_refunded";
-  
-  const shouldShowStatusDropdown = existingAppointment !== null && existingAppointment !== undefined;
+  const isCompleted =
+    appointmentStatus === "completed" ||
+    appointmentStatus === "refunded" ||
+    appointmentStatus === "partially_refunded";
 
-  const displayTime = stateSelectedTime ? formatTimeString(stateSelectedTime) : "";
-  
-  const headerBgColor = appointmentStatus && getStatusBackgroundColor(appointmentStatus);
+  const shouldShowStatusDropdown =
+    currentScreen === SCREEN.SERVICE_SELECTION &&
+    newAppointmentId &&
+    existingAppointment !== null &&
+    existingAppointment !== undefined;
+
+  const displayTime = stateSelectedTime
+    ? formatTimeString(stateSelectedTime)
+    : "";
+
+  const headerBgColor =
+    appointmentStatus && getStatusBackgroundColor(appointmentStatus);
 
   return (
     <div
@@ -498,12 +520,14 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                     <p className="text-sm text-muted-foreground">
                       {displayTime}
                     </p>
-                    
+
                     {shouldShowStatusDropdown && (
                       <div className="flex items-center gap-2">
                         <Select
                           value={appointmentStatus}
-                          onValueChange={(value) => handleStatusChange(value as AppointmentStatus)}
+                          onValueChange={(value) =>
+                            handleStatusChange(value as AppointmentStatus)
+                          }
                           disabled={isCompleted}
                         >
                           <SelectTrigger className="w-[180px] h-8">
@@ -527,9 +551,12 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                             <SelectItem value="canceled">
                               <StatusBadge status="canceled" />
                             </SelectItem>
-                            <SelectItem value="completed">
-                              <StatusBadge status="completed" />
-                            </SelectItem>
+                            {currentScreen === SCREEN.SUMMARY as typeof currentScreen &&
+                            newAppointmentId ? (
+                              <SelectItem value="completed">
+                                <StatusBadge status="completed" />
+                              </SelectItem>
+                            ) : null}
                           </SelectContent>
                         </Select>
                       </div>
@@ -574,7 +601,10 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                       </div>
                     )}
                     <div className="flex justify-end gap-4">
-                      <Button variant="outline" onClick={onHandleSaveAppointment}>
+                      <Button
+                        variant="outline"
+                        onClick={onHandleSaveAppointment}
+                      >
                         Save Appointment
                       </Button>
                       <Button
@@ -590,7 +620,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
               {currentScreen === SCREEN.CHECKOUT && (
                 <CheckoutSection
-                  appointmentId={newAppointmentId || existingAppointment?.id || ""}
+                  appointmentId={
+                    newAppointmentId || existingAppointment?.id || ""
+                  }
                   selectedCustomer={selectedCustomer}
                   selectedServices={selectedServices}
                   selectedPackages={selectedPackages}
@@ -607,7 +639,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   onPaymentComplete={handlePaymentComplete}
                   selectedStylists={selectedStylists}
                   selectedTimeSlots={{
-                    [newAppointmentId || existingAppointment?.id || ""]: stateSelectedTime,
+                    [newAppointmentId || existingAppointment?.id || ""]:
+                      stateSelectedTime,
                   }}
                   onSaveAppointment={handleSaveAppointment}
                   onRemoveService={handleRemoveService}
@@ -616,9 +649,16 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   customizedServices={customizedServices}
                   isExistingAppointment={!!existingAppointment}
                   locationId={locationId}
-                  onCancelAppointment={existingAppointment ? handleCancelAppointment : undefined}
-                  onMarkAsNoShow={existingAppointment ? () => handleMarkAs("noshow") : undefined}
-                  onMarkAsCompleted={existingAppointment ? () => handleMarkAs("completed") : undefined}
+                  onMarkAsNoShow={
+                    existingAppointment
+                      ? () => handleMarkAs("noshow")
+                      : undefined
+                  }
+                  onMarkAsCompleted={
+                    existingAppointment
+                      ? () => handleMarkAs("completed")
+                      : undefined
+                  }
                   appointmentStatus={appointmentStatus}
                 />
               )}
@@ -646,32 +686,35 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         </div>
       </div>
 
-      <AlertDialog open={showStatusConfirmation} onOpenChange={setShowStatusConfirmation}>
+      <AlertDialog
+        open={showStatusConfirmation}
+        onOpenChange={setShowStatusConfirmation}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pendingStatus === "canceled" 
-                ? "Cancel Appointment" 
-                : pendingStatus === "noshow" 
-                  ? "Mark as No Show" 
-                  : "Change Status"}
+              {pendingStatus === "canceled"
+                ? "Cancel Appointment"
+                : pendingStatus === "noshow"
+                ? "Mark as No Show"
+                : "Change Status"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingStatus === "canceled" 
+              {pendingStatus === "canceled"
                 ? "Are you sure you want to cancel this appointment? This will notify the customer and free up the time slot."
-                : pendingStatus === "noshow" 
-                  ? "Are you sure you want to mark this appointment as a no-show? This will be recorded in the customer's history."
-                  : "Are you sure you want to change the status?"}
+                : pendingStatus === "noshow"
+                ? "Are you sure you want to mark this appointment as a no-show? This will be recorded in the customer's history."
+                : "Are you sure you want to change the status?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmStatusChange}>
-              {pendingStatus === "canceled" 
-                ? "Yes, Cancel Appointment" 
-                : pendingStatus === "noshow" 
-                  ? "Yes, Mark as No Show" 
-                  : "Confirm"}
+              {pendingStatus === "canceled"
+                ? "Yes, Cancel Appointment"
+                : pendingStatus === "noshow"
+                ? "Yes, Mark as No Show"
+                : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
