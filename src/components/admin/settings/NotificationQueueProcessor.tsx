@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ReloadIcon } from "lucide-react";
+import { Loader } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 import {
@@ -96,7 +96,7 @@ export function NotificationQueueProcessor() {
           onClick={handleProcessQueue} 
           disabled={processing || isLoading}
         >
-          {(processing || isLoading) && <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />}
+          {(processing || isLoading) && <Loader className="mr-2 h-4 w-4 animate-spin" />}
           Process Queue
         </Button>
       </div>

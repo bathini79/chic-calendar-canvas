@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { GupshupConfig } from "@/components/admin/settings/GupshupConfig";
+import { NotificationQueueProcessor } from "@/components/admin/settings/NotificationQueueProcessor";
 
 // Optional fallback Spinner
 const Spinner = () => (
@@ -38,7 +41,7 @@ export default function ThirdParty() {
   const [accountDetails, setAccountDetails] =
     useState<TwilioAccountDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<string>("twilio");
+  const [activeSection, setActiveSection] = useState<string>("gupshup");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -67,8 +70,10 @@ export default function ThirdParty() {
       }
     };
 
-    fetchTwilioAccountDetails();
-  }, [toast]);
+    if (activeSection === "twilio") {
+      fetchTwilioAccountDetails();
+    }
+  }, [activeSection, toast]);
 
   return (
     <div className="container py-6 max-w-6xl">
@@ -94,6 +99,22 @@ export default function ThirdParty() {
             <CardContent className="p-0">
               <div
                 className={`px-4 py-2 cursor-pointer ${
+                  activeSection === "gupshup" ? "bg-accent" : ""
+                }`}
+                onClick={() => setActiveSection("gupshup")}
+              >
+                <span>GupShup Configuration</span>
+              </div>
+              <div
+                className={`px-4 py-2 cursor-pointer ${
+                  activeSection === "notifications" ? "bg-accent" : ""
+                }`}
+                onClick={() => setActiveSection("notifications")}
+              >
+                <span>Notification Queue</span>
+              </div>
+              <div
+                className={`px-4 py-2 cursor-pointer ${
                   activeSection === "twilio" ? "bg-accent" : ""
                 }`}
                 onClick={() => setActiveSection("twilio")}
@@ -114,6 +135,19 @@ export default function ThirdParty() {
 
         {/* Main Content */}
         <div className="md:col-span-3">
+          {activeSection === "gupshup" && <GupshupConfig />}
+          
+          {activeSection === "notifications" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Notification Queue</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <NotificationQueueProcessor />
+              </CardContent>
+            </Card>
+          )}
+
           {activeSection === "twilio" && (
             <Card>
               <CardHeader>

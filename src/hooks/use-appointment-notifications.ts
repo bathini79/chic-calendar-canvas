@@ -33,11 +33,58 @@ interface NotificationQueueItem {
 }
 
 /**
- * Hook for sending appointment notifications through WhatsApp using GupShup
+ * Hook for sending appointment notifications through WhatsApp
  */
 export const useAppointmentNotifications = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Gets active messaging provider from system settings
+   */
+  const getActiveMessagingProvider = async () => {
+    try {
+      // Check if messaging is configured
+      const { data: messagingSettings, error: settingsError } = await supabase
+        .from('system_settings')
+        .select('settings, is_active')
+        .eq('category', 'messaging')
+        .single();
+
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        // PGRST116 is "no rows returned" error
+        throw new Error(`Failed to fetch messaging settings: ${settingsError.message}`);
+      }
+
+      // If messaging settings exist and are active, get the provider
+      if (messagingSettings?.is_active) {
+        const activeProvider = messagingSettings.settings.active_provider;
+        
+        if (activeProvider) {
+          // Check if the provider configuration exists and is active
+          const { data: providerConfig, error: providerError } = await supabase
+            .from('system_settings')
+            .select('is_active')
+            .eq('category', activeProvider)
+            .single();
+            
+          if (providerError && providerError.code !== 'PGRST116') {
+            throw new Error(`Failed to fetch provider configuration: ${providerError.message}`);
+          }
+            
+          if (providerConfig?.is_active) {
+            return activeProvider;
+          }
+        }
+      }
+      
+      // If we reach here, either no active provider or default to gupshup
+      return 'gupshup';
+    } catch (err) {
+      console.error('Error getting active messaging provider:', err);
+      return 'gupshup'; // Default fallback
+    }
+  };
 
   /**
    * Send a notification for an appointment
@@ -68,28 +115,53 @@ export const useAppointmentNotifications = () => {
       // If notification exists in queue but is pending, process it
       if (existingNotifications && existingNotifications.length > 0) {
         if (existingNotifications[0].status === 'pending') {
-          // Process the notification directly using the Edge Function
-          const { data, error } = await supabase.functions.invoke(
-            'send-appointment-notification',
-            {
-              body: {
-                appointmentId,
-                notificationType: NOTIFICATION_TYPES[notificationType],
-                notificationId: existingNotifications[0].id
+          const activeProvider = await getActiveMessagingProvider();
+          
+          // Process the notification using the appropriate edge function
+          if (activeProvider === 'gupshup') {
+            const { data, error } = await supabase.functions.invoke(
+              'send-gupshup-notification',
+              {
+                body: {
+                  notificationId: existingNotifications[0].id
+                }
               }
+            );
+
+            if (error) {
+              throw new Error(error.message);
             }
-          );
 
-          if (error) {
-            throw new Error(error.message);
+            if (!data.success) {
+              throw new Error(data.error || 'Failed to send notification');
+            }
+
+            toast.success('Notification sent successfully');
+            return true;
+          } else {
+            // Process with Twilio or other provider
+            const { data, error } = await supabase.functions.invoke(
+              'send-appointment-notification',
+              {
+                body: {
+                  appointmentId,
+                  notificationType: NOTIFICATION_TYPES[notificationType],
+                  notificationId: existingNotifications[0].id
+                }
+              }
+            );
+
+            if (error) {
+              throw new Error(error.message);
+            }
+
+            if (!data.success) {
+              throw new Error(data.error || 'Failed to send notification');
+            }
+
+            toast.success('Notification sent successfully');
+            return true;
           }
-
-          if (!data.success) {
-            throw new Error(data.error || 'Failed to send notification');
-          }
-
-          toast.success('Notification sent successfully');
-          return true;
         } else if (existingNotifications[0].status === 'sent') {
           toast.info('Notification was already sent');
           return true;
@@ -138,25 +210,48 @@ export const useAppointmentNotifications = () => {
       if (insertError) {
         throw new Error(insertError.message);
       }
-
+      
+      // Determine which provider to use
+      const activeProvider = await getActiveMessagingProvider();
+      
       // Process the newly created notification
-      const { data, error } = await supabase.functions.invoke(
-        'send-appointment-notification',
-        {
-          body: {
-            appointmentId,
-            notificationType: NOTIFICATION_TYPES[notificationType],
-            notificationId: notificationData.id
+      if (activeProvider === 'gupshup') {
+        const { data, error } = await supabase.functions.invoke(
+          'send-gupshup-notification',
+          {
+            body: {
+              notificationId: notificationData.id
+            }
           }
+        );
+
+        if (error) {
+          throw new Error(error.message);
         }
-      );
 
-      if (error) {
-        throw new Error(error.message);
-      }
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to send notification');
+        }
+      } else {
+        // Use Twilio as fallback
+        const { data, error } = await supabase.functions.invoke(
+          'send-appointment-notification',
+          {
+            body: {
+              appointmentId,
+              notificationType: NOTIFICATION_TYPES[notificationType],
+              notificationId: notificationData.id
+            }
+          }
+        );
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to send notification');
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to send notification');
+        }
       }
 
       toast.success('Notification sent successfully');
@@ -196,34 +291,60 @@ export const useAppointmentNotifications = () => {
         toast.info('No pending notifications to process');
         return true; // No pending notifications
       }
+      
+      // Determine which provider to use
+      const activeProvider = await getActiveMessagingProvider();
 
       // Process each notification
       const results = await Promise.all(
         pendingNotifications.map(async (notification) => {
           try {
-            const { data, error } = await supabase.functions.invoke(
-              'send-appointment-notification',
-              {
-                body: {
-                  appointmentId: notification.appointment_id,
-                  notificationType: notification.notification_type,
-                  notificationId: notification.id,
-                  provider: 'gupshup' // Specify to use GupShup
+            if (activeProvider === 'gupshup') {
+              const { data, error } = await supabase.functions.invoke(
+                'send-gupshup-notification',
+                {
+                  body: {
+                    notificationId: notification.id
+                  }
                 }
+              );
+
+              if (error) {
+                console.error(`Error processing notification ${notification.id}:`, error);
+                return false;
               }
-            );
 
-            if (error) {
-              console.error(`Error processing notification ${notification.id}:`, error);
-              return false;
+              if (!data.success) {
+                console.error(`Failed to send notification ${notification.id}:`, data.error);
+                return false;
+              }
+              
+              return true;
+            } else {
+              // Use Twilio as fallback
+              const { data, error } = await supabase.functions.invoke(
+                'send-appointment-notification',
+                {
+                  body: {
+                    appointmentId: notification.appointment_id,
+                    notificationType: notification.notification_type,
+                    notificationId: notification.id
+                  }
+                }
+              );
+
+              if (error) {
+                console.error(`Error processing notification ${notification.id}:`, error);
+                return false;
+              }
+
+              if (!data.success) {
+                console.error(`Failed to send notification ${notification.id}:`, data.error);
+                return false;
+              }
+
+              return true;
             }
-
-            if (!data.success) {
-              console.error(`Failed to send notification ${notification.id}:`, data.error);
-              return false;
-            }
-
-            return true;
           } catch (err) {
             console.error(`Error processing notification ${notification.id}:`, err);
             return false;
