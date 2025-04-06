@@ -1369,6 +1369,50 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_queue: {
+        Row: {
+          appointment_id: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message_content: string
+          notification_type: string
+          processed_at: string | null
+          recipient_number: string
+          status: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content: string
+          notification_type: string
+          processed_at?: string | null
+          recipient_number: string
+          status?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content?: string
+          notification_type?: string
+          processed_at?: string | null
+          recipient_number?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       package_categories: {
         Row: {
           category_id: string
@@ -2383,6 +2427,13 @@ export type Database = {
       remove_old_verification_codes: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      send_appointment_notification_internal: {
+        Args: {
+          appointment_id: string
+          notification_type: string
+        }
+        Returns: boolean
       }
       set_claim: {
         Args: {

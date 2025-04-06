@@ -26,7 +26,7 @@ serve(async (req) => {
 
   try {
     // Parse request body
-    const { appointmentId, notificationType = NOTIFICATION_TYPES.BOOKING_CONFIRMATION } = await req.json()
+    const { appointmentId, notificationType = NOTIFICATION_TYPES.BOOKING_CONFIRMATION, notificationId } = await req.json()
     
     if (!appointmentId) {
       throw new Error('Appointment ID is required')
@@ -45,41 +45,33 @@ serve(async (req) => {
       throw new Error('Supabase credentials not configured')
     }
     
-    // Create authenticated client
-    const supabaseClient = createClient(
+    // Create admin client with service role key
+    const adminClient = createClient(
       supabaseUrl,
-      supabaseAnonKey,
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      supabaseServiceRoleKey || supabaseAnonKey
     )
     
-    // Verify the user has required access rights
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
-    
-    if (authError || !user) {
-      console.error("Authentication error:", authError)
-      throw new Error('User not authenticated')
-    }
-    
-    // Get admin status
-    const { data: profileData, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    // Get the notification details if notificationId is provided
+    let notification = null
+    let notificationMessage = null
+
+    if (notificationId) {
+      const { data: notificationData, error: notificationError } = await adminClient
+        .from('notification_queue')
+        .select('*')
+        .eq('id', notificationId)
+        .single()
+        
+      if (notificationError) {
+        throw new Error(`Failed to retrieve notification: ${notificationError.message}`)
+      }
       
-    if (profileError) {
-      console.error("Profile lookup error:", profileError)
-      throw new Error(`Failed to retrieve user profile: ${profileError.message}`)
-    }
-    
-    // Only allow admins to send notifications
-    if (!profileData || !['admin', 'superadmin'].includes(profileData.role)) {
-      console.error("Unauthorized access attempt by:", user.id, "with role:", profileData?.role)
-      throw new Error('Unauthorized: Admin access required')
+      notification = notificationData
+      notificationMessage = notificationData.message_content
     }
 
     // Get appointment details including customer info
-    const { data: appointment, error: appointmentError } = await supabaseClient
+    const { data: appointment, error: appointmentError } = await adminClient
       .from('appointments')
       .select(`
         id,
@@ -108,7 +100,6 @@ serve(async (req) => {
       .single()
     
     if (appointmentError || !appointment) {
-      console.error("Appointment lookup error:", appointmentError)
       throw new Error(`Failed to retrieve appointment: ${appointmentError?.message || 'Not found'}`)
     }
 
@@ -117,15 +108,13 @@ serve(async (req) => {
     }
 
     // Get Twilio configuration from system_settings
-    const serviceRoleClient = createClient(supabaseUrl, supabaseServiceRoleKey)
-    const { data: twilioConfig, error: twilioConfigError } = await serviceRoleClient
+    const { data: twilioConfig, error: twilioConfigError } = await adminClient
       .from('system_settings')
       .select('settings, is_active')
       .eq('category', 'twilio')
       .single()
     
     if (twilioConfigError || !twilioConfig) {
-      console.error("Twilio config error:", twilioConfigError)
       throw new Error('Twilio is not configured')
     }
 
@@ -139,86 +128,99 @@ serve(async (req) => {
       throw new Error('Incomplete Twilio configuration')
     }
 
-    // Format appointment services/packages for the message
-    const servicesText = appointment.bookings
-      .map(booking => booking.services?.name || booking.packages?.name)
-      .filter(Boolean)
-      .join(', ')
+    // If message was not provided in the notification, generate it
+    if (!notificationMessage) {
+      // Format appointment services/packages for the message
+      const servicesText = appointment.bookings
+        .map(booking => booking.services?.name || booking.packages?.name)
+        .filter(Boolean)
+        .join(', ')
 
-    // Format appointment date/time
-    const appointmentDate = new Date(appointment.start_time)
-    const formattedDate = appointmentDate.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    })
-    const formattedTime = appointmentDate.toLocaleTimeString('en-US', {
-      hour: '2-digit', 
-      minute: '2-digit'
-    })
+      // Format appointment date/time
+      const appointmentDate = new Date(appointment.start_time)
+      const formattedDate = appointmentDate.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+      const formattedTime = appointmentDate.toLocaleTimeString('en-US', {
+        hour: '2-digit', 
+        minute: '2-digit'
+      })
 
-    // Get location name if available
-    let locationName = appointment.location || 'our salon';
-    if (appointment.location) {
-      try {
-        const { data: locationData } = await supabaseClient
-          .from('locations')
-          .select('name')
-          .eq('id', appointment.location)
-          .single();
-          
-        if (locationData?.name) {
-          locationName = locationData.name;
+      // Get location name if available
+      let locationName = appointment.location || 'our salon';
+      if (appointment.location) {
+        try {
+          const { data: locationData } = await adminClient
+            .from('locations')
+            .select('name')
+            .eq('id', appointment.location)
+            .single();
+            
+          if (locationData?.name) {
+            locationName = locationData.name;
+          }
+        } catch (error) {
+          console.error("Error fetching location:", error);
         }
-      } catch (error) {
-        console.error("Error fetching location:", error);
       }
-    }
 
-    // Compose WhatsApp message based on notification type
-    let message = '';
-    
-    switch (notificationType) {
-      case NOTIFICATION_TYPES.BOOKING_CONFIRMATION:
-        message = `Hello ${appointment.profiles.full_name},\n\nThank you for booking with us! Your appointment has been scheduled at ${locationName} on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe look forward to seeing you!`;
-        break;
-        
-      case NOTIFICATION_TYPES.APPOINTMENT_CONFIRMED:
-        message = `Hello ${appointment.profiles.full_name},\n\nYour appointment at ${locationName} has been confirmed for ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nSee you soon!`;
-        break;
-        
-      case NOTIFICATION_TYPES.REMINDER_1_HOUR:
-        message = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder that your appointment at ${locationName} is in 1 hour, at ${formattedTime} today.\n\nService(s): ${servicesText}\n\nWe're looking forward to seeing you soon!`;
-        break;
-        
-      case NOTIFICATION_TYPES.REMINDER_4_HOURS:
-        message = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder that your appointment at ${locationName} is coming up in 4 hours on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe're looking forward to seeing you!`;
-        break;
-        
-      case NOTIFICATION_TYPES.APPOINTMENT_COMPLETED:
-        message = `Hello ${appointment.profiles.full_name},\n\nThank you for visiting us today at ${locationName}. We hope you enjoyed your ${servicesText}.\n\nWe appreciate your business and look forward to seeing you again soon!`;
-        break;
-        
-      default:
-        message = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder about your upcoming appointment at ${locationName} on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe look forward to seeing you!`;
+      // Compose WhatsApp message based on notification type
+      switch (notificationType) {
+        case NOTIFICATION_TYPES.BOOKING_CONFIRMATION:
+          notificationMessage = `Hello ${appointment.profiles.full_name},\n\nThank you for booking with us! Your appointment has been scheduled at ${locationName} on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe look forward to seeing you!`;
+          break;
+          
+        case NOTIFICATION_TYPES.APPOINTMENT_CONFIRMED:
+          notificationMessage = `Hello ${appointment.profiles.full_name},\n\nYour appointment at ${locationName} has been confirmed for ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nSee you soon!`;
+          break;
+          
+        case NOTIFICATION_TYPES.REMINDER_1_HOUR:
+          notificationMessage = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder that your appointment at ${locationName} is in 1 hour, at ${formattedTime} today.\n\nService(s): ${servicesText}\n\nWe're looking forward to seeing you soon!`;
+          break;
+          
+        case NOTIFICATION_TYPES.REMINDER_4_HOURS:
+          notificationMessage = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder that your appointment at ${locationName} is coming up in 4 hours on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe're looking forward to seeing you!`;
+          break;
+          
+        case NOTIFICATION_TYPES.APPOINTMENT_COMPLETED:
+          notificationMessage = `Hello ${appointment.profiles.full_name},\n\nThank you for visiting us today at ${locationName}. We hope you enjoyed your ${servicesText}.\n\nWe appreciate your business and look forward to seeing you again soon!`;
+          break;
+          
+        default:
+          notificationMessage = `Hello ${appointment.profiles.full_name},\n\nThis is a reminder about your upcoming appointment at ${locationName} on ${formattedDate} at ${formattedTime}.\n\nService(s): ${servicesText}\n\nWe look forward to seeing you!`;
+      }
     }
 
     // Initialize Twilio client
     const twilio = new Twilio(accountSid, authToken)
     
     // Send WhatsApp message through Twilio
-    await twilio.messages.create({
-      body: message,
+    const messageResponse = await twilio.messages.create({
+      body: notificationMessage,
       from: `whatsapp:${phoneNumber}`,
       to: `whatsapp:${appointment.profiles.phone_number}`
     })
+
+    // If notification exists in the queue, update its status
+    if (notification) {
+      await adminClient
+        .from('notification_queue')
+        .update({ 
+          status: 'sent',
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', notification.id)
+    }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'Appointment notification sent successfully',
-        notificationType
+        notificationType,
+        messageId: messageResponse.sid
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -227,6 +229,30 @@ serve(async (req) => {
     )
   } catch (error: any) {
     console.error('Error sending WhatsApp notification:', error)
+    
+    // If a notification ID was provided, update its status to 'failed'
+    try {
+      const { notificationId } = await req.json()
+      if (notificationId) {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')
+        const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+        
+        if (supabaseUrl && supabaseServiceRoleKey) {
+          const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey)
+          
+          await adminClient
+            .from('notification_queue')
+            .update({ 
+              status: 'failed',
+              processed_at: new Date().toISOString(),
+              error_message: error.message || "Unknown error"
+            })
+            .eq('id', notificationId)
+        }
+      }
+    } catch (updateError) {
+      console.error('Error updating notification status:', updateError)
+    }
     
     return new Response(
       JSON.stringify({ 
