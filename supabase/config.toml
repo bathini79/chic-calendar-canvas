@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.send-gupshup-notification]
 verify_jwt = true
+
+[functions.employee-onboarding]
+verify_jwt = false

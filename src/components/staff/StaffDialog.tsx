@@ -35,72 +35,9 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
     enabled: !!employeeId
   });
 
-  const sendWhatsAppVerification = async (phoneNumber: string, employeeId: string, name: string) => {
-    try {
-      // Get the current window location to create the verification link
-      const baseUrl = window.location.origin;
-      
-      const { data, error } = await supabase.functions.invoke('verify-employee-otp', {
-        body: { 
-          phoneNumber,
-          employeeId,
-          name,
-          baseUrl
-        }
-      });
-      
-      if (error) throw error;
-      
-      if (data.success) {
-        toast.success("Verification message sent to WhatsApp");
-        return true;
-      } else {
-        toast.error(data.message || "Failed to send verification");
-        return false;
-      }
-    } catch (error: any) {
-      console.error("Error sending WhatsApp verification:", error);
-      toast.error(error.message || "Failed to send verification");
-      return false;
-    }
-  };
-
-  const createAuthUser = async (data: any, employeeId: string) => {
-    try {
-      // Generate email from phone if not provided
-      const email = data.email || `${data.phone.replace(/\D/g, '')}@staff.internal`;
-      const password = generateStrongPassword();
-      
-      // Create user in auth
-      const { data: authData, error: authError } = await supabase.functions.invoke('create-employee-auth', {
-        body: {
-          email,
-          phone: data.phone,
-          password,
-          employeeId,
-          name: data.name,
-        }
-      });
-      
-      if (authError) throw authError;
-      
-      if (!authData.success) {
-        throw new Error(authData.message || "Failed to create employee account");
-      }
-      
-      return true;
-    } catch (error: any) {
-      console.error("Error creating auth user:", error);
-      toast.error(error.message || "Failed to create employee account");
-      return false;
-    }
-  };
-
   const handleFormSubmit = async (data: any) => {
     try {
-      let id = employeeId;
-      
-      // If editing, update employee record
+      // If editing existing employee
       if (employeeId) {
         const { error } = await supabase
           .from("employees")
@@ -131,73 +68,71 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
           .eq("employee_id", employeeId);
           
         if (locationsDeleteError) throw locationsDeleteError;
+          
+        // Insert skills
+        if (data.skills.length > 0) {
+          const skillsToInsert = data.skills.map((skillId: string) => ({
+            employee_id: employeeId,
+            service_id: skillId,
+          }));
+          
+          const { error: skillsInsertError } = await supabase
+            .from("employee_skills")
+            .insert(skillsToInsert);
+            
+          if (skillsInsertError) throw skillsInsertError;
+        }
+        
+        // Insert location assignments
+        if (data.locations.length > 0) {
+          const locationsToInsert = data.locations.map((locationId: string) => ({
+            employee_id: employeeId,
+            location_id: locationId,
+          }));
+          
+          const { error: locationsInsertError } = await supabase
+            .from("employee_locations")
+            .insert(locationsToInsert);
+            
+          if (locationsInsertError) throw locationsInsertError;
+        }
+        
+        toast.success("Staff member updated successfully");
       } 
-      // If creating new, insert employee record with inactive status initially
+      // Creating new employee - use the onboarding edge function
       else {
-        const { data: newEmployee, error } = await supabase
-          .from("employees")
-          .insert({
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            photo_url: data.photo_url,
-            status: 'inactive', // Set as inactive until verified
-            employment_type: data.employment_type,
-          })
-          .select()
-          .single();
-          
+        // Get the current window location to create the verification link
+        const baseUrl = window.location.origin;
+        
+        // Call the employee-onboarding edge function
+        const { data: responseData, error } = await supabase.functions.invoke('employee-onboarding', {
+          body: { 
+            employeeData: {
+              ...data,
+              baseUrl
+            },
+            sendWelcomeMessage: true,
+            createAuthAccount: true
+          }
+        });
+        
         if (error) throw error;
-        id = newEmployee.id;
         
-        // Create auth user for the employee
-        const authCreated = await createAuthUser(data, id);
-        if (!authCreated) {
-          // If auth creation fails, delete the employee record
-          await supabase.from("employees").delete().eq("id", id);
-          throw new Error("Failed to create employee account");
+        if (!responseData.success) {
+          throw new Error(responseData.message || "Failed to onboard employee");
         }
         
-        // Send WhatsApp verification to the newly created employee
-        const verificationSent = await sendWhatsAppVerification(data.phone, id, data.name);
-        if (!verificationSent) {
-          // If verification sending fails, we continue but inform the user
-          toast.warning("Employee created but verification message could not be sent");
+        // Show appropriate toast messages based on the response
+        if (responseData.verificationSent) {
+          toast.success("Staff member created! Verification sent to WhatsApp");
+        } else if (responseData.welcomeMessageSent) {
+          toast.success("Staff member created! Welcome message sent to WhatsApp");
+        } else {
+          toast.success("Staff member created successfully");
+          toast.warning("Could not send notifications to the staff member");
         }
       }
       
-      // Insert skills
-      if (data.skills.length > 0) {
-        const skillsToInsert = data.skills.map((skillId: string) => ({
-          employee_id: id,
-          service_id: skillId,
-        }));
-        
-        const { error: skillsInsertError } = await supabase
-          .from("employee_skills")
-          .insert(skillsToInsert);
-          
-        if (skillsInsertError) throw skillsInsertError;
-      }
-      
-      // Insert location assignments
-      if (data.locations.length > 0) {
-        const locationsToInsert = data.locations.map((locationId: string) => ({
-          employee_id: id,
-          location_id: locationId,
-        }));
-        
-        const { error: locationsInsertError } = await supabase
-          .from("employee_locations")
-          .insert(locationsToInsert);
-          
-        if (locationsInsertError) throw locationsInsertError;
-      }
-      
-      toast.success(employeeId 
-        ? "Staff member updated successfully" 
-        : "Staff member created successfully. Verification sent to WhatsApp"
-      );
       onOpenChange(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to save staff member");
