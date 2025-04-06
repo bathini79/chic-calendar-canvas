@@ -1,9 +1,12 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAppointmentNotifications } from '@/hooks/use-appointment-notifications';
 
 export const useSaveAppointment = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const { sendNotification } = useAppointmentNotifications();
 
   const saveAppointment = async (appointmentData: any, bookingsData: any[]) => {
     setIsLoading(true);
@@ -35,7 +38,17 @@ export const useSaveAppointment = () => {
       await upsertBookings();
 
       // Show success notification
-      showSuccessNotification();
+      toast.success("Appointment saved successfully");
+      
+      // Send confirmation notification if it's a new appointment
+      try {
+        if (updatedAppointment && !appointmentData.id) {
+          await sendNotification(updatedAppointment.id, 'booking_confirmation');
+        }
+      } catch (notificationError) {
+        console.error("Error sending confirmation:", notificationError);
+        // Don't fail the booking if notification fails
+      }
 
       return updatedAppointment;
     } catch (error: any) {
@@ -45,11 +58,6 @@ export const useSaveAppointment = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Remove sendNotification function and replace with toast message
-  const showSuccessNotification = () => {
-    toast.success("Appointment saved successfully");
   };
 
   return { saveAppointment, isLoading };

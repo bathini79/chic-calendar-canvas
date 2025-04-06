@@ -49,7 +49,7 @@ export function useAppointmentNotifications() {
     }
   };
 
-  // New function to send appointment notifications
+  // Send appointment notification function
   const sendNotification = async (appointmentId: string, notificationType = NOTIFICATION_TYPES.BOOKING_CONFIRMATION) => {
     try {
       setIsLoading(true);
