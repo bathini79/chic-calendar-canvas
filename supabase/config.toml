@@ -1,8 +1,6 @@
 
 project_id = "oygmfedzibzxojqirgxo"
 
-[functions.gupshup-webhook]
-verify_jwt = false
-
-[functions.send-gupshup-notification]
+[functions.send-appointment-notification]
 verify_jwt = true
+

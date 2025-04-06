@@ -26,30 +26,14 @@ export function useAppointmentNotifications() {
         return { processed: 0 };
       }
 
-      // Check if GupShup is configured and active
-      const { data: gupshupConfig, error: configError } = await supabase
-        .from('messaging_providers')
-        .select('*')
-        .eq('provider_name', 'gupshup')
-        .single();
-      
-      if (configError && configError.code !== 'PGRST116') throw configError;
-      
-      // If GupShup is not configured or not active, use Supabase edge function
-      const useGupshup = gupshupConfig && 
-                          gupshupConfig.is_active && 
-                          gupshupConfig.configuration?.api_key && 
-                          gupshupConfig.configuration?.app_id && 
-                          gupshupConfig.configuration?.source_mobile;
-      
       const results = [];
       
       // Process each notification
       for (const notification of pendingNotifications) {
         try {
-          // Call the appropriate edge function based on configuration
+          // Call the edge function
           const { data, error } = await supabase.functions.invoke(
-            useGupshup ? 'send-gupshup-notification' : 'send-appointment-notification',
+            'send-appointment-notification',
             {
               body: { notificationId: notification.id }
             }
