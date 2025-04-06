@@ -40,10 +40,28 @@ serve(async (req) => {
     const expiresInMinutes = 15
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000)
     
-    // Load GupShup configuration
-    const gupshupAppId = Deno.env.get('GUPSHUP_APP_ID')
-    const gupshupApiKey = Deno.env.get('GUPSHUP_API_KEY')
-    const gupshupSourceMobile = Deno.env.get('GUPSHUP_SOURCE_MOBILE')
+    // Load GupShup configuration from the database instead of environment variables
+    const { data: gupshupConfig, error: configError } = await supabaseAdmin
+      .from('messaging_providers') // Fixed table name here (was "message_providers")
+      .select('*')
+      .eq('provider_name', 'gupshup')
+      .maybeSingle()
+    
+    // Log the result of the query for debugging
+    console.log('GupShup config query result:', {
+      data: gupshupConfig ? 'Found' : 'Not found',
+      error: configError ? configError.message : 'No error'
+    })
+    
+    // Check if GupShup is configured and active
+    if (!gupshupConfig || !gupshupConfig.is_active || !gupshupConfig.configuration) {
+      console.log('GupShup not configured or not active, falling back to environment variables')
+    }
+    
+    // Get configuration - prioritize database config, fall back to env vars
+    const gupshupAppId = gupshupConfig?.configuration?.app_id || Deno.env.get('GUPSHUP_APP_ID')
+    const gupshupApiKey = gupshupConfig?.configuration?.api_key || Deno.env.get('GUPSHUP_API_KEY')
+    const gupshupSourceMobile = gupshupConfig?.configuration?.source_mobile || Deno.env.get('GUPSHUP_SOURCE_MOBILE')
     
     if (!gupshupAppId || !gupshupApiKey || !gupshupSourceMobile) {
       throw new Error('GupShup credentials are not configured')
