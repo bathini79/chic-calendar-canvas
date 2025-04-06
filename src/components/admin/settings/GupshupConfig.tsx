@@ -40,7 +40,6 @@ export function GupshupConfig() {
 
       const { data, error } = await supabase
         .from("messaging_providers")
-        .select("*")
         .eq("provider_name", "gupshup")
         .single();
 
