@@ -34,6 +34,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
 import confetti from "canvas-confetti";
 import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
+import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 
 export default function BookingConfirmation() {
   const {
@@ -68,6 +69,8 @@ export default function BookingConfirmation() {
   const { customerMemberships, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
   const [membershipDiscount, setMembershipDiscount] = useState(0);
   const [activeMembership, setActiveMembership] = useState<any>(null);
+  const { sendNotification } = useAppointmentNotifications();
+  const [hasFetchedMemberships, setHasFetchedMemberships] = useState(false);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -111,13 +114,14 @@ export default function BookingConfirmation() {
   useEffect(() => {
     const loadMemberships = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (session && !hasFetchedMemberships) {
         await fetchCustomerMemberships(session.user.id);
+        setHasFetchedMemberships(true);
       }
     };
-    
+
     loadMemberships();
-  }, [fetchCustomerMemberships]);
+  }, [fetchCustomerMemberships, hasFetchedMemberships]); // Fetch only if memberships are not already loaded
 
   useEffect(() => {
     if (items && items.length > 0 && customerMemberships.length > 0) {
@@ -228,13 +232,16 @@ export default function BookingConfirmation() {
     };
 
     const processCouponData = (data: any) => {
-      setCoupon(data);
-      
+      setCoupon((prevCoupon) => {
+        if (prevCoupon?.id === data.id) return prevCoupon; // Prevent unnecessary updates
+        return data;
+      });
+
       if (!items || items.length === 0) {
         setCouponDiscount(0);
         return;
       }
-      
+
       const subtotal = getTotalPrice();
       const afterMembershipDiscount = subtotal - membershipDiscount;
       const newDiscount =
@@ -624,7 +631,7 @@ export default function BookingConfirmation() {
         console.error("Errors inserting bookings:", bookingErrors);
         throw new Error("Failed to create some bookings. Please try again.");
       }
-
+      sendNotification(appointmentId, "BOOKING_CONFIRMATION")
       toast.success("Booking confirmed successfully!");
       
       setBookingSuccess(true);
