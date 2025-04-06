@@ -1369,11 +1369,39 @@ export type Database = {
         }
         Relationships: []
       }
+      messaging_providers: {
+        Row: {
+          configuration: Json | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          provider_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          configuration?: Json | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          configuration?: Json | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       notification_queue: {
         Row: {
           appointment_id: string | null
           created_at: string | null
           error_message: string | null
+          external_message_id: string | null
           id: string
           message_content: string
           notification_type: string
@@ -1385,6 +1413,7 @@ export type Database = {
           appointment_id?: string | null
           created_at?: string | null
           error_message?: string | null
+          external_message_id?: string | null
           id?: string
           message_content: string
           notification_type: string
@@ -1396,6 +1425,7 @@ export type Database = {
           appointment_id?: string | null
           created_at?: string | null
           error_message?: string | null
+          external_message_id?: string | null
           id?: string
           message_content?: string
           notification_type?: string

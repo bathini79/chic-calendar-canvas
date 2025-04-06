@@ -40,8 +40,9 @@ export function GupshupConfig() {
 
       const { data, error } = await supabase
         .from("messaging_providers")
+        .select("*")
         .eq("provider_name", "gupshup")
-        .single();
+        .maybeSingle(); // Using maybeSingle instead of single to handle the no rows case
 
       if (error && error.code !== "PGRST116") {
         // PGRST116 is "no rows returned" error
@@ -81,7 +82,7 @@ export function GupshupConfig() {
         .from("messaging_providers")
         .select("id")
         .eq("provider_name", "gupshup")
-        .single();
+        .maybeSingle(); // Using maybeSingle to handle when no record exists
 
       let result;
       

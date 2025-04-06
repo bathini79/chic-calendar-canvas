@@ -65,8 +65,9 @@ serve(async (req) => {
       .from('messaging_providers')
       .select('*')
       .eq('provider_name', 'gupshup')
-      .single()
+      .maybeSingle() // Using maybeSingle to handle case when no config exists
     
+    // If GupShup config doesn't exist or there was an error, consider it not configured
     if (configError || !gupshupConfig) {
       throw new Error('GupShup is not configured')
     }

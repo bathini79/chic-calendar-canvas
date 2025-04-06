@@ -31,7 +31,7 @@ export function useAppointmentNotifications() {
         .from('messaging_providers')
         .select('*')
         .eq('provider_name', 'gupshup')
-        .single();
+        .maybeSingle(); // Using maybeSingle instead of single to handle the no rows case
       
       if (configError && configError.code !== 'PGRST116') throw configError;
       
