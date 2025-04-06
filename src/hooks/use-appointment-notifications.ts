@@ -33,7 +33,7 @@ interface NotificationQueueItem {
 }
 
 /**
- * Hook for sending appointment notifications through WhatsApp
+ * Hook for sending appointment notifications through WhatsApp using GupShup
  */
 export const useAppointmentNotifications = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -207,7 +207,8 @@ export const useAppointmentNotifications = () => {
                 body: {
                   appointmentId: notification.appointment_id,
                   notificationType: notification.notification_type,
-                  notificationId: notification.id
+                  notificationId: notification.id,
+                  provider: 'gupshup' // Specify to use GupShup
                 }
               }
             );

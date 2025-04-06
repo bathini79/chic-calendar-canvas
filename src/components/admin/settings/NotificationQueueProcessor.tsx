@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ReloadIcon } from "@radix-ui/react-icons";
+import { ReloadIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 import {

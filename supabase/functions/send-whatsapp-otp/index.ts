@@ -40,22 +40,20 @@ serve(async (req) => {
     const expiresInMinutes = 15
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000)
     
-    // Load Twilio configuration
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
-    const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')
-    const twilioWhatsappNumber = Deno.env.get('TWILIO_PHONE_NUMBER') // Use the regular phone number if WhatsApp number isn't set
+    // Load GupShup configuration
+    const gupshupAppId = Deno.env.get('GUPSHUP_APP_ID')
+    const gupshupApiKey = Deno.env.get('GUPSHUP_API_KEY')
+    const gupshupSourceMobile = Deno.env.get('GUPSHUP_SOURCE_MOBILE')
     
-    if (!accountSid || !authToken || !twilioPhoneNumber) {
-      throw new Error('Twilio credentials are not configured')
+    if (!gupshupAppId || !gupshupApiKey || !gupshupSourceMobile) {
+      throw new Error('GupShup credentials are not configured')
     }
 
-    // Log the Twilio configuration for debugging
-    console.log('Twilio configuration:', {
-      accountSid: accountSid ? 'Configured' : 'Missing',
-      authToken: authToken ? 'Configured' : 'Missing',
-      twilioPhoneNumber,
-      twilioWhatsappNumber
+    // Log the GupShup configuration for debugging
+    console.log('GupShup configuration:', {
+      gupshupAppId: gupshupAppId ? 'Configured' : 'Missing',
+      gupshupApiKey: gupshupApiKey ? 'Configured' : 'Missing',
+      gupshupSourceMobile
     })
     
     let messageResponse
@@ -125,45 +123,56 @@ This code will expire in ${expiresInMinutes} minutes.
 Thank you for joining our team!`
       }
       
-      // Send message using Twilio
-      const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
+      // Format phone number for GupShup (remove '+' character)
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber;
       
-      if (method === 'whatsapp' && twilioWhatsappNumber) {
-        // Send via WhatsApp
-        const body = new URLSearchParams({
-          To: `whatsapp:${phoneNumber}`,
-          From: `whatsapp:${twilioWhatsappNumber}`,
-          Body: message
-        }).toString()
-
-        console.log(`Sending WhatsApp message to: whatsapp:${phoneNumber} from: whatsapp:${twilioWhatsappNumber}`);
-
-        messageResponse = await fetch(twilioEndpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body
-        })
-      } else {
-        // Send via SMS as fallback
-        console.log(`Sending SMS message to: ${phoneNumber} from: ${twilioPhoneNumber}`);
+      if (method === 'whatsapp') {
+        // Send via GupShup WhatsApp API
+        const gupshupEndpoint = 'https://api.gupshup.io/sm/api/v1/msg'
         
-        const body = new URLSearchParams({
-          To: phoneNumber,
-          From: twilioPhoneNumber,
-          Body: `Your verification code is: ${otp}. This code will expire in ${expiresInMinutes} minutes.`
-        }).toString()
+        // Create FormData for the request
+        const formData = new FormData();
+        formData.append('channel', 'whatsapp');
+        formData.append('source', gupshupSourceMobile);
+        formData.append('destination', formattedPhone);
+        formData.append('message', JSON.stringify({
+          type: 'text',
+          text: message
+        }));
+        formData.append('app', gupshupAppId);
+        
+        console.log(`Sending WhatsApp message to: ${formattedPhone} from: ${gupshupSourceMobile}`);
 
-        messageResponse = await fetch(twilioEndpoint, {
+        // Send message using GupShup
+        messageResponse = await fetch(gupshupEndpoint, {
           method: 'POST',
           headers: {
-            'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'apikey': gupshupApiKey
           },
-          body
-        })
+          body: formData
+        });
+      } else {
+        // Send via SMS as fallback (still using GupShup)
+        console.log(`Sending SMS message to: ${formattedPhone} from: ${gupshupSourceMobile}`);
+        
+        const smsMessage = `Your verification code is: ${otp}. This code will expire in ${expiresInMinutes} minutes.`;
+        
+        // Create FormData for the request
+        const formData = new FormData();
+        formData.append('channel', 'sms');
+        formData.append('source', gupshupSourceMobile);
+        formData.append('destination', formattedPhone);
+        formData.append('message', smsMessage);
+        formData.append('app', gupshupAppId);
+        
+        // Send SMS using GupShup
+        messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
+          method: 'POST',
+          headers: {
+            'apikey': gupshupApiKey
+          },
+          body: formData
+        });
       }
       
       storedEntity = 'employee'
@@ -181,45 +190,56 @@ Thank you for joining our team!`
         throw new Error(`Failed to store verification code: ${otpError.message}`)
       }
       
-      // Send message using Twilio
-      const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
+      // Format phone number for GupShup (remove '+' character)
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber;
       
-      if (method === 'whatsapp' && twilioWhatsappNumber) {
-        // Send via WhatsApp
-        const body = new URLSearchParams({
-          To: `whatsapp:${phoneNumber}`,
-          From: `whatsapp:${twilioWhatsappNumber}`,
-          Body: `Your verification code is: *${otp}*. This code will expire in ${expiresInMinutes} minutes.`
-        }).toString()
-
-        console.log(`Sending WhatsApp message to: whatsapp:${phoneNumber} from: whatsapp:${twilioWhatsappNumber}`);
-
-        messageResponse = await fetch(twilioEndpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body
-        })
-      } else {
-        // Send via SMS as fallback
-        console.log(`Sending SMS message to: ${phoneNumber} from: ${twilioPhoneNumber}`);
+      if (method === 'whatsapp') {
+        // Send via GupShup WhatsApp API
+        console.log(`Sending WhatsApp message to: ${formattedPhone} from: ${gupshupSourceMobile}`);
         
-        const body = new URLSearchParams({
-          To: phoneNumber,
-          From: twilioPhoneNumber,
-          Body: `Your verification code is: ${otp}. This code will expire in ${expiresInMinutes} minutes.`
-        }).toString()
-
-        messageResponse = await fetch(twilioEndpoint, {
+        const whatsappMessage = `Your verification code is: *${otp}*. This code will expire in ${expiresInMinutes} minutes.`;
+        
+        // Create FormData for the request
+        const formData = new FormData();
+        formData.append('channel', 'whatsapp');
+        formData.append('source', gupshupSourceMobile);
+        formData.append('destination', formattedPhone);
+        formData.append('message', JSON.stringify({
+          type: 'text',
+          text: whatsappMessage
+        }));
+        formData.append('app', gupshupAppId);
+        
+        // Send message using GupShup
+        messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
           method: 'POST',
           headers: {
-            'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'apikey': gupshupApiKey
           },
-          body
-        })
+          body: formData
+        });
+      } else {
+        // Send via SMS as fallback (still using GupShup)
+        console.log(`Sending SMS message to: ${formattedPhone} from: ${gupshupSourceMobile}`);
+        
+        const smsMessage = `Your verification code is: ${otp}. This code will expire in ${expiresInMinutes} minutes.`;
+        
+        // Create FormData for the request
+        const formData = new FormData();
+        formData.append('channel', 'sms');
+        formData.append('source', gupshupSourceMobile);
+        formData.append('destination', formattedPhone);
+        formData.append('message', smsMessage);
+        formData.append('app', gupshupAppId);
+        
+        // Send SMS using GupShup
+        messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
+          method: 'POST',
+          headers: {
+            'apikey': gupshupApiKey
+          },
+          body: formData
+        });
       }
       
       storedEntity = 'user'
