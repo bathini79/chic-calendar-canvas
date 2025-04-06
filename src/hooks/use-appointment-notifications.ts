@@ -4,6 +4,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+export const NOTIFICATION_TYPES = {
+  BOOKING_CONFIRMATION: 'booking_confirmation',
+  APPOINTMENT_CONFIRMED: 'appointment_confirmed',
+  REMINDER_1_HOUR: 'reminder_1_hour',
+  REMINDER_4_HOURS: 'reminder_4_hours',
+  APPOINTMENT_COMPLETED: 'appointment_completed'
+};
+
 export function useAppointmentNotifications() {
   const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
@@ -41,6 +49,36 @@ export function useAppointmentNotifications() {
     }
   };
 
+  // New function to send appointment notifications
+  const sendNotification = async (appointmentId: string, notificationType = NOTIFICATION_TYPES.BOOKING_CONFIRMATION) => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase.functions.invoke('send-appointment-notification', {
+        body: { 
+          appointmentId, 
+          notificationType 
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data.success) {
+        toast.success("Confirmation message sent successfully");
+      } else {
+        throw new Error(data.error || "Failed to send confirmation message");
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error sending appointment notification:", error);
+      toast.error(error.message || "Failed to send confirmation message");
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const { mutate, isPending } = useMutation({
     mutationFn: processPendingNotifications,
     onSuccess: () => {
@@ -50,6 +88,7 @@ export function useAppointmentNotifications() {
 
   return {
     processPendingNotifications: mutate,
-    isLoading: isPending
+    sendNotification,
+    isLoading: isPending || isLoading
   };
 }

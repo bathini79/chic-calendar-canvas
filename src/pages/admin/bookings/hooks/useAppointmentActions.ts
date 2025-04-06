@@ -390,8 +390,17 @@ export const useAppointmentActions = () => {
   const sendBookingConfirmation = async (appointmentId: string) => {
     try {
       setIsLoading(true);
-      toast.info("Notification functionality has been disabled");
-      return true;
+      
+      const { useAppointmentNotifications } = await import("@/hooks/use-appointment-notifications");
+      const { sendNotification } = useAppointmentNotifications();
+      
+      if (sendNotification) {
+        await sendNotification(appointmentId, 'booking_confirmation');
+        return true;
+      } else {
+        toast.error("Notification service unavailable");
+        return false;
+      }
     } catch (error: any) {
       console.error('Error sending booking confirmation:', error);
       toast.error(error.message || 'Failed to send booking confirmation');
@@ -404,8 +413,20 @@ export const useAppointmentActions = () => {
   const sendReminderNotification = async (appointmentId: string, hoursBeforeAppointment: 1 | 4) => {
     try {
       setIsLoading(true);
-      toast.info("Notification functionality has been disabled");
-      return true;
+      
+      const { useAppointmentNotifications } = await import("@/hooks/use-appointment-notifications");
+      const { sendNotification } = useAppointmentNotifications();
+      const notificationType = hoursBeforeAppointment === 1 
+        ? 'reminder_1_hour' 
+        : 'reminder_4_hours';
+      
+      if (sendNotification) {
+        await sendNotification(appointmentId, notificationType);
+        return true;
+      } else {
+        toast.error("Notification service unavailable");
+        return false;
+      }
     } catch (error: any) {
       console.error('Error sending reminder notification:', error);
       toast.error(error.message || 'Failed to send reminder notification');

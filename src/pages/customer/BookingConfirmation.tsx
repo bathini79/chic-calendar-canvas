@@ -632,7 +632,15 @@ export default function BookingConfirmation() {
         console.error("Errors inserting bookings:", bookingErrors);
         throw new Error("Failed to create some bookings. Please try again.");
       }
-      sendConfirmation();
+      
+      try {
+        const notificationResult = await sendConfirmation(appointmentId);
+        console.log("Notification sent:", notificationResult);
+      } catch (notificationError) {
+        console.error("Error sending confirmation:", notificationError);
+        // Don't fail the booking if notification fails
+      }
+      
       toast.success("Booking confirmed successfully!");
       
       setBookingSuccess(true);
@@ -978,14 +986,18 @@ export default function BookingConfirmation() {
   );
 }
 
-const sendConfirmation = async () => {
+const sendConfirmation = async (appointmentId: string) => {
   try {
-    setIsSendingNotification(true);
-    toast.success("Booking confirmed successfully!");
+    const { useAppointmentNotifications } = await import("@/hooks/use-appointment-notifications");
+    const { sendNotification } = useAppointmentNotifications();
+    
+    if (sendNotification) {
+      return await sendNotification(appointmentId, 'booking_confirmation');
+    }
+    return null;
   } catch (error) {
     console.error("Error sending confirmation:", error);
-    toast.error("Failed to send confirmation message");
-  } finally {
-    setIsSendingNotification(false);
+    // Don't show error to user since this is a background task
+    return null;
   }
 };
