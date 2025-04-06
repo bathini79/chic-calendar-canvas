@@ -52,13 +52,13 @@ export const useAppointmentNotifications = () => {
         throw new Error(data.error || 'Failed to send notification');
       }
 
-      toast.success('Notification sent successfully');
       return true;
     } catch (err: any) {
       console.error('Error sending notification:', err);
       const errorMessage = err.message || 'Failed to send notification';
       setError(errorMessage);
-      toast.error(errorMessage);
+      // Don't show toast on the customer side to avoid confusion
+      // toast.error(errorMessage);
       return false;
     } finally {
       setIsLoading(false);
