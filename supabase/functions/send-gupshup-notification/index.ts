@@ -60,20 +60,90 @@ serve(async (req) => {
       )
     }
 
-    // Update notification status to failed since this function is disabled
+    // Get GupShup configuration from messaging_providers table
+    const { data: gupshupConfig, error: configError } = await supabase
+      .from('messaging_providers')
+      .select('*')
+      .eq('provider_name', 'gupshup')
+      .single()
+    
+    if (configError || !gupshupConfig) {
+      throw new Error('GupShup is not configured')
+    }
+
+    if (!gupshupConfig.is_active) {
+      throw new Error('GupShup integration is not active')
+    }
+
+    const { app_id, api_key, source_mobile } = gupshupConfig.configuration || {}
+
+    if (!app_id || !api_key || !source_mobile) {
+      throw new Error('Incomplete GupShup configuration')
+    }
+    
+    // Format phone number for GupShup (ensure no '+' character)
+    const formattedPhone = notification.recipient_number.startsWith('+') 
+      ? notification.recipient_number.substring(1) 
+      : notification.recipient_number;
+    
+    console.log(`Sending WhatsApp message to: ${formattedPhone} from: ${source_mobile}`);
+    
+    // Create FormData for the request
+    const formData = new FormData();
+    formData.append('channel', 'whatsapp');
+    formData.append('source', source_mobile);
+    formData.append('destination', formattedPhone);
+    formData.append('message', JSON.stringify({
+      type: 'text',
+      text: notification.message_content
+    }));
+    formData.append('app', app_id);
+    
+    // Send message using GupShup
+    const messageResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
+      method: 'POST',
+      headers: {
+        'apikey': api_key
+      },
+      body: formData
+    });
+    
+    // Check if message was sent successfully
+    if (!messageResponse.ok) {
+      const errorData = await messageResponse.json()
+      
+      // Update notification status to failed
+      await supabase
+        .from('notification_queue')
+        .update({ 
+          status: 'failed',
+          processed_at: new Date().toISOString(),
+          error_message: JSON.stringify(errorData)
+        })
+        .eq('id', notification.id)
+        
+      throw new Error(`Failed to send message: ${JSON.stringify(errorData)}`)
+    }
+    
+    // Get response data to extract message ID
+    const responseData = await messageResponse.json()
+    console.log('GupShup API response:', JSON.stringify(responseData, null, 2))
+    
+    // Update notification status to sent
     await supabase
       .from('notification_queue')
       .update({ 
-        status: 'failed',
+        status: 'sent',
         processed_at: new Date().toISOString(),
-        error_message: 'GupShup integration is disabled'
+        external_message_id: responseData.messageId || null
       })
       .eq('id', notification.id)
     
     return new Response(
       JSON.stringify({ 
-        success: false, 
-        message: 'GupShup integration is disabled',
+        success: true, 
+        message: 'Notification sent successfully',
+        messageId: responseData.messageId || null
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -90,7 +160,7 @@ serve(async (req) => {
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+        status: 200 // Using 200 to avoid CORS issues with error responses
       }
     )
   }
