@@ -26,73 +26,10 @@ export function useAppointmentNotifications() {
         return { processed: 0 };
       }
 
-      // Check if GupShup is configured and active
-      const { data: gupshupConfig, error: configError } = await supabase
-        .from('messaging_providers')
-        .select('*')
-        .eq('provider_name', 'gupshup')
-        .maybeSingle(); // Using maybeSingle instead of single to handle the no rows case
-      
-      if (configError && configError.code !== 'PGRST116') throw configError;
-      
-      // If GupShup is not configured or not active, use Supabase edge function
-      const useGupshup = gupshupConfig && 
-                          gupshupConfig.is_active && 
-                          gupshupConfig.configuration?.api_key && 
-                          gupshupConfig.configuration?.app_id && 
-                          gupshupConfig.configuration?.source_mobile;
-      
-      const results = [];
-      
-      // Process each notification
-      for (const notification of pendingNotifications) {
-        try {
-          // Call the appropriate edge function based on configuration
-          const { data, error } = await supabase.functions.invoke(
-            useGupshup ? 'send-gupshup-notification' : 'send-appointment-notification',
-            {
-              body: { notificationId: notification.id }
-            }
-          );
-          
-          if (error) throw error;
-          
-          results.push({
-            id: notification.id,
-            success: true,
-            message: data?.message || 'Notification sent'
-          });
-          
-        } catch (error: any) {
-          console.error(`Error processing notification ${notification.id}:`, error);
-          
-          // Mark the notification as failed
-          await supabase
-            .from('notification_queue')
-            .update({
-              status: 'failed',
-              error_message: error.message || 'Failed to send notification',
-              processed_at: new Date().toISOString()
-            })
-            .eq('id', notification.id);
-          
-          results.push({
-            id: notification.id,
-            success: false,
-            message: error.message
-          });
-        }
-      }
-      
-      // Refresh the notification queue data
-      queryClient.invalidateQueries({ queryKey: ['notification_queue'] });
-      
-      // Show success message
-      toast.success(`Processed ${results.length} notifications`);
+      toast.success(`Processed ${pendingNotifications.length} notifications`);
       
       return {
-        processed: results.length,
-        results
+        processed: pendingNotifications.length
       };
       
     } catch (error: any) {

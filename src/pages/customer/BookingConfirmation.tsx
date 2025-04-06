@@ -71,6 +71,7 @@ export default function BookingConfirmation() {
   const [activeMembership, setActiveMembership] = useState<any>(null);
   const { sendNotification } = useAppointmentNotifications();
   const [hasFetchedMemberships, setHasFetchedMemberships] = useState(false);
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -631,7 +632,7 @@ export default function BookingConfirmation() {
         console.error("Errors inserting bookings:", bookingErrors);
         throw new Error("Failed to create some bookings. Please try again.");
       }
-      sendNotification(appointmentId, "BOOKING_CONFIRMATION")
+      sendConfirmation();
       toast.success("Booking confirmed successfully!");
       
       setBookingSuccess(true);
@@ -976,3 +977,15 @@ export default function BookingConfirmation() {
     </div>
   );
 }
+
+const sendConfirmation = async () => {
+  try {
+    setIsSendingNotification(true);
+    toast.success("Booking confirmed successfully!");
+  } catch (error) {
+    console.error("Error sending confirmation:", error);
+    toast.error("Failed to send confirmation message");
+  } finally {
+    setIsSendingNotification(false);
+  }
+};

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 import {
   Table,
   TableBody,
@@ -14,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 // Define type for notification queue items
 interface NotificationQueueItem {
@@ -32,8 +32,7 @@ interface NotificationQueueItem {
 export function NotificationQueueProcessor() {
   const [notifications, setNotifications] = useState<NotificationQueueItem[]>([]);
   const [processing, setProcessing] = useState(false);
-  const { processPendingNotifications, isLoading } = useAppointmentNotifications();
-
+  
   // Fetch the queue
   const fetchQueue = async () => {
     const { data, error } = await supabase
@@ -47,11 +46,11 @@ export function NotificationQueueProcessor() {
     }
   };
 
-  // Process the queue
+  // Process the queue (functionality removed)
   const handleProcessQueue = async () => {
     setProcessing(true);
     try {
-      processPendingNotifications();
+      toast.info("Notification processing has been disabled");
       await fetchQueue(); // Refresh the list
     } finally {
       setProcessing(false);
@@ -95,9 +94,9 @@ export function NotificationQueueProcessor() {
         <h3 className="text-lg font-medium">Notification Queue</h3>
         <Button 
           onClick={handleProcessQueue} 
-          disabled={processing || isLoading}
+          disabled={processing}
         >
-          {(processing || isLoading) && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+          {processing && <Loader className="mr-2 h-4 w-4 animate-spin" />}
           Process Queue
         </Button>
       </div>

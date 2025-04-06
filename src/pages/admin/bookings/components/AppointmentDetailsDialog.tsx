@@ -150,7 +150,6 @@ export function AppointmentDetailsDialog({
     markAppointmentAs
   } = useAppointmentActions();
   
-  // Add the appointments notifications hook
   const { sendNotification, isLoading: isSendingNotification } = useAppointmentNotifications();
   
   useEffect(() => {
@@ -225,11 +224,17 @@ export function AppointmentDetailsDialog({
     }
   };
 
-  // Add a function to handle manual notification sending
-  const handleSendNotification = async (notificationType) => {
-    if (!appointment?.id) return;
-    
-    await sendNotification(appointment.id, notificationType);
+  const handleSendNotification = async (type: string) => {
+    try {
+      setIsSendingNotification(true);
+      toast.info("Notification functionality has been disabled");
+      return true;
+    } catch (error) {
+      toast.error("Failed to send notification");
+      return false;
+    } finally {
+      setIsSendingNotification(false);
+    }
   };
 
   const tabs = [

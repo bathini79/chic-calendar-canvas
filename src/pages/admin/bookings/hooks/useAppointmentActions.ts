@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Appointment, RefundData, TransactionDetails } from '../types';
-import { useAppointmentNotifications, NOTIFICATION_TYPES } from '@/hooks/use-appointment-notifications';
 
 type RefundReason = "customer_dissatisfaction" | "service_quality_issue" | "scheduling_error" | "health_concern" | "price_dispute" | "other";
 
@@ -21,7 +20,6 @@ interface SelectedItem {
 export const useAppointmentActions = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
-  const { sendNotification } = useAppointmentNotifications();
 
   const fetchAppointmentDetails = async (appointmentId: string): Promise<TransactionDetails | null> => {
     try {
@@ -325,16 +323,6 @@ export const useAppointmentActions = () => {
 
       if (bookingsError) throw bookingsError;
 
-      try {
-        if (status === 'confirmed') {
-          await sendNotification(appointmentId, 'APPOINTMENT_CONFIRMED');
-        } else if (status === 'completed') {
-          await sendNotification(appointmentId, 'APPOINTMENT_COMPLETED');
-        }
-      } catch (notificationError) {
-        console.error('Error sending notification:', notificationError);
-      }
-
       let message = '';
       switch (status) {
         case 'canceled':
@@ -402,8 +390,8 @@ export const useAppointmentActions = () => {
   const sendBookingConfirmation = async (appointmentId: string) => {
     try {
       setIsLoading(true);
-      const success = await sendNotification(appointmentId, 'BOOKING_CONFIRMATION');
-      return success;
+      toast.info("Notification functionality has been disabled");
+      return true;
     } catch (error: any) {
       console.error('Error sending booking confirmation:', error);
       toast.error(error.message || 'Failed to send booking confirmation');
@@ -416,9 +404,8 @@ export const useAppointmentActions = () => {
   const sendReminderNotification = async (appointmentId: string, hoursBeforeAppointment: 1 | 4) => {
     try {
       setIsLoading(true);
-      const notificationType = hoursBeforeAppointment === 1 ? 'REMINDER_1_HOUR' : 'REMINDER_4_HOURS';
-      const success = await sendNotification(appointmentId, notificationType as keyof typeof NOTIFICATION_TYPES);
-      return success;
+      toast.info("Notification functionality has been disabled");
+      return true;
     } catch (error: any) {
       console.error('Error sending reminder notification:', error);
       toast.error(error.message || 'Failed to send reminder notification');
