@@ -26,6 +26,7 @@ interface NotificationQueueItem {
   created_at: string;
   processed_at: string | null;
   error_message: string | null;
+  external_message_id?: string | null;
 }
 
 export function NotificationQueueProcessor() {

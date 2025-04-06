@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Check, InfoIcon, Loader2, Save } from "lucide-react";
+import { Check, Info, Loader2, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -39,9 +39,9 @@ export function GupshupConfig() {
       setError(null);
 
       const { data, error } = await supabase
-        .from("system_settings")
+        .from("messaging_providers")
         .select("*")
-        .eq("category", "gupshup")
+        .eq("provider_name", "gupshup")
         .single();
 
       if (error && error.code !== "PGRST116") {
@@ -51,9 +51,9 @@ export function GupshupConfig() {
 
       if (data) {
         setIsActive(data.is_active);
-        setAppId(data.settings?.app_id || "");
-        setApiKey(data.settings?.api_key || "");
-        setSourceMobile(data.settings?.source_mobile || "");
+        setAppId(data.configuration?.app_id || "");
+        setApiKey(data.configuration?.api_key || "");
+        setSourceMobile(data.configuration?.source_mobile || "");
       }
     } catch (error: any) {
       console.error("Error fetching GupShup config:", error);
@@ -69,7 +69,7 @@ export function GupshupConfig() {
       setSaveSuccess(false);
       setError(null);
 
-      const settings = {
+      const configuration = {
         app_id: appId,
         api_key: apiKey,
         source_mobile: sourceMobile,
@@ -78,9 +78,9 @@ export function GupshupConfig() {
 
       // Check if record exists
       const { data: existingData } = await supabase
-        .from("system_settings")
+        .from("messaging_providers")
         .select("id")
-        .eq("category", "gupshup")
+        .eq("provider_name", "gupshup")
         .single();
 
       let result;
@@ -88,19 +88,19 @@ export function GupshupConfig() {
       if (existingData) {
         // Update existing record
         result = await supabase
-          .from("system_settings")
+          .from("messaging_providers")
           .update({
-            settings,
+            configuration,
             is_active: isActive
           })
-          .eq("category", "gupshup");
+          .eq("provider_name", "gupshup");
       } else {
         // Insert new record
         result = await supabase
-          .from("system_settings")
+          .from("messaging_providers")
           .insert({
-            category: "gupshup",
-            settings,
+            provider_name: "gupshup",
+            configuration,
             is_active: isActive
           });
       }
@@ -205,11 +205,11 @@ export function GupshupConfig() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="source-mobile">
+            <Label htmlFor="source-mobile" className="flex items-center">
               Source Mobile Number
-              <InfoIcon 
-                className="inline-block ml-1 h-4 w-4 text-muted-foreground" 
-                title="Mobile number in format: 917834811114 (no + symbol)"
+              <Info 
+                className="inline-block ml-1 h-4 w-4 text-muted-foreground cursor-help"
+                aria-label="Mobile number in format: 917834811114 (no + symbol)" 
               />
             </Label>
             <Input

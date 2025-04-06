@@ -59,7 +59,8 @@ serve(async (req) => {
         .update({
           status: mapGupshupStatus(eventType),
           processed_at: new Date(eventTs).toISOString(),
-          error_message: eventType === 'failed' ? 'Message delivery failed' : null
+          error_message: eventType === 'failed' ? 'Message delivery failed' : null,
+          external_message_id: id
         })
         .eq('external_message_id', id)
     }
