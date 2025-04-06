@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -27,6 +26,9 @@ export function GupshupConfig() {
   const [sourceMobile, setSourceMobile] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testPhoneNumber, setTestPhoneNumber] = useState("");
+  const [testResult, setTestResult] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -85,16 +87,16 @@ export function GupshupConfig() {
         .maybeSingle(); // Using maybeSingle to handle when no record exists
 
       let result;
-      
+      console.log("Existing Data:", existingData);
       if (existingData) {
         // Update existing record
         result = await supabase
           .from("messaging_providers")
           .update({
             is_active: isActive,
-            configuration
+            configuration: configuration // Pass the configuration object directly
           })
-          .eq("provider_name", "gupshup");
+          .eq("id",existingData.id);
       } else {
         // Insert new record
         result = await supabase
@@ -130,6 +132,56 @@ export function GupshupConfig() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const testGupshupConnection = async () => {
+    try {
+      setIsTesting(true);
+      setTestResult(null);
+      setError(null);
+
+      const response = await fetch("https://api.gupshup.io/wa/api/v1/msg", {
+        method: "POST",
+        headers: {
+          "Cache-Control": "no-cache",
+          "Content-Type": "application/x-www-form-urlencoded",
+          "apikey": apiKey,
+        },
+        body: new URLSearchParams({
+          channel: "whatsapp",
+          source: sourceMobile,
+          destination: testPhoneNumber,
+          message: JSON.stringify({ type: "text", text: "Test message from GupShup" }),
+          "src.name": "TestApp",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to connect to Gupshup API");
+      }
+
+      const result = await response.json();
+      if (result.status === "submitted") {
+        setTestResult(`Message sent successfully! Message ID: ${result.messageId}`);
+        toast({
+          title: "Success",
+          description: `Message sent successfully. Message ID: ${result.messageId}`,
+        });
+      } else {
+        throw new Error("Unexpected response from Gupshup API");
+      }
+    } catch (error: any) {
+      console.error("Error testing GupShup connection:", error);
+      setTestResult("Failed to send message");
+      setError(error.message || "Failed to test connection");
+      toast({
+        title: "Error",
+        description: "Failed to send test message",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -224,8 +276,21 @@ export function GupshupConfig() {
               Enter the phone number in format: 917834811114 (country code without + symbol)
             </p>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="test-phone-number">Test Phone Number</Label>
+            <Input
+              id="test-phone-number"
+              placeholder="Enter phone number (e.g. 919876543210)"
+              value={testPhoneNumber}
+              onChange={(e) => setTestPhoneNumber(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Enter the phone number in format: 919876543210 (country code without + symbol)
+            </p>
+          </div>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex justify-between">
           <Button type="submit" disabled={isSaving}>
             {isSaving ? (
               <>
@@ -241,7 +306,26 @@ export function GupshupConfig() {
               </>
             )}
           </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={testGupshupConnection}
+            disabled={isTesting || !apiKey || !sourceMobile || !testPhoneNumber}
+          >
+            {isTesting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Testing
+              </>
+            ) : (
+              "Test Connection"
+            )}
+          </Button>
         </CardFooter>
+        {testResult && (
+          <p className={`mt-4 text-sm ${testResult.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+            {testResult}
+          </p>
+        )}
       </form>
     </Card>
   );
