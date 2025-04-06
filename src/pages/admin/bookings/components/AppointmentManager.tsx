@@ -7,7 +7,7 @@ import { SummaryView } from "./SummaryView";
 import { useAppointmentState } from "../hooks/useAppointmentState";
 import { useActiveServices } from "../hooks/useActiveServices";
 import { useActivePackages } from "../hooks/useActivePackages";
-import useSaveAppointment from "../hooks/useSaveAppointment";
+import {useSaveAppointment} from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
 import { Appointment, SCREEN, Service, Package, PaymentMethod, AppointmentStatus } from "../types";

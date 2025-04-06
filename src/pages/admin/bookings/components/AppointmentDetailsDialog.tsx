@@ -150,7 +150,7 @@ export function AppointmentDetailsDialog({
     markAppointmentAs
   } = useAppointmentActions();
   
-  const { sendNotification, isLoading: isSendingNotification } = useAppointmentNotifications();
+  const {  isLoading: isSendingNotification } = useAppointmentNotifications();
   
   useEffect(() => {
     if (appointmentId) {
@@ -221,19 +221,6 @@ export function AppointmentDetailsDialog({
         description: error.message || "Failed to update stylist.",
         variant: "destructive",
       });
-    }
-  };
-
-  const handleSendNotification = async (type: string) => {
-    try {
-      setIsSendingNotification(true);
-      toast.info("Notification functionality has been disabled");
-      return true;
-    } catch (error) {
-      toast.error("Failed to send notification");
-      return false;
-    } finally {
-      setIsSendingNotification(false);
     }
   };
 
@@ -536,61 +523,6 @@ export function AppointmentDetailsDialog({
                 </div>
               )}
 
-  {activeTab === "notifications" && (
-    <div className="space-y-4 p-4">
-      <h3 className="text-lg font-medium">Send Notifications</h3>
-      <p className="text-sm text-muted-foreground mb-4">
-        Send WhatsApp notifications to the customer manually
-      </p>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Button
-          className="w-full"
-          onClick={() => handleSendNotification('BOOKING_CONFIRMATION')}
-          disabled={isSendingNotification}
-        >
-          {isSendingNotification ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Booking Confirmation
-        </Button>
-        
-        <Button
-          className="w-full"
-          onClick={() => handleSendNotification('APPOINTMENT_CONFIRMED')}
-          disabled={isSendingNotification}
-        >
-          {isSendingNotification ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Appointment Confirmed
-        </Button>
-        
-        <Button
-          className="w-full"
-          onClick={() => handleSendNotification('REMINDER_1_HOUR')}
-          disabled={isSendingNotification}
-        >
-          {isSendingNotification ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          1 Hour Reminder
-        </Button>
-        
-        <Button
-          className="w-full"
-          onClick={() => handleSendNotification('REMINDER_4_HOURS')}
-          disabled={isSendingNotification}
-        >
-          {isSendingNotification ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          4 Hour Reminder
-        </Button>
-        
-        <Button
-          className="w-full"
-          onClick={() => handleSendNotification('APPOINTMENT_COMPLETED')}
-          disabled={isSendingNotification}
-        >
-          {isSendingNotification ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Appointment Completed
-        </Button>
-      </div>
-    </div>
-  )}
             </>
           )}
         </ScrollArea>

@@ -23,18 +23,15 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
 import { useCoupons } from "@/hooks/use-coupons";
-import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
 import confetti from "canvas-confetti";
 import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
-import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 
 export default function BookingConfirmation() {
   const {
@@ -69,9 +66,7 @@ export default function BookingConfirmation() {
   const { customerMemberships, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
   const [membershipDiscount, setMembershipDiscount] = useState(0);
   const [activeMembership, setActiveMembership] = useState<any>(null);
-  const { sendNotification } = useAppointmentNotifications();
   const [hasFetchedMemberships, setHasFetchedMemberships] = useState(false);
-  const [isSendingNotification, setIsSendingNotification] = useState(false);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
