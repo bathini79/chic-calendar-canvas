@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -58,46 +57,28 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
 
   const deleteEmployee = async () => {
     if (!employeeToDelete) return;
-    
+
     try {
       const employeeId = employeeToDelete.id;
       setShowDeleteDialog(false);
-      
-      // First find profiles linked to this employee
-      const { data: authData } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'employee')
-        .contains('user_metadata', { employee_id: employeeId });
-      
+
       // Delete the employee record
-      const { error } = await supabase
+      const { error: employeeError } = await supabase
         .from('employees')
         .delete()
         .eq('id', employeeId);
 
-      if (error) throw error;
-      
-      // Delete auth user(s) associated with this employee
-      if (authData && authData.length > 0) {
-        // We need to use the edge function as the client doesn't have permission to delete users
-        for (const profile of authData) {
-          // Call a service role function to delete the auth user
-          const { error: authError } = await supabase.functions.invoke('delete-auth-user', {
-            body: { userId: profile.id }
-          });
-          
-          if (authError) {
-            console.error('Error deleting auth user:', authError);
-            toast.error(`Warning: The employee was deleted but their auth account remains. Error: ${authError.message}`);
-          }
-        }
-      }
+      if (employeeError) throw employeeError;
+
+      // Delete the Authentication User
+      const { error: authError } = await supabase.auth.admin.deleteUser(employeeId);
+
+      if (authError) throw authError;
 
       toast.success("Staff member deleted successfully");
       setEmployeeToDelete(null);
       refetch();
-      
+
     } catch (error: any) {
       toast.error(error.message || "Failed to delete staff member");
       console.error("Error deleting staff member:", error);

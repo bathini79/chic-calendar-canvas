@@ -138,7 +138,6 @@ export default function VerificationPage() {
                   placeholder="Enter verification code"
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
-                  disabled={loading || !!token}
                 />
                 <p className="text-xs text-slate-500">
                   Enter the 6-digit code sent to your WhatsApp
