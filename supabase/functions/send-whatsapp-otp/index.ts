@@ -40,9 +40,9 @@ serve(async (req) => {
     const expiresInMinutes = 15
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000)
     
-    // Load GupShup configuration from the database instead of environment variables
+    // Load GupShup configuration from the database
     const { data: gupshupConfig, error: configError } = await supabaseAdmin
-      .from('messaging_providers') // Fixed table name here (was "message_providers")
+      .from('messaging_providers')
       .select('*')
       .eq('provider_name', 'gupshup')
       .maybeSingle()
@@ -59,12 +59,26 @@ serve(async (req) => {
     }
     
     // Get configuration - prioritize database config, fall back to env vars
-    const gupshupAppId = gupshupConfig?.configuration?.app_id || Deno.env.get('GUPSHUP_APP_ID')
-    const gupshupApiKey = gupshupConfig?.configuration?.api_key || Deno.env.get('GUPSHUP_API_KEY')
-    const gupshupSourceMobile = gupshupConfig?.configuration?.source_mobile || Deno.env.get('GUPSHUP_SOURCE_MOBILE')
+    let gupshupAppId, gupshupApiKey, gupshupSourceMobile
+    
+    if (gupshupConfig?.configuration) {
+      const config = gupshupConfig.configuration
+      gupshupAppId = config.app_id
+      gupshupApiKey = config.api_key
+      gupshupSourceMobile = config.source_mobile
+    } else {
+      gupshupAppId = Deno.env.get('GUPSHUP_APP_ID')
+      gupshupApiKey = Deno.env.get('GUPSHUP_API_KEY')
+      gupshupSourceMobile = Deno.env.get('GUPSHUP_SOURCE_MOBILE')
+    }
     
     if (!gupshupAppId || !gupshupApiKey || !gupshupSourceMobile) {
       throw new Error('GupShup credentials are not configured')
+    }
+
+    // Ensure the source mobile is in the correct format (without +)
+    if (gupshupSourceMobile.startsWith('+')) {
+      gupshupSourceMobile = gupshupSourceMobile.substring(1)
     }
 
     // Log the GupShup configuration for debugging
@@ -171,9 +185,18 @@ Thank you for joining our team!`
             body: formData
           });
           
-          // Log status and headers for debugging
+          // Log response details for better debugging
           console.log('GupShup response status:', messageResponse.status);
           console.log('GupShup response headers:', Object.fromEntries(messageResponse.headers.entries()));
+          
+          // Log the full response text
+          const responseText = await messageResponse.text();
+          console.log('GupShup raw response:', responseText);
+          
+          // Check for error status
+          if (!messageResponse.ok) {
+            throw new Error(`Failed to send message: ${responseText}`);
+          }
         } catch (fetchError) {
           console.error('Error making GupShup API request:', fetchError);
           throw new Error(`GupShup API request failed: ${fetchError.message}`);
@@ -202,8 +225,15 @@ Thank you for joining our team!`
             body: formData
           });
           
-          // Log status and headers for debugging
+          // Log response for better debugging
           console.log('GupShup SMS response status:', messageResponse.status);
+          
+          const responseText = await messageResponse.text();
+          console.log('GupShup SMS raw response:', responseText);
+          
+          if (!messageResponse.ok) {
+            throw new Error(`Failed to send message: ${responseText}`);
+          }
         } catch (fetchError) {
           console.error('Error making GupShup SMS API request:', fetchError);
           throw new Error(`GupShup SMS API request failed: ${fetchError.message}`);
@@ -255,9 +285,16 @@ Thank you for joining our team!`
             body: formData
           });
           
-          // Log status and headers for debugging
+          // Log response details for debugging
           console.log('GupShup response status:', messageResponse.status);
           console.log('GupShup response headers:', Object.fromEntries(messageResponse.headers.entries()));
+          
+          const responseText = await messageResponse.text();
+          console.log('GupShup raw response:', responseText);
+          
+          if (!messageResponse.ok) {
+            throw new Error(`Failed to send message: ${responseText}`);
+          }
         } catch (fetchError) {
           console.error('Error making GupShup API request:', fetchError);
           throw new Error(`GupShup API request failed: ${fetchError.message}`);
@@ -286,8 +323,12 @@ Thank you for joining our team!`
             body: formData
           });
           
-          // Log status and headers for debugging
-          console.log('GupShup SMS response status:', messageResponse.status);
+          const responseText = await messageResponse.text();
+          console.log('GupShup SMS raw response:', responseText);
+          
+          if (!messageResponse.ok) {
+            throw new Error(`Failed to send message: ${responseText}`);
+          }
         } catch (fetchError) {
           console.error('Error making GupShup SMS API request:', fetchError);
           throw new Error(`GupShup SMS API request failed: ${fetchError.message}`);
@@ -295,54 +336,6 @@ Thank you for joining our team!`
       }
       
       storedEntity = 'user'
-    }
-    
-    // Check if message was sent successfully by status code, not by trying to parse the response as JSON
-    if (!messageResponse.ok) {
-      try {
-        // Try to parse the error response as JSON
-        const errorText = await messageResponse.text();
-        console.error('GupShup error response:', errorText);
-        
-        // Try to parse the error text as JSON if it looks like JSON
-        let errorData;
-        if (errorText.trim().startsWith('{') || errorText.trim().startsWith('[')) {
-          try {
-            errorData = JSON.parse(errorText);
-          } catch (parseError) {
-            // If JSON parsing fails, use the raw text
-            errorData = { error: errorText };
-          }
-        } else {
-          // If it's not JSON, just use the text
-          errorData = { error: errorText };
-        }
-        
-        throw new Error(`Failed to send message: ${errorData.error || errorText}`);
-      } catch (parseError) {
-        // If we can't even parse the error, return a generic error
-        console.error('Error parsing GupShup error response:', parseError);
-        throw new Error(`Failed to send message: Status ${messageResponse.status}`);
-      }
-    }
-
-    // Get the text response to log it, but don't try to parse it as JSON unless necessary
-    const responseText = await messageResponse.text();
-    console.log('GupShup raw response:', responseText);
-    
-    let responseData;
-    // Only try to parse as JSON if it looks like JSON
-    if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
-      try {
-        responseData = JSON.parse(responseText);
-        console.log('GupShup parsed response:', responseData);
-      } catch (parseError) {
-        console.log('Could not parse response as JSON, using text response');
-        responseData = { message: responseText };
-      }
-    } else {
-      console.log('Response is not JSON, using as text');
-      responseData = { message: responseText };
     }
     
     // Return success response
