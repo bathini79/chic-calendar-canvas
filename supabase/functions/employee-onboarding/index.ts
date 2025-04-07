@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.26.0";
 // Define CORS headers
@@ -102,7 +103,7 @@ serve(async (req)=>{
         });
         if (authError) throw authError;
         authUserId = authUser.user.id;
-        // Link auth user to employee record
+        // Link auth user to employee record by updating the auth_id field
         await supabaseAdmin.from('employees').update({
           auth_id: authUser.user.id
         }).eq('id', employeeId);

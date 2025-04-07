@@ -737,6 +737,7 @@ export type Database = {
       }
       employees: {
         Row: {
+          auth_id: string | null
           created_at: string
           email: string
           employment_type: Database["public"]["Enums"]["employee_type"]
@@ -748,6 +749,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          auth_id?: string | null
           created_at?: string
           email: string
           employment_type?: Database["public"]["Enums"]["employee_type"]
@@ -759,6 +761,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          auth_id?: string | null
           created_at?: string
           email?: string
           employment_type?: Database["public"]["Enums"]["employee_type"]

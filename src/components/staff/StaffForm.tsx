@@ -1,3 +1,4 @@
+
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +31,7 @@ import { toast } from "sonner";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address").optional().or(z.literal('')).transform(val => val || `${Date.now()}@placeholder.com`),
+  email: z.string().email("Invalid email address").optional().or(z.literal('')).transform(val => val || ''),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   photo_url: z.string().optional(),
   status: z.enum(['active', 'inactive']).default('active'),
