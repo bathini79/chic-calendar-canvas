@@ -80,6 +80,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
   const { cancelAppointment, markAppointmentAs, updateAppointmentStatus } =
     useAppointmentActions();
+  const [loadingPayment,setLoadingPayment] = useState(false);
 
   const { data: services } = useActiveServices(locationId);
   const { data: packages } = useActivePackages(locationId);
@@ -241,7 +242,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     );
   };
 
-  const { handleSaveAppointment, isLoading } = useSaveAppointment({
+  const { handleSaveAppointment } = useSaveAppointment({
     selectedDate: stateSelectedDate,
     selectedTime: stateSelectedTime,
     selectedCustomer,
@@ -356,12 +357,14 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     if (appointmentId) {
       // Update status to completed when payment is done
       try {
+        setLoadingPayment(true);
         const { data: bookings } = await supabase
           .from("bookings")
           .select("id")
           .eq("appointment_id", appointmentId);
 
         if (bookings) {
+
           const bookingIds = bookings.map((booking) => booking.id);
           await updateAppointmentStatus(appointmentId, "completed", bookingIds);
           // Update local state to reflect the change
@@ -371,8 +374,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         console.error(
           "Error updating appointment status after payment:",
           error
-        );
-      }
+        )}finally{
+          setLoadingPayment(false)
+        }
     }
 
     setNewAppointmentId(appointmentId || null);
@@ -660,6 +664,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                       : undefined
                   }
                   appointmentStatus={appointmentStatus}
+                  loadingPayment={loadingPayment}
                 />
               )}
 
