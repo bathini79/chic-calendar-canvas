@@ -1,4 +1,3 @@
-
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +30,7 @@ import { toast } from "sonner";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address").optional().or(z.literal('')),
+  email: z.string().email("Invalid email address").optional().or(z.literal('')).transform(val => val || `${Date.now()}@placeholder.com`),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   photo_url: z.string().optional(),
   status: z.enum(['active', 'inactive']).default('active'),
@@ -74,7 +73,6 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
     },
   });
 
-  // Fetch locations
   const { data: locations } = useQuery({
     queryKey: ['locations'],
     queryFn: async () => {
@@ -89,13 +87,12 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
     },
   });
 
-  // Initialize form with employee data when it's loaded
   useEffect(() => {
     if (initialData) {
       form.reset({
         name: initialData.name || '',
         email: initialData.email || '',
-        phone: initialData.phone ? initialData.phone.replace(/^\+\d+\s/, '') : '', // Remove country code if present
+        phone: initialData.phone ? initialData.phone.replace(/^\+\d+\s/, '') : '',
         photo_url: initialData.photo_url || '',
         status: initialData.status || 'active',
         employment_type: initialData.employment_type || 'stylist',
@@ -112,12 +109,10 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
     }
   }, [initialData, form]);
 
-  // Update form when selected locations change
   useEffect(() => {
     form.setValue('locations', selectedLocations);
   }, [selectedLocations, form]);
 
-  // Update form when selected skills change
   useEffect(() => {
     form.setValue('skills', selectedSkills);
   }, [selectedSkills, form]);
@@ -130,7 +125,6 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
     try {
       setIsPhoneCheckLoading(true);
       
-      // Check if phone exists in employees table
       const { data: employeeData, error: employeeError } = await supabase
         .from('employees')
         .select('id')
@@ -138,7 +132,6 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
       
       if (employeeError) throw employeeError;
       
-      // Check if phone exists in profiles table
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id')
@@ -146,7 +139,6 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
       
       if (profileError) throw profileError;
       
-      // Only consider it a duplicate if it's not the current employee being edited
       const employeeExists = employeeData.some(e => e.id !== employeeId);
       const profileExists = profileData.length > 0;
       

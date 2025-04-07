@@ -42,7 +42,7 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
           .from("employees")
           .update({
             name: data.name,
-            email: data.email,
+            email: data.email || `${data.phone.replace(/\D/g, '')}@staff.internal`, // Ensure email is never null
             phone: data.phone,
             photo_url: data.photo_url,
             status: data.status,

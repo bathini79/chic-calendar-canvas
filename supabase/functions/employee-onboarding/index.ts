@@ -24,19 +24,26 @@ serve(async (req)=>{
     }
     // Create Supabase client
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    
+    // Ensure email is never null
+    const safeEmail = employeeData.email || `${employeeData.phone.replace(/\D/g, '')}@staff.internal`;
+    
     // 1. Create the employee record with inactive status
     const { data: newEmployee, error: employeeError } = await supabaseAdmin.from('employees').insert({
       name: employeeData.name,
-      email: employeeData.email || null,
+      email: safeEmail, // Use the safe email that's never null
       phone: employeeData.phone,
       photo_url: employeeData.photo_url || null,
       status: 'inactive',
       employment_type: employeeData.employment_type || 'stylist'
     }).select().single();
+    
     if (employeeError) {
       throw new Error(`Failed to create employee: ${employeeError.message}`);
     }
+    
     const employeeId = newEmployee.id;
+    
     // 2. Associate skills if provided
     if (employeeData.skills && employeeData.skills.length > 0) {
       const skillsToInsert = employeeData.skills.map((skillId)=>({
@@ -66,8 +73,9 @@ serve(async (req)=>{
     let authUserId = null;
     if (createAuthAccount) {
       try {
-        // Generate email from phone if not provided
-        const email = employeeData.email || `${employeeData.phone.replace(/\D/g, '')}@staff.internal`;
+        // Use the same safe email
+        const email = safeEmail;
+        
         // Generate random password
         const generatePassword = ()=>{
           const length = 12;
@@ -104,6 +112,7 @@ serve(async (req)=>{
       // Continue with the process even if auth account creation fails
       }
     }
+    
     // 5. Generate and send verification link if requested
     let verificationSent = false;
     let verificationLink = "";
@@ -252,6 +261,7 @@ The Management Team
       // Continue with the process even if welcome message fails
       }
     }
+    
     return new Response(JSON.stringify({
       success: true,
       employee: newEmployee,
