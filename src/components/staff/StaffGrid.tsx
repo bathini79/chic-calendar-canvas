@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -62,6 +63,44 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
       const employeeId = employeeToDelete.id;
       setShowDeleteDialog(false);
 
+      // First, delete related employee_skills records
+      const { error: skillsError } = await supabase
+        .from('employee_skills')
+        .delete()
+        .eq('employee_id', employeeId);
+      
+      if (skillsError) throw skillsError;
+      
+      // Delete related employee_locations records
+      const { error: locationsError } = await supabase
+        .from('employee_locations')
+        .delete()
+        .eq('employee_id', employeeId);
+      
+      if (locationsError) throw locationsError;
+      
+      // Delete employee verification records if they exist
+      await supabase
+        .from('employee_verification_codes')
+        .delete()
+        .eq('employee_id', employeeId);
+        
+      await supabase
+        .from('employee_verification_links')
+        .delete()
+        .eq('employee_id', employeeId);
+
+      // Get auth_id from the employee record
+      const { data: employeeData, error: getEmployeeError } = await supabase
+        .from('employees')
+        .select('auth_id')
+        .eq('id', employeeId)
+        .single();
+        
+      if (getEmployeeError && getEmployeeError.code !== 'PGRST116') {
+        throw getEmployeeError;
+      }
+      
       // Delete the employee record
       const { error: employeeError } = await supabase
         .from('employees')
@@ -70,10 +109,18 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
 
       if (employeeError) throw employeeError;
 
-      // Delete the Authentication User
-      const { error: authError } = await supabase.auth.admin.deleteUser(employeeId);
+      // Delete the Authentication User if auth_id exists
+      if (employeeData?.auth_id) {
+        // Use our edge function to delete the auth user
+        const { error: authError } = await supabase.functions.invoke('employee-onboarding', {
+          body: { 
+            action: 'delete',
+            authUserId: employeeData.auth_id
+          }
+        });
 
-      if (authError) throw authError;
+        if (authError) throw authError;
+      }
 
       toast.success("Staff member deleted successfully");
       setEmployeeToDelete(null);

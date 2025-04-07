@@ -9,3 +9,6 @@ verify_jwt = true
 
 [functions.employee-onboarding]
 verify_jwt = false
+
+[functions.verify-employee-code]
+verify_jwt = false
