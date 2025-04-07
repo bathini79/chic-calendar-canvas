@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,7 +67,7 @@ export default function VerificationPage() {
     }
 
     if (!verificationCode && !token) {
-      setError("Please enter the verification code");
+      setError("Please enter the verification code or use a verification link");
       return;
     }
 
@@ -129,20 +130,29 @@ export default function VerificationPage() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="code" className="text-sm font-medium">
-                  Verification Code
-                </label>
-                <Input
-                  id="code"
-                  placeholder="Enter verification code"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                />
-                <p className="text-xs text-slate-500">
-                  Enter the 6-digit code sent to your WhatsApp
-                </p>
-              </div>
+              {!token && (
+                <div className="space-y-2">
+                  <label htmlFor="code" className="text-sm font-medium">
+                    Verification Code
+                  </label>
+                  <Input
+                    id="code"
+                    placeholder="Enter verification code"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Enter the 6-digit code sent to your WhatsApp
+                  </p>
+                </div>
+              )}
+
+              {token && (
+                <div className="bg-blue-50 text-blue-600 p-3 rounded-md flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Verification link detected. Click the button below to verify your account.</span>
+                </div>
+              )}
 
               {error && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-md flex items-center gap-2">

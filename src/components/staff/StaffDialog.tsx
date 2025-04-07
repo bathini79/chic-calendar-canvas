@@ -4,7 +4,6 @@ import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { generateStrongPassword } from "@/lib/utils";
 
 interface StaffDialogProps {
   open: boolean;
@@ -104,15 +103,17 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
         // Get the current window location to create the verification link
         const baseUrl = window.location.origin;
         
-        // Call the employee-onboarding edge function
+        // Call the employee-onboarding edge function with updated parameters
         const { data: responseData, error } = await supabase.functions.invoke('employee-onboarding', {
           body: { 
             employeeData: {
               ...data,
+              status: 'inactive', // Always set to inactive for new employees
               baseUrl
             },
             sendWelcomeMessage: true,
-            createAuthAccount: true
+            createAuthAccount: true,
+            sendVerificationLink: true
           }
         });
         
@@ -124,9 +125,9 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
         
         // Show appropriate toast messages based on the response
         if (responseData.verificationSent) {
-          toast.success("Staff member created! Verification sent to WhatsApp");
+          toast.success("Staff member created! Verification link sent to their phone");
         } else if (responseData.welcomeMessageSent) {
-          toast.success("Staff member created! Welcome message sent to WhatsApp");
+          toast.success("Staff member created! Welcome message sent to their phone");
         } else {
           toast.success("Staff member created successfully");
           toast.warning("Could not send notifications to the staff member");

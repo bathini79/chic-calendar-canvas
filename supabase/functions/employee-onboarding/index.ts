@@ -13,16 +13,21 @@ serve(async (req)=>{
     });
   }
   try {
-    const { employeeData, sendWelcomeMessage = true, createAuthAccount = true } = await req.json();
+    const requestBody = await req.json();
+    // Check if this is a delete request
+    if (requestBody.action === 'delete' && requestBody.authUserId) {
+      return handleDeleteAuthUser(requestBody.authUserId);
+    }
+    const { employeeData, sendWelcomeMessage = true, createAuthAccount = true, sendVerificationLink = true } = requestBody;
     if (!employeeData || !employeeData.name || !employeeData.phone) {
       throw new Error("Employee data is required with at least name and phone number");
     }
     // Create Supabase client
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
-    // 1. Create the employee record
+    // 1. Create the employee record with inactive status
     const { data: newEmployee, error: employeeError } = await supabaseAdmin.from('employees').insert({
       name: employeeData.name,
-      email: employeeData.email || (employeeData.phone + "@salon.com"),
+      email: employeeData.email || null,
       phone: employeeData.phone,
       photo_url: employeeData.photo_url || null,
       status: 'inactive',
@@ -58,6 +63,7 @@ serve(async (req)=>{
     }
     // 4. Create auth account if requested
     let authAccountCreated = false;
+    let authUserId = null;
     if (createAuthAccount) {
       try {
         // Generate email from phone if not provided
@@ -87,6 +93,7 @@ serve(async (req)=>{
           }
         });
         if (authError) throw authError;
+        authUserId = authUser.user.id;
         // Link auth user to employee record
         await supabaseAdmin.from('employees').update({
           auth_id: authUser.user.id
@@ -97,9 +104,100 @@ serve(async (req)=>{
       // Continue with the process even if auth account creation fails
       }
     }
-    // 5. Send welcome message if requested
+    // 5. Generate and send verification link if requested
+    let verificationSent = false;
+    let verificationLink = "";
+    if (sendVerificationLink) {
+      try {
+        // Get base URL from request origin or use default
+        const baseUrl = employeeData.baseUrl || `${Deno.env.get('SUPABASE_URL')}`;
+        // Generate a random verification token
+        const generateToken = ()=>{
+          const length = 32;
+          const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+          let token = "";
+          for(let i = 0; i < length; i++){
+            const randomIndex = Math.floor(Math.random() * charset.length);
+            token += charset[randomIndex];
+          }
+          return token;
+        };
+        const verificationToken = generateToken();
+        // Calculate expiration (24 hours from now)
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+        // Store the verification token in the database
+        const { error: tokenError } = await supabaseAdmin.from('employee_verification_links').insert({
+          employee_id: employeeId,
+          verification_token: verificationToken,
+          expires_at: expiresAt.toISOString(),
+          used: false
+        });
+        if (tokenError) throw tokenError;
+        // Create the verification link
+        verificationLink = `${baseUrl}/verify?token=${verificationToken}&phone=${encodeURIComponent(employeeData.phone)}`;
+        // Send the verification link via Gupshup
+        try {
+          // Check if Gupshup is configured
+          const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin.from('messaging_providers').select('configuration').eq('provider_name', 'gupshup').single();
+          if (providerConfigError || !providerConfigData?.configuration) {
+            throw new Error('Gupshup config not found');
+          }
+          const gupshupConfig = providerConfigData.configuration;
+          const GUPSHUP_API_KEY = gupshupConfig.api_key;
+          const SOURCE_NUMBER = gupshupConfig.source_mobile.startsWith("+") ? gupshupConfig.source_mobile.slice(1) : gupshupConfig.source_mobile;
+          const APP_NAME = gupshupConfig.app_name;
+          // Format phone number for WhatsApp
+          const formattedPhone = employeeData.phone.startsWith('+') ? employeeData.phone.slice(1) : employeeData.phone;
+          // Create verification message
+          const message = `
+Hello ${employeeData.name},
+
+Welcome to our team! Please click the link below to verify your account:
+
+${verificationLink}
+
+This link will expire in 24 hours. If you have any questions, please contact your manager.
+
+Best regards,
+The Management Team
+          `.trim();
+          // Send message via Gupshup
+          const gupshupPayload = new URLSearchParams({
+            channel: "whatsapp",
+            source: SOURCE_NUMBER,
+            destination: formattedPhone,
+            message: JSON.stringify({
+              type: "text",
+              text: message
+            }),
+            "src.name": APP_NAME
+          });
+          const gupshupResponse = await fetch("https://api.gupshup.io/wa/api/v1/msg", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              apikey: GUPSHUP_API_KEY
+            },
+            body: gupshupPayload.toString()
+          });
+          const gupshupResult = await gupshupResponse.json();
+          if (!gupshupResponse.ok) {
+            throw new Error(`Gupshup error: ${JSON.stringify(gupshupResult)}`);
+          }
+          verificationSent = true;
+        } catch (error) {
+          console.error(`Error sending verification message: ${error.message}`);
+        // Continue with the process even if sending the verification message fails
+        }
+      } catch (error) {
+        console.error(`Error creating verification link: ${error.message}`);
+      // Continue with the process even if verification link creation fails
+      }
+    }
+    // 6. Send welcome message if requested and verification link wasn't sent
     let welcomeMessageSent = false;
-    if (sendWelcomeMessage) {
+    if (sendWelcomeMessage && !verificationSent) {
       try {
         // Check if Gupshup is configured
         const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin.from('messaging_providers').select('configuration').eq('provider_name', 'gupshup').single();
@@ -118,7 +216,7 @@ Hello ${employeeData.name},
 
 Welcome to our team! We're excited to have you join us.
 
-Your staff account has been created and your manager will provide you with the login details soon. You'll receive a verification message with instructions to activate your account.
+Your staff account has been created and your manager will provide you with the login details soon.
 
 If you have any questions, please contact your manager.
 
@@ -154,42 +252,14 @@ The Management Team
       // Continue with the process even if welcome message fails
       }
     }
-    // 6. Generate and store verification token
-    let verificationSent = false;
-    try {
-      // Get base URL from request origin or use default
-      const requestUrl = new URL(req.url);
-      const baseUrl = employeeData.baseUrl || `${requestUrl.protocol}//${requestUrl.host}`;
-      // Invoke the verify-employee-otp function
-      const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/verify-employee-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-        },
-        body: JSON.stringify({
-          phoneNumber: employeeData.phone,
-          employeeId: employeeId,
-          name: employeeData.name,
-          baseUrl
-        })
-      });
-      const result = await response.json();
-      if (result.success) {
-        verificationSent = true;
-      } else {
-        console.error(`Error sending verification: ${result.message}`);
-      }
-    } catch (error) {
-      console.error(`Error sending verification: ${error.message}`);
-    // Continue with the process even if verification fails
-    }
     return new Response(JSON.stringify({
       success: true,
       employee: newEmployee,
       authAccountCreated,
+      authUserId,
       welcomeMessageSent,
       verificationSent,
+      verificationLink,
       message: "Employee onboarding process completed"
     }), {
       status: 200,
@@ -212,3 +282,34 @@ The Management Team
     });
   }
 });
+// Helper function to handle auth user deletion
+async function handleDeleteAuthUser(authUserId) {
+  try {
+    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    // Delete the auth user
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
+    if (error) throw error;
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Auth user deleted successfully"
+    }), {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (error) {
+    console.error("Error deleting auth user:", error);
+    return new Response(JSON.stringify({
+      success: false,
+      message: error.message || "Failed to delete auth user"
+    }), {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+}
