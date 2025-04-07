@@ -1,4 +1,3 @@
-
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,14 +27,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { CountryCodeDropdown } from "@/components/ui/country-code-dropdown";
 import { toast } from "sonner";
+import { LoaderCircle } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address").optional().or(z.literal('')).transform(val => val || ''),
+  email: z
+    .string()
+    .email("Invalid email address")
+    .optional()
+    .or(z.literal(""))
+    .transform((val) => val || ""),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   photo_url: z.string().optional(),
-  status: z.enum(['active', 'inactive']).default('active'),
-  employment_type: z.enum(['stylist', 'operations']).default('stylist'),
+  status: z.enum(["active", "inactive"]).default("active"),
+  employment_type: z.enum(["stylist", "operations"]).default("stylist"),
   skills: z.array(z.string()).min(1, "At least one skill is required"),
   locations: z.array(z.string()).min(1, "At least one location is required"),
 });
@@ -49,40 +54,49 @@ interface StaffFormProps {
   employeeId?: string;
 }
 
-export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: StaffFormProps) {
+export function StaffForm({
+  initialData,
+  onSubmit,
+  onCancel,
+  employeeId,
+}: StaffFormProps) {
   const [images, setImages] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [isPhoneCheckLoading, setIsPhoneCheckLoading] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState<{ name: string; code: string; flag: string }>({ 
-    name: "India", 
-    code: "+91", 
-    flag: "🇮🇳" 
+  const [selectedCountry, setSelectedCountry] = useState<{
+    name: string;
+    code: string;
+    flag: string;
+  }>({
+    name: "India",
+    code: "+91",
+    flag: "🇮🇳",
   });
 
   const form = useForm<StaffFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
-      email: '',
-      phone: '',
-      photo_url: '',
-      status: 'active',
-      employment_type: 'stylist',
+      name: "",
+      email: "",
+      phone: "",
+      photo_url: "",
+      status: "active",
+      employment_type: "stylist",
       skills: [],
       locations: [],
     },
   });
 
   const { data: locations } = useQuery({
-    queryKey: ['locations'],
+    queryKey: ["locations"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-      
+        .from("locations")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+
       if (error) throw error;
       return data || [];
     },
@@ -91,63 +105,71 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
   useEffect(() => {
     if (initialData) {
       form.reset({
-        name: initialData.name || '',
-        email: initialData.email || '',
-        phone: initialData.phone ? initialData.phone.replace(/^\+\d+\s/, '') : '',
-        photo_url: initialData.photo_url || '',
-        status: initialData.status || 'active',
-        employment_type: initialData.employment_type || 'stylist',
-        skills: initialData.employee_skills?.map((s: any) => s.service_id) || [],
-        locations: initialData.employee_locations?.map((l: any) => l.location_id) || [],
+        name: initialData.name || "",
+        email: initialData.email || "",
+        phone: initialData.phone
+          ? initialData.phone.replace(/^\+\d+\s/, "")
+          : "",
+        photo_url: initialData.photo_url || "",
+        status: initialData.status || "active",
+        employment_type: initialData.employment_type || "stylist",
+        skills:
+          initialData.employee_skills?.map((s: any) => s.service_id) || [],
+        locations:
+          initialData.employee_locations?.map((l: any) => l.location_id) || [],
       });
-      
+
       if (initialData.photo_url) {
         setImages([initialData.photo_url]);
       }
-      
-      setSelectedSkills(initialData.employee_skills?.map((s: any) => s.service_id) || []);
-      setSelectedLocations(initialData.employee_locations?.map((l: any) => l.location_id) || []);
+
+      setSelectedSkills(
+        initialData.employee_skills?.map((s: any) => s.service_id) || []
+      );
+      setSelectedLocations(
+        initialData.employee_locations?.map((l: any) => l.location_id) || []
+      );
     }
   }, [initialData, form]);
 
   useEffect(() => {
-    form.setValue('locations', selectedLocations);
+    form.setValue("locations", selectedLocations);
   }, [selectedLocations, form]);
 
   useEffect(() => {
-    form.setValue('skills', selectedSkills);
+    form.setValue("skills", selectedSkills);
   }, [selectedSkills, form]);
 
   const checkPhoneExists = async (phone: string) => {
     if (!phone || phone.length < 10) return false;
-    
+
     const formattedPhone = `${selectedCountry.code}${phone}`;
-    
+
     try {
       setIsPhoneCheckLoading(true);
-      
+
       const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('phone', formattedPhone);
-      
+        .from("employees")
+        .select("id")
+        .eq("phone", formattedPhone);
+
       if (employeeError) throw employeeError;
-      
+
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('phone_number', formattedPhone);
-      
+        .from("profiles")
+        .select("id")
+        .eq("phone_number", formattedPhone);
+
       if (profileError) throw profileError;
-      
-      const employeeExists = employeeData.some(e => e.id !== employeeId);
+
+      const employeeExists = employeeData.some((e) => e.id !== employeeId);
       const profileExists = profileData.length > 0;
-      
+
       if (employeeExists || profileExists) {
         toast.error("Phone number already exists in the system");
         return true;
       }
-      
+
       return false;
     } catch (error) {
       console.error("Error checking phone existence:", error);
@@ -162,20 +184,20 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
     if (phoneExists) {
       return;
     }
-    
+
     const updatedData = {
       ...data,
       photo_url: images[0] || null,
-      phone: `${selectedCountry.code}${data.phone}`
+      phone: `${selectedCountry.code}${data.phone}`,
     };
-    
+
     onSubmit(updatedData);
   };
 
   const handleLocationChange = (locationId: string) => {
-    setSelectedLocations(prev => {
+    setSelectedLocations((prev) => {
       if (prev.includes(locationId)) {
-        return prev.filter(id => id !== locationId);
+        return prev.filter((id) => id !== locationId);
       } else {
         return [...prev, locationId];
       }
@@ -183,13 +205,16 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '');
-    form.setValue('phone', value);
+    const value = e.target.value.replace(/\D/g, "");
+    form.setValue("phone", value);
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+      <form
+        onSubmit={form.handleSubmit(handleFormSubmit)}
+        className="space-y-4"
+      >
         <FormField
           control={form.control}
           name="name"
@@ -231,12 +256,12 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
                     onChange={setSelectedCountry}
                     className="w-[120px]"
                   />
-                  <Input 
-                    className="flex-1" 
-                    {...field} 
-                    onChange={handlePhoneChange} 
+                  <Input
+                    className="flex-1"
+                    {...field}
+                    onChange={handlePhoneChange}
                     maxLength={10}
-                    placeholder="Phone Number" 
+                    placeholder="Phone Number"
                   />
                 </div>
               </FormControl>
@@ -245,10 +270,7 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
           )}
         />
 
-        <ImageUploadSection
-          images={images}
-          setImages={setImages}
-        />
+        <ImageUploadSection images={images} setImages={setImages} />
 
         <FormField
           control={form.control}
@@ -304,13 +326,18 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
                 <div className="border border-input rounded-md p-4 space-y-2">
                   {locations?.length ? (
                     locations.map((location) => (
-                      <div key={location.id} className="flex items-center space-x-2">
-                        <Checkbox 
+                      <div
+                        key={location.id}
+                        className="flex items-center space-x-2"
+                      >
+                        <Checkbox
                           id={`location-${location.id}`}
                           checked={selectedLocations.includes(location.id)}
-                          onCheckedChange={() => handleLocationChange(location.id)}
+                          onCheckedChange={() =>
+                            handleLocationChange(location.id)
+                          }
                         />
-                        <Label 
+                        <Label
                           htmlFor={`location-${location.id}`}
                           className="text-sm font-normal cursor-pointer"
                         >
@@ -319,7 +346,9 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
                       </div>
                     ))
                   ) : (
-                    <div className="text-muted-foreground text-sm">No locations available</div>
+                    <div className="text-muted-foreground text-sm">
+                      No locations available
+                    </div>
                   )}
                 </div>
               </FormControl>
@@ -341,7 +370,9 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
                     setSelectedSkills([...field.value, serviceId]);
                   }}
                   onServiceRemove={(serviceId) => {
-                    setSelectedSkills(field.value.filter(id => id !== serviceId));
+                    setSelectedSkills(
+                      field.value.filter((id) => id !== serviceId)
+                    );
                   }}
                 />
               </FormControl>
@@ -355,7 +386,15 @@ export function StaffForm({ initialData, onSubmit, onCancel, employeeId }: Staff
             Cancel
           </Button>
           <Button type="submit" disabled={isPhoneCheckLoading}>
-            {employeeId ? 'Update Staff Member' : 'Create Staff Member'}
+            {isPhoneCheckLoading ? (
+              <LoaderCircle
+                className="animate-spin mr-2"
+                size={16}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+            ) : null}
+            {employeeId ? "Update Staff Member" : "Create Staff Member"}
           </Button>
         </div>
       </form>
