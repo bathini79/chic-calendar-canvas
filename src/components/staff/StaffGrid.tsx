@@ -109,17 +109,33 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
 
       if (employeeError) throw employeeError;
 
-      // Delete the Authentication User if auth_id exists
+      // Delete the Authentication User and profile if auth_id exists
       if (employeeData?.auth_id) {
-        // Use our edge function to delete the auth user
-        const { error: authError } = await supabase.functions.invoke('employee-onboarding', {
-          body: { 
-            action: 'delete',
-            authUserId: employeeData.auth_id
+        try {
+          // First try to delete the profile record
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .delete()
+            .eq('id', employeeData.auth_id);
+          
+          if (profileError) {
+            console.error("Failed to delete profile:", profileError);
+            // Continue with auth user deletion even if profile deletion fails
           }
-        });
+          
+          // Use the edge function to delete the auth user
+          const { error: authError } = await supabase.functions.invoke('employee-onboarding', {
+            body: { 
+              action: 'delete',
+              authUserId: employeeData.auth_id
+            }
+          });
 
-        if (authError) throw authError;
+          if (authError) throw authError;
+        } catch (cleanupError) {
+          console.error("Error cleaning up related records:", cleanupError);
+          toast.error("Staff member deleted, but there was an issue cleaning up related accounts");
+        }
       }
 
       toast.success("Staff member deleted successfully");
@@ -200,8 +216,8 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete staff member</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {employeeToDelete?.name}? This will permanently remove the staff member 
-              and their account from the system. This action cannot be undone.
+              Are you sure you want to delete {employeeToDelete?.name}? This will permanently remove the staff member,
+              their account, and all associated data from the system. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
