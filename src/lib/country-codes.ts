@@ -57,7 +57,6 @@ export type CountryCode = {
 
 // Helper function to find country code from a full phone number
 export function parsePhoneCountryCode(fullPhone: string): CountryCode | undefined {
-  if (!fullPhone || !fullPhone.startsWith('+')) return undefined;
   
   // Sort codes by length (longest first) to avoid partial matches
   const sortedCodes = [...countryCodes].sort((a, b) => b.code.length - a.code.length);

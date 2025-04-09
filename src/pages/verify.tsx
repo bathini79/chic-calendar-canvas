@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { toast } from "sonner";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { parsePhoneCountryCode } from "@/enums/CountryCode";
 
 export default function VerificationPage() {
   const [searchParams] = useSearchParams();
@@ -24,16 +25,19 @@ export default function VerificationPage() {
 
   useEffect(() => {
     // Parse phone parameter to extract country code if provided
-    if (phone && phone.startsWith('+')) {
       // Try to find the country code in the phone number
       const countryCodeObj = parsePhoneCountryCode(phone);
       if (countryCodeObj) {
-        setCountryCode(countryCodeObj);
+        setCountryCode({
+          name: countryCodeObj.name || "Unknown",
+          code: `+${countryCodeObj.code}`,
+          flag: countryCodeObj.flag || "🏳️"
+        });
         // Extract the phone number without country code
         const phoneWithoutCode = phone.substring(countryCodeObj.code.length);
         setPhoneNumber(phoneWithoutCode);
       }
-    }
+    
     
     // Auto-verify if token or code and phone are provided in URL
     if ((token || code) && phone) {
@@ -41,20 +45,7 @@ export default function VerificationPage() {
     }
   }, [token, code, phone]);
 
-  // Function to parse phone number and find country code
-  const parsePhoneCountryCode = (fullPhone: string) => {
-    // Import country codes from phone-input component
-    const countryCodes = [
-      { name: "India", code: "+91", flag: "🇮🇳" },
-      { name: "United States", code: "+1", flag: "🇺🇸" },
-      { name: "United Kingdom", code: "+44", flag: "🇬🇧" },
-      // ... other country codes
-    ];
-    
-    // Find the matching country code (starting with the longest ones to avoid partial matches)
-    const sortedCodes = [...countryCodes].sort((a, b) => b.code.length - a.code.length);
-    return sortedCodes.find(country => fullPhone.startsWith(country.code));
-  };
+  
 
   const handleCountryChange = (country: {name: string, code: string, flag: string}) => {
     setCountryCode(country);
