@@ -188,7 +188,7 @@ export function StaffForm({
     const updatedData = {
       ...data,
       photo_url: images[0] || null,
-      phone: `${selectedCountry.code}${data.phone}`,
+      phone: `${selectedCountry.code.slice(-1)}${data.phone}`,
     };
 
     onSubmit(updatedData);
