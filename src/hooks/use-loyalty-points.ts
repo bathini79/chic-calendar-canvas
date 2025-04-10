@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Service, Package } from "@/pages/admin/bookings/types";
@@ -14,6 +15,9 @@ interface LoyaltyProgramSettings {
   applicable_packages?: string[] | null;
   points_validity_days?: number | null;
   cashback_validity_days?: number | null;
+  max_redemption_points: number | null;
+  max_redemption_percentage: number | null;
+  max_redemption_type: "fixed" | "percentage" | null;
 }
 
 interface UseLoyaltyPointsResult {
@@ -35,6 +39,7 @@ interface UseLoyaltyPointsResult {
   calculateAmountFromPoints: (points: number) => number;
   hasMinimumForRedemption: (points: number) => boolean;
   canEarnPoints: (amount: number) => boolean;
+  getMaxRedeemablePoints: (subtotal: number) => number;
 }
 
 export function useLoyaltyPoints(customerId?: string): UseLoyaltyPointsResult {
@@ -210,6 +215,31 @@ export function useLoyaltyPoints(customerId?: string): UseLoyaltyPointsResult {
     return true;
   };
 
+  /**
+   * Gets the maximum redeemable points based on settings and subtotal
+   */
+  const getMaxRedeemablePoints = (subtotal: number): number => {
+    if (!settings || !settings.enabled || !customerPoints) return 0;
+    
+    // Convert subtotal to max points allowed
+    const maxPointsByValue = Math.floor(subtotal / settings.point_value);
+    
+    // Apply max redemption settings if configured
+    if (settings.max_redemption_type === "fixed" && settings.max_redemption_points) {
+      // Fixed maximum points
+      return Math.min(customerPoints, maxPointsByValue, settings.max_redemption_points);
+    } 
+    else if (settings.max_redemption_type === "percentage" && settings.max_redemption_percentage) {
+      // Percentage of subtotal as maximum
+      const maxDiscountAmount = subtotal * (settings.max_redemption_percentage / 100);
+      const maxPointsByPercentage = Math.floor(maxDiscountAmount / settings.point_value);
+      return Math.min(customerPoints, maxPointsByValue, maxPointsByPercentage);
+    }
+    
+    // If no max redemption setting, just limit by available points and subtotal
+    return Math.min(customerPoints, maxPointsByValue);
+  };
+
   return {
     isLoading,
     settings,
@@ -222,6 +252,7 @@ export function useLoyaltyPoints(customerId?: string): UseLoyaltyPointsResult {
     calculatePointsFromAmount,
     calculateAmountFromPoints,
     hasMinimumForRedemption,
-    canEarnPoints
+    canEarnPoints,
+    getMaxRedeemablePoints
   };
 }

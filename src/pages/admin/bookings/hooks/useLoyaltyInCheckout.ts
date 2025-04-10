@@ -23,6 +23,8 @@ interface UseLoyaltyInCheckoutResult {
   maxPointsToRedeem: number;
   minRedemptionPoints: number;
   pointValue: number;
+  maxRedemptionType: "fixed" | "percentage" | null;
+  maxRedemptionValue: number | null;
   setUsePoints: (usePoints: boolean) => void;
   setPointsToRedeem: (points: number) => void;
 }
@@ -43,7 +45,8 @@ export function useLoyaltyInCheckout({
     getEligibleAmount,
     calculatePointsFromAmount,
     calculateAmountFromPoints,
-    hasMinimumForRedemption
+    hasMinimumForRedemption,
+    getMaxRedeemablePoints
   } = useLoyaltyPoints(customerId);
   
   const [usePoints, setUsePoints] = useState(false);
@@ -61,11 +64,8 @@ export function useLoyaltyInCheckout({
   // Calculate points that will be earned from this purchase
   const pointsToEarn = calculatePointsFromAmount(eligibleAmount);
   
-  // The maximum points that can be redeemed (limited by available points and purchase amount)
-  const maxRedeemableByAmount = Math.floor(subtotal / (settings?.point_value || 0.01));
-  const maxPointsToRedeem = availablePoints 
-    ? Math.min(availablePoints, maxRedeemableByAmount) 
-    : 0;
+  // Get the maximum points that can be redeemed based on settings and available points
+  const maxPointsToRedeem = getMaxRedeemablePoints(subtotal);
   
   // Calculate the discount amount from redeemed points
   const pointsDiscountAmount = usePoints 
@@ -104,6 +104,10 @@ export function useLoyaltyInCheckout({
     maxPointsToRedeem,
     minRedemptionPoints: settings?.min_redemption_points || 100,
     pointValue: settings?.point_value || 0.01,
+    maxRedemptionType: settings?.max_redemption_type || null,
+    maxRedemptionValue: settings?.max_redemption_type === "fixed" 
+      ? settings?.max_redemption_points 
+      : settings?.max_redemption_percentage,
     setUsePoints,
     setPointsToRedeem
   };

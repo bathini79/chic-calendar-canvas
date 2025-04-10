@@ -17,6 +17,9 @@ export type LoyaltyProgramSettings = {
   applicable_packages: string[];
   created_at: string;
   updated_at: string;
+  max_redemption_points: number | null;
+  max_redemption_percentage: number | null;
+  max_redemption_type: "fixed" | "percentage" | null;
 };
 
 export type LoyaltyProgramFormValues = Omit<LoyaltyProgramSettings, 'id' | 'created_at' | 'updated_at'>;

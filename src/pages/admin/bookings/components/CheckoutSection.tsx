@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -195,7 +194,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  // Calculate the discounted subtotal here, before it's used by the loyalty logic
   const discountedSubtotal = useMemo(() => {
     const regularDiscountedPrice = getFinalPrice(
       subtotal,
@@ -218,7 +216,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     couponDiscount,
   ]);
 
-  // Initialize the loyalty hook after discountedSubtotal is calculated
   const loyalty = useLoyaltyInCheckout({
     customerId: selectedCustomer?.id,
     selectedServices,
@@ -975,19 +972,24 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               </div>
             )}
 
-            {loyalty.isLoyaltyEnabled && selectedCustomer && (
-              <LoyaltyPointsSection
-                customerName={selectedCustomer.full_name}
-                customerPoints={loyalty.customerPoints}
-                pointsToEarn={loyalty.pointsToEarn}
-                maxPointsToRedeem={loyalty.maxPointsToRedeem}
-                pointValue={loyalty.pointValue}
-                onPointsToRedeemChange={loyalty.setPointsToRedeem}
-                onUsePointsChange={loyalty.setUsePoints}
-                usePoints={loyalty.usePoints}
-                pointsToRedeem={loyalty.pointsToRedeem}
-                minRedemptionPoints={loyalty.minRedemptionPoints}
-              />
+            {selectedCustomer && (
+              <div className="mt-4">
+                <LoyaltyPointsSection
+                  isEnabled={loyalty.isLoyaltyEnabled}
+                  customerPoints={loyalty.customerPoints}
+                  pointsToEarn={loyalty.pointsToEarn}
+                  usePoints={loyalty.usePoints}
+                  setUsePoints={loyalty.setUsePoints}
+                  pointsToRedeem={loyalty.pointsToRedeem}
+                  setPointsToRedeem={loyalty.setPointsToRedeem}
+                  maxPointsToRedeem={loyalty.maxPointsToRedeem}
+                  minRedemptionPoints={loyalty.minRedemptionPoints}
+                  pointsDiscountAmount={loyalty.pointsDiscountAmount}
+                  pointValue={loyalty.pointValue}
+                  maxRedemptionType={loyalty.maxRedemptionType}
+                  maxRedemptionValue={loyalty.maxRedemptionValue}
+                />
+              </div>
             )}
 
             {loyalty.usePoints && loyalty.pointsDiscountAmount > 0 && (
