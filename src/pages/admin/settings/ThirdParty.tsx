@@ -115,14 +115,6 @@ export default function ThirdParty() {
               </div>
               <div
                 className={`px-4 py-2 cursor-pointer ${
-                  activeSection === "twilio" ? "bg-accent" : ""
-                }`}
-                onClick={() => setActiveSection("twilio")}
-              >
-                <span>Twilio Configuration</span>
-              </div>
-              <div
-                className={`px-4 py-2 cursor-pointer ${
                   activeSection === "other" ? "bg-accent" : ""
                 }`}
                 onClick={() => setActiveSection("other")}
@@ -148,99 +140,7 @@ export default function ThirdParty() {
             </Card>
           )}
 
-          {activeSection === "twilio" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Twilio Account Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <>
-                    <Skeleton className="h-10 w-full mb-4 rounded-md" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[...Array(6)].map((_, i) => (
-                        <Skeleton key={i} className="h-16 rounded-md" />
-                      ))}
-                    </div>
-                    <Skeleton className="h-8 w-40 mt-6" />
-                    <Spinner />
-                  </>
-                ) : error ? (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                ) : accountDetails ? (
-                  <div className="space-y-6">
-                    {/* Status at top */}
-                    <div className="flex items-center space-x-2">
-                      <p className="text-sm font-medium">Status:</p>
-                      <p className="text-xs text-green-700 font-semibold">
-                      {accountDetails.status}
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Balance</p>
-                        <p className="font-medium">
-                          {accountDetails.balance} {accountDetails.currency}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Account Type</p>
-                        <p className="font-medium">{accountDetails.account_type}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Messages Sent</p>
-                        <p className="font-medium">
-                          {accountDetails.total_messages_sent}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Last Billing Amount
-                        </p>
-                        <p className="font-medium">
-                          {accountDetails.last_billing_amount}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Last Billing Period
-                        </p>
-                        <p className="font-medium">
-                          {accountDetails.last_billing_start} →{" "}
-                          {accountDetails.last_billing_end}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Next Billing Date
-                        </p>
-                        <p className="font-medium">
-                          {accountDetails.next_billing_date}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <a
-                        href={accountDetails.billing_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block mt-2 text-sm font-medium text-blue-600 hover:underline"
-                      >
-                        View Billing Details
-                      </a>
-                    </div>
-                  </div>
-                ) : (
-                  <p>No account details available.</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
+     
           {activeSection === "other" && (
             <Card>
               <CardHeader>
