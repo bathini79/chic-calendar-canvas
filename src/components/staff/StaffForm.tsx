@@ -143,7 +143,7 @@ export function StaffForm({
   const checkPhoneExists = async (phone: string) => {
     if (!phone || phone.length < 10) return false;
 
-    const formattedPhone = `${selectedCountry.code}${phone}`;
+    const formattedPhone = `${selectedCountry.code.slice(1)}${phone}`;
 
     try {
       setIsPhoneCheckLoading(true);
@@ -188,7 +188,7 @@ export function StaffForm({
     const updatedData = {
       ...data,
       photo_url: images[0] || null,
-      phone: `${selectedCountry.code.slice(-1)}${data.phone}`,
+      phone: `${selectedCountry.code.slice(1)}${data.phone}`,
     };
 
     onSubmit(updatedData);

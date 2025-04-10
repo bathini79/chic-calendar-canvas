@@ -20,9 +20,7 @@ serve(async (req) => {
     if (!phoneNumber || !code) {
       throw new Error('Phone number and verification code are required')
     }
-    
-    console.log("Request received:", { phoneNumber, code, fullName, lead_source });
-    
+      
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -114,13 +112,6 @@ serve(async (req) => {
         const email = `${phoneNumber.replace(/[^0-9]/g, '')}@phone.user`
         // Generate a random password
         const password = crypto.randomUUID()
-        
-        console.log("Attempting to create new user with:", { 
-          phone: phoneNumber, 
-          email: email,
-          fullName: fullName
-        });
-        
         // Create new user with phone as unique identifier
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
           phone: phoneNumber,
@@ -146,15 +137,12 @@ serve(async (req) => {
             .maybeSingle();
             
           if (existingProfile) {
-            console.log('Found existing profile despite auth error:', existingProfile);
             userId = existingProfile.id;
             
             // Try to get auth user by ID to proceed with login
             const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
             
-            if (authUser && authUser.user) {
-              console.log('Retrieved auth user for existing profile');
-              
+            if (authUser && authUser.user) {              
               // Get email from existing auth user
               const email = authUser.user.email;
               

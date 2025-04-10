@@ -90,7 +90,6 @@ export function GupshupConfig() {
         .maybeSingle(); // Using maybeSingle to handle when no record exists
 
       let result;
-      console.log("Existing Data:", existingData);
       if (existingData) {
         // Update existing record
         result = await supabase

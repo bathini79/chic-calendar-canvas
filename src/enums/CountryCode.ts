@@ -1218,5 +1218,5 @@ export const parsePhoneCountryCode = (fullPhone: string) => {
   const sortedCodes = [...countryCodes].sort(
     (a, b) => b.flag.length - a.flag.length
   );
-  return sortedCodes.find((country) => fullPhone.startsWith(country.flag));
+  return sortedCodes.find((country) => fullPhone.startsWith(country.code));
 };

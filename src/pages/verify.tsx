@@ -46,7 +46,6 @@ export default function VerificationPage() {
   }, [token, code, phone]);
 
   
-
   const handleCountryChange = (country: {name: string, code: string, flag: string}) => {
     setCountryCode(country);
   };
@@ -66,12 +65,11 @@ export default function VerificationPage() {
     setError("");
 
     try {
-      const fullPhoneNumber = `${countryCode.code}${phoneNumber.replace(/\s/g, '')}`;
       
       const { data, error } = await supabase.functions.invoke("verify-employee-code", {
         body: {
           code: verificationCode,
-          phoneNumber: fullPhoneNumber,
+          phoneNumber: phone,
           token
         }
       });

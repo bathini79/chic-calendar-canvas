@@ -359,7 +359,6 @@ export default function useSaveAppointment({
         .eq("id", createdAppointmentId);
 
       if (updateError) throw updateError;
-      console.log("Appointment saved successfully:", createdAppointmentId,appointmentStatus);
       if (appointmentStatus === "completed" && createdAppointmentId) {
         try {
           await sendNotification(createdAppointmentId, "completed");

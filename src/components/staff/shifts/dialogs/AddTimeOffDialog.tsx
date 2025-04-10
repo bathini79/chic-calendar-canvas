@@ -52,7 +52,6 @@ export function AddTimeOffDialog({
   const [startDate, setStartDate] = useState<Date | undefined>(
     existingTimeOff ? new Date(existingTimeOff.start_date) : new Date()
   );
-  console.log("selectedEmployee",selectedEmployee)
   const [endDate, setEndDate] = useState<Date | undefined>(
     existingTimeOff ? new Date(existingTimeOff.end_date) : new Date(),
   );

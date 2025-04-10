@@ -207,10 +207,7 @@ const Auth = () => {
     setEdgeFunctionError(null);
     
     try {
-      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
-      
-      console.log("Verifying OTP:", fullPhoneNumber, otp, needsFullName ? fullName : undefined);
-      
+      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;      
       const response = await supabase.functions.invoke('verify-whatsapp-otp', {
         body: { 
           phoneNumber: fullPhoneNumber, 
@@ -219,9 +216,6 @@ const Auth = () => {
           lead_source: referralSource || undefined
         },
       });
-
-      console.log("OTP verification response:", response);
-
       if (response.data && response.data.error) {
         if (response.data.error === "new_user_requires_name") {
           setNeedsFullName(true);
@@ -249,9 +243,7 @@ const Auth = () => {
       }
 
       // If we have credentials in the response, sign in with them
-      if (response.data && response.data.credentials) {
-        console.log("Signing in with credentials from OTP verification");
-        
+      if (response.data && response.data.credentials) {        
         try {
           // Sign in with the credentials
           const { data, error: signInError } = await supabase.auth.signInWithPassword({
@@ -271,9 +263,7 @@ const Auth = () => {
             setIsLoading(false);
             return;
           }
-          
-          console.log("Sign in successful, session created:", data.session);
-          
+                    
           // // Update profile phone number directly as a fallback
           // if (data.user) {
           //   try {

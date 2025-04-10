@@ -635,7 +635,6 @@ export default function BookingConfirmation() {
           appointmentId,
           sendNotification
         );
-        console.log("Notification sent:", notificationResult);
       } catch (notificationError) {
         console.error("Error sending confirmation:", notificationError);
         // Don't fail the booking if notification fails

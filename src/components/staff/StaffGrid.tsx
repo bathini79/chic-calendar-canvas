@@ -165,7 +165,6 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
                 </Avatar>
                 <div className="text-center">
                   <h3 className="font-semibold text-lg">{member.name}</h3>
-                  <p className="text-sm text-muted-foreground">{member.email}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {member.phone}
                   </p>
