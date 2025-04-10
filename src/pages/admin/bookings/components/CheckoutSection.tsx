@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -193,6 +194,40 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       ),
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
+
+  // Calculate the discounted subtotal here, before it's used by the loyalty logic
+  const discountedSubtotal = useMemo(() => {
+    const regularDiscountedPrice = getFinalPrice(
+      subtotal,
+      discountType,
+      discountValue
+    );
+    const afterMembershipDiscount = Math.max(
+      0,
+      regularDiscountedPrice - membershipDiscount
+    );
+
+    return couponDiscount > 0
+      ? Math.max(0, afterMembershipDiscount - couponDiscount)
+      : afterMembershipDiscount;
+  }, [
+    subtotal,
+    discountType,
+    discountValue,
+    membershipDiscount,
+    couponDiscount,
+  ]);
+
+  // Initialize the loyalty hook after discountedSubtotal is calculated
+  const loyalty = useLoyaltyInCheckout({
+    customerId: selectedCustomer?.id,
+    selectedServices,
+    selectedPackages,
+    services,
+    packages,
+    subtotal,
+    discountedSubtotal
+  });
 
   useEffect(() => {
     const loadTaxData = async () => {
@@ -404,16 +439,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  const loyalty = useLoyaltyInCheckout({
-    customerId: selectedCustomer?.id,
-    selectedServices,
-    selectedPackages,
-    services,
-    packages,
-    subtotal,
-    discountedSubtotal
-  });
-
   const taxAmount = useMemo(() => {
     const afterAllDiscounts = Math.max(
       0, 
@@ -426,28 +451,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     appliedTaxId,
     appliedTaxRate,
     loyalty.pointsDiscountAmount
-  ]);
-
-  const discountedSubtotal = useMemo(() => {
-    const regularDiscountedPrice = getFinalPrice(
-      subtotal,
-      discountType,
-      discountValue
-    );
-    const afterMembershipDiscount = Math.max(
-      0,
-      regularDiscountedPrice - membershipDiscount
-    );
-
-    return couponDiscount > 0
-      ? Math.max(0, afterMembershipDiscount - couponDiscount)
-      : afterMembershipDiscount;
-  }, [
-    subtotal,
-    discountType,
-    discountValue,
-    membershipDiscount,
-    couponDiscount,
   ]);
 
   const total = useMemo(
