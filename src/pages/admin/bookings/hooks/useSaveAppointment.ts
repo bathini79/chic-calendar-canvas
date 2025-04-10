@@ -38,6 +38,9 @@ interface SaveAppointmentProps {
   membership_name?: string | null;
   coupon_name?: string | null;
   coupon_amount?: number;
+  pointsEarned?: number;
+  pointsRedeemed?: number;
+  pointsDiscountAmount?: number;
 }
 
 export default function useSaveAppointment({
@@ -67,6 +70,9 @@ export default function useSaveAppointment({
   membership_name,
   coupon_name,
   coupon_amount,
+  pointsEarned = 0,
+  pointsRedeemed = 0,
+  pointsDiscountAmount = 0,
 }: SaveAppointmentProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { sendNotification } = useAppointmentNotifications();
@@ -174,6 +180,21 @@ export default function useSaveAppointment({
         }
       }
 
+      const pointsEarnedFromParams = 
+        summaryParams?.pointsEarned !== undefined
+          ? summaryParams.pointsEarned
+          : pointsEarned;
+          
+      const pointsRedeemedFromParams = 
+        summaryParams?.pointsRedeemed !== undefined
+          ? summaryParams.pointsRedeemed
+          : pointsRedeemed;
+          
+      const pointsDiscountAmountFromParams = 
+        summaryParams?.pointsDiscountAmount !== undefined
+          ? summaryParams.pointsDiscountAmount
+          : pointsDiscountAmount;
+
       const appointmentData = {
         customer_id: selectedCustomer.id,
         start_time: startTime.toISOString(),
@@ -194,6 +215,9 @@ export default function useSaveAppointment({
           summaryParams?.membershipDiscount || membership_discount,
         membership_id: summaryParams?.membershipId || membership_id,
         membership_name: summaryParams?.membershipName || membership_name,
+        points_earned: pointsEarnedFromParams,
+        points_redeemed: pointsRedeemedFromParams,
+        points_discount_amount: pointsDiscountAmountFromParams,
       };
 
       let createdAppointmentId;
@@ -369,6 +393,41 @@ export default function useSaveAppointment({
           );
         }
       }
+
+      if (selectedCustomer && (pointsEarnedFromParams > 0 || pointsRedeemedFromParams > 0)) {
+        const { data: customerData, error: customerFetchError } = await supabase
+          .from("profiles")
+          .select("wallet_balance, cashback_balance")
+          .eq("id", selectedCustomer.id)
+          .single();
+          
+        if (customerFetchError) {
+          console.error("Error fetching customer points:", customerFetchError);
+        } else {
+          let newWalletBalance = customerData.wallet_balance || 0;
+          if (pointsRedeemedFromParams > 0) {
+            newWalletBalance = Math.max(0, newWalletBalance - pointsRedeemedFromParams);
+          }
+          
+          let newCashbackBalance = customerData.cashback_balance || 0;
+          if (pointsEarnedFromParams > 0) {
+            newCashbackBalance += pointsEarnedFromParams;
+          }
+          
+          const { error: updateError } = await supabase
+            .from("profiles")
+            .update({
+              wallet_balance: newWalletBalance,
+              cashback_balance: newCashbackBalance
+            })
+            .eq("id", selectedCustomer.id);
+            
+          if (updateError) {
+            console.error("Error updating customer points:", updateError);
+          }
+        }
+      }
+
       toast.success(
         appointmentId ? "Appointment updated" : "Appointment created"
       );

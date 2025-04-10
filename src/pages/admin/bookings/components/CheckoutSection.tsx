@@ -50,6 +50,8 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
+import { LoyaltyPointsSection } from "./LoyaltyPointsSection";
+import { useLoyaltyInCheckout } from "../hooks/useLoyaltyInCheckout";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -76,6 +78,7 @@ interface CheckoutSectionProps {
   isExistingAppointment?: boolean;
   customizedServices?: Record<string, string[]>;
   locationId?: string;
+  loadingPayment?: boolean;
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -401,30 +404,28 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
+  const loyalty = useLoyaltyInCheckout({
+    customerId: selectedCustomer?.id,
+    selectedServices,
+    selectedPackages,
+    services,
+    packages,
+    subtotal,
+    discountedSubtotal
+  });
+
   const taxAmount = useMemo(() => {
-    const regularDiscountedPrice = getFinalPrice(
-      subtotal,
-      discountType,
-      discountValue
+    const afterAllDiscounts = Math.max(
+      0, 
+      discountedSubtotal - loyalty.pointsDiscountAmount
     );
-    const afterMembershipDiscount = Math.max(
-      0,
-      regularDiscountedPrice - membershipDiscount
-    );
-    const afterAllDiscounts =
-      couponDiscount > 0
-        ? Math.max(0, afterMembershipDiscount - couponDiscount)
-        : afterMembershipDiscount;
 
     return appliedTaxId ? afterAllDiscounts * (appliedTaxRate / 100) : 0;
   }, [
-    subtotal,
+    discountedSubtotal,
     appliedTaxId,
     appliedTaxRate,
-    discountType,
-    discountValue,
-    membershipDiscount,
-    couponDiscount,
+    loyalty.pointsDiscountAmount
   ]);
 
   const discountedSubtotal = useMemo(() => {
@@ -450,13 +451,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   ]);
 
   const total = useMemo(
-    () => discountedSubtotal + taxAmount,
-    [discountedSubtotal, taxAmount]
+    () => Math.max(0, discountedSubtotal - loyalty.pointsDiscountAmount + taxAmount),
+    [discountedSubtotal, loyalty.pointsDiscountAmount, taxAmount]
   );
 
   const discountAmount = useMemo(
-    () => subtotal - discountedSubtotal + couponDiscount + membershipDiscount,
-    [subtotal, discountedSubtotal, couponDiscount, membershipDiscount]
+    () => subtotal - discountedSubtotal + couponDiscount + membershipDiscount + loyalty.pointsDiscountAmount,
+    [subtotal, discountedSubtotal, couponDiscount, membershipDiscount, loyalty.pointsDiscountAmount]
   );
 
   const adjustedPrices = useMemo(() => {
@@ -669,7 +670,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         couponName:
           availableCoupons?.filter((c) => c.id === selectedCouponId)?.[0]
             ?.code || null,
-        paymentMethod, // Include the payment method in the save parameters
+        paymentMethod,
+        pointsEarned: loyalty.pointsToEarn,
+        pointsRedeemed: loyalty.usePoints ? loyalty.pointsToRedeem : 0,
+        pointsDiscountAmount: loyalty.pointsDiscountAmount
       };
 
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
@@ -965,6 +969,31 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     : discountValue
                   ).toFixed(2)}
                 </span>
+              </div>
+            )}
+
+            {loyalty.isLoyaltyEnabled && selectedCustomer && (
+              <LoyaltyPointsSection
+                customerName={selectedCustomer.full_name}
+                customerPoints={loyalty.customerPoints}
+                pointsToEarn={loyalty.pointsToEarn}
+                maxPointsToRedeem={loyalty.maxPointsToRedeem}
+                pointValue={loyalty.pointValue}
+                onPointsToRedeemChange={loyalty.setPointsToRedeem}
+                onUsePointsChange={loyalty.setUsePoints}
+                usePoints={loyalty.usePoints}
+                pointsToRedeem={loyalty.pointsToRedeem}
+                minRedemptionPoints={loyalty.minRedemptionPoints}
+              />
+            )}
+
+            {loyalty.usePoints && loyalty.pointsDiscountAmount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span className="flex items-center">
+                  <Award className="mr-2 h-4 w-4" />
+                  Loyalty Points Discount
+                </span>
+                <span>-₹{loyalty.pointsDiscountAmount.toFixed(2)}</span>
               </div>
             )}
 
