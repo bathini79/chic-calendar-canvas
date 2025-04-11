@@ -38,7 +38,11 @@ export function useLoyaltyProgram() {
         .maybeSingle();
 
       if (error) throw error;
-      setSettings(data);
+      if (data) {
+        setSettings(data as LoyaltyProgramSettings);
+      } else {
+        setSettings(null);
+      }
     } catch (error: any) {
       toast.error(`Error fetching loyalty program settings: ${error.message}`);
       console.error("Error fetching loyalty program settings:", error);
@@ -59,8 +63,9 @@ export function useLoyaltyProgram() {
 
         if (error) throw error;
         toast.success("Loyalty program settings created successfully");
-        setSettings(data);
-        return data;
+        const newSettings = data as LoyaltyProgramSettings;
+        setSettings(newSettings);
+        return newSettings;
       } else {
         // Update existing settings
         const { data, error } = await supabase
@@ -72,8 +77,9 @@ export function useLoyaltyProgram() {
 
         if (error) throw error;
         toast.success("Loyalty program settings updated successfully");
-        setSettings(data);
-        return data;
+        const updatedSettings = data as LoyaltyProgramSettings;
+        setSettings(updatedSettings);
+        return updatedSettings;
       }
     } catch (error: any) {
       toast.error(`Error updating loyalty program settings: ${error.message}`);

@@ -31,9 +31,6 @@ export const SalesPerformance = ({ onBack }: SalesPerformanceProps) => {
           </Button>
           <h2 className="text-2xl font-bold">Sales By Service Report</h2>
         </div>
-        <Button variant="outline" size="sm">
-          <Download className="h-4 w-4 mr-2" /> Export
-        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
