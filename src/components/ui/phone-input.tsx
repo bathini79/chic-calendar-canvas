@@ -26,8 +26,14 @@ export interface PhoneInputProps extends Omit<React.InputHTMLAttributes<HTMLInpu
 
 const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
   ({ className, onChange, onCountryChange, selectedCountry, ...props }, ref) => {
-    const [country, setCountry] = React.useState(selectedCountry || countryCodes[0]);
+    const [country, setCountry] = React.useState(selectedCountry || countryCodes.find(c => c.name === "India") || countryCodes[0]);
     const [open, setOpen] = React.useState(false);
+
+    React.useEffect(() => {
+      if (selectedCountry) {
+        setCountry(selectedCountry);
+      }
+    }, [selectedCountry]);
 
     const handleCountrySelect = (selectedCountry: CountryCode) => {
       setCountry(selectedCountry);
@@ -40,7 +46,6 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       let value = e.target.value.replace(/\D/g, "");
       
-      // Restrict to 10 digits
       if (value.length > 10) {
         value = value.slice(0, 10);
       }
@@ -64,7 +69,6 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
                 "flex gap-1 rounded-r-none border-r-0 px-3 text-sm",
                 "select-none min-w-[90px] justify-between"
               )}
-              disabled={true}
             >
               <span>{country.flag}</span>
               <span>{country.code}</span>
@@ -112,12 +116,9 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
 
 PhoneInput.displayName = "PhoneInput";
 
-// Helper to format phone numbers as they are typed
 function formatPhoneNumber(value: string): string {
-  // Keep only first 10 digits
   value = value.slice(0, 10);
   
-  // Format as XXXXX XXXXX for readability
   if (value.length > 5) {
     return `${value.slice(0, 5)} ${value.slice(5)}`;
   }

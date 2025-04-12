@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { CustomerSearch } from "./CustomerSearch";
 import { Customer } from "@/pages/admin/bookings/types";

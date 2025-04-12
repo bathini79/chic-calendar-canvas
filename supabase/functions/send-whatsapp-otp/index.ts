@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0';
 const corsHeaders = {
@@ -24,7 +25,7 @@ serve(async (req)=>{
     });
   }
   try {
-    const { phoneNumber } = await req.json();
+    const { phoneNumber, fullName, lead_source } = await req.json();
     if (!phoneNumber) {
       return new Response(JSON.stringify({
         error: "Missing phoneNumber parameter"
@@ -54,7 +55,9 @@ serve(async (req)=>{
      const { error: otpError } = await supabaseAdmin.from('phone_auth_codes').insert({
         phone_number: phoneNumber,
         code: otp,
-        expires_at: expiresAt.toISOString()
+        expires_at: expiresAt.toISOString(),
+        full_name: fullName,
+        lead_source: lead_source
       });
       if (otpError) {
         throw new Error(`Failed to store verification code: ${otpError.message}`);

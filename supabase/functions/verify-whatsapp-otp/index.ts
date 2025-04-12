@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
@@ -15,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumber, code, fullName, lead_source } = await req.json()
+    const { phoneNumber, code } = await req.json()
     
     if (!phoneNumber || !code) {
       throw new Error('Phone number and verification code are required')
@@ -76,6 +75,10 @@ serve(async (req) => {
       )
     }
     
+    // Extract fullName and lead_source from OTP data
+    const fullName = otpData.full_name || '';
+    const lead_source = otpData.lead_source || null;
+    
     // Step 2: Check if user exists by phone number
     let existingUserQuery = supabaseAdmin
       .from('profiles')
@@ -122,7 +125,8 @@ serve(async (req) => {
           user_metadata: { 
             full_name: fullName,
             phone_verified: true,
-            phone: phoneNumber  // Add phone to metadata explicitly
+            phone: phoneNumber,  // Add phone to metadata explicitly
+            lead_source: lead_source
           }
         })
         
@@ -154,7 +158,8 @@ serve(async (req) => {
                 password: tempPassword,
                 user_metadata: {
                   ...authUser.user.user_metadata,
-                  phone: phoneNumber  // Ensure phone is in metadata
+                  phone: phoneNumber,  // Ensure phone is in metadata
+                  lead_source: lead_source
                 }
               });
               
@@ -178,7 +183,8 @@ serve(async (req) => {
                   userId: userId,
                   phoneNumber: phoneNumber,
                   credentials: credentials,
-                  fullName: fullName
+                  fullName: fullName,
+                  lead_source: lead_source
                 }),
                 { 
                   headers: { 
@@ -215,7 +221,7 @@ serve(async (req) => {
             phone_number: phoneNumber,
             phone_verified: true,
             full_name: fullName,
-            lead_source: lead_source || null,
+            lead_source: lead_source,
             role: 'customer'
           })
           
@@ -229,7 +235,7 @@ serve(async (req) => {
               phone_number: phoneNumber,
               phone_verified: true,
               full_name: fullName,
-              lead_source: lead_source || null
+              lead_source: lead_source
             })
             .eq('id', userId);
             
@@ -284,15 +290,23 @@ serve(async (req) => {
       // Generate a one-time password for this login
       const tempPassword = crypto.randomUUID()
       
-      // Update the user's password and ensure phone is in metadata
+      // Update the user's metadata with lead_source if provided
+      const updatedMetadata = {
+        ...userData.user.user_metadata,
+        phone: phoneNumber,  // Ensure phone is in metadata
+      };
+      
+      // Only add lead_source if it exists and is not already set
+      if (lead_source && !userData.user.user_metadata.lead_source) {
+        updatedMetadata.lead_source = lead_source;
+      }
+      
+      // Update the user's password and metadata
       const { error: passwordUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
         userId,
         { 
           password: tempPassword,
-          user_metadata: {
-            ...userData.user.user_metadata,
-            phone: phoneNumber  // Ensure phone is in metadata
-          }
+          user_metadata: updatedMetadata
         }
       )
       
@@ -310,14 +324,19 @@ serve(async (req) => {
         )
       }
       
-      // Also update profile phone number in case it's missing
+      // Also update profile phone number and lead_source if provided
+      const updateData: any = { phone_number: phoneNumber };
+      if (lead_source) {
+        updateData.lead_source = lead_source;
+      }
+      
       const { error: profileUpdateError } = await supabaseAdmin
         .from('profiles')
-        .update({ phone_number: phoneNumber })
+        .update(updateData)
         .eq('id', userId);
         
       if (profileUpdateError) {
-        console.error('Error updating profile phone:', profileUpdateError);
+        console.error('Error updating profile:', profileUpdateError);
       }
       
       // Return credentials for frontend to create session
@@ -341,7 +360,8 @@ serve(async (req) => {
         userId: userId,
         phoneNumber: phoneNumber,
         credentials: credentials,
-        fullName: fullName
+        fullName: fullName,
+        lead_source: lead_source
       }),
       { 
         headers: { 
