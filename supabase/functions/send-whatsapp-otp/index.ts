@@ -25,7 +25,7 @@ serve(async (req)=>{
     });
   }
   try {
-    const { phoneNumber } = await req.json();
+    const { phoneNumber, fullName, lead_source } = await req.json();
     if (!phoneNumber) {
       return new Response(JSON.stringify({
         error: "Missing phoneNumber parameter"
@@ -91,7 +91,9 @@ serve(async (req)=>{
     }
     return new Response(JSON.stringify({
       success: true,
-      response: responseBody
+      response: responseBody,
+      fullName,
+      lead_source
     }), {
       status: 200,
       headers: {

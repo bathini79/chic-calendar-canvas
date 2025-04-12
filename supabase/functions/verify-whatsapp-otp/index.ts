@@ -209,19 +209,6 @@ serve(async (req) => {
         
         userId = newUser.user.id
         
-        // Explicitly create profile in case the trigger doesn't work
-        const { error: profileError } = await supabaseAdmin
-          .from('profiles')
-          .update({
-            phone_verified: true,
-            lead_source: lead_source || null
-          })
-          .eq('id', userId);
-          
-        if (profileError) {
-          console.error('Error updating profile:', profileError)
-        }
-        
         // Return credentials for frontend to create session
         credentials = {
           email: email,
@@ -299,28 +286,6 @@ serve(async (req) => {
             status: 200
           }
         )
-      }
-      
-      // Also update profile lead_source if provided
-      if (lead_source) {
-        const { error: profileUpdateError } = await supabaseAdmin
-          .from('profiles')
-          .update({ lead_source: lead_source })
-          .eq('id', userId);
-          
-        if (profileUpdateError) {
-          console.error('Error updating profile lead_source:', profileUpdateError);
-        }
-      }
-      
-      // Update phone_verified to true
-      const { error: verificationUpdateError } = await supabaseAdmin
-        .from('profiles')
-        .update({ phone_verified: true })
-        .eq('id', userId);
-        
-      if (verificationUpdateError) {
-        console.error('Error updating verification status:', verificationUpdateError);
       }
       
       // Return credentials for frontend to create session

@@ -51,7 +51,11 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
     try {
       setIsSubmitting(true);
       const { data, error } = await supabase.functions.invoke('send-whatsapp-otp', {
-        body: { phoneNumber }
+        body: { 
+          phoneNumber,
+          fullName: form.getValues("full_name"),
+          lead_source: form.getValues("lead_source")
+        }
       });
 
       if (error) {
@@ -86,7 +90,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         ? data.phone_number 
         : `+${data.phone_number.replace(/\D/g, '')}`;
 
-      // Send WhatsApp verification
+      // Send WhatsApp verification with full name and lead source
       const verificationSent = await sendWhatsAppVerification(formattedPhone);
       
       if (!verificationSent) {
@@ -94,28 +98,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         return;
       }
 
-      // Create customer entry with pending verification status
-      const { data: clientData, error: clientError } = await supabase
-        .from('profiles')
-        .insert({
-          full_name: data.full_name,
-          email: data.email || null,
-          phone_number: formattedPhone,
-          lead_source: data.lead_source,
-          role: 'customer',
-          phone_verified: false, // Will be updated after verification
-        })
-        .select()
-        .single();
-
-      if (clientError) {
-        toast.error("Failed to create client: " + clientError.message);
-        setIsSubmitting(false);
-        return;
-      }
-
-      toast.success("Verification sent to client's WhatsApp. Customer will be created after verification.");
-      onSuccess(clientData as Customer);
+      toast.success("Verification sent to client's WhatsApp. User will be created after verification.");
       form.reset();
       onClose();
     } catch (error: any) {
