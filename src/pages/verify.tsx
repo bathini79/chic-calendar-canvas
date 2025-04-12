@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { toast } from "sonner";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { parsePhoneCountryCode } from "@/enums/CountryCode";
+import { parsePhoneCountryCode } from "@/lib/country-codes";
 
 export default function VerificationPage() {
   const [searchParams] = useSearchParams();
@@ -24,20 +24,20 @@ export default function VerificationPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // Parse phone parameter to extract country code if provided
+    if (phone) {
       // Try to find the country code in the phone number
       const countryCodeObj = parsePhoneCountryCode(phone);
       if (countryCodeObj) {
         setCountryCode({
           name: countryCodeObj.name || "Unknown",
-          code: `+${countryCodeObj.code}`,
+          code: countryCodeObj.code,
           flag: countryCodeObj.flag || "🏳️"
         });
         // Extract the phone number without country code
         const phoneWithoutCode = phone.substring(countryCodeObj.code.length);
         setPhoneNumber(phoneWithoutCode);
       }
-    
+    }
     
     // Auto-verify if token or code and phone are provided in URL
     if ((token || code) && phone) {
@@ -65,11 +65,15 @@ export default function VerificationPage() {
     setError("");
 
     try {
+      // Format the full phone number with country code
+      const formattedPhone = phoneNumber.startsWith('+') ? 
+        phoneNumber : 
+        `${countryCode.code}${phoneNumber.replace(/\s+/g, '')}`;
       
-      const { data, error } = await supabase.functions.invoke("verify-employee-code", {
+      const { data, error } = await supabase.functions.invoke("verify-whatsapp-otp", {
         body: {
           code: verificationCode,
-          phoneNumber: phone,
+          phoneNumber: formattedPhone,
           token
         }
       });
@@ -94,9 +98,9 @@ export default function VerificationPage() {
     <div className="min-h-screen flex justify-center items-center bg-slate-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Employee Verification</CardTitle>
+          <CardTitle className="text-2xl">Verification</CardTitle>
           <CardDescription>
-            Verify your account to activate your staff profile
+            Verify your account to activate your profile
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -115,7 +119,7 @@ export default function VerificationPage() {
                   disabled={loading}
                 />
                 <p className="text-xs text-slate-500">
-                  Enter the phone number associated with your staff account
+                  Enter the phone number associated with your account
                 </p>
               </div>
 
@@ -155,7 +159,7 @@ export default function VerificationPage() {
               <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
               <h3 className="text-xl font-semibold">Verification Successful!</h3>
               <p className="text-slate-600 mt-2">
-                Your staff account has been activated successfully.
+                Your account has been activated successfully.
               </p>
             </div>
           )}

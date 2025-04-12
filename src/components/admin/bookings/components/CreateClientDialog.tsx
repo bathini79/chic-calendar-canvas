@@ -14,7 +14,7 @@ import { generateStrongPassword } from "@/lib/utils";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { countryCodes, CountryCode } from "@/lib/country-codes";
-import { Spinner } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 // Lead source options
 const LEAD_SOURCES = [
@@ -110,8 +110,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         id: "", // This will be filled after verification
         full_name: data.full_name,
         email: data.email || "",
-        phone_number: formattedPhone,
-        lead_source: data.lead_source || null
+        phone_number: formattedPhone
       };
       
       onSuccess(customerData);
@@ -212,7 +211,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
               <Button type="submit" disabled={isVerifying}>
                 {isVerifying ? (
                   <>
-                    <Spinner className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Sending...
                   </>
                 ) : (

@@ -1631,21 +1631,27 @@ export type Database = {
           code: string
           created_at: string
           expires_at: string
+          full_name: string | null
           id: string
+          lead_source: string | null
           phone_number: string
         }
         Insert: {
           code: string
           created_at?: string
           expires_at: string
+          full_name?: string | null
           id?: string
+          lead_source?: string | null
           phone_number: string
         }
         Update: {
           code?: string
           created_at?: string
           expires_at?: string
+          full_name?: string | null
           id?: string
+          lead_source?: string | null
           phone_number?: string
         }
         Relationships: []
