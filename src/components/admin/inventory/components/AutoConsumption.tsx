@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Trash2, Plus, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { LocationSelector } from "@/components/admin/dashboard/LocationSelector";
 import {
   Select,
   SelectContent,
@@ -384,22 +385,12 @@ export function AutoConsumption() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Auto Consumption Rules</h2>
         <div className="flex items-center space-x-2">
-          <MapPin className="h-4 w-4" />
-          <Select
+          <LocationSelector 
+            locations={locations || []}
             value={selectedLocationId}
-            onValueChange={handleLocationSelect}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select location" />
-            </SelectTrigger>
-            <SelectContent>
-              {locations?.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={handleLocationSelect}
+            includeAllOption={false}
+          />
         </div>
       </div>
 
