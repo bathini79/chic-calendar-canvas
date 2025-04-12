@@ -61,7 +61,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       // Removing the + from the country code
       const countryCodeWithoutPlus = selectedCountry.code.replace("+", "");
       const formattedPhoneNumber = phoneNumber.replace(/\s/g, ""); // Remove spaces
-      const fullPhoneNumber = `+${countryCodeWithoutPlus}${formattedPhoneNumber}`;
+      const fullPhoneNumber = `${countryCodeWithoutPlus}${formattedPhoneNumber}`;
       
       const { data, error } = await supabase.functions.invoke('send-whatsapp-otp', {
         body: { 
@@ -98,13 +98,8 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
     try {
       setIsSubmitting(true);
 
-      // Format the phone number with country code but without the +
-      const countryCodeWithoutPlus = selectedCountry.code.replace("+", "");
-      const formattedPhoneNumber = data.phone_number.replace(/\s/g, ""); // Remove spaces
-      const fullPhoneNumber = `+${countryCodeWithoutPlus}${formattedPhoneNumber}`;
-
       // Send WhatsApp verification with full name and lead source
-      const verificationSent = await sendWhatsAppVerification(fullPhoneNumber);
+      const verificationSent = await sendWhatsAppVerification(data?.phone_number);
       
       if (!verificationSent) {
         setIsSubmitting(false);
