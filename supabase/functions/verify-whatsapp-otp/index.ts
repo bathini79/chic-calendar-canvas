@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
@@ -122,7 +121,8 @@ serve(async (req) => {
           user_metadata: { 
             full_name: fullName,
             phone_verified: true,
-            phone: phoneNumber  // Add phone to metadata explicitly
+            phone: phoneNumber,  // Add phone to metadata explicitly
+            lead_source: lead_source
           }
         })
         
@@ -154,7 +154,8 @@ serve(async (req) => {
                 password: tempPassword,
                 user_metadata: {
                   ...authUser.user.user_metadata,
-                  phone: phoneNumber  // Ensure phone is in metadata
+                  phone: phoneNumber,  // Ensure phone is in metadata
+                  lead_source: lead_source
                 }
               });
               
@@ -178,7 +179,8 @@ serve(async (req) => {
                   userId: userId,
                   phoneNumber: phoneNumber,
                   credentials: credentials,
-                  fullName: fullName
+                  fullName: fullName,
+                  lead_source: lead_source
                 }),
                 { 
                   headers: { 
@@ -210,32 +212,14 @@ serve(async (req) => {
         // Explicitly create profile in case the trigger doesn't work
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
-          .insert({
-            id: userId,
-            phone_number: phoneNumber,
+          .update({
             phone_verified: true,
-            full_name: fullName,
-            lead_source: lead_source || null,
-            role: 'customer'
+            lead_source: lead_source || null
           })
+          .eq('id', userId);
           
         if (profileError) {
-          console.error('Error creating profile:', profileError)
-          
-          // Try to update if insert failed due to existing record
-          const { error: updateError } = await supabaseAdmin
-            .from('profiles')
-            .update({
-              phone_number: phoneNumber,
-              phone_verified: true,
-              full_name: fullName,
-              lead_source: lead_source || null
-            })
-            .eq('id', userId);
-            
-          if (updateError) {
-            console.error('Error updating profile:', updateError)
-          }
+          console.error('Error updating profile:', profileError)
         }
         
         // Return credentials for frontend to create session
@@ -284,15 +268,22 @@ serve(async (req) => {
       // Generate a one-time password for this login
       const tempPassword = crypto.randomUUID()
       
-      // Update the user's password and ensure phone is in metadata
+      // Update the user's metadata with lead_source if provided
+      const updatedMetadata = {
+        ...userData.user.user_metadata,
+        phone: phoneNumber,  // Ensure phone is in metadata
+      };
+      
+      if (lead_source) {
+        updatedMetadata.lead_source = lead_source;
+      }
+      
+      // Update the user's password and metadata
       const { error: passwordUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
         userId,
         { 
           password: tempPassword,
-          user_metadata: {
-            ...userData.user.user_metadata,
-            phone: phoneNumber  // Ensure phone is in metadata
-          }
+          user_metadata: updatedMetadata
         }
       )
       
@@ -310,14 +301,26 @@ serve(async (req) => {
         )
       }
       
-      // Also update profile phone number in case it's missing
-      const { error: profileUpdateError } = await supabaseAdmin
+      // Also update profile lead_source if provided
+      if (lead_source) {
+        const { error: profileUpdateError } = await supabaseAdmin
+          .from('profiles')
+          .update({ lead_source: lead_source })
+          .eq('id', userId);
+          
+        if (profileUpdateError) {
+          console.error('Error updating profile lead_source:', profileUpdateError);
+        }
+      }
+      
+      // Update phone_verified to true
+      const { error: verificationUpdateError } = await supabaseAdmin
         .from('profiles')
-        .update({ phone_number: phoneNumber })
+        .update({ phone_verified: true })
         .eq('id', userId);
         
-      if (profileUpdateError) {
-        console.error('Error updating profile phone:', profileUpdateError);
+      if (verificationUpdateError) {
+        console.error('Error updating verification status:', verificationUpdateError);
       }
       
       // Return credentials for frontend to create session
@@ -341,7 +344,8 @@ serve(async (req) => {
         userId: userId,
         phoneNumber: phoneNumber,
         credentials: credentials,
-        fullName: fullName
+        fullName: fullName,
+        lead_source: lead_source
       }),
       { 
         headers: { 
