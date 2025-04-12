@@ -27,7 +27,7 @@ serve(async (req)=>{
     });
   }
   try {
-    const { phoneNumber, fullName, lead_source } = await req.json();
+    const { phoneNumber, fullName, lead_source, baseUrl } = await req.json();
     if (!phoneNumber) {
       return new Response(JSON.stringify({
         error: "Missing phoneNumber parameter"
@@ -76,8 +76,8 @@ serve(async (req)=>{
       throw new Error(`Failed to store verification token: ${tokenError.message}`);
     }
     
-    // Construct the verification URL - use app URL or a default
-    const appUrl = Deno.env.get('APP_URL') || 'https://your-app-url.com';
+    // Use baseUrl from the frontend if provided, fall back to APP_URL env var as backup
+    const appUrl = baseUrl || Deno.env.get('APP_URL') || 'https://your-app-url.com';
     const verificationUrl = `${appUrl}/verify?token=${verificationToken}&phone=${encodeURIComponent(phoneNumber)}`;
     
     const config = providerConfigData.configuration;

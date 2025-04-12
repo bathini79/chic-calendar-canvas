@@ -1,230 +1,156 @@
-
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { Customer } from "@/pages/admin/bookings/types";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { LoaderCircle } from "lucide-react";
-import { CountryCode } from "@/lib/country-codes";
-
-const createClientSchema = z.object({
-  full_name: z.string().min(1, "Full name is required"),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  phone_number: z.string().min(10, "Valid phone number is required"),
-  lead_source: z.string().min(1, "How did you hear about us is required"),
-});
-
-type CreateClientFormData = z.infer<typeof createClientSchema>;
+import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { parsePhoneCountryCode } from "@/enums/CountryCode";
 
 interface CreateClientDialogProps {
   open: boolean;
-  onClose: () => void;
-  onSuccess: (customer: Customer) => void;
+  onOpenChange: (open: boolean) => void;
+  onClientCreated?: () => void;
 }
 
-export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
+export function CreateClientDialog({
   open,
-  onClose,
-  onSuccess,
-}) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>({ 
-    name: "India", 
-    code: "+91", 
-    flag: "🇮🇳" 
+  onOpenChange,
+  onClientCreated
+}: CreateClientDialogProps) {
+  const [fullName, setFullName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState({
+    name: "United States",
+    flag: "🇺🇸",
+    code: "+1",
   });
+  const [isOTPSent, setIsOTPSent] = useState(false);
+  const [isSendingOTP, setIsSendingOTP] = useState(false);
+  const [error, setError] = useState("");
+  const leadSource = "admin_booking";
 
-  const form = useForm<CreateClientFormData>({
-    resolver: zodResolver(createClientSchema),
-    defaultValues: {
-      full_name: "",
-      email: "",
-      phone_number: "",
-      lead_source: "",
-    },
-  });
+  const handlePhoneChange = (value: string) => {
+    setPhoneNumber(value);
+  };
 
-  const sendWhatsAppVerification = async (phoneNumber: string) => {
+  const handleCountryChange = (country: any) => {
+    setPhoneCountryCode(country);
+  };
+
+  const handleSendOTP = async (phoneWithCode: string, fullName: string) => {
     try {
-      setIsSubmitting(true);
+      setIsSendingOTP(true);
+      setError("");
       
-      // Format the phone number correctly for the API
-      // Removing the + from the country code
-      const countryCodeWithoutPlus = selectedCountry.code.replace("+", "");
-      const formattedPhoneNumber = phoneNumber.replace(/\s/g, ""); // Remove spaces
-      const fullPhoneNumber = `${countryCodeWithoutPlus}${formattedPhoneNumber}`;
+      // Get the base URL from the current window location
+      const baseUrl = `${window.location.protocol}//${window.location.host}`;
       
-      const { data, error } = await supabase.functions.invoke('send-whatsapp-otp', {
-        body: { 
-          phoneNumber: fullPhoneNumber,
-          fullName: form.getValues("full_name"),
-          lead_source: form.getValues("lead_source")
+      const { data, error } = await supabase.functions.invoke("send-whatsapp-otp", {
+        body: {
+          phoneNumber: phoneWithCode,
+          fullName,
+          lead_source: leadSource,
+          baseUrl
         }
       });
 
       if (error) {
-        toast.error("Failed to send verification: " + error.message);
-        setIsSubmitting(false);
-        return false;
+        throw new Error(error.message);
       }
 
-      if (data?.success) {
-        toast.success("Verification link sent to WhatsApp");
-        setIsSubmitting(false);
-        return true;
+      if (data.success) {
+        setIsOTPSent(true);
+        toast.success("Verification link sent successfully. Please ask the customer to check their WhatsApp.");
       } else {
-        toast.error("Failed to send verification: " + (data?.error || "Unknown error"));
-        setIsSubmitting(false);
-        return false;
+        throw new Error(data.error || "Failed to send verification link");
       }
-    } catch (error: any) {
-      toast.error("Failed to send verification: " + error.message);
-      setIsSubmitting(false);
-      return false;
-    }
-  };
-
-  const onSubmit = async (data: CreateClientFormData) => {
-    try {
-      setIsSubmitting(true);
-
-      // Send WhatsApp verification with full name and lead source
-      const verificationSent = await sendWhatsAppVerification(data?.phone_number);
-      
-      if (!verificationSent) {
-        setIsSubmitting(false);
-        return;
-      }
-
-      toast.success("Verification link sent to client's WhatsApp. User will be created after verification.");
-      form.reset();
-      onClose();
-    } catch (error: any) {
-      toast.error("Failed to create client: " + error.message);
+    } catch (err: any) {
+      console.error("Error sending OTP:", err);
+      setError(err.message || "Failed to send verification link. Please try again.");
     } finally {
-      setIsSubmitting(false);
+      setIsSendingOTP(false);
     }
   };
 
-  const leadSourceOptions = [
-    { value: "social_media", label: "Social Media" },
-    { value: "friend_referral", label: "Friend Referral" },
-    { value: "google", label: "Google Search" },
-    { value: "advertisement", label: "Advertisement" },
-    { value: "walk_in", label: "Walk-in" },
-    { value: "other", label: "Other" },
-  ];
+  const handleSubmit = async () => {
+    const phoneWithCode = phoneCountryCode.code + " " + phoneNumber;
+
+    if (!fullName) {
+      setError("Full name is required");
+      return;
+    }
+
+    if (!phoneNumber) {
+      setError("Phone number is required");
+      return;
+    }
+
+    await handleSendOTP(phoneWithCode, fullName);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Client</DialogTitle>
+          <DialogTitle>Create New Client</DialogTitle>
+          <DialogDescription>
+            Enter the client's details to send a verification link.
+          </DialogDescription>
         </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="full_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="phone_number"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number *</FormLabel>
-                  <FormControl>
-                    <PhoneInput 
-                      placeholder="9876543210..." 
-                      selectedCountry={selectedCountry}
-                      onCountryChange={setSelectedCountry}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="john@example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="lead_source"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>How did you hear about us? *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select source" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {leadSourceOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end gap-4 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  "Create Client"
-                )}
-              </Button>
+        <div className="grid gap-4 py-4">
+          {error && (
+            <div className="text-red-500 text-sm" role="alert">
+              {error}
             </div>
-          </form>
-        </Form>
+          )}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Full Name
+            </Label>
+            <Input
+              id="name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="phone" className="text-right">
+              Phone Number
+            </Label>
+            <div className="col-span-3">
+              <PhoneInput
+                id="phone"
+                selectedCountry={phoneCountryCode}
+                onCountryChange={handleCountryChange}
+                onChange={handlePhoneChange}
+              />
+            </div>
+          </div>
+          {isOTPSent && (
+            <div className="text-green-500 text-sm" role="alert">
+              Verification link sent successfully!
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSendingOTP || isOTPSent}>
+            {isSendingOTP ? "Sending..." : "Send Verification Link"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-};
+}

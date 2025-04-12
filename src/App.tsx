@@ -24,6 +24,7 @@ import Sales from "./pages/admin/settings/Sales";
 import ThirdParty from "./pages/admin/settings/ThirdParty";
 import Reports from "./pages/admin/Reports";
 import VerifyEmployeePage from "./pages/verify";
+import CustomerVerificationPage from "./pages/customer/CustomerVerify";
 
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -56,6 +57,10 @@ export default function App() {
           </Route>
 
           <Route path="/auth" element={<Auth />} />
+          
+          {/* Verification Routes */}
+          <Route path="/verify" element={<CustomerVerificationPage />} />
+          <Route path="/verify-employee" element={<VerifyEmployeePage />} />
 
           {/* Admin Routes */}
           <Route
@@ -80,8 +85,6 @@ export default function App() {
             <Route path="settings/third-party" element={<ThirdParty />} />
             <Route path="settings/third-party/*" element={<ThirdParty />} />
           </Route>
-
-          <Route path="/verify" element={<VerifyEmployeePage />} />
         </Routes>
       </DndProvider>
     </BrowserRouter>
