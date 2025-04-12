@@ -50,7 +50,7 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
-import { LoyaltyPointsSection } from "./LoyaltyPointsSection";
+import  LoyaltyPointsSection  from "./LoyaltyPointsSection";
 import { useLoyaltyInCheckout } from "../hooks/useLoyaltyInCheckout";
 
 interface CheckoutSectionProps {
