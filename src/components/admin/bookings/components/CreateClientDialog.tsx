@@ -10,7 +10,6 @@ import { adminSupabase } from "@/integrations/supabase/client";
 import { Customer } from "@/pages/admin/bookings/types";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { generateStrongPassword } from "@/lib/utils";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { countryCodes, CountryCode } from "@/lib/country-codes";
@@ -73,12 +72,14 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
     try {
       setIsVerifying(true);
       
-      // Format phone number with country code (without + sign)
-      const countryCodeWithoutPlus = selectedCountry.code.startsWith('+') 
-        ? selectedCountry.code.substring(1) 
-        : selectedCountry.code;
+      // Format phone number with country code
+      const formattedPhone = `${selectedCountry.code}${data.phone_number.replace(/\s+/g, '')}`;
       
-      const formattedPhone = `+${countryCodeWithoutPlus}${data.phone_number.replace(/\s+/g, '')}`;
+      console.log("Sending verification for:", {
+        phoneNumber: formattedPhone,
+        fullName: data.full_name,
+        lead_source: data.lead_source || null
+      });
       
       // Send WhatsApp OTP
       const response = await fetch(`${window.location.origin}/api/send-whatsapp-otp`, {
@@ -119,6 +120,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       
     } catch (error: any) {
       setIsVerifying(false);
+      console.error("Verification error:", error);
       toast.error("Failed to send verification: " + error.message);
     }
   };

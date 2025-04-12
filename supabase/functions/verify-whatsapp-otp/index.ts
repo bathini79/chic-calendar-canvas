@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
@@ -14,18 +15,40 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumber, code } = await req.json()
+    let data;
     
-    if (!phoneNumber || !code) {
-      throw new Error('Phone number and verification code are required')
+    // Check if this is a GET request from a verification link
+    const url = new URL(req.url);
+    const isUrlVerification = req.method === 'GET' && url.pathname === '/verify-whatsapp-otp';
+    
+    if (isUrlVerification) {
+      // Extract parameters from URL for link verification
+      const token = url.searchParams.get('token');
+      const code = url.searchParams.get('code');
+      const phone = url.searchParams.get('phone');
+      
+      if (!phone || (!token && !code)) {
+        throw new Error('Phone number and verification token or code are required');
+      }
+      
+      data = { phoneNumber: phone, code, token };
+    } else {
+      // Regular POST verification
+      data = await req.json();
+    }
+    
+    const { phoneNumber, code, token } = data;
+    
+    if (!phoneNumber || (!code && !token)) {
+      throw new Error('Phone number and verification code or token are required');
     }
       
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !supabaseServiceRoleKey) {
-      throw new Error('Supabase credentials not configured')
+      throw new Error('Supabase credentials not configured');
     }
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -33,7 +56,9 @@ serve(async (req) => {
         autoRefreshToken: false,
         persistSession: false
       }
-    })    
+    });    
+    
+    console.log("Verifying code for phone:", phoneNumber);
     
     // Step 1: Verify OTP from database
     const { data: otpData, error: otpError } = await supabaseAdmin
@@ -41,10 +66,10 @@ serve(async (req) => {
       .select('*')
       .eq('phone_number', phoneNumber)
       .eq('code', code)
-      .single()
+      .single();
       
     if (otpError || !otpData) {
-      console.error('OTP verification error:', otpError)
+      console.error('OTP verification error:', otpError || "No matching OTP found");
       return new Response(
         JSON.stringify({ 
           error: 'invalid_code',
@@ -58,11 +83,11 @@ serve(async (req) => {
     }
     
     // Check if OTP has expired
-    const expiresAt = new Date(otpData.expires_at)
-    const currentTime = new Date()
+    const expiresAt = new Date(otpData.expires_at);
+    const currentTime = new Date();
     
     if (currentTime > expiresAt) {
-      console.error('OTP expired')
+      console.error('OTP expired');
       return new Response(
         JSON.stringify({ 
           error: 'code_expired',
@@ -78,6 +103,8 @@ serve(async (req) => {
     // Extract fullName and lead_source from OTP data
     const fullName = otpData.full_name || '';
     const lead_source = otpData.lead_source || null;
+    
+    console.log("OTP validated for user:", fullName, "lead source:", lead_source);
     
     // Step 2: Check if user exists by phone number
     let existingUserQuery = supabaseAdmin
@@ -111,6 +138,8 @@ serve(async (req) => {
       }
       
       try {
+        console.log("Creating new user with phone:", phoneNumber);
+        
         // Create a unique email based on phone number
         const email = `${phoneNumber.replace(/[^0-9]/g, '')}@phone.user`
         // Generate a random password
@@ -178,6 +207,7 @@ serve(async (req) => {
               // Return success with existing user info
               return new Response(
                 JSON.stringify({
+                  success: true,
                   message: 'Login successful',
                   isNewUser: false,
                   userId: userId,
@@ -212,6 +242,8 @@ serve(async (req) => {
         }
         
         userId = newUser.user.id
+        
+        console.log("User created with ID:", userId);
         
         // Explicitly create profile in case the trigger doesn't work
         const { error: profileError } = await supabaseAdmin
@@ -249,6 +281,8 @@ serve(async (req) => {
           email: email,
           password: password
         }
+        
+        console.log("User registered successfully with credentials");
       } catch (error) {
         console.error('Unexpected error in user creation:', error);
         return new Response(
@@ -266,6 +300,8 @@ serve(async (req) => {
     } else {
       // Existing user - direct sign in
       userId = existingUser.id
+      
+      console.log("Existing user found with ID:", userId);
       
       // Get user from auth
       const { data: userData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId)
@@ -344,6 +380,8 @@ serve(async (req) => {
         email: email,
         password: tempPassword
       }
+      
+      console.log("Existing user login credentials generated");
     }
     
     // Delete used OTP
@@ -355,6 +393,7 @@ serve(async (req) => {
     // Return user data and credentials
     return new Response(
       JSON.stringify({ 
+        success: true,
         message: isNewUser ? 'Registration successful' : 'Login successful',
         isNewUser: isNewUser,
         userId: userId,

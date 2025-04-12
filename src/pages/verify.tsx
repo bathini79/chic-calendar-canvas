@@ -22,9 +22,11 @@ export default function VerificationPage() {
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState("");
+  const [autoVerifiedAttempted, setAutoVerifiedAttempted] = useState(false);
 
   useEffect(() => {
     if (phone) {
+      console.log("Phone from URL:", phone);
       // Try to find the country code in the phone number
       const countryCodeObj = parsePhoneCountryCode(phone);
       if (countryCodeObj) {
@@ -40,10 +42,11 @@ export default function VerificationPage() {
     }
     
     // Auto-verify if token or code and phone are provided in URL
-    if ((token || code) && phone) {
+    if ((token || code) && phone && !autoVerifiedAttempted) {
+      setAutoVerifiedAttempted(true);
       handleVerify();
     }
-  }, [token, code, phone]);
+  }, [token, code, phone, autoVerifiedAttempted]);
 
   
   const handleCountryChange = (country: {name: string, code: string, flag: string}) => {
@@ -70,6 +73,8 @@ export default function VerificationPage() {
         phoneNumber : 
         `${countryCode.code}${phoneNumber.replace(/\s+/g, '')}`;
       
+      console.log("Sending verification request for phone:", formattedPhone, "code:", verificationCode);
+      
       const { data, error } = await supabase.functions.invoke("verify-whatsapp-otp", {
         body: {
           code: verificationCode,
@@ -78,11 +83,35 @@ export default function VerificationPage() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Verification error from function:", error);
+        throw error;
+      }
+
+      console.log("Verification response:", data);
 
       if (data.success) {
         setVerified(true);
         toast.success("Your account has been verified successfully!");
+        
+        if (data.credentials) {
+          // Sign in the user with the credentials
+          try {
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+              email: data.credentials.email,
+              password: data.credentials.password,
+            });
+            
+            if (signInError) {
+              console.error("Auto sign-in error:", signInError);
+              toast.error("Verification succeeded, but automatic login failed. Please login manually.");
+            } else {
+              toast.success("You have been automatically logged in!");
+            }
+          } catch (signInErr) {
+            console.error("Sign-in error:", signInErr);
+          }
+        }
       } else {
         setError(data.message || "Verification failed. Please try again.");
       }
