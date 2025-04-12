@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { CustomerSearch } from "./CustomerSearch";
 import { Customer } from "@/pages/admin/bookings/types";
@@ -113,11 +114,12 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
 
       <CreateClientDialog
         open={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
+        onOpenChange={setIsCreateDialogOpen}
         onSuccess={(customer) => {
           setSelectedCustomer(customer);
           setShowCreateForm(false);
         }}
+        onClose={() => setIsCreateDialogOpen(false)}
       />
     </div>
   );

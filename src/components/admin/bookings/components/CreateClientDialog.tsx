@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   Dialog,
@@ -11,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { parsePhoneCountryCode } from "@/enums/CountryCode";
 
@@ -19,19 +20,23 @@ interface CreateClientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onClientCreated?: () => void;
+  onSuccess?: (customer: any) => void;
+  onClose?: () => void;
 }
 
 export function CreateClientDialog({
   open,
   onOpenChange,
-  onClientCreated
+  onClientCreated,
+  onSuccess,
+  onClose
 }: CreateClientDialogProps) {
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneCountryCode, setPhoneCountryCode] = useState({
-    name: "United States",
-    flag: "🇺🇸",
-    code: "+1",
+    name: "India",
+    flag: "🇮🇳",
+    code: "+91",
   });
   const [isOTPSent, setIsOTPSent] = useState(false);
   const [isSendingOTP, setIsSendingOTP] = useState(false);
@@ -82,7 +87,7 @@ export function CreateClientDialog({
   };
 
   const handleSubmit = async () => {
-    const phoneWithCode = phoneCountryCode.code + " " + phoneNumber;
+    const phoneWithCode = phoneCountryCode.code + phoneNumber;
 
     if (!fullName) {
       setError("Full name is required");
@@ -95,6 +100,14 @@ export function CreateClientDialog({
     }
 
     await handleSendOTP(phoneWithCode, fullName);
+  };
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -143,7 +156,7 @@ export function CreateClientDialog({
           )}
         </div>
         <DialogFooter>
-          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={isSendingOTP || isOTPSent}>
