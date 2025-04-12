@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +51,7 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
-import { LoyaltyPointsSection } from "./LoyaltyPointsSection";
+import LoyaltyPointsSection from "./LoyaltyPointsSection";
 import { useLoyaltyInCheckout } from "../hooks/useLoyaltyInCheckout";
 
 interface CheckoutSectionProps {
