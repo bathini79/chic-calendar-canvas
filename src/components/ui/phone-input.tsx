@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,13 +28,6 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
   ({ className, onChange, onCountryChange, selectedCountry, ...props }, ref) => {
     const [country, setCountry] = React.useState(selectedCountry || countryCodes[0]);
     const [open, setOpen] = React.useState(false);
-
-    // Update local state when selectedCountry prop changes
-    React.useEffect(() => {
-      if (selectedCountry) {
-        setCountry(selectedCountry);
-      }
-    }, [selectedCountry]);
 
     const handleCountrySelect = (selectedCountry: CountryCode) => {
       setCountry(selectedCountry);
@@ -72,6 +64,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
                 "flex gap-1 rounded-r-none border-r-0 px-3 text-sm",
                 "select-none min-w-[90px] justify-between"
               )}
+              disabled={true}
             >
               <span>{country.flag}</span>
               <span>{country.code}</span>
