@@ -14,10 +14,10 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumber, code, fullName, lead_source } = await req.json()
+    const { phoneNumber, code, token, fullName, lead_source } = await req.json();
     
-    if (!phoneNumber || !code) {
-      throw new Error('Phone number and verification code are required')
+    if ((!phoneNumber || (!code && !token))) {
+      throw new Error('Phone number and verification code/token are required')
     }
       
     // Initialize Supabase client
@@ -35,20 +35,27 @@ serve(async (req) => {
       }
     })    
     
-    // Step 1: Verify OTP from database
-    const { data: otpData, error: otpError } = await supabaseAdmin
+    // Step 1: Verify OTP or token from database
+    let verificationQuery = supabaseAdmin
       .from('phone_auth_codes')
       .select('*')
-      .eq('phone_number', phoneNumber)
-      .eq('code', code)
-      .single()
+      .eq('phone_number', phoneNumber);
+      
+    // If token is provided, verify by token, otherwise by code
+    if (token) {
+      verificationQuery = verificationQuery.eq('code', token);
+    } else if (code) {
+      verificationQuery = verificationQuery.eq('code', code);
+    }
+    
+    const { data: otpData, error: otpError } = await verificationQuery.single();
       
     if (otpError || !otpData) {
-      console.error('OTP verification error:', otpError)
+      console.error('Verification error:', otpError);
       return new Response(
         JSON.stringify({ 
-          error: 'invalid_code',
-          message: 'Invalid verification code'
+          error: 'invalid_verification',
+          message: 'Invalid verification code or token'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -57,16 +64,16 @@ serve(async (req) => {
       )
     }
     
-    // Check if OTP has expired
+    // Check if verification has expired
     const expiresAt = new Date(otpData.expires_at)
     const currentTime = new Date()
     
     if (currentTime > expiresAt) {
-      console.error('OTP expired')
+      console.error('Verification expired')
       return new Response(
         JSON.stringify({ 
-          error: 'code_expired',
-          message: 'Verification code has expired'
+          error: 'verification_expired',
+          message: 'Verification code or link has expired'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -75,7 +82,7 @@ serve(async (req) => {
       )
     }
     
-    // Step 2: Check if user exists by phone number (just the phone, no need to check profiles as the trigger will handle it)
+    // Step 2: Check if user exists by phone number
     const { data: existingUser, error: userError } = await supabaseAdmin.auth.admin.listUsers({
       phone: phoneNumber
     });
@@ -106,10 +113,10 @@ serve(async (req) => {
       try {
         // Create a unique email based on phone number - use normalized phone without the +
         const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber;
-        const email = `${normalizedPhone}@phone.user`
+        const email = `${normalizedPhone}@phone.user`;
         
         // Generate a random password
-        const password = crypto.randomUUID()
+        const password = crypto.randomUUID();
         
         // Create new user with phone number and metadata
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -124,10 +131,10 @@ serve(async (req) => {
             phone: phoneNumber,  // Add phone to metadata explicitly
             lead_source: lead_source
           }
-        })
+        });
         
         if (createError) {
-          console.error('Error creating user:', createError)
+          console.error('Error creating user:', createError);
           return new Response(
             JSON.stringify({ 
               error: "user_creation_failed",
@@ -138,16 +145,16 @@ serve(async (req) => {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200
             }
-          )
+          );
         }
         
-        userId = newUser.user.id
+        userId = newUser.user.id;
         
         // Return credentials for frontend to create session
         credentials = {
           email: email,
           password: password
-        }
+        };
       } catch (error) {
         console.error('Unexpected error in user creation:', error);
         return new Response(
@@ -160,18 +167,18 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
           }
-        )
+        );
       }
     } else {
       // Existing user - direct sign in
-      const user = existingUser.users[0]
-      userId = user.id
+      const user = existingUser.users[0];
+      userId = user.id;
       
       // Extract email from user data
-      const email = user.email
+      const email = user.email;
       
       // Generate a one-time password for this login
-      const tempPassword = crypto.randomUUID()
+      const tempPassword = crypto.randomUUID();
       
       // Update the user's metadata with lead_source if provided
       const updatedMetadata = {
@@ -190,10 +197,10 @@ serve(async (req) => {
           password: tempPassword,
           user_metadata: updatedMetadata
         }
-      )
+      );
       
       if (passwordUpdateError) {
-        console.error('Error updating user password:', passwordUpdateError)
+        console.error('Error updating user password:', passwordUpdateError);
         return new Response(
           JSON.stringify({ 
             error: "password_update_failed",
@@ -203,25 +210,26 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
           }
-        )
+        );
       }
       
       // Return credentials for frontend to create session
       credentials = {
         email: email,
         password: tempPassword
-      }
+      };
     }
     
-    // Delete used OTP
+    // Delete used verification code/token
     await supabaseAdmin
       .from('phone_auth_codes')
       .delete()
-      .eq('phone_number', phoneNumber)
+      .eq('phone_number', phoneNumber);
     
     // Return user data and credentials
     return new Response(
       JSON.stringify({ 
+        success: true,
         message: isNewUser ? 'Registration successful' : 'Login successful',
         isNewUser: isNewUser,
         userId: userId,
@@ -237,9 +245,9 @@ serve(async (req) => {
         },
         status: 200 
       }
-    )
+    );
   } catch (error) {
-    console.error('Error verifying OTP:', error)
+    console.error('Error verifying:', error);
     
     return new Response(
       JSON.stringify({ 
@@ -253,6 +261,6 @@ serve(async (req) => {
         },
         status: 200
       }
-    )
+    );
   }
-})
+});

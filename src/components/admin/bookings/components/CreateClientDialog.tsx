@@ -7,7 +7,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { adminSupabase, supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { Customer } from "@/pages/admin/bookings/types";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,7 +36,6 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
   onSuccess,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>({ 
     name: "India", 
     code: "+91", 
@@ -78,8 +77,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       }
 
       if (data?.success) {
-        toast.success("Verification code sent to WhatsApp");
-        setOtpSent(true);
+        toast.success("Verification link sent to WhatsApp");
         setIsSubmitting(false);
         return true;
       } else {
@@ -106,7 +104,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         return;
       }
 
-      toast.success("Verification sent to client's WhatsApp. User will be created after verification.");
+      toast.success("Verification link sent to client's WhatsApp. User will be created after verification.");
       form.reset();
       onClose();
     } catch (error: any) {
