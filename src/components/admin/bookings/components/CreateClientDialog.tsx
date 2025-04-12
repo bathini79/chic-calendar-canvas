@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -72,8 +71,8 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
     try {
       setIsVerifying(true);
       
-      // Format phone number with country code
-      const formattedPhone = `${selectedCountry.code}${data.phone_number.replace(/\s+/g, '')}`;
+      // Format phone number with country code but without + prefix
+      const formattedPhone = `${selectedCountry.code.substring(1)}${data.phone_number.replace(/\s+/g, '')}`;
       
       console.log("Sending verification for:", {
         phoneNumber: formattedPhone,
@@ -94,7 +93,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminSupabase.supabaseKey}`
+          'Authorization': `Bearer ${adminSupabase.auth.getSession().then(res => res.data.session?.access_token)}`
         },
         body: JSON.stringify({ 
           phoneNumber: formattedPhone,

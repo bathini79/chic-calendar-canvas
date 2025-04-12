@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
+
+import React from 'react';
 import {
   BrowserRouter,
   Routes,
   Route,
   Navigate,
-  useLocation,
 } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Auth from '@/pages/Auth';
@@ -26,10 +26,8 @@ import ProfileDetails from '@/pages/customer/ProfileDetails';
 import UserDetails from '@/pages/customer/UserDetails';
 import AdminLayout from '@/layouts/AdminLayout';
 import CustomerLayout from '@/layouts/CustomerLayout';
-import { useUser } from '@/hooks/useUser';
-import { useToast } from "@/components/ui/use-toast"
-import { Toast } from "@/components/ui/toast"
 import VerificationPage from '@/pages/verify';
+import CustomerVerification from '@/components/verification/CustomerVerification';
 
 const queryClient = new QueryClient();
 
@@ -40,6 +38,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Auth />} />
           <Route path="/verify" element={<VerificationPage />} />
+          <Route path="/customer-verify" element={<CustomerVerification />} />
           
           {/* Admin routes */}
           <Route path="/admin" element={<AdminLayout />}>

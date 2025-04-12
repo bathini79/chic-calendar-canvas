@@ -77,7 +77,9 @@ serve(async (req)=>{
     // Get base URL from request origin or use a default
     const requestUrl = new URL(req.url);
     const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
-    const verificationUrl = `${baseUrl}/verify?${verificationParams.toString()}`;
+    
+    // Use customer verification page for the link
+    const verificationUrl = `${baseUrl}/customer-verify?${verificationParams.toString()}`;
     
     // Create message with verification link
     const MESSAGE_TEXT = `Please verify your phone number by clicking this link: ${verificationUrl}\n\nOr use code: ${otp}\n\nThis code will expire in ${expiresInMinutes} minutes.`;
@@ -91,7 +93,10 @@ serve(async (req)=>{
       "Content-Type": "application/x-www-form-urlencoded",
       "apikey": GUPSHUP_API_KEY
     };
+    
+    // Ensure number is formatted correctly - don't add + prefix
     const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber;
+    
     const APP_NAME = config.app_name
     const formData = new URLSearchParams();
     formData.append("channel", "whatsapp");

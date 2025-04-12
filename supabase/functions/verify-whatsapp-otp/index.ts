@@ -19,7 +19,10 @@ serve(async (req) => {
     
     // Check if this is a GET request from a verification link
     const url = new URL(req.url);
-    const isUrlVerification = req.method === 'GET' && url.pathname === '/verify-whatsapp-otp';
+    const isUrlVerification = req.method === 'GET' && (
+      url.pathname === '/verify-whatsapp-otp' || 
+      url.pathname === '/customer-verify'
+    );
     
     if (isUrlVerification) {
       // Extract parameters from URL for link verification
@@ -60,11 +63,16 @@ serve(async (req) => {
     
     console.log("Verifying code for phone:", phoneNumber);
     
+    // Ensure the phone number format is consistent (without + prefix)
+    const normalizedPhone = phoneNumber.startsWith('+') 
+      ? phoneNumber.substring(1) 
+      : phoneNumber;
+    
     // Step 1: Verify OTP from database
     const { data: otpData, error: otpError } = await supabaseAdmin
       .from('phone_auth_codes')
       .select('*')
-      .eq('phone_number', phoneNumber)
+      .eq('phone_number', normalizedPhone)
       .eq('code', code)
       .single();
       
@@ -110,7 +118,7 @@ serve(async (req) => {
     let existingUserQuery = supabaseAdmin
       .from('profiles')
       .select('id')
-      .eq('phone_number', phoneNumber);
+      .eq('phone_number', normalizedPhone);
     
     const { data: existingUser, error: userError } = await existingUserQuery.maybeSingle();
     
@@ -138,15 +146,15 @@ serve(async (req) => {
       }
       
       try {
-        console.log("Creating new user with phone:", phoneNumber);
+        console.log("Creating new user with phone:", normalizedPhone);
         
         // Create a unique email based on phone number
-        const email = `${phoneNumber.replace(/[^0-9]/g, '')}@phone.user`
+        const email = `${normalizedPhone.replace(/[^0-9]/g, '')}@phone.user`
         // Generate a random password
         const password = crypto.randomUUID()
         // Create new user with phone as unique identifier
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          phone: phoneNumber,
+          phone: `+${normalizedPhone}`, // Add + for auth storage
           email: email,
           password: password,
           phone_confirm: true,
@@ -154,7 +162,7 @@ serve(async (req) => {
           user_metadata: { 
             full_name: fullName,
             phone_verified: true,
-            phone: phoneNumber,  // Add phone to metadata explicitly
+            phone: `+${normalizedPhone}`, // Add + for metadata
             lead_source: lead_source
           }
         })
@@ -166,7 +174,7 @@ serve(async (req) => {
           const { data: existingProfile } = await supabaseAdmin
             .from('profiles')
             .select('id')
-            .eq('phone_number', phoneNumber)
+            .eq('phone_number', normalizedPhone)
             .maybeSingle();
             
           if (existingProfile) {
@@ -187,7 +195,7 @@ serve(async (req) => {
                 password: tempPassword,
                 user_metadata: {
                   ...authUser.user.user_metadata,
-                  phone: phoneNumber,  // Ensure phone is in metadata
+                  phone: `+${normalizedPhone}`, // Add + for metadata
                   lead_source: lead_source
                 }
               });
@@ -202,7 +210,7 @@ serve(async (req) => {
               await supabaseAdmin
                 .from('phone_auth_codes')
                 .delete()
-                .eq('phone_number', phoneNumber);
+                .eq('phone_number', normalizedPhone);
                 
               // Return success with existing user info
               return new Response(
@@ -211,7 +219,7 @@ serve(async (req) => {
                   message: 'Login successful',
                   isNewUser: false,
                   userId: userId,
-                  phoneNumber: phoneNumber,
+                  phoneNumber: normalizedPhone,
                   credentials: credentials,
                   fullName: fullName,
                   lead_source: lead_source
@@ -250,7 +258,7 @@ serve(async (req) => {
           .from('profiles')
           .insert({
             id: userId,
-            phone_number: phoneNumber,
+            phone_number: normalizedPhone,
             phone_verified: true,
             full_name: fullName,
             lead_source: lead_source,
@@ -264,7 +272,7 @@ serve(async (req) => {
           const { error: updateError } = await supabaseAdmin
             .from('profiles')
             .update({
-              phone_number: phoneNumber,
+              phone_number: normalizedPhone,
               phone_verified: true,
               full_name: fullName,
               lead_source: lead_source
@@ -329,7 +337,7 @@ serve(async (req) => {
       // Update the user's metadata with lead_source if provided
       const updatedMetadata = {
         ...userData.user.user_metadata,
-        phone: phoneNumber,  // Ensure phone is in metadata
+        phone: `+${normalizedPhone}`, // Add + for metadata
       };
       
       // Only add lead_source if it exists and is not already set
@@ -361,7 +369,7 @@ serve(async (req) => {
       }
       
       // Also update profile phone number and lead_source if provided
-      const updateData: any = { phone_number: phoneNumber };
+      const updateData: any = { phone_number: normalizedPhone };
       if (lead_source) {
         updateData.lead_source = lead_source;
       }
@@ -388,7 +396,7 @@ serve(async (req) => {
     await supabaseAdmin
       .from('phone_auth_codes')
       .delete()
-      .eq('phone_number', phoneNumber)
+      .eq('phone_number', normalizedPhone)
     
     // Return user data and credentials
     return new Response(
@@ -397,7 +405,7 @@ serve(async (req) => {
         message: isNewUser ? 'Registration successful' : 'Login successful',
         isNewUser: isNewUser,
         userId: userId,
-        phoneNumber: phoneNumber,
+        phoneNumber: normalizedPhone,
         credentials: credentials,
         fullName: fullName,
         lead_source: lead_source
