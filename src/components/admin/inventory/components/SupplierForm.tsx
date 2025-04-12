@@ -1,14 +1,11 @@
-import { useEffect, useState } from "react";
+
 import { useForm } from "react-hook-form";
-import { zodResolver
- } from "@hookform/resolvers/zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { supplierSchema, type SupplierFormValues } from "../schemas/supplier-schema";
-import { ItemMultiSelect } from "./ItemMultiSelect";
 
 interface SupplierFormProps {
   defaultValues: SupplierFormValues;
@@ -17,8 +14,6 @@ interface SupplierFormProps {
 }
 
 export function SupplierForm({ defaultValues, supplierId, onSubmit }: SupplierFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-
   const form = useForm<SupplierFormValues>({
     resolver: zodResolver(supplierSchema),
     defaultValues,
@@ -69,22 +64,6 @@ export function SupplierForm({ defaultValues, supplierId, onSubmit }: SupplierFo
         <Textarea
           id="address"
           {...form.register("address")}
-        />
-      </div>
-      <div>
-        <label className="text-sm font-medium">Items</label>
-        <ItemMultiSelect
-          selectedItems={form.watch("items") || []}
-          onItemSelected={(itemId) => {
-            form.setValue("items", [...(form.watch("items") || []), itemId]);
-          }}
-          onItemRemoved={(itemId) => {
-            form.setValue(
-              "items",
-              (form.watch("items") || []).filter((id) => id !== itemId)
-            );
-          }}
-          isLoading={isLoading}
         />
       </div>
       <div className="flex justify-end pt-4">
