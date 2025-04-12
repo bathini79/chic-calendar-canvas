@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addDays, startOfToday, isSameDay, addMinutes, parseISO, isToday, isBefore } from "date-fns";
+import { format, addDays, startOfToday, isSameDay, addMinutes, isToday, isBefore } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -195,14 +195,19 @@ export function UnifiedCalendar({
   const calculateSequentialTimeSlots = (startTimeString: string) => {
     if (!selectedDate || sortedItems.length === 0) return {};
     
-    let currentStartTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${startTimeString}`);
+    // Create a full ISO date string to avoid potential date parsing issues
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const currentStartTime = new Date(`${dateStr}T${startTimeString}:00`);
+    
     const newTimeSlots: Record<string, string> = {};
     
     sortedItems.forEach((item) => {
       newTimeSlots[item.id] = format(currentStartTime, 'HH:mm');
       
       const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
-      currentStartTime = addMinutes(currentStartTime, itemDuration);
+      // Use a new Date object to avoid mutating the original
+      const nextTime = addMinutes(currentStartTime, itemDuration);
+      currentStartTime.setTime(nextTime.getTime());
     });
     
     return newTimeSlots;
