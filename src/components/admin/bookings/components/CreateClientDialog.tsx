@@ -81,11 +81,20 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         lead_source: data.lead_source || null
       });
       
+      // Get the current Supabase URL from the client
+      const { data: { origin } } = await adminSupabase.functions.invoke('get-app-url', {
+        method: 'GET',
+      });
+      
+      // Use the Supabase Functions URL for the API call
+      const functionUrl = `${origin}/functions/v1/send-whatsapp-otp`;
+      
       // Send WhatsApp OTP
-      const response = await fetch(`${window.location.origin}/api/send-whatsapp-otp`, {
+      const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminSupabase.supabaseKey}`
         },
         body: JSON.stringify({ 
           phoneNumber: formattedPhone,
@@ -94,9 +103,15 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         }),
       });
       
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Failed to send verification: ${response.status} ${response.statusText}`);
+      }
+      
       const result = await response.json();
       
-      if (!response.ok || result.error) {
+      if (result.error) {
         throw new Error(result.error || 'Failed to send verification message');
       }
       
