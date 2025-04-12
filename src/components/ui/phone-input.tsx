@@ -64,7 +64,6 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
                 "flex gap-1 rounded-r-none border-r-0 px-3 text-sm",
                 "select-none min-w-[90px] justify-between"
               )}
-              disabled={true}
             >
               <span>{country.flag}</span>
               <span>{country.code}</span>

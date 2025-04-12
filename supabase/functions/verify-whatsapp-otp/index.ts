@@ -75,20 +75,17 @@ serve(async (req) => {
       )
     }
     
-    // Step 2: Check if user exists by phone number
-    let existingUserQuery = supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('phone_number', phoneNumber);
-    
-    const { data: existingUser, error: userError } = await existingUserQuery.maybeSingle();
+    // Step 2: Check if user exists by phone number (just the phone, no need to check profiles as the trigger will handle it)
+    const { data: existingUser, error: userError } = await supabaseAdmin.auth.admin.listUsers({
+      phone: phoneNumber
+    });
     
     let userId = null
     let isNewUser = false
     let credentials = null
     
     // Step 3: Handle authentication based on whether user exists
-    if (userError || !existingUser) {
+    if (!existingUser || existingUser.users.length === 0) {
       // New user registration
       isNewUser = true
       
@@ -107,11 +104,14 @@ serve(async (req) => {
       }
       
       try {
-        // Create a unique email based on phone number
-        const email = `${phoneNumber.replace(/[^0-9]/g, '')}@phone.user`
+        // Create a unique email based on phone number - use normalized phone without the +
+        const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber;
+        const email = `${normalizedPhone}@phone.user`
+        
         // Generate a random password
         const password = crypto.randomUUID()
-        // Create new user with phone as unique identifier
+        
+        // Create new user with phone number and metadata
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
           phone: phoneNumber,
           email: email,
@@ -128,72 +128,6 @@ serve(async (req) => {
         
         if (createError) {
           console.error('Error creating user:', createError)
-          
-          // Check if profile entry exists despite auth error
-          const { data: existingProfile } = await supabaseAdmin
-            .from('profiles')
-            .select('id')
-            .eq('phone_number', phoneNumber)
-            .maybeSingle();
-            
-          if (existingProfile) {
-            userId = existingProfile.id;
-            
-            // Try to get auth user by ID to proceed with login
-            const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
-            
-            if (authUser && authUser.user) {              
-              // Get email from existing auth user
-              const email = authUser.user.email;
-              
-              // Generate a temporary password for this login
-              const tempPassword = crypto.randomUUID();
-              
-              // Update password to allow login
-              await supabaseAdmin.auth.admin.updateUserById(userId, { 
-                password: tempPassword,
-                user_metadata: {
-                  ...authUser.user.user_metadata,
-                  phone: phoneNumber,  // Ensure phone is in metadata
-                  lead_source: lead_source
-                }
-              });
-              
-              // Set credentials for frontend login
-              credentials = {
-                email: email,
-                password: tempPassword
-              };
-              
-              // Delete used OTP
-              await supabaseAdmin
-                .from('phone_auth_codes')
-                .delete()
-                .eq('phone_number', phoneNumber);
-                
-              // Return success with existing user info
-              return new Response(
-                JSON.stringify({
-                  message: 'Login successful',
-                  isNewUser: false,
-                  userId: userId,
-                  phoneNumber: phoneNumber,
-                  credentials: credentials,
-                  fullName: fullName,
-                  lead_source: lead_source
-                }),
-                { 
-                  headers: { 
-                    ...corsHeaders,
-                    'Content-Type': 'application/json' 
-                  },
-                  status: 200 
-                }
-              );
-            }
-          }
-          
-          // If we reach here, the error is real and we should return it
           return new Response(
             JSON.stringify({ 
               error: "user_creation_failed",
@@ -230,34 +164,18 @@ serve(async (req) => {
       }
     } else {
       // Existing user - direct sign in
-      userId = existingUser.id
-      
-      // Get user from auth
-      const { data: userData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId)
-      
-      if (authUserError) {
-        console.error('Error fetching user:', authUserError)
-        return new Response(
-          JSON.stringify({ 
-            error: "user_not_found",
-            message: "User exists in profiles but not in auth"
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200
-          }
-        )
-      }
+      const user = existingUser.users[0]
+      userId = user.id
       
       // Extract email from user data
-      const email = userData.user.email
+      const email = user.email
       
       // Generate a one-time password for this login
       const tempPassword = crypto.randomUUID()
       
       // Update the user's metadata with lead_source if provided
       const updatedMetadata = {
-        ...userData.user.user_metadata,
+        ...user.user_metadata,
         phone: phoneNumber,  // Ensure phone is in metadata
       };
       

@@ -46,22 +46,27 @@ serve(async (req)=>{
     const otp = generateOTP();
     const expiresInMinutes = 15;
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+    
     // Load GupShup configuration
     // Fetch Gupshup config from message_providers table
     const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin.from('messaging_providers').select('configuration').eq('provider_name', 'gupshup').single();
     if (providerConfigError || !providerConfigData?.configuration) {
       throw new Error('Gupshup config not found in message_providers');
     }
-     const { error: otpError } = await supabaseAdmin.from('phone_auth_codes').insert({
-        phone_number: phoneNumber,
-        code: otp,
-        expires_at: expiresAt.toISOString()
-      });
-      if (otpError) {
-        throw new Error(`Failed to store verification code: ${otpError.message}`);
-      }
+    
+    // Store the verification code
+    const { error: otpError } = await supabaseAdmin.from('phone_auth_codes').insert({
+      phone_number: phoneNumber,
+      code: otp,
+      expires_at: expiresAt.toISOString()
+    });
+    
+    if (otpError) {
+      throw new Error(`Failed to store verification code: ${otpError.message}`);
+    }
+    
     const config = providerConfigData.configuration;
-     const MESSAGE_TEXT =  `Your verification code is: ${otp}. This code will expire in ${expiresInMinutes} minutes.`;
+    const MESSAGE_TEXT =  `Your verification code is: ${otp}. This code will expire in ${expiresInMinutes} minutes.`;
     const GUPSHUP_API_KEY = config.api_key;
     const SOURCE_NUMBER = config.source_mobile.startsWith('+') ? config.source_mobile.slice(1) : config.source_mobile;
     const url = "https://api.gupshup.io/wa/api/v1/msg";
@@ -69,8 +74,11 @@ serve(async (req)=>{
       "Content-Type": "application/x-www-form-urlencoded",
       "apikey": GUPSHUP_API_KEY
     };
+    
+    // Remove any + symbols from the phone number for Gupshup
     const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber;
-    const APP_NAME = config.app_name
+    const APP_NAME = config.app_name;
+    
     const formData = new URLSearchParams();
     formData.append("channel", "whatsapp");
     formData.append("source", SOURCE_NUMBER);
@@ -80,15 +88,18 @@ serve(async (req)=>{
       text: MESSAGE_TEXT
     }));
     formData.append("src.name", APP_NAME);
+    
     const response = await fetch(url, {
       method: "POST",
       headers,
       body: formData.toString()
     });
+    
     const responseBody = await response.json();
     if (!response.ok) {
       throw new Error(`Gupshup API error: ${JSON.stringify(responseBody)}`);
     }
+    
     return new Response(JSON.stringify({
       success: true,
       response: responseBody,

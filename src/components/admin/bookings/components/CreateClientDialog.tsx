@@ -13,6 +13,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { LoaderCircle } from "lucide-react";
+import { CountryCode } from "@/lib/country-codes";
 
 const createClientSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
@@ -36,6 +37,11 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>({ 
+    name: "India", 
+    code: "+91", 
+    flag: "🇮🇳" 
+  });
 
   const form = useForm<CreateClientFormData>({
     resolver: zodResolver(createClientSchema),
@@ -50,9 +56,16 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
   const sendWhatsAppVerification = async (phoneNumber: string) => {
     try {
       setIsSubmitting(true);
+      
+      // Format the phone number correctly for the API
+      // Removing the + from the country code
+      const countryCodeWithoutPlus = selectedCountry.code.replace("+", "");
+      const formattedPhoneNumber = phoneNumber.replace(/\s/g, ""); // Remove spaces
+      const fullPhoneNumber = `+${countryCodeWithoutPlus}${formattedPhoneNumber}`;
+      
       const { data, error } = await supabase.functions.invoke('send-whatsapp-otp', {
         body: { 
-          phoneNumber,
+          phoneNumber: fullPhoneNumber,
           fullName: form.getValues("full_name"),
           lead_source: form.getValues("lead_source")
         }
@@ -85,13 +98,13 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
     try {
       setIsSubmitting(true);
 
-      // Format phone number to ensure it has international format with + prefix
-      const formattedPhone = data.phone_number.startsWith('+') 
-        ? data.phone_number 
-        : `+${data.phone_number.replace(/\D/g, '')}`;
+      // Format the phone number with country code but without the +
+      const countryCodeWithoutPlus = selectedCountry.code.replace("+", "");
+      const formattedPhoneNumber = data.phone_number.replace(/\s/g, ""); // Remove spaces
+      const fullPhoneNumber = `+${countryCodeWithoutPlus}${formattedPhoneNumber}`;
 
       // Send WhatsApp verification with full name and lead source
-      const verificationSent = await sendWhatsAppVerification(formattedPhone);
+      const verificationSent = await sendWhatsAppVerification(fullPhoneNumber);
       
       if (!verificationSent) {
         setIsSubmitting(false);
@@ -149,6 +162,8 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
                   <FormControl>
                     <PhoneInput 
                       placeholder="9876543210..." 
+                      selectedCountry={selectedCountry}
+                      onCountryChange={setSelectedCountry}
                       {...field}
                     />
                   </FormControl>
