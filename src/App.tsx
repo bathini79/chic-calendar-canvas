@@ -28,6 +28,9 @@ import AdminLayout from '@/layouts/AdminLayout';
 import CustomerLayout from '@/layouts/CustomerLayout';
 import VerificationPage from '@/pages/verify';
 import CustomerVerification from '@/components/verification/CustomerVerification';
+import BusinessSetup from './pages/admin/settings/BusinessSetup';
+import ThirdParty from './pages/admin/settings/ThirdParty';
+import Sales from './pages/admin/settings/Sales';
 
 const queryClient = new QueryClient();
 
@@ -49,6 +52,9 @@ function App() {
             <Route path="inventory" element={<Inventory />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="settings/business-setup" element={<BusinessSetup />} />
+        <Route path="settings/third-party" element={<ThirdParty />} />
+        <Route path="settings/sales" element={<Sales />} />
           </Route>
           
           {/* Customer routes */}
