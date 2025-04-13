@@ -15,6 +15,7 @@ import {
   X,
   Check,
   Award,
+  Coins
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -33,6 +34,7 @@ import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
 import confetti from "canvas-confetti";
 import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
+import { useLoyaltyPoints } from "@/hooks/use-loyalty-points";
 
 export default function BookingConfirmation() {
   const {
@@ -69,6 +71,77 @@ export default function BookingConfirmation() {
   const [activeMembership, setActiveMembership] = useState<any>(null);
   const [hasFetchedMemberships, setHasFetchedMemberships] = useState(false);
   const { sendNotification } = useAppointmentNotifications();
+  
+  const [customerId, setCustomerId] = useState<string | undefined>();
+  const [pointsToEarn, setPointsToEarn] = useState(0);
+  const { 
+    settings: loyaltySettings, 
+    customerPoints,
+    isLoading: loyaltyLoading,
+    fetchCustomerPoints,
+    getEligibleAmount,
+    calculatePointsFromAmount,
+    walletBalance
+  } = useLoyaltyPoints(customerId);
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        setCustomerId(session.user.id);
+      }
+    };
+    
+    getCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    if (!loyaltySettings?.enabled || !items || items.length === 0 || !customerId) {
+      setPointsToEarn(0);
+      return;
+    }
+
+    try {
+      const selectedServices = items
+        .filter(item => item.type === 'service' && item.service_id)
+        .map(item => item.service_id as string);
+      
+      const selectedPackages = items
+        .filter(item => item.type === 'package' && item.package_id)
+        .map(item => item.package_id as string);
+      
+      const subtotal = getTotalPrice();
+      const eligibleAmount = getEligibleAmount(
+        selectedServices,
+        selectedPackages,
+        items.filter(item => item.type === 'service').map(item => item.service),
+        items.filter(item => item.type === 'package').map(item => item.package),
+        subtotal
+      );
+      
+      const afterMembershipDiscount = eligibleAmount - 
+        (eligibleAmount / subtotal) * membershipDiscount;
+      
+      const afterCouponDiscount = afterMembershipDiscount - 
+        (afterMembershipDiscount / (subtotal - membershipDiscount)) * couponDiscount;
+      
+      const calculatedPoints = calculatePointsFromAmount(afterCouponDiscount);
+      setPointsToEarn(calculatedPoints);
+      
+    } catch (error) {
+      console.error("Error calculating points to earn:", error);
+      setPointsToEarn(0);
+    }
+  }, [
+    loyaltySettings, 
+    items, 
+    customerId, 
+    membershipDiscount, 
+    couponDiscount, 
+    getTotalPrice, 
+    getEligibleAmount, 
+    calculatePointsFromAmount
+  ]);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -119,7 +192,7 @@ export default function BookingConfirmation() {
     };
 
     loadMemberships();
-  }, [fetchCustomerMemberships, hasFetchedMemberships]); // Fetch only if memberships are not already loaded
+  }, [fetchCustomerMemberships, hasFetchedMemberships]);
 
   useEffect(() => {
     if (items && items.length > 0 && customerMemberships.length > 0) {
@@ -452,6 +525,7 @@ export default function BookingConfirmation() {
         return;
       }
       const endDateTime = addMinutes(startDateTime, totalDuration);
+      
       const { data: appointmentData, error: appointmentError } = await supabase
         .from("appointments")
         .insert({
@@ -471,7 +545,10 @@ export default function BookingConfirmation() {
           location: selectedLocation,
           membership_id: activeMembership?.id || null,
           membership_name: activeMembership?.name || null,
-          membership_discount: membershipDiscount || 0
+          membership_discount: membershipDiscount || 0,
+          points_earned: pointsToEarn,
+          points_redeemed: 0,
+          points_discount_amount: 0
         })
         .select();
 
@@ -905,6 +982,28 @@ export default function BookingConfirmation() {
                     </span>
                     <span>₹{taxAmount.toFixed(2)}</span>
                   </div>
+                )}
+
+                {loyaltySettings?.enabled && customerId && (
+                  <>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Coins className="h-4 w-4" />
+                        Current Points
+                      </span>
+                      <span className="font-medium">{walletBalance || 0}</span>
+                    </div>
+                    
+                    {pointsToEarn > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span className="flex items-center gap-1">
+                          <Coins className="h-4 w-4" />
+                          Points You'll Earn
+                        </span>
+                        <span>+{pointsToEarn}</span>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="flex justify-between text-base font-medium pt-1 border-t">

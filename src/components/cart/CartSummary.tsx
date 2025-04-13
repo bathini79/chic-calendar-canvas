@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Award } from "lucide-react";
+import { Award, Coins } from "lucide-react";
+import { useLoyaltyPoints } from "@/hooks/use-loyalty-points";
 
 export function CartSummary() {
   const { 
@@ -51,6 +52,29 @@ export function CartSummary() {
   const isSchedulingPage = location.pathname === '/schedule';
   const isServicesPage = location.pathname === '/services';
   const isBookingConfirmation = location.pathname === '/booking-confirmation';
+
+  // Customer ID and loyalty points
+  const [customerId, setCustomerId] = useState<string | undefined>();
+  const [pointsToEarn, setPointsToEarn] = useState(0);
+  
+  const { 
+    settings: loyaltySettings, 
+    walletBalance,
+    getEligibleAmount,
+    calculatePointsFromAmount
+  } = useLoyaltyPoints(customerId);
+  
+  // Get current user id
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        setCustomerId(session.user.id);
+      }
+    };
+    
+    getCurrentUser();
+  }, []);
   
   // Only show tax and coupons on booking-confirmation or other pages, not on services or schedule
   const shouldShowTaxAndCoupon = !isServicesPage && !isSchedulingPage;
@@ -67,6 +91,59 @@ export function CartSummary() {
   const locationSettingsLoadedRef = useRef(false);
   const membershipFetchedRef = useRef(false);
   const couponsFetchedRef = useRef(false);
+  
+  // Calculate points to earn
+  useEffect(() => {
+    if (!loyaltySettings?.enabled || !items || items.length === 0 || !customerId) {
+      setPointsToEarn(0);
+      return;
+    }
+
+    try {
+      // Get selected service and package IDs
+      const selectedServices = items
+        .filter(item => item.type === 'service' && item.service_id)
+        .map(item => item.service_id as string);
+      
+      const selectedPackages = items
+        .filter(item => item.type === 'package' && item.package_id)
+        .map(item => item.package_id as string);
+      
+      // Calculate eligible amount for points
+      const subtotal = getTotalPrice();
+      const eligibleAmount = getEligibleAmount(
+        selectedServices,
+        selectedPackages,
+        items.filter(item => item.type === 'service').map(item => item.service),
+        items.filter(item => item.type === 'package').map(item => item.package),
+        subtotal
+      );
+      
+      // Apply membership and coupon discounts to eligible amount
+      const afterMembershipDiscount = eligibleAmount - 
+        (eligibleAmount / subtotal) * membershipDiscount;
+      
+      const afterCouponDiscount = afterMembershipDiscount - 
+        (afterMembershipDiscount / (subtotal - membershipDiscount)) * couponDiscount;
+      
+      // Calculate points from the eligible discounted amount
+      const calculatedPoints = calculatePointsFromAmount(afterCouponDiscount);
+      setPointsToEarn(calculatedPoints);
+      
+    } catch (error) {
+      console.error("Error calculating points to earn:", error);
+      setPointsToEarn(0);
+    }
+  }, [
+    loyaltySettings, 
+    items, 
+    customerId, 
+    membershipDiscount, 
+    couponDiscount, 
+    getTotalPrice, 
+    getEligibleAmount, 
+    calculatePointsFromAmount
+  ]);
   
   // Fetch customer memberships when the component loads (if we're not in booking confirmation)
   const fetchMemberships = useCallback(async () => {
@@ -345,6 +422,29 @@ export function CartSummary() {
                   </span>
                   <span>-{formatPrice(membershipDiscount)}</span>
                 </div>
+              )}
+              
+              {/* Loyalty Points Section */}
+              {loyaltySettings?.enabled && customerId && (
+                <>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Coins className="h-4 w-4" />
+                      Current Points
+                    </span>
+                    <span className="font-medium">{walletBalance || 0}</span>
+                  </div>
+                  
+                  {pointsToEarn > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span className="flex items-center gap-1">
+                        <Coins className="h-4 w-4" />
+                        Points You'll Earn
+                      </span>
+                      <span>+{pointsToEarn}</span>
+                    </div>
+                  )}
+                </>
               )}
               
               {/* Reorganized layout for Tax and Coupon */}
