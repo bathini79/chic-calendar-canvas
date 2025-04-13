@@ -159,7 +159,7 @@ const Auth = () => {
     setResendCountdown(30);
     
     try {
-      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      const fullPhoneNumber = `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;
       
       const response = await supabase.functions.invoke('send-whatsapp-otp', {
         body: { phoneNumber: fullPhoneNumber },
