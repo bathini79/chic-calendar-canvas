@@ -405,7 +405,7 @@ export default function useSaveAppointment({
           if (customerFetchError) {
             console.error("Error fetching customer points:", customerFetchError);
             toast.error("Failed to fetch customer loyalty points");
-            return;
+            return createdAppointmentId;
           }
 
           console.log("Loyalty Points Transaction:", {
@@ -420,16 +420,14 @@ export default function useSaveAppointment({
           let newWalletBalance = currentWalletBalance;
           let newCashbackBalance = currentCashbackBalance;
 
-          // Redeem points from wallet
           if (pointsRedeemedFromParams > 0) {
-            newWalletBalance = Math.max(0, newWalletBalance - pointsRedeemedFromParams);
-            console.log(`Wallet Balance Deduction: ${currentWalletBalance} -> ${newWalletBalance}`);
+            newWalletBalance = Math.max(0, currentWalletBalance - pointsRedeemedFromParams);
+            console.log(`Wallet Balance Deduction: ${currentWalletBalance} -> ${newWalletBalance} (deducting ${pointsRedeemedFromParams} points)`);
           }
           
-          // Add points to cashback
           if (pointsEarnedFromParams > 0) {
-            newCashbackBalance += pointsEarnedFromParams;
-            console.log(`Cashback Balance Increment: ${currentCashbackBalance} -> ${newCashbackBalance}`);
+            newCashbackBalance = currentCashbackBalance + pointsEarnedFromParams;
+            console.log(`Cashback Balance Increment: ${currentCashbackBalance} -> ${newCashbackBalance} (adding ${pointsEarnedFromParams} points)`);
           }
           
           const { error: updateError } = await supabase
@@ -444,9 +442,17 @@ export default function useSaveAppointment({
             console.error("Error updating customer loyalty points:", updateError);
             toast.error("Failed to update loyalty points");
           } else {
-            console.log(`Loyalty Points Updated: 
+            console.log(`Loyalty Points Updated Successfully: 
               Wallet Balance: ${currentWalletBalance} -> ${newWalletBalance}
               Cashback Balance: ${currentCashbackBalance} -> ${newCashbackBalance}`);
+            
+            if (pointsRedeemedFromParams > 0) {
+              toast.success(`Redeemed ${pointsRedeemedFromParams} points from customer's wallet`);
+            }
+            
+            if (pointsEarnedFromParams > 0) {
+              toast.success(`Added ${pointsEarnedFromParams} points to customer's cashback balance`);
+            }
           }
         } catch (error) {
           console.error("Comprehensive loyalty points processing error:", error);
