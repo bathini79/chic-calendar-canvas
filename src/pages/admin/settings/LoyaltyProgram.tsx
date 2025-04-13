@@ -402,7 +402,7 @@ export default function LoyaltyProgram() {
                               <SelectValue placeholder="No limit" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">No limit</SelectItem>
+                              <SelectItem value="none">No limit</SelectItem>
                               <SelectItem value="fixed">Fixed Points</SelectItem>
                               <SelectItem value="percentage">Percentage of Subtotal</SelectItem>
                             </SelectContent>
