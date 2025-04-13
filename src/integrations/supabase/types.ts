@@ -1222,7 +1222,6 @@ export type Database = {
           max_redemption_type: string | null
           min_billing_amount: number | null
           min_redemption_points: number
-          point_value: number
           points_per_spend: number
           points_validity_days: number | null
           updated_at: string | null
@@ -1240,7 +1239,6 @@ export type Database = {
           max_redemption_type?: string | null
           min_billing_amount?: number | null
           min_redemption_points?: number
-          point_value?: number
           points_per_spend?: number
           points_validity_days?: number | null
           updated_at?: string | null
@@ -1258,7 +1256,6 @@ export type Database = {
           max_redemption_type?: string | null
           min_billing_amount?: number | null
           min_redemption_points?: number
-          point_value?: number
           points_per_spend?: number
           points_validity_days?: number | null
           updated_at?: string | null

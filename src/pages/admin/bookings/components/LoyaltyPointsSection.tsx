@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -39,15 +38,15 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
   maxRedemptionType,
   maxRedemptionValue
 }) => {
+  if (!isEnabled) {
+    return null;
+  }
+
   const handleSliderChange = (values: number[]) => {
     if (values.length > 0) {
       setPointsToRedeem(Math.floor(values[0]));
     }
   };
-
-  if (!isEnabled) {
-    return null;
-  }
 
   const canUsePoints = walletBalance >= minRedemptionPoints && maxPointsToRedeem > 0;
   

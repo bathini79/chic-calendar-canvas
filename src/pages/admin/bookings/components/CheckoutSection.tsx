@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -438,27 +437,21 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   );
 
   const taxAmount = useMemo(() => {
-    const afterAllDiscounts = Math.max(
-      0, 
-      discountedSubtotal - loyalty.pointsDiscountAmount
-    );
-
-    return appliedTaxId ? afterAllDiscounts * (appliedTaxRate / 100) : 0;
+    return appliedTaxId ? discountedSubtotal * (appliedTaxRate / 100) : 0;
   }, [
     discountedSubtotal,
     appliedTaxId,
     appliedTaxRate,
-    loyalty.pointsDiscountAmount
   ]);
 
   const total = useMemo(
-    () => Math.max(0, discountedSubtotal - loyalty.pointsDiscountAmount + taxAmount),
-    [discountedSubtotal, loyalty.pointsDiscountAmount, taxAmount]
+    () => Math.max(0, discountedSubtotal + taxAmount),
+    [discountedSubtotal, taxAmount]
   );
 
   const discountAmount = useMemo(
-    () => subtotal - discountedSubtotal + couponDiscount + membershipDiscount + loyalty.pointsDiscountAmount,
-    [subtotal, discountedSubtotal, couponDiscount, membershipDiscount, loyalty.pointsDiscountAmount]
+    () => subtotal - discountedSubtotal + couponDiscount + membershipDiscount,
+    [subtotal, discountedSubtotal, couponDiscount, membershipDiscount]
   );
 
   const adjustedPrices = useMemo(() => {
@@ -672,9 +665,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           availableCoupons?.filter((c) => c.id === selectedCouponId)?.[0]
             ?.code || null,
         paymentMethod,
-        pointsEarned: loyalty.pointsToEarn,
-        pointsRedeemed: loyalty.usePoints ? loyalty.pointsToRedeem : 0,
-        pointsDiscountAmount: loyalty.pointsDiscountAmount
+        pointsEarned: 0,
+        pointsRedeemed: 0,
+        pointsDiscountAmount: 0
       };
 
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
