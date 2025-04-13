@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
@@ -179,7 +178,6 @@ export function useLoyaltyPoints(customerId?: string) {
     return maxPoints;
   };
 
-  // New function to transfer points from cashback to wallet
   const transferPointsToWallet = async (pointsToTransfer: number): Promise<boolean> => {
     if (!customerId || !customerPoints) return false;
     
@@ -188,6 +186,12 @@ export function useLoyaltyPoints(customerId?: string) {
       
       if (pointsToTransfer > customerPoints.cashbackBalance) {
         toast.error(`Cannot transfer more than available cashback balance (${customerPoints.cashbackBalance} points)`);
+        return false;
+      }
+      
+      // Validate against loyalty program settings
+      if (settings?.min_redemption_points && pointsToTransfer < settings.min_redemption_points) {
+        toast.error(`Minimum transfer amount is ${settings.min_redemption_points} points`);
         return false;
       }
       
