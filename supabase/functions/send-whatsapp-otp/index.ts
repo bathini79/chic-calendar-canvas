@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0';
 const corsHeaders = {
@@ -25,7 +24,7 @@ serve(async (req)=>{
     });
   }
   try {
-    const { phoneNumber, fullName, lead_source, baseUrl } = await req.json();
+    const { phoneNumber, fullName, lead_source,baseUrl } = await req.json();
     if (!phoneNumber) {
       return new Response(JSON.stringify({
         error: "Missing phoneNumber parameter"
@@ -45,24 +44,12 @@ serve(async (req)=>{
     const otp = generateOTP();
     const expiresInMinutes = 15;
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
-    
-    // First check if user with this phone number already exists
-    const { data: existingUser, error: userLookupError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, full_name, wallet_balance, cashback_balance')
-      .eq('phone_number', phoneNumber)
-      .single();
-    
-    // If user exists, we'll return their info along with the verification
-    const userInfo = existingUser || null;
-    
     // Load GupShup configuration
     // Fetch Gupshup config from message_providers table
     const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin.from('messaging_providers').select('configuration').eq('provider_name', 'gupshup').single();
     if (providerConfigError || !providerConfigData?.configuration) {
       throw new Error('Gupshup config not found in message_providers');
     }
-    
     const { error: otpError } = await supabaseAdmin.from('phone_auth_codes').insert({
       phone_number: phoneNumber,
       code: otp,
@@ -118,8 +105,7 @@ serve(async (req)=>{
     console.log("Gupshup API success:", responseBody);
     return new Response(JSON.stringify({
       success: true,
-      response: responseBody,
-      userInfo: userInfo
+      response: responseBody
     }), {
       status: 200,
       headers: {

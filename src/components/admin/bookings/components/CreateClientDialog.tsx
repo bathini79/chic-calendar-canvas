@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Customer } from "@/pages/admin/bookings/types";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { LoaderCircle, Star } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { CountryCode } from "@/lib/country-codes";
 
 const createClientSchema = z.object({
@@ -42,7 +42,6 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
     code: "+91", 
     flag: "🇮🇳" 
   });
-  const [existingUserInfo, setExistingUserInfo] = useState<any>(null);
 
   const form = useForm<CreateClientFormData>({
     resolver: zodResolver(createClientSchema),
@@ -81,12 +80,6 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       }
 
       if (data?.success) {
-        // Store existing user info if returned
-        if (data.userInfo) {
-          setExistingUserInfo(data.userInfo);
-          toast.info(`User with this phone number already exists: ${data.userInfo.full_name}`);
-        }
-        
         toast.success("Verification code sent to WhatsApp");
         setOtpSent(true);
         setIsSubmitting(false);
@@ -112,24 +105,6 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       
       if (!verificationSent) {
         setIsSubmitting(false);
-        return;
-      }
-
-      // If we have existing user info, return that customer directly
-      if (existingUserInfo) {
-        const customer: Customer = {
-          id: existingUserInfo.id,
-          email: existingUserInfo.email || '',
-          phone_number: selectedCountry.code + data.phone_number,
-          full_name: existingUserInfo.full_name,
-          wallet_balance: existingUserInfo.wallet_balance || 0,
-          cashback_balance: existingUserInfo.cashback_balance || 0,
-          phone_verified: true
-        };
-        
-        onSuccess(customer);
-        form.reset();
-        onClose();
         return;
       }
 
@@ -236,23 +211,6 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
               )}
             />
 
-            {existingUserInfo && (
-              <div className="bg-blue-50 p-3 rounded-md flex items-start gap-2">
-                <div className="text-blue-700 text-sm">
-                  <p className="font-semibold">Existing Customer Found</p>
-                  <p>Name: {existingUserInfo.full_name}</p>
-                  {(existingUserInfo.wallet_balance > 0 || existingUserInfo.cashback_balance > 0) && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Star className="h-4 w-4 text-amber-500" />
-                      <span>
-                        Loyalty Points: {existingUserInfo.wallet_balance || 0}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             <div className="flex justify-end gap-4 pt-4">
               <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
                 Cancel
@@ -263,7 +221,9 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
                     <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
                     Sending...
                   </>
-                ) : existingUserInfo ? "Use Existing Client" : "Create Client"}
+                ) : (
+                  "Create Client"
+                )}
               </Button>
             </div>
           </form>
