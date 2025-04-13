@@ -17,11 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 const formSchema = z.object({
   enabled: z.boolean().default(false),
   points_per_spend: z.coerce.number().min(0, "Points per spend must be a positive number"),
-  point_value: z.coerce.number().min(0.01, "Point value must be at least 0.01"),
   min_redemption_points: z.coerce.number().min(0, "Minimum redemption must be a positive number"),
   min_billing_amount: z.coerce.number().nullable().optional(),
   points_validity_days: z.coerce.number().nullable().optional(),
-  cashback_validity_days: z.coerce.number().nullable().optional(),
   apply_to_all: z.boolean().default(true),
   applicable_services: z.array(z.string()).optional(),
   applicable_packages: z.array(z.string()).optional(),
@@ -44,14 +42,12 @@ export default function LoyaltyProgram() {
     defaultValues: {
       enabled: false,
       points_per_spend: 1,
-      point_value: 0.01,
       min_redemption_points: 100,
       min_billing_amount: null,
       apply_to_all: true,
       applicable_services: [],
       applicable_packages: [],
       points_validity_days: null,
-      cashback_validity_days: null,
       max_redemption_type: null,
       max_redemption_points: null,
       max_redemption_percentage: null,
@@ -68,14 +64,12 @@ export default function LoyaltyProgram() {
       form.reset({
         enabled: settings.enabled,
         points_per_spend: settings.points_per_spend,
-        point_value: settings.point_value,
         min_redemption_points: settings.min_redemption_points,
         min_billing_amount: settings.min_billing_amount,
         apply_to_all: settings.apply_to_all,
         applicable_services: settings.applicable_services || [],
         applicable_packages: settings.applicable_packages || [],
         points_validity_days: settings.points_validity_days,
-        cashback_validity_days: settings.cashback_validity_days,
         max_redemption_type: settings.max_redemption_type,
         max_redemption_points: settings.max_redemption_points,
         max_redemption_percentage: settings.max_redemption_percentage,
@@ -206,34 +200,7 @@ export default function LoyaltyProgram() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="point_value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Point Value
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="h-4 w-4 ml-1 inline cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="w-60">The monetary value of each point when redeemed.</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Example: Each point is worth $0.01
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              
 
                   <FormField
                     control={form.control}
@@ -339,42 +306,7 @@ export default function LoyaltyProgram() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="cashback_validity_days"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Cashback Validity (Days)
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="h-4 w-4 ml-1 inline cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="w-60">Number of days before cashback expires. Leave empty for no expiration.</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            placeholder="No expiration" 
-                            value={field.value !== null ? field.value : ''} 
-                            onChange={(e) => {
-                              const value = e.target.value === '' ? null : parseInt(e.target.value);
-                              field.onChange(value);
-                            }}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Example: Cashback expires after 30 days
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              
 
                   <FormField
                     control={form.control}
