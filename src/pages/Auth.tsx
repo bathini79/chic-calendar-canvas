@@ -159,10 +159,15 @@ const Auth = () => {
     setResendCountdown(30);
     
     try {
-      const fullPhoneNumber = `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;
+      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
       
-      const response = await supabase.functions.invoke('send-whatsapp-otp', {
-        body: { phoneNumber: fullPhoneNumber },
+      const response = await supabase.functions.invoke('customer-send-whatsapp-otp', {
+        body: { 
+          phoneNumber: fullPhoneNumber,
+          fullName: fullName || undefined,
+          lead_source: referralSource || undefined,
+          baseUrl: window.location.origin
+        },
       });
 
       if (response.error) {
@@ -207,8 +212,9 @@ const Auth = () => {
     setEdgeFunctionError(null);
     
     try {
-      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;      
-      const response = await supabase.functions.invoke('verify-whatsapp-otp', {
+      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      
+      const response = await supabase.functions.invoke('customer-verify-whatsapp-otp', {
         body: { 
           phoneNumber: fullPhoneNumber, 
           code: otp,
@@ -216,6 +222,7 @@ const Auth = () => {
           lead_source: referralSource || undefined
         },
       });
+      
       if (response.data && response.data.error) {
         if (response.data.error === "new_user_requires_name") {
           setNeedsFullName(true);
@@ -242,10 +249,8 @@ const Auth = () => {
         return;
       }
 
-      // If we have credentials in the response, sign in with them
       if (response.data && response.data.credentials) {        
         try {
-          // Sign in with the credentials
           const { data, error: signInError } = await supabase.auth.signInWithPassword({
             email: response.data.credentials.email,
             password: response.data.credentials.password,
@@ -263,29 +268,11 @@ const Auth = () => {
             setIsLoading(false);
             return;
           }
-                    
-          // // Update profile phone number directly as a fallback
-          // if (data.user) {
-          //   try {
-          //     const { error: profileError } = await supabase
-          //       .from('profiles')
-          //       .update({ phone_number: fullPhoneNumber })
-          //       .eq('id', data.user.id);
-                
-          //     if (profileError) {
-          //       console.error("Error updating profile phone:", profileError);
-          //     }
-          //   } catch (updateError) {
-          //     console.error("Profile update error:", updateError);
-          //   }
-          // }
           
-          // Session will be handled by the auth state change listener
           toast.success(response.data.isNewUser ? 
             "Registration successful! Welcome!" : 
             "Login successful!");
             
-          // Explicitly navigate after successful login
           if (data.session) {
             navigate("/services");
           }
