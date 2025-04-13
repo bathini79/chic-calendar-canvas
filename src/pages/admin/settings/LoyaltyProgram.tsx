@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Info, Star, Save } from "lucide-react";
+import { Info, Star, Save, Loader2 } from "lucide-react";
 import { useLoyaltyProgram, LoyaltyProgramFormValues } from "@/hooks/use-loyalty-program";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -38,7 +38,7 @@ export default function LoyaltyProgram() {
   const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
   const [showServicesSelector, setShowServicesSelector] = useState(false);
   const [showPackagesSelector, setShowPackagesSelector] = useState(false);
-
+  const [loading,setLoading] = useState(false);
   const form = useForm<LoyaltyProgramFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -104,6 +104,8 @@ export default function LoyaltyProgram() {
   };
   
   const onSubmit = async (values: LoyaltyProgramFormValues) => {
+    // Ensure we include the service and package selections
+    setLoading(true);
     const dataToSubmit = {
       ...values,
       applicable_services: values.apply_to_all ? [] : selectedServices,
@@ -111,6 +113,7 @@ export default function LoyaltyProgram() {
     };
     
     await updateSettings(dataToSubmit);
+    setLoading(false)
   };
   
   const handleServiceToggle = (serviceId: string) => {
@@ -593,8 +596,8 @@ export default function LoyaltyProgram() {
 
                 <div className="flex justify-end">
                   <Button type="submit" className="flex items-center">
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Settings
+                    {loading ? <Loader2/> : 
+                    <><Save className="mr-2 h-4 w-4" /><p>Save Settings</p></>}
                   </Button>
                 </div>
               </form>
