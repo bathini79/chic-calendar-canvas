@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,7 +43,7 @@ interface SaveAppointmentProps {
   pointsDiscountAmount?: number;
 }
 
-export function useSaveAppointment({
+export default function useSaveAppointment({
   selectedDate,
   selectedTime,
   selectedCustomer,
@@ -251,50 +250,6 @@ export function useSaveAppointment({
         isNewAppointment = true;
       }
 
-      // Calculate points discount distribution among services
-      let remainingPointsDiscount = pointsDiscountAmountFromParams;
-      const servicePrices: Record<string, number> = {};
-      const serviceDiscounts: Record<string, number> = {};
-      
-      // Get all services (including those in packages)
-      const allServiceIds = [...selectedServices];
-      for (const packageId of selectedPackages) {
-        const pkg = packages.find((p) => p.id === packageId);
-        if (!pkg) continue;
-        
-        const packageServiceIds = pkg.package_services?.map((ps: any) => ps.service.id) || [];
-        allServiceIds.push(...packageServiceIds);
-        
-        const customServiceIds = customizedServices[packageId] || [];
-        allServiceIds.push(...customServiceIds);
-      }
-      
-      // Calculate total services price for proportional distribution
-      let totalServicesPrice = 0;
-      for (const serviceId of allServiceIds) {
-        const service = services.find((s) => s.id === serviceId);
-        if (!service) continue;
-        const servicePrice = service.selling_price;
-        servicePrices[serviceId] = servicePrice;
-        totalServicesPrice += servicePrice;
-      }
-      
-      // Distribute points discount proportionally among services
-      if (totalServicesPrice > 0 && remainingPointsDiscount > 0) {
-        for (const serviceId of allServiceIds) {
-          if (!servicePrices[serviceId]) continue;
-          
-          const proportion = servicePrices[serviceId] / totalServicesPrice;
-          const serviceDiscount = Math.min(
-            remainingPointsDiscount,
-            proportion * pointsDiscountAmountFromParams
-          );
-          
-          serviceDiscounts[serviceId] = serviceDiscount;
-          remainingPointsDiscount -= serviceDiscount;
-        }
-      }
-
       for (const serviceId of selectedServices) {
         const service = services.find((s) => s.id === serviceId);
         if (!service) continue;
@@ -303,15 +258,11 @@ export function useSaveAppointment({
         const bookingStatus: AppointmentStatus =
           currentScreen === SCREEN.CHECKOUT ? "completed" : "booked";
 
-        // Apply the calculated points discount to this service
-        const serviceDiscount = serviceDiscounts[serviceId] || 0;
-        const adjustedPricePaid = Math.max(service.selling_price - serviceDiscount, 0);
-
         const pricePaid =
           summaryParams.adjustedPrices &&
           summaryParams.adjustedPrices[serviceId] !== undefined
             ? summaryParams.adjustedPrices[serviceId]
-            : adjustedPricePaid;
+            : service.selling_price;
 
         const bookingData = {
           appointment_id: createdAppointmentId,
@@ -349,16 +300,12 @@ export function useSaveAppointment({
           if (!packageService) continue;
 
           const packageServiceStartTime = new Date(startTime);
-          
-          // Apply the calculated points discount to this service
-          const serviceDiscount = serviceDiscounts[packageServiceId] || 0;
-          const adjustedPricePaid = 0; // Package services are usually 0
 
           const pricePaid =
             summaryParams.adjustedPrices &&
             summaryParams.adjustedPrices[packageServiceId] !== undefined
               ? summaryParams.adjustedPrices[packageServiceId]
-              : adjustedPricePaid;
+              : 0;
 
           const bookingData = {
             appointment_id: createdAppointmentId,
@@ -393,15 +340,11 @@ export function useSaveAppointment({
           const isInPackage = packageServiceIds.includes(customServiceId);
           if (isInPackage) continue;
 
-          // Apply the calculated points discount to this custom service
-          const serviceDiscount = serviceDiscounts[customServiceId] || 0;
-          const adjustedPricePaid = Math.max(customService.selling_price - serviceDiscount, 0);
-
           const pricePaid =
             summaryParams.adjustedPrices &&
             summaryParams.adjustedPrices[customServiceId] !== undefined
               ? summaryParams.adjustedPrices[customServiceId]
-              : adjustedPricePaid;
+              : customService.selling_price;
 
           const bookingData = {
             appointment_id: createdAppointmentId,
@@ -463,8 +406,7 @@ export function useSaveAppointment({
           
           const currentWalletBalance = typeof customerData.wallet_balance === 'number' ? customerData.wallet_balance : 0;
           
-          // Subtract redeemed points from wallet balance and add earned points
-          const newWalletBalance = currentWalletBalance - pointsRedeemedFromParams + pointsEarnedFromParams;
+          const newWalletBalance = currentWalletBalance + pointsEarnedFromParams;
           
           console.log(`Wallet Balance Update: ${currentWalletBalance} -> ${newWalletBalance}`);
           
@@ -507,5 +449,3 @@ export function useSaveAppointment({
 
   return { handleSaveAppointment, isLoading };
 }
-
-export default useSaveAppointment;

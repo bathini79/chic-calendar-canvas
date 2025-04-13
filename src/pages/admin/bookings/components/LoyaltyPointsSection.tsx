@@ -1,6 +1,7 @@
 
 import React, { useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { Award, Info, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
@@ -42,13 +43,14 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
     return null;
   }
 
-  // Automatically set points to redeem to max and turn on usePoints when component mounts
+  // Automatically set points to redeem to max when toggle is switched on
   useEffect(() => {
-    if (walletBalance >= minRedemptionPoints && maxPointsToRedeem > 0) {
-      setUsePoints(true);
+    if (usePoints && maxPointsToRedeem > 0) {
       setPointsToRedeem(maxPointsToRedeem);
+    } else {
+      setPointsToRedeem(0);
     }
-  }, [walletBalance, minRedemptionPoints, maxPointsToRedeem, setUsePoints, setPointsToRedeem]);
+  }, [usePoints, maxPointsToRedeem, setPointsToRedeem]);
 
   const canUsePoints = walletBalance >= minRedemptionPoints && maxPointsToRedeem > 0;
   
@@ -104,13 +106,17 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <span className="text-green-600 text-sm">Applying</span>
+              <Switch
+                checked={usePoints}
+                onCheckedChange={setUsePoints}
+                disabled={!canUsePoints}
+              />
             </div>
 
             {usePoints && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Points being redeemed</span>
+                  <span>Points to redeem</span>
                   <span>{maxPointsToRedeem} points (₹{pointsDiscountAmount.toFixed(2)})</span>
                 </div>
               </div>

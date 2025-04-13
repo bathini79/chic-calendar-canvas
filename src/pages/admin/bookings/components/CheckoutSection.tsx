@@ -53,39 +53,31 @@ import {
 import  LoyaltyPointsSection  from "./LoyaltyPointsSection";
 import { useLoyaltyInCheckout } from "../hooks/useLoyaltyInCheckout";
 
-interface AppointmentStatus {
-  status: string;
-  message: string;
-}
-
 interface CheckoutSectionProps {
-  appointmentId: string;
-  selectedCustomer: any;
+  appointmentId?: string;
+  selectedCustomer: Customer | null;
   selectedServices: string[];
   selectedPackages: string[];
-  services: any[];
-  packages: any[];
-  discountType: "percentage" | "fixed" | "none";
+  services: Service[];
+  packages: Package[];
+  discountType: "none" | "percentage" | "fixed";
   discountValue: number;
-  paymentMethod: string;
+  paymentMethod: "cash" | "online";
   notes: string;
-  onDiscountTypeChange: (type: "percentage" | "fixed" | "none") => void;
+  onDiscountTypeChange: (type: "none" | "percentage" | "fixed") => void;
   onDiscountValueChange: (value: number) => void;
-  onPaymentMethodChange: (method: string) => void;
+  onPaymentMethodChange: (method: "cash" | "online") => void;
   onNotesChange: (notes: string) => void;
   onPaymentComplete: (appointmentId?: string) => void;
   selectedStylists: Record<string, string>;
   selectedTimeSlots: Record<string, string>;
-  onSaveAppointment: (params?: any) => Promise<string | undefined>;
+  onSaveAppointment: (params?: any) => Promise<string | null>;
   onRemoveService: (serviceId: string) => void;
   onRemovePackage: (packageId: string) => void;
   onBackToServices: () => void;
-  customizedServices: Record<string, string[]>;
   isExistingAppointment?: boolean;
+  customizedServices?: Record<string, string[]>;
   locationId?: string;
-  onMarkAsNoShow?: () => void;
-  onMarkAsCompleted?: () => void;
-  appointmentStatus?: AppointmentStatus;
   loadingPayment?: boolean;
 }
 
@@ -111,12 +103,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onRemoveService,
   onRemovePackage,
   onBackToServices,
-  customizedServices,
   isExistingAppointment,
+  customizedServices = {},
   locationId,
-  onMarkAsNoShow,
-  onMarkAsCompleted,
-  appointmentStatus,
   loadingPayment = false,
 }) => {
   const { data: employees } = useQuery({
@@ -193,36 +182,48 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [couponDiscount, setCouponDiscount] = useState<number>(0);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
 
-  const selectedServiceObjects = selectedServices
-    .map((id) => services?.find((s) => s.id === id))
-    .filter(Boolean);
-
-  const selectedPackageObjects = selectedPackages
-    .map((id) => packages?.find((p) => p.id === id))
-    .filter(Boolean);
-
-  const subtotal = getTotalPrice(
-    selectedServices,
-    selectedPackages,
-    services || [],
-    packages || [],
-    customizedServices
+  const subtotal = useMemo(
+    () =>
+      getTotalPrice(
+        selectedServices,
+        selectedPackages,
+        services,
+        packages,
+        customizedServices
+      ),
+    [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
-  const afterDiscountedSubtotal = getFinalPrice(
+  const discountedSubtotal = useMemo(() => {
+    const regularDiscountedPrice = getFinalPrice(
+      subtotal,
+      discountType,
+      discountValue
+    );
+    const afterMembershipDiscount = Math.max(
+      0,
+      regularDiscountedPrice - membershipDiscount
+    );
+
+    return couponDiscount > 0
+      ? Math.max(0, afterMembershipDiscount - couponDiscount)
+      : afterMembershipDiscount;
+  }, [
     subtotal,
     discountType,
-    discountValue
-  );
+    discountValue,
+    membershipDiscount,
+    couponDiscount,
+  ]);
 
   const loyalty = useLoyaltyInCheckout({
     customerId: selectedCustomer?.id,
     selectedServices,
     selectedPackages,
-    services: services || [],
-    packages: packages || [],
+    services,
+    packages,
     subtotal,
-    discountedSubtotal: afterDiscountedSubtotal
+    discountedSubtotal
   });
 
   useEffect(() => {
@@ -428,35 +429,37 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       getTotalDuration(
         selectedServices,
         selectedPackages,
-        services || [],
-        packages || [],
+        services,
+        packages,
         customizedServices
       ),
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
   const taxAmount = useMemo(() => {
-    return appliedTaxId ? afterDiscountedSubtotal * (appliedTaxRate / 100) : 0;
+    return appliedTaxId ? discountedSubtotal * (appliedTaxRate / 100) : 0;
   }, [
-    afterDiscountedSubtotal,
+    discountedSubtotal,
     appliedTaxId,
     appliedTaxRate,
   ]);
 
-  const finalTotal = afterDiscountedSubtotal - loyalty.pointsDiscountAmount + taxAmount;
+  const total = useMemo(
+    () => Math.max(0, discountedSubtotal + taxAmount),
+    [discountedSubtotal, taxAmount]
+  );
 
   const discountAmount = useMemo(
-    () =>
-      subtotal - afterDiscountedSubtotal + couponDiscount + membershipDiscount,
-    [subtotal, afterDiscountedSubtotal, couponDiscount, membershipDiscount]
+    () => subtotal - discountedSubtotal + couponDiscount + membershipDiscount,
+    [subtotal, discountedSubtotal, couponDiscount, membershipDiscount]
   );
 
   const adjustedPrices = useMemo(() => {
     return getAdjustedServicePrices(
       selectedServices,
       selectedPackages,
-      services || [],
-      packages || [],
+      services,
+      packages,
       customizedServices,
       discountType,
       discountValue,
@@ -656,7 +659,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         membershipId,
         membershipName,
         membershipDiscount,
-        total: finalTotal,
+        total,
         adjustedPrices,
         couponName:
           availableCoupons?.filter((c) => c.id === selectedCouponId)?.[0]
@@ -676,35 +679,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       toast.success("Payment completed successfully");
       onPaymentComplete(savedAppointmentId);
     } catch (error: any) {
-      console.error("Error completing payment:", error);
-      toast.error(error.message || "Failed to complete payment");
-    }
-  };
-
-  const handleCheckout = async () => {
-    if (loadingPayment) return;
-    
-    try {
-      const params = {
-        appointmentId,
-        adjustedPrices: {},
-        total: finalTotal,
-        taxAmount,
-        appliedTaxId,
-        pointsEarned: pointsToEarn,
-        pointsRedeemed: usePoints ? pointsToRedeem : 0,
-        pointsDiscountAmount: usePoints ? pointsDiscountAmount : 0,
-      };
-
-      const savedAppointmentId = await onSaveAppointment(params);
-      if (!savedAppointmentId) {
-        toast.error("Failed to complete payment");
-        return;
-      }
-
-      toast.success("Payment completed successfully");
-      onPaymentComplete(savedAppointmentId);
-    } catch (error) {
       console.error("Error completing payment:", error);
       toast.error(error.message || "Failed to complete payment");
     }
@@ -1008,7 +982,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   pointValue={loyalty.pointValue}
                   maxRedemptionType={loyalty.maxRedemptionType}
                   maxRedemptionValue={loyalty.maxRedemptionValue}
-                  pointsExpiryDate={loyalty.pointsExpiryDate}
                 />
               </div>
             )}
@@ -1025,7 +998,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
 
             <div className="flex justify-between text-lg font-bold pt-2">
               <span>Total</span>
-              <span>₹{finalTotal.toFixed(2)}</span>
+              <span>₹{total.toFixed(2)}</span>
             </div>
           </div>
 
