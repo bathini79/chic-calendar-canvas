@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
 import { toast } from "sonner";
@@ -12,6 +13,7 @@ export function useLoyaltyPoints(customerId?: string) {
   const [settings, setSettings] = useState<LoyaltyProgramSettings | null>(null);
   const [customerPoints, setCustomerPoints] = useState<CustomerPoints | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const autoTransferInProgressRef = useRef(false);
 
   const fetchSettings = async () => {
     try {
@@ -58,8 +60,9 @@ export function useLoyaltyPoints(customerId?: string) {
       }
       
       if (data) {
-        const walletBalance = typeof data.wallet_balance === 'number' ? data.wallet_balance : 0;
-        const cashbackBalance = typeof data.cashback_balance === 'number' ? data.cashback_balance : 0;
+        // Force convert to number type to avoid string issues
+        const walletBalance = Number(data.wallet_balance) || 0;
+        const cashbackBalance = Number(data.cashback_balance) || 0;
         
         console.log('Fetched wallet balance:', walletBalance);
         console.log('Fetched cashback balance:', cashbackBalance);
@@ -69,9 +72,7 @@ export function useLoyaltyPoints(customerId?: string) {
           cashbackBalance
         });
 
-        if (cashbackBalance > 0) {
-          await autoTransferCashbackToWallet(cashbackBalance);
-        }
+        // Don't auto-transfer here to avoid looping, we'll do that in a separate effect
       }
     } catch (error) {
       console.error('Unexpected error fetching customer points:', error);
@@ -81,11 +82,13 @@ export function useLoyaltyPoints(customerId?: string) {
   };
 
   const autoTransferCashbackToWallet = async (cashbackAmount: number) => {
-    if (!customerId || cashbackAmount <= 0) return;
+    if (!customerId || cashbackAmount <= 0 || autoTransferInProgressRef.current) return;
     
     try {
+      autoTransferInProgressRef.current = true;
       console.log('Auto-transferring cashback to wallet:', cashbackAmount);
 
+      // Get fresh data from the database to ensure we have the most up-to-date values
       const { data, error: fetchError } = await supabase
         .from('profiles')
         .select('wallet_balance, cashback_balance')
@@ -97,8 +100,9 @@ export function useLoyaltyPoints(customerId?: string) {
         return;
       }
       
-      const currentWalletBalance = typeof data.wallet_balance === 'number' ? data.wallet_balance : 0;
-      const currentCashbackBalance = typeof data.cashback_balance === 'number' ? data.cashback_balance : 0;
+      // Again force convert to Number type
+      const currentWalletBalance = Number(data.wallet_balance) || 0;
+      const currentCashbackBalance = Number(data.cashback_balance) || 0;
       
       if (currentCashbackBalance <= 0) {
         console.log('No cashback balance to transfer');
@@ -106,6 +110,8 @@ export function useLoyaltyPoints(customerId?: string) {
       }
 
       const newWalletBalance = currentWalletBalance + currentCashbackBalance;
+      
+      // Update database with new values
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
@@ -119,6 +125,7 @@ export function useLoyaltyPoints(customerId?: string) {
         return;
       }
       
+      // Update local state
       setCustomerPoints({
         walletBalance: newWalletBalance,
         cashbackBalance: 0
@@ -127,6 +134,8 @@ export function useLoyaltyPoints(customerId?: string) {
       console.log('Successfully auto-transferred cashback to wallet. New wallet balance:', newWalletBalance);
     } catch (error) {
       console.error('Unexpected error during auto-transfer:', error);
+    } finally {
+      autoTransferInProgressRef.current = false;
     }
   };
 
@@ -141,6 +150,13 @@ export function useLoyaltyPoints(customerId?: string) {
       setCustomerPoints(null);
     }
   }, [customerId]);
+
+  // Separate effect for auto-transfer to avoid dependency cycles
+  useEffect(() => {
+    if (customerId && customerPoints && customerPoints.cashbackBalance > 0 && !autoTransferInProgressRef.current) {
+      autoTransferCashbackToWallet(customerPoints.cashbackBalance);
+    }
+  }, [customerId, customerPoints?.cashbackBalance]);
 
   const isEligibleItem = (itemId: string, type: 'service' | 'package') => {
     if (!settings) return false;
@@ -218,15 +234,28 @@ export function useLoyaltyPoints(customerId?: string) {
       return 0;
     }
     
+    // Start with wallet balance as the max redeemable points
     let maxPoints = customerPoints.walletBalance;
     
+    // Apply fixed maximum if configured
     if (settings.max_redemption_type === "fixed" && settings.max_redemption_points) {
       maxPoints = Math.min(maxPoints, settings.max_redemption_points);
-    } else if (settings.max_redemption_type === "percentage" && settings.max_redemption_percentage) {
+    } 
+    // Apply percentage maximum if configured
+    else if (settings.max_redemption_type === "percentage" && settings.max_redemption_percentage) {
       const maxAmount = subtotal * (settings.max_redemption_percentage / 100);
       const pointsEquivalent = Math.floor(maxAmount / settings.point_value);
       maxPoints = Math.min(maxPoints, pointsEquivalent);
     }
+    
+    // Ensure we don't exceed the minimum redemption points
+    if (maxPoints < settings.min_redemption_points) {
+      return 0; // Cannot redeem any points
+    }
+    
+    // Make sure we're not allowing more points than would cover the full amount
+    const maxPointsForAmount = Math.floor(subtotal / settings.point_value);
+    maxPoints = Math.min(maxPoints, maxPointsForAmount);
     
     return maxPoints;
   };
