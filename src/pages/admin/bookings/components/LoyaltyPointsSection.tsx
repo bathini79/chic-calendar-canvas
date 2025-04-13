@@ -1,9 +1,11 @@
+
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Award, Info } from "lucide-react";
+import { Award, Info, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { format } from "date-fns";
 
 interface LoyaltyPointsSectionProps {
   isEnabled: boolean;
@@ -20,6 +22,7 @@ interface LoyaltyPointsSectionProps {
   pointValue: number;
   maxRedemptionType: "fixed" | "percentage" | null;
   maxRedemptionValue: number | null;
+  pointsExpiryDate?: Date | null;
 }
 
 const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
@@ -36,7 +39,8 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
   pointsDiscountAmount,
   pointValue,
   maxRedemptionType,
-  maxRedemptionValue
+  maxRedemptionValue,
+  pointsExpiryDate
 }) => {
   if (!isEnabled) {
     return null;
@@ -59,9 +63,17 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
             <span className="font-medium">Loyalty Points</span>
           </div>
           {pointsToEarn > 0 && (
-            <span className="text-sm text-green-600">
-              Will earn {pointsToEarn} points
-            </span>
+            <div className="flex flex-col items-end">
+              <span className="text-sm text-green-600">
+                Will earn {pointsToEarn} points
+              </span>
+              {pointsExpiryDate && (
+                <div className="flex items-center text-xs text-muted-foreground mt-1">
+                  <Clock className="h-3 w-3 mr-1" />
+                  <span>Expires: {format(pointsExpiryDate, "MMM d, yyyy")}</span>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
