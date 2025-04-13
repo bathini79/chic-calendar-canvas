@@ -219,21 +219,9 @@ export default function useSaveAppointment({
         membership_name: summaryParams?.membershipName || membership_name,
         points_earned: pointsEarnedFromParams,
         points_redeemed: pointsRedeemedFromParams,
+        points_discount_amount: pointsDiscountAmountFromParams
       };
       
-      // Before inserting/updating, check if the column exists by making a small test query
-      const { error: schemaCheckError } = await supabase
-        .from("appointments")
-        .select("points_discount_amount")
-        .limit(1);
-        
-      // Only add points_discount_amount if the column exists in the schema
-      if (!schemaCheckError) {
-        appointmentData.points_discount_amount = pointsDiscountAmountFromParams;
-      } else {
-        console.log("points_discount_amount column doesn't exist in schema, skipping field");
-      }
-
       let createdAppointmentId;
       let isNewAppointment = false;
 
@@ -427,6 +415,11 @@ export default function useSaveAppointment({
           if (pointsEarnedFromParams > 0) {
             newCashbackBalance += pointsEarnedFromParams;
           }
+          
+          console.log("Updating customer points:", {
+            wallet_balance: newWalletBalance,
+            cashback_balance: newCashbackBalance
+          });
           
           const { error: updateError } = await supabase
             .from("profiles")

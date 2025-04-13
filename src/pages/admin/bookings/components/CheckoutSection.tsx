@@ -1,1119 +1,656 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+import { Label } from "@/components/ui/label";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
 } from "@/components/ui/select";
-import {
-  MoreVertical,
-  IndianRupee,
-  Percent,
-  Clock,
-  User,
-  Plus,
-  ArrowLeft,
-  Trash2,
-  Award,
-  LoaderCircle,
-} from "lucide-react";
-import { toast } from "sonner";
-import type { Service, Package, Customer } from "../types";
-import {
+import { Textarea } from "@/components/ui/textarea";
+import { 
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Card, CardContent } from "@/components/ui/card";
-import { format } from "date-fns";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
-  getTotalPrice,
-  getTotalDuration,
-  getFinalPrice,
-  getServicePriceInPackage,
-  calculatePackagePrice,
-  getAdjustedServicePrices,
-} from "../utils/bookingUtils";
-import { getMembershipDiscount } from "@/lib/utils";
+  CreditCard,
+  Banknote,
+  Globe,
+  Tag,
+  Star,
+  Sparkles
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useTaxRates } from "@/hooks/use-tax-rates";
-import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
-import { cwd } from "process";
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "@/components/ui/accordion";
-import  LoyaltyPointsSection  from "./LoyaltyPointsSection";
+import { Coupon } from "@/types/coupon";
+import { useCouponSelection } from "../hooks/useCouponSelection";
+import { 
+  DiscountType, 
+  Service, 
+  Package, 
+  Customer, 
+  PaymentMethod 
+} from "../types";
+import { formatPrice } from "@/lib/utils";
 import { useLoyaltyInCheckout } from "../hooks/useLoyaltyInCheckout";
 
 interface CheckoutSectionProps {
-  appointmentId?: string;
-  selectedCustomer: Customer | null;
   selectedServices: string[];
   selectedPackages: string[];
   services: Service[];
   packages: Package[];
-  discountType: "none" | "percentage" | "fixed";
+  discountType: DiscountType;
+  setDiscountType: (type: DiscountType) => void;
   discountValue: number;
-  paymentMethod: "cash" | "online";
+  setDiscountValue: (value: number) => void;
+  paymentMethod: PaymentMethod;
+  setPaymentMethod: (method: PaymentMethod) => void;
   notes: string;
-  onDiscountTypeChange: (type: "none" | "percentage" | "fixed") => void;
-  onDiscountValueChange: (value: number) => void;
-  onPaymentMethodChange: (method: "cash" | "online") => void;
-  onNotesChange: (notes: string) => void;
-  onPaymentComplete: (appointmentId?: string) => void;
-  selectedStylists: Record<string, string>;
-  selectedTimeSlots: Record<string, string>;
-  onSaveAppointment: (params?: any) => Promise<string | null>;
-  onRemoveService: (serviceId: string) => void;
-  onRemovePackage: (packageId: string) => void;
-  onBackToServices: () => void;
-  isExistingAppointment?: boolean;
-  customizedServices?: Record<string, string[]>;
-  locationId?: string;
+  setNotes: (notes: string) => void;
+  handleCheckout: () => void;
+  loadingCheckout: boolean;
+  selectedCustomer: Customer;
+  customizedServices: Record<string, string[]>;
+  appointmentId?: string;
   loadingPayment?: boolean;
+  existingAppointment?: any;
+  handleSaveAppointment?: () => void;
+  handlePaymentComplete?: () => void;
+  appliedTaxId?: string | null;
+  taxAmount?: number;
 }
 
-export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
-  appointmentId,
-  selectedCustomer,
+const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   selectedServices,
   selectedPackages,
   services,
   packages,
   discountType,
+  setDiscountType,
   discountValue,
+  setDiscountValue,
   paymentMethod,
+  setPaymentMethod,
   notes,
-  onDiscountTypeChange,
-  onDiscountValueChange,
-  onPaymentMethodChange,
-  onNotesChange,
-  onPaymentComplete,
-  selectedStylists,
-  selectedTimeSlots,
-  onSaveAppointment,
-  onRemoveService,
-  onRemovePackage,
-  onBackToServices,
-  isExistingAppointment,
-  customizedServices = {},
-  locationId,
-  loadingPayment = false,
+  setNotes,
+  handleCheckout,
+  loadingCheckout,
+  selectedCustomer,
+  customizedServices,
+  appointmentId,
+  loadingPayment,
+  existingAppointment,
+  handleSaveAppointment,
+  handlePaymentComplete,
+  appliedTaxId,
+  taxAmount = 0,
 }) => {
-  const { data: employees } = useQuery({
-    queryKey: ["employees"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("employment_type", "stylist");
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { taxRates, fetchTaxRates, isLoading: taxRatesLoading } = useTaxRates();
-  const { fetchLocationTaxSettings } = useLocationTaxSettings();
-  const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
-  const [appliedTaxRate, setAppliedTaxRate] = useState<number>(0);
-  const [appliedTaxName, setAppliedTaxName] = useState<string>("");
-
-  const [membershipDiscount, setMembershipDiscount] = useState<number>(0);
-  const [membershipId, setMembershipId] = useState<string | null>(null);
+  const [activeCouponId, setActiveCouponId] = useState<string | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponName, setCouponName] = useState<string | null>(null);
+  const [couponAmount, setCouponAmount] = useState<number | null>(null);
+  const [customerMemberships, setCustomerMemberships] = useState<any[]>([]);
+  const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null);
+  const [membershipDiscount, setMembershipDiscount] = useState(0);
   const [membershipName, setMembershipName] = useState<string | null>(null);
 
-  const { data: paymentMethods = [], isLoading: paymentMethodsLoading } =
-    useQuery({
-      queryKey: ["payment-methods"],
-      queryFn: async () => {
-        const { data, error } = await supabase
-          .from("payment_methods")
-          .select("*")
-          .eq("is_enabled", true)
-          .order("name");
-
-        if (error) throw error;
-        return data;
-      },
-    });
-
-  const { data: customerMemberships = [] } = useQuery({
+  // Get customer memberships
+  const { data: memberships = [] } = useQuery({
     queryKey: ["customer-memberships", selectedCustomer?.id],
     queryFn: async () => {
-      if (!selectedCustomer) return [];
-
+      if (!selectedCustomer?.id) return [];
+      
       const { data, error } = await supabase
         .from("customer_memberships")
-        .select(
-          `
+        .select(`
           id,
+          membership_id,
           status,
-          membership:memberships(
+          start_date,
+          end_date,
+          memberships:membership_id(
             id, 
-            name, 
-            discount_type, 
+            name,
+            description,
+            discount_type,
             discount_value,
-            applicable_services, 
+            max_discount_value,
+            min_billing_amount,
+            validity_period,
+            validity_unit,
+            applicable_services,
             applicable_packages
           )
-        `
-        )
+        `)
         .eq("customer_id", selectedCustomer.id)
-        .eq("status", "active");
-
-      if (error) throw error;
-      return data;
+        .eq("status", "active")
+        .gte("end_date", new Date().toISOString());
+      
+      if (error) {
+        console.error("Error fetching customer memberships:", error);
+        return [];
+      }
+      
+      return data || [];
     },
-    enabled: !!selectedCustomer,
+    enabled: !!selectedCustomer?.id
   });
 
-  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
-  const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
-  const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
-  const [couponDiscount, setCouponDiscount] = useState<number>(0);
-  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+  useEffect(() => {
+    if (memberships.length > 0) {
+      setCustomerMemberships(memberships);
+    } else {
+      setCustomerMemberships([]);
+      setSelectedMembershipId(null);
+      setMembershipDiscount(0);
+      setMembershipName(null);
+    }
+  }, [memberships]);
 
-  const subtotal = useMemo(
-    () =>
-      getTotalPrice(
+  // Get coupons
+  const { data: coupons = [] } = useQuery({
+    queryKey: ["coupons"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("is_active", true);
+      
+      if (error) {
+        console.error("Error fetching coupons:", error);
+        return [];
+      }
+      
+      return data || [];
+    }
+  });
+
+  const {
+    validateCouponForSelection,
+  } = useCouponSelection();
+
+  // Calculate subtotal
+  const calcSubtotal = () => {
+    let total = 0;
+    
+    // Sum up selected services
+    for (const serviceId of selectedServices) {
+      const service = services.find(s => s.id === serviceId);
+      if (service) {
+        total += service.selling_price;
+      }
+    }
+    
+    // Sum up selected packages
+    for (const packageId of selectedPackages) {
+      const pkg = packages.find(p => p.id === packageId);
+      if (pkg) {
+        total += pkg.price;
+        
+        // Add any customized services that aren't part of the package
+        const customServiceIds = customizedServices[packageId] || [];
+        for (const customServiceId of customServiceIds) {
+          const customService = services.find(s => s.id === customServiceId);
+          if (customService) {
+            const packageServices = pkg.package_services?.map(ps => ps.service_id);
+            const isPartOfPackage = packageServices?.includes(customServiceId);
+            
+            if (!isPartOfPackage) {
+              total += customService.selling_price;
+            }
+          }
+        }
+      }
+    }
+    
+    return total;
+  };
+
+  const subtotal = calcSubtotal();
+
+  // Calculate discount
+  const calculateDiscount = (discountType: DiscountType, value: number) => {
+    if (discountType === "percentage") {
+      return (subtotal * value) / 100;
+    } else if (discountType === "fixed") {
+      return value;
+    }
+    return 0;
+  };
+
+  const discount = calculateDiscount(discountType, discountValue);
+  const discountedSubtotal = Math.max(0, subtotal - discount);
+
+  // Apply membership discount
+  useEffect(() => {
+    if (!selectedMembershipId) {
+      setMembershipDiscount(0);
+      setMembershipName(null);
+      return;
+    }
+    
+    const selectedMembership = customerMemberships.find(m => m.membership_id === selectedMembershipId);
+    if (!selectedMembership) return;
+    
+    const membership = selectedMembership.memberships;
+    
+    // Check if membership applies to selected services/packages
+    const isApplicable = (): boolean => {
+      // If membership applies to all, no need to check further
+      if (membership.apply_to_all) return true;
+      
+      // Check if selected services are covered by the membership
+      const applicableServiceIds = membership.applicable_services || [];
+      const hasApplicableService = selectedServices.some(id => applicableServiceIds.includes(id));
+      
+      // Check if selected packages are covered by the membership
+      const applicablePackageIds = membership.applicable_packages || [];
+      const hasApplicablePackage = selectedPackages.some(id => applicablePackageIds.includes(id));
+      
+      return hasApplicableService || hasApplicablePackage;
+    };
+    
+    // Calculate the membership discount
+    if (isApplicable()) {
+      const minBillingAmount = membership.min_billing_amount || 0;
+      
+      if (subtotal >= minBillingAmount) {
+        let calculatedDiscount = 0;
+        
+        if (membership.discount_type === "percentage") {
+          calculatedDiscount = (discountedSubtotal * membership.discount_value) / 100;
+        } else if (membership.discount_type === "fixed") {
+          calculatedDiscount = membership.discount_value;
+        }
+        
+        // Apply max discount value if set
+        if (membership.max_discount_value && calculatedDiscount > membership.max_discount_value) {
+          calculatedDiscount = membership.max_discount_value;
+        }
+        
+        setMembershipDiscount(calculatedDiscount);
+        setMembershipName(membership.name);
+      } else {
+        setMembershipDiscount(0);
+        setMembershipName(null);
+      }
+    } else {
+      setMembershipDiscount(0);
+      setMembershipName(null);
+    }
+  }, [selectedMembershipId, customerMemberships, subtotal, discountedSubtotal, selectedServices, selectedPackages]);
+
+  // Apply coupon
+  const applyCoupon = async (couponId: string) => {
+    if (!couponId) {
+      setActiveCouponId(null);
+      setCouponDiscount(0);
+      setCouponName(null);
+      setCouponAmount(null);
+      return;
+    }
+    
+    try {
+      const selectedCoupon = coupons.find((c: Coupon) => c.id === couponId);
+      if (!selectedCoupon) return;
+      
+      const validation = await validateCouponForSelection(
+        selectedCoupon,
         selectedServices,
         selectedPackages,
         services,
         packages,
-        customizedServices
-      ),
-    [selectedServices, selectedPackages, services, packages, customizedServices]
-  );
+        discountedSubtotal
+      );
+      
+      if (validation.isValid) {
+        setActiveCouponId(couponId);
+        setCouponDiscount(validation.discountAmount);
+        setCouponName(selectedCoupon.code);
+        setCouponAmount(validation.discountAmount);
+      } else {
+        setActiveCouponId(null);
+        setCouponDiscount(0);
+        setCouponName(null);
+        setCouponAmount(null);
+        console.log("Coupon validation failed:", validation.message);
+      }
+    } catch (error) {
+      console.error("Error applying coupon:", error);
+    }
+  };
 
-  const discountedSubtotal = useMemo(() => {
-    const regularDiscountedPrice = getFinalPrice(
-      subtotal,
-      discountType,
-      discountValue
-    );
-    const afterMembershipDiscount = Math.max(
-      0,
-      regularDiscountedPrice - membershipDiscount
-    );
+  useEffect(() => {
+    // If coupon is applied, recalculate the discount when the subtotal changes
+    if (activeCouponId) {
+      applyCoupon(activeCouponId);
+    }
+  }, [discountedSubtotal]);
 
-    return couponDiscount > 0
-      ? Math.max(0, afterMembershipDiscount - couponDiscount)
-      : afterMembershipDiscount;
-  }, [
-    subtotal,
-    discountType,
-    discountValue,
-    membershipDiscount,
-    couponDiscount,
-  ]);
-
-  const loyalty = useLoyaltyInCheckout({
+  // Loyalty Points Integration
+  const {
+    isLoyaltyEnabled,
+    pointsToEarn,
+    customerPoints,
+    usePoints,
+    pointsToRedeem,
+    pointsDiscountAmount,
+    maxPointsToRedeem,
+    minRedemptionPoints,
+    pointValue,
+    setUsePoints,
+    setPointsToRedeem
+  } = useLoyaltyInCheckout({
     customerId: selectedCustomer?.id,
     selectedServices,
     selectedPackages,
     services,
     packages,
     subtotal,
-    discountedSubtotal
+    discountedSubtotal: discountedSubtotal - membershipDiscount - couponDiscount 
   });
 
-  useEffect(() => {
-    const loadTaxData = async () => {
-      await fetchTaxRates();
+  // Final total after all discounts
+  const total = Math.max(0, discountedSubtotal - membershipDiscount - couponDiscount - pointsDiscountAmount + taxAmount);
 
-      if (locationId) {
-        const settings = await fetchLocationTaxSettings(locationId);
-
-        if (settings && settings.service_tax_id) {
-          setAppliedTaxId(settings.service_tax_id);
-        }
-      }
-    };
-
-    loadTaxData();
-  }, [locationId]);
-
-  useEffect(() => {
-    if (appliedTaxId && taxRates.length > 0) {
-      const tax = taxRates.find((t) => t.id === appliedTaxId);
-      if (tax) {
-        setAppliedTaxRate(tax.percentage);
-        setAppliedTaxName(tax.name);
-      }
-    } else {
-      setAppliedTaxRate(0);
-      setAppliedTaxName("");
-    }
-  }, [appliedTaxId, taxRates]);
-
-  useEffect(() => {
-    const fetchCoupons = async () => {
-      setIsLoadingCoupons(true);
-      try {
-        const { data, error } = await supabase
-          .from("coupons")
-          .select("*")
-          .eq("is_active", true)
-          .order("code");
-
-        if (error) throw error;
-        setAvailableCoupons(data || []);
-      } catch (error) {
-        console.error("Error fetching coupons:", error);
-      } finally {
-        setIsLoadingCoupons(false);
-      }
-    };
-
-    fetchCoupons();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCouponId && availableCoupons.length > 0) {
-      const coupon = availableCoupons.find((c) => c.id === selectedCouponId);
-      if (coupon) {
-        setSelectedCoupon(coupon);
-
-        const discountAmount =
-          coupon.discount_type === "percentage"
-            ? subtotal * (coupon.discount_value / 100)
-            : Math.min(coupon.discount_value, subtotal);
-
-        setCouponDiscount(discountAmount);
-      }
-    } else {
-      setSelectedCoupon(null);
-      setCouponDiscount(0);
-    }
-  }, [selectedCouponId, availableCoupons, subtotal]);
-
-  useEffect(() => {
-    let bestDiscount = 0;
-    let bestMembershipId = null;
-    let bestMembershipName = null;
-
-    if (
-      customerMemberships.length > 0 &&
-      (selectedServices.length > 0 || selectedPackages.length > 0)
-    ) {
-      selectedServices.forEach((serviceId) => {
-        const service = services.find((s) => s.id === serviceId);
-        if (!service) return;
-
-        customerMemberships.forEach((membership) => {
-          const membershipData = membership.membership;
-          if (!membershipData) return;
-
-          const isServiceEligible =
-            membershipData.applicable_services?.includes(serviceId) ||
-            membershipData.applicable_services?.length === 0;
-
-          if (isServiceEligible) {
-            const discountAmount =
-              membershipData.discount_type === "percentage"
-                ? service.selling_price * (membershipData.discount_value / 100)
-                : Math.min(
-                    membershipData.discount_value,
-                    service.selling_price
-                  );
-
-            if (discountAmount > bestDiscount) {
-              bestDiscount = discountAmount;
-              bestMembershipId = membershipData.id;
-              bestMembershipName = membershipData.name;
-            }
-          }
-        });
-      });
-
-      selectedPackages.forEach((packageId) => {
-        const pkg = packages.find((p) => p.id === packageId);
-        if (!pkg) return;
-
-        const packagePrice = calculatePackagePrice(
-          pkg,
-          customizedServices[packageId] || [],
-          services
-        );
-
-        customerMemberships.forEach((membership) => {
-          const membershipData = membership.membership;
-          if (!membershipData) return;
-
-          const isPackageEligible =
-            membershipData.applicable_packages?.includes(packageId) ||
-            membershipData.applicable_packages?.length === 0;
-
-          if (isPackageEligible) {
-            const discountAmount =
-              membershipData.discount_type === "percentage"
-                ? packagePrice * (membershipData.discount_value / 100)
-                : Math.min(membershipData.discount_value, packagePrice);
-
-            if (discountAmount > bestDiscount) {
-              bestDiscount = discountAmount;
-              bestMembershipId = membershipData.id;
-              bestMembershipName = membershipData.name;
-            }
-          }
-        });
-      });
-    }
-
-    setMembershipDiscount(bestDiscount);
-    setMembershipId(bestMembershipId);
-    setMembershipName(bestMembershipName);
-  }, [
-    customerMemberships,
-    selectedServices,
-    selectedPackages,
-    services,
-    packages,
-    customizedServices,
-  ]);
-
-  const handleTaxChange = (taxId: string) => {
-    if (taxId === "none") {
-      setAppliedTaxId(null);
-      return;
-    }
-    setAppliedTaxId(taxId);
-  };
-
-  const handleCouponChange = (couponId: string) => {
-    if (couponId === "none") {
-      setSelectedCouponId(null);
-      return;
-    }
-    setSelectedCouponId(couponId);
-  };
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    if (hours > 0) {
-      return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ""}`;
-    }
-    return `${minutes}m`;
-  };
-
-  const formatTimeSlot = (timeString: string) => {
-    try {
-      const baseDate = new Date();
-      const [hours, minutes] = timeString.split(":").map(Number);
-      baseDate.setHours(hours, minutes);
-      return format(baseDate, "hh:mm a");
-    } catch (error) {
-      console.error("Error formatting time:", error);
-      return timeString;
+  const handleSave = () => {
+    if (handleSaveAppointment) {
+      handleSaveAppointment();
     }
   };
-
-  const getStylistName = (stylistId: string) => {
-    if (!employees || !stylistId) return null;
-    const stylist = employees.find((emp) => emp.id === stylistId);
-    return stylist ? stylist.name : null;
-  };
-
-  const totalDuration = useMemo(
-    () =>
-      getTotalDuration(
-        selectedServices,
-        selectedPackages,
-        services,
-        packages,
-        customizedServices
-      ),
-    [selectedServices, selectedPackages, services, packages, customizedServices]
-  );
-
-  const taxAmount = useMemo(() => {
-    const afterAllDiscounts = Math.max(
-      0, 
-      discountedSubtotal - loyalty.pointsDiscountAmount
-    );
-
-    return appliedTaxId ? afterAllDiscounts * (appliedTaxRate / 100) : 0;
-  }, [
-    discountedSubtotal,
-    appliedTaxId,
-    appliedTaxRate,
-    loyalty.pointsDiscountAmount
-  ]);
-
-  const total = useMemo(
-    () => Math.max(0, discountedSubtotal - loyalty.pointsDiscountAmount + taxAmount),
-    [discountedSubtotal, loyalty.pointsDiscountAmount, taxAmount]
-  );
-
-  const discountAmount = useMemo(
-    () => subtotal - discountedSubtotal + couponDiscount + membershipDiscount + loyalty.pointsDiscountAmount,
-    [subtotal, discountedSubtotal, couponDiscount, membershipDiscount, loyalty.pointsDiscountAmount]
-  );
-
-  const adjustedPrices = useMemo(() => {
-    return getAdjustedServicePrices(
-      selectedServices,
-      selectedPackages,
-      services,
-      packages,
-      customizedServices,
-      discountType,
-      discountValue,
-      membershipDiscount,
-      couponDiscount
-    );
-  }, [
-    selectedServices,
-    selectedPackages,
-    services,
-    packages,
-    customizedServices,
-    discountType,
-    discountValue,
-    membershipDiscount,
-    couponDiscount,
-  ]);
-
-  const getServiceDisplayPrice = (serviceId: string) => {
-    return adjustedPrices[serviceId] !== undefined
-      ? adjustedPrices[serviceId]
-      : services?.find((s) => s.id === serviceId)?.selling_price || 0;
-  };
-
-  const selectedItems = useMemo(() => {
-    const individualServices = selectedServices
-      .map((id) => {
-        const service = services.find((s) => s.id === id);
-        return service
-          ? {
-              id,
-              name: service.name,
-              price: service.selling_price,
-              adjustedPrice: getServiceDisplayPrice(id),
-              duration: service.duration,
-              type: "service" as const,
-              packageId: null as string | null,
-              stylist: selectedStylists[id],
-              stylistName: getStylistName(selectedStylists[id]),
-              time:
-                selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ""],
-              formattedDuration: formatDuration(service.duration),
-            }
-          : null;
-      })
-      .filter(Boolean);
-
-    const packageItems = selectedPackages.flatMap((packageId) => {
-      const pkg = packages.find((p) => p.id === packageId);
-      if (!pkg) return [];
-
-      const packageTotalPrice = calculatePackagePrice(
-        pkg,
-        customizedServices[packageId] || [],
-        services
-      );
-
-      const packageItem = {
-        id: packageId,
-        name: pkg.name,
-        price: packageTotalPrice,
-        duration: getTotalDuration(
-          [],
-          [packageId],
-          services,
-          packages,
-          customizedServices
-        ),
-        type: "package" as const,
-        packageId: null as string | null,
-        stylist: selectedStylists[packageId],
-        stylistName: getStylistName(selectedStylists[packageId]),
-        time:
-          selectedTimeSlots[packageId] ||
-          selectedTimeSlots[appointmentId || ""],
-        formattedDuration: formatDuration(
-          getTotalDuration(
-            [],
-            [packageId],
-            services,
-            packages,
-            customizedServices
-          )
-        ),
-        services: [] as Array<{
-          id: string;
-          name: string;
-          price: number;
-          adjustedPrice: number;
-          duration: number;
-          stylist: string | null;
-          stylistName: string | null;
-          isCustomized: boolean;
-        }>,
-      };
-
-      if (pkg.package_services) {
-        packageItem.services = pkg.package_services.map((ps) => {
-          const serviceId = ps.service.id;
-          const adjustedPrice = getServiceDisplayPrice(serviceId);
-          const originalPrice =
-            ps.package_selling_price !== undefined &&
-            ps.package_selling_price !== null
-              ? ps.package_selling_price
-              : ps.service.selling_price;
-
-          return {
-            id: serviceId,
-            name: ps.service.name,
-            price: originalPrice,
-            adjustedPrice: adjustedPrice,
-            duration: ps.service.duration,
-            stylist:
-              selectedStylists[serviceId] ||
-              selectedStylists[packageId] ||
-              null,
-            stylistName: getStylistName(
-              selectedStylists[serviceId] || selectedStylists[packageId] || ""
-            ),
-            isCustomized: false,
-          };
-        });
-      }
-
-      if (
-        customizedServices[packageId] &&
-        customizedServices[packageId].length > 0
-      ) {
-        const additionalServices = customizedServices[packageId]
-          .filter((serviceId) => {
-            return !pkg.package_services.some(
-              (ps) => ps.service.id === serviceId
-            );
-          })
-          .map((serviceId) => {
-            const service = services.find((s) => s.id === serviceId);
-            if (!service) return null;
-
-            return {
-              id: service.id,
-              name: service.name,
-              price: service.selling_price,
-              adjustedPrice: getServiceDisplayPrice(service.id),
-              duration: service.duration,
-              stylist:
-                selectedStylists[service.id] ||
-                selectedStylists[packageId] ||
-                null,
-              stylistName: getStylistName(
-                selectedStylists[service.id] ||
-                  selectedStylists[packageId] ||
-                  ""
-              ),
-              isCustomized: true,
-            };
-          })
-          .filter(Boolean);
-
-        packageItem.services.push(...additionalServices);
-      }
-
-      return [packageItem];
-    });
-
-    return [...individualServices, ...packageItems] as Array<any>;
-  }, [
-    selectedServices,
-    selectedPackages,
-    services,
-    packages,
-    selectedStylists,
-    selectedTimeSlots,
-    appointmentId,
-    customizedServices,
-    employees,
-    adjustedPrices,
-  ]);
-
-  const handlePayment = async () => {
-    try {
-      if (!selectedCustomer) {
-        toast.error("Please select a customer");
-        return;
-      }
-
-      if (!paymentMethod) {
-        toast.error("Please select a payment method");
-        return;
-      }
-
-      const saveAppointmentParams = {
-        appointmentId,
-        appliedTaxId,
-        taxAmount,
-        couponId: selectedCouponId,
-        couponDiscount,
-        membershipId,
-        membershipName,
-        membershipDiscount,
-        total,
-        adjustedPrices,
-        couponName:
-          availableCoupons?.filter((c) => c.id === selectedCouponId)?.[0]
-            ?.code || null,
-        paymentMethod,
-        pointsEarned: loyalty.pointsToEarn,
-        pointsRedeemed: loyalty.usePoints ? loyalty.pointsToRedeem : 0,
-        pointsDiscountAmount: loyalty.pointsDiscountAmount
-      };
-
-      const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
-      if (!savedAppointmentId) {
-        toast.error("Failed to complete payment");
-        return;
-      }
-
-      toast.success("Payment completed successfully");
-      onPaymentComplete(savedAppointmentId);
-    } catch (error: any) {
-      console.error("Error completing payment:", error);
-      toast.error(error.message || "Failed to complete payment");
-    }
-  };
-
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop =
-        scrollContainerRef.current.scrollHeight;
-    }
-  }, [selectedItems, subtotal, total]);
 
   return (
-    <div className="h-full w-full bg-gray-50">
-      <Card className="h-[calc(100vh-100px)] overflow-hidden">
-        <CardContent className="p-6 h-full flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Checkout Summary</h2>
+    <div className="space-y-6">
+      <h2 className="text-xl font-semibold mb-6">Payment Details</h2>
+      
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="payment-method">Payment Method</Label>
+          <div className="grid grid-cols-3 gap-2 mt-2">
             <Button
-              variant="outline"
-              onClick={onBackToServices}
-              className="flex items-center gap-2"
+              variant={paymentMethod === "cash" ? "default" : "outline"}
+              className={`flex items-center ${paymentMethod === "cash" ? "bg-green-600 hover:bg-green-700" : ""}`}
+              onClick={() => setPaymentMethod("cash")}
+              type="button"
             >
-              <Plus className="h-4 w-4" />
-              Add Service
+              <Banknote className="w-4 h-4 mr-2" />
+              Cash
+            </Button>
+            <Button
+              variant={paymentMethod === "card" ? "default" : "outline"}
+              className={`flex items-center ${paymentMethod === "card" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+              onClick={() => setPaymentMethod("card")}
+              type="button"
+            >
+              <CreditCard className="w-4 h-4 mr-2" />
+              Card
+            </Button>
+            <Button
+              variant={paymentMethod === "online" ? "default" : "outline"}
+              className={`flex items-center ${paymentMethod === "online" ? "bg-purple-600 hover:bg-purple-700" : ""}`}
+              onClick={() => setPaymentMethod("online")}
+              type="button"
+            >
+              <Globe className="w-4 h-4 mr-2" />
+              Online
             </Button>
           </div>
+        </div>
 
-          <div
-            ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto space-y-6 pr-2"
-          >
-            {selectedItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full space-y-4">
-                <p className="text-muted-foreground text-center">
-                  No services or packages selected
-                </p>
-                <Button
-                  variant="default"
-                  onClick={onBackToServices}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Go to Services
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {selectedItems.map(
-                  (item) =>
-                    item && (
-                      <div
-                        key={`${item.type}-${item.id}`}
-                        className="flex flex-col py-4 border-b border-gray-200"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="space-y-1">
-                            <p className="text-lg font-semibold tracking-tight">
-                              {item.name}
-                            </p>
-                            <div className="flex flex-wrap text-sm text-muted-foreground gap-2">
-                              <div className="flex items-center">
-                                <Clock className="mr-1 h-4 w-4" />
-                                {item.time && (
-                                  <span>
-                                    {item.time} • {item.formattedDuration}
-                                  </span>
-                                )}
-                                {!item.time && (
-                                  <span>{item.formattedDuration}</span>
-                                )}
-                              </div>
-                              {item.stylistName && (
-                                <div className="flex items-center">
-                                  <User className="mr-1 h-4 w-4" />
-                                  {item.stylistName}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center">
-                            {item.type === "package" && (
-                              <p className="font-semibold text-lg">
-                                <IndianRupee className="inline h-4 w-4" />
-                                {item.price}
-                              </p>
-                            )}
-                            {item.type === "service" && (
-                              <div className="flex justify-end">
-                                {item.price !== item.adjustedPrice && (
-                                  <p className="font-medium text-lg line-through text-muted-foreground mr-2">
-                                    <IndianRupee className="inline h-4 w-4" />
-                                    {item.price.toFixed(2)}
-                                  </p>
-                                )}
-                                <p
-                                  className={`font-semibold text-lg ${
-                                    item.price !== item.adjustedPrice
-                                      ? "text-green-600"
-                                      : ""
-                                  }`}
-                                >
-                                  <IndianRupee className="inline h-4 w-4" />
-                                  {item.adjustedPrice.toFixed(2)}
-                                </p>
-                              </div>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => {
-                                if (item.type === "service") {
-                                  onRemoveService(item.id);
-                                } else {
-                                  onRemovePackage(item.id);
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        {item.type === "package" &&
-                          item.services &&
-                          item.services.length > 0 && (
-                            <Accordion type="single" collapsible>
-                              <AccordionItem value="package-details">
-                                <AccordionTrigger className="text-sm font-medium text-muted-foreground hover:text-primary border-t border-gray-200 pt-2">
-                                  View Package Details
-                                </AccordionTrigger>
-                                <AccordionContent className="mt-2 space-y-4 bg-gray-50 rounded-md p-4 border border-gray-200">
-                                  {item.services.map((service) => (
-                                    <div
-                                      key={service.id}
-                                      className="py-2 border-b last:border-b-0 border-gray-200"
-                                    >
-                                      <div className="flex justify-between items-start">
-                                        <div>
-                                          <p className="text-sm font-medium">
-                                            {service.name}
-                                            {service.isCustomized && (
-                                              <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                                                Added
-                                              </span>
-                                            )}
-                                          </p>
-                                          <div className="flex flex-wrap text-xs text-muted-foreground gap-2">
-                                            <span>
-                                              {formatDuration(service.duration)}
-                                            </span>
-                                            {service.stylistName && (
-                                              <div className="flex items-center">
-                                                <User className="mr-1 h-3 w-3" />
-                                                {service.stylistName}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="text-sm flex flex-col items-end">
-                                          {service.price !==
-                                            service.adjustedPrice && (
-                                            <span className="text-xs line-through text-muted-foreground">
-                                              <IndianRupee className="inline h-3 w-3" />
-                                              {service.price.toFixed(2)}
-                                            </span>
-                                          )}
-                                          <span
-                                            className={
-                                              service.price !==
-                                              service.adjustedPrice
-                                                ? "text-green-600"
-                                                : ""
-                                            }
-                                          >
-                                            <IndianRupee className="inline h-3 w-3" />
-                                            {service.adjustedPrice.toFixed(2)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </AccordionContent>
-                              </AccordionItem>
-                            </Accordion>
-                          )}
-                      </div>
-                    )
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3 mt-auto">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span>₹{subtotal}</span>
-            </div>
-
-            <div className="flex justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Tax</span>
-                <Select
-                  value={appliedTaxId || "none"}
-                  onValueChange={handleTaxChange}
-                >
-                  <SelectTrigger className="h-7 w-[120px]">
-                    <SelectValue placeholder="No Tax" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Tax</SelectItem>
-                    {taxRates.map((tax) => (
-                      <SelectItem key={tax.id} value={tax.id}>
-                        {tax.name} ({tax.percentage}%)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <span>₹{taxAmount.toFixed(2)}</span>
-            </div>
-
-            <div className="flex justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Coupon</span>
-                <Select
-                  value={selectedCouponId || "none"}
-                  onValueChange={handleCouponChange}
-                  disabled={isLoadingCoupons}
-                >
-                  <SelectTrigger className="h-7 w-[120px]">
-                    <SelectValue placeholder="No Coupon" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Coupon</SelectItem>
-                    {availableCoupons.map((coupon) => (
-                      <SelectItem key={coupon.id} value={coupon.id}>
-                        {coupon.code}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <span>
-                {selectedCoupon ? `-₹${couponDiscount.toFixed(2)}` : "₹0.00"}
-              </span>
-            </div>
-
-            {selectedCoupon && (
-              <div className="flex justify-between text-xs text-green-600 -mt-2 ml-16">
-                <span>
-                  {selectedCoupon.discount_type === "percentage"
-                    ? `${selectedCoupon.discount_value}% off`
-                    : `Fixed ₹${selectedCoupon.discount_value} off`}
-                </span>
-              </div>
-            )}
-
-            {membershipDiscount > 0 && membershipName && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span className="flex items-center">
-                  <Award className="mr-2 h-4 w-4" />
-                  Membership ({membershipName})
-                </span>
-                <span>-₹{membershipDiscount.toFixed(2)}</span>
-              </div>
-            )}
-
+        <div className="space-y-2">
+          <Label htmlFor="discount-type">Discount</Label>
+          <div className="grid grid-cols-3 gap-2">
+            <Select 
+              value={discountType} 
+              onValueChange={(value: DiscountType) => setDiscountType(value)}
+            >
+              <SelectTrigger id="discount-type">
+                <SelectValue placeholder="Discount Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Discount</SelectItem>
+                <SelectItem value="percentage">Percentage (%)</SelectItem>
+                <SelectItem value="fixed">Fixed Amount</SelectItem>
+              </SelectContent>
+            </Select>
+            
             {discountType !== "none" && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span className="flex items-center">
-                  <Percent className="mr-2 h-4 w-4" />
-                  Discount
-                  {discountType === "percentage" && ` (${discountValue}%)`}
-                </span>
-                <span>
-                  -₹
-                  {(discountType === "percentage"
-                    ? subtotal * (discountValue / 100)
-                    : discountValue
-                  ).toFixed(2)}
-                </span>
-              </div>
-            )}
-
-            {selectedCustomer && (
-              <div className="mt-4">
-                <LoyaltyPointsSection
-                  isEnabled={loyalty.isLoyaltyEnabled}
-                  customerPoints={loyalty.customerPoints}
-                  pointsToEarn={loyalty.pointsToEarn}
-                  usePoints={loyalty.usePoints}
-                  setUsePoints={loyalty.setUsePoints}
-                  pointsToRedeem={loyalty.pointsToRedeem}
-                  setPointsToRedeem={loyalty.setPointsToRedeem}
-                  maxPointsToRedeem={loyalty.maxPointsToRedeem}
-                  minRedemptionPoints={loyalty.minRedemptionPoints}
-                  pointsDiscountAmount={loyalty.pointsDiscountAmount}
-                  pointValue={loyalty.pointValue}
-                  maxRedemptionType={loyalty.maxRedemptionType}
-                  maxRedemptionValue={loyalty.maxRedemptionValue}
-                />
-              </div>
-            )}
-
-            {loyalty.usePoints && loyalty.pointsDiscountAmount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span className="flex items-center">
-                  <Award className="mr-2 h-4 w-4" />
-                  Loyalty Points Discount
-                </span>
-                <span>-₹{loyalty.pointsDiscountAmount.toFixed(2)}</span>
-              </div>
-            )}
-
-            <div className="flex justify-between text-lg font-bold pt-2">
-              <span>Total</span>
-              <span>₹{total.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <div className="pt-6 space-y-4 mt-auto">
-            <div>
-              <h4 className="text-sm font-medium mb-2">Payment Method</h4>
-              <Select
-                value={paymentMethod}
-                onValueChange={onPaymentMethodChange}
-                defaultValue=""
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select payment method" />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentMethodsLoading ? (
-                    <SelectItem value="loading">Loading...</SelectItem>
-                  ) : paymentMethods.length > 0 ? (
-                    paymentMethods.map((method) => (
-                      <SelectItem key={method.id} value={method.name}>
-                        {method.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="online">Online</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                className="flex-1 flex items-center justify-center gap-2"
-                size="lg"
-                onClick={handlePayment}
-                disabled={selectedItems.length === 0 || loadingPayment}
-              >
-                {loadingPayment ? (
-                  <>
-                    <LoaderCircle
-                      className="animate-spin"
-                      size={16}
-                      strokeWidth={2}
-                      aria-hidden="true"
-                    />
-                    Processing...
-                  </>
-                ) : (
-                  "Complete Payment"
-                )}
-              </Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="lg">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80" align="end">
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Discount</h3>
-                    <div className="flex gap-4">
-                      <Select
-                        value={discountType}
-                        onValueChange={onDiscountTypeChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Discount type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No Discount</SelectItem>
-                          <SelectItem value="percentage">Percentage</SelectItem>
-                          <SelectItem value="fixed">Fixed Amount</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {discountType !== "none" && (
-                        <Input
-                          type="number"
-                          placeholder={
-                            discountType === "percentage"
-                              ? "Enter %"
-                              : "Enter amount"
-                          }
-                          value={discountValue}
-                          onChange={(e) =>
-                            onDiscountValueChange(Number(e.target.value))
-                          }
-                          className="w-24"
-                        />
-                      )}
-                    </div>
+              <div className="col-span-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                    >
+                      {discountType === "percentage" ? `${discountValue}%` : formatPrice(discountValue)}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">
                     <div className="space-y-2">
-                      <h3 className="font-semibold">Notes</h3>
-                      <Textarea
-                        placeholder="Add appointment notes..."
-                        value={notes}
-                        onChange={(e) => onNotesChange(e.target.value)}
-                        rows={3}
+                      <h4 className="font-medium">Adjust Discount</h4>
+                      <Slider
+                        value={[discountValue]}
+                        max={discountType === "percentage" ? 100 : subtotal}
+                        step={discountType === "percentage" ? 1 : 10}
+                        onValueChange={(values) => setDiscountValue(values[0])}
                       />
+                      <div className="flex justify-between">
+                        <span>0</span>
+                        <span>{discountType === "percentage" ? "100%" : formatPrice(subtotal)}</span>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {customerMemberships.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="membership">Apply Membership</Label>
+            <Select 
+              value={selectedMembershipId || ""} 
+              onValueChange={(value) => setSelectedMembershipId(value || null)}
+            >
+              <SelectTrigger id="membership">
+                <SelectValue placeholder="Select Membership" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No Membership</SelectItem>
+                {customerMemberships.map((membership) => (
+                  <SelectItem key={membership.membership_id} value={membership.membership_id}>
+                    {membership.memberships.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="coupon">Apply Coupon</Label>
+          <Select 
+            value={activeCouponId || ""} 
+            onValueChange={(value) => applyCoupon(value)}
+          >
+            <SelectTrigger id="coupon">
+              <SelectValue placeholder="Select Coupon" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No Coupon</SelectItem>
+              {coupons.map((coupon: Coupon) => (
+                <SelectItem key={coupon.id} value={coupon.id}>
+                  {coupon.code} - {coupon.discount_type === "percentage" ? `${coupon.discount_value}%` : formatPrice(coupon.discount_value)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {isLoyaltyEnabled && (
+          <div className="space-y-4 border p-4 rounded-md bg-amber-50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-amber-500" />
+                <Label className="text-sm font-medium">Loyalty Points</Label>
+              </div>
+              <div className="text-sm text-amber-700 font-medium">
+                Balance: {customerPoints} points
+              </div>
+            </div>
+            
+            {customerPoints >= minRedemptionPoints && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="use-points" className="text-sm">
+                    Use Points for this Purchase
+                  </Label>
+                  <Switch 
+                    id="use-points" 
+                    checked={usePoints}
+                    onCheckedChange={setUsePoints} 
+                  />
+                </div>
+                
+                {usePoints && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span>Points to redeem</span>
+                      <span>{pointsToRedeem} points ({formatPrice(pointsDiscountAmount)})</span>
+                    </div>
+                    <Slider
+                      value={[pointsToRedeem]}
+                      min={minRedemptionPoints}
+                      max={maxPointsToRedeem}
+                      step={minRedemptionPoints}
+                      onValueChange={(values) => setPointsToRedeem(values[0])}
+                      disabled={!usePoints}
+                    />
+                    <div className="flex justify-between text-xs">
+                      <span>{minRedemptionPoints}</span>
+                      <span>{maxPointsToRedeem}</span>
                     </div>
                   </div>
-                </PopoverContent>
-              </Popover>
+                )}
+              </div>
+            )}
+            
+            <div className="flex items-center gap-2 mt-2 bg-amber-100 p-2 rounded-md">
+              <Sparkles className="h-4 w-4 text-amber-500" />
+              <span className="text-xs">You'll earn <span className="font-bold">{pointsToEarn} points</span> from this purchase!</span>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="notes">Notes</Label>
+          <Textarea
+            id="notes"
+            placeholder="Add any special notes or requests"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+          />
+        </div>
+      </div>
+      
+      <Separator />
+      
+      <div className="space-y-3">
+        <div className="flex justify-between text-sm">
+          <span>Subtotal</span>
+          <span>{formatPrice(subtotal)}</span>
+        </div>
+        
+        {discountType !== "none" && discount > 0 && (
+          <div className="flex justify-between text-sm text-green-600">
+            <span>Discount ({discountType === "percentage" ? `${discountValue}%` : formatPrice(discountValue)})</span>
+            <span>-{formatPrice(discount)}</span>
+          </div>
+        )}
+        
+        {membershipDiscount > 0 && membershipName && (
+          <div className="flex justify-between text-sm text-green-600">
+            <span className="flex items-center gap-1">
+              <Tag className="h-3 w-3" />
+              {membershipName} Discount
+            </span>
+            <span>-{formatPrice(membershipDiscount)}</span>
+          </div>
+        )}
+        
+        {couponDiscount > 0 && couponName && (
+          <div className="flex justify-between text-sm text-green-600">
+            <span className="flex items-center gap-1">
+              <Tag className="h-3 w-3" />
+              Coupon: {couponName}
+            </span>
+            <span>-{formatPrice(couponDiscount)}</span>
+          </div>
+        )}
+        
+        {pointsDiscountAmount > 0 && (
+          <div className="flex justify-between text-sm text-green-600">
+            <span className="flex items-center gap-1">
+              <Star className="h-3 w-3 text-amber-500" />
+              Loyalty Points Discount
+            </span>
+            <span>-{formatPrice(pointsDiscountAmount)}</span>
+          </div>
+        )}
+        
+        {taxAmount > 0 && (
+          <div className="flex justify-between text-sm">
+            <span>Tax</span>
+            <span>{formatPrice(taxAmount)}</span>
+          </div>
+        )}
+        
+        <div className="flex justify-between font-bold pt-2 border-t">
+          <span>Total</span>
+          <span>{formatPrice(total)}</span>
+        </div>
+        
+        {isLoyaltyEnabled && pointsToEarn > 0 && (
+          <div className="flex justify-between text-xs text-amber-600 bg-amber-50 p-2 rounded">
+            <span className="flex items-center gap-1">
+              <Star className="h-3 w-3" />
+              Points to Earn
+            </span>
+            <span>+{pointsToEarn}</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="space-y-2 pt-4">
+        {handleSaveAppointment && (
+          <Button
+            className="w-full"
+            variant="outline"
+            onClick={handleSave}
+            disabled={loadingCheckout || loadingPayment}
+          >
+            Save Appointment
+          </Button>
+        )}
+        
+        <Button
+          className="w-full h-12"
+          onClick={handleCheckout}
+          disabled={loadingCheckout || loadingPayment || total <= 0}
+        >
+          {loadingCheckout || loadingPayment ? "Processing..." : "Complete Payment"}
+        </Button>
+      </div>
     </div>
   );
 };
+
+export default CheckoutSection;
