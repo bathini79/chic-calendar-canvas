@@ -16,7 +16,8 @@ interface UseLoyaltyInCheckoutProps {
 interface UseLoyaltyInCheckoutResult {
   isLoyaltyEnabled: boolean;
   pointsToEarn: number;
-  customerPoints: number;
+  walletBalance: number;
+  cashbackBalance: number;
   usePoints: boolean;
   pointsToRedeem: number;
   pointsDiscountAmount: number;
@@ -41,7 +42,7 @@ export function useLoyaltyInCheckout({
   const {
     settings,
     isEligibleForPoints,
-    customerPoints: availablePoints,
+    customerPoints,
     getEligibleAmount,
     calculatePointsFromAmount,
     calculateAmountFromPoints,
@@ -83,31 +84,32 @@ export function useLoyaltyInCheckout({
   
   // When loyalty settings or available points change, reset the points to redeem
   useEffect(() => {
-    if (settings && availablePoints !== null) {
-      console.log('Settings or points changed, recalculating. Available points:', availablePoints);
+    if (settings && customerPoints) {
+      console.log('Settings or points changed, recalculating. Available points:', customerPoints);
       // If user has enough points, default to minimum redemption points or zero
-      if (hasMinimumForRedemption(availablePoints)) {
-        setPointsToRedeem(Math.min(settings.min_redemption_points, availablePoints));
+      if (hasMinimumForRedemption(customerPoints)) {
+        setPointsToRedeem(Math.min(settings.min_redemption_points, customerPoints.walletBalance));
       } else {
         setUsePoints(false);
         setPointsToRedeem(0);
       }
     }
-  }, [settings, availablePoints, hasMinimumForRedemption]);
+  }, [settings, customerPoints, hasMinimumForRedemption]);
   
   // When usePoints changes, reset or set pointsToRedeem
   useEffect(() => {
     if (!usePoints) {
       setPointsToRedeem(0);
-    } else if (settings && availablePoints !== null && hasMinimumForRedemption(availablePoints)) {
-      setPointsToRedeem(Math.min(settings.min_redemption_points, availablePoints));
+    } else if (settings && customerPoints && hasMinimumForRedemption(customerPoints)) {
+      setPointsToRedeem(Math.min(settings.min_redemption_points, customerPoints.walletBalance));
     }
-  }, [usePoints, settings, availablePoints, hasMinimumForRedemption]);
+  }, [usePoints, settings, customerPoints, hasMinimumForRedemption]);
   
   return {
     isLoyaltyEnabled: Boolean(settings?.enabled),
     pointsToEarn,
-    customerPoints: availablePoints || 0,
+    walletBalance: customerPoints?.walletBalance || 0,
+    cashbackBalance: customerPoints?.cashbackBalance || 0,
     usePoints,
     pointsToRedeem,
     pointsDiscountAmount,
