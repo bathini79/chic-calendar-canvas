@@ -26,7 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Referral source options
 const referralSources = [
   { value: "google", label: "Google Search" },
   { value: "facebook", label: "Facebook" },
@@ -102,7 +101,6 @@ const Auth = () => {
   }, [otpSent, resendCountdown]);
 
   useEffect(() => {
-    // Set referral source from URL parameter if available
     if (referralSourceParam && referralSources.some(source => source.value === referralSourceParam)) {
       setReferralSource(referralSourceParam);
     }
@@ -133,7 +131,7 @@ const Auth = () => {
     } catch (error: any) {
       const errorMessage = error.message || "An unexpected error occurred. Please try again.";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       console.error("Authentication error:", error);
     } finally {
       setIsLoading(false);
@@ -148,7 +146,7 @@ const Auth = () => {
     if (!phoneNumber || phoneNumber.length < 10) {
       const errorMessage = "Please enter a valid phone number";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       return;
     }
 
@@ -161,7 +159,7 @@ const Auth = () => {
     try {
       const fullPhoneNumber = `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;
       
-      const response = await supabase.functions.invoke('send-whatsapp-otp', {
+      const response = await supabase.functions.invoke('customer-send-whatsapp-otp', {
         body: { phoneNumber: fullPhoneNumber },
       });
 
@@ -179,7 +177,7 @@ const Auth = () => {
     } catch (error: any) {
       const errorMessage = error.message || "Failed to send OTP. Please try again.";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       setEdgeFunctionError(errorMessage);
       console.error("OTP send error:", error);
     } finally {
@@ -191,14 +189,14 @@ const Auth = () => {
     if (!otp || otp.length !== 6) {
       const errorMessage = "Please enter a valid 6-digit OTP";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       return;
     }
 
     if (needsFullName && !fullName.trim()) {
       const errorMessage = "Full name is required for new registrations";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       return;
     }
 
@@ -207,8 +205,8 @@ const Auth = () => {
     setEdgeFunctionError(null);
     
     try {
-      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;      
-      const response = await supabase.functions.invoke('verify-whatsapp-otp', {
+      const fullPhoneNumber = `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;      
+      const response = await supabase.functions.invoke('customer-verify-whatsapp-otp', {
         body: { 
           phoneNumber: fullPhoneNumber, 
           code: otp,
@@ -216,6 +214,7 @@ const Auth = () => {
           lead_source: referralSource || undefined
         },
       });
+      
       if (response.data && response.data.error) {
         if (response.data.error === "new_user_requires_name") {
           setNeedsFullName(true);
@@ -236,16 +235,14 @@ const Auth = () => {
         
         const errorMessage = response.data.message || "Verification failed. Please try again.";
         toast.error(errorMessage);
-        setVerificationError(errorMessage); // Set error feedback
+        setVerificationError(errorMessage);
         setEdgeFunctionError(response.data.error);
         setIsLoading(false);
         return;
       }
 
-      // If we have credentials in the response, sign in with them
       if (response.data && response.data.credentials) {        
         try {
-          // Sign in with the credentials
           const { data, error: signInError } = await supabase.auth.signInWithPassword({
             email: response.data.credentials.email,
             password: response.data.credentials.password,
@@ -263,29 +260,11 @@ const Auth = () => {
             setIsLoading(false);
             return;
           }
-                    
-          // // Update profile phone number directly as a fallback
-          // if (data.user) {
-          //   try {
-          //     const { error: profileError } = await supabase
-          //       .from('profiles')
-          //       .update({ phone_number: fullPhoneNumber })
-          //       .eq('id', data.user.id);
-                
-          //     if (profileError) {
-          //       console.error("Error updating profile phone:", profileError);
-          //     }
-          //   } catch (updateError) {
-          //     console.error("Profile update error:", updateError);
-          //   }
-          // }
           
-          // Session will be handled by the auth state change listener
           toast.success(response.data.isNewUser ? 
             "Registration successful! Welcome!" : 
             "Login successful!");
             
-          // Explicitly navigate after successful login
           if (data.session) {
             navigate("/services");
           }
@@ -301,7 +280,7 @@ const Auth = () => {
       console.error("OTP verification error:", error);
       const errorMessage = error.message || "Connection error. Please try again.";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       setEdgeFunctionError("Network or server error occurred");
     } finally {
       setIsLoading(false);

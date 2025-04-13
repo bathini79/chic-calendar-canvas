@@ -1,49 +1,58 @@
-import React, { useState, useEffect } from "react";
+
+import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { toast } from "sonner";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { countryCodes, CountryCode } from "@/lib/country-codes";
-import { parsePhoneCountryCode } from "@/enums/CountryCode";
+import { parsePhoneCountryCode } from "@/lib/country-codes";
 
 export default function CustomerVerification() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const token = searchParams.get("token");
   const code = searchParams.get("code");
   const phone = searchParams.get("phone");
   
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [countryCode, setCountryCode] = useState<CountryCode>(
-    countryCodes.find(c => c.name === "India") || countryCodes[0]
-  );
+  const [phoneNumber, setPhoneNumber] = useState(phone || "");
+  const [countryCode, setCountryCode] = useState({ name: "India", code: "+91", flag: "🇮🇳" });
   const [verificationCode, setVerificationCode] = useState(code || "");
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState("");
   const [autoVerifiedAttempted, setAutoVerifiedAttempted] = useState(false);
 
-  // Parse phone number from URL if present
   useEffect(() => {
     if (phone) {
-         const countryCodeObj = parsePhoneCountryCode(phone);
-            if (countryCodeObj) {
-              setCountryCode({
-                name: countryCodeObj.name || "Unknown",
-                code: countryCodeObj.code,
-                flag: countryCodeObj.flag || "🏳️"
-              });
-              // Extract the phone number without country code
-              const phoneWithoutCode = phone.substring(countryCodeObj.code.length);
-              setPhoneNumber(phoneWithoutCode);
-            }
-          }
-          
+      console.log("Phone from URL:", phone);
+      // Try to find the country code in the phone number
+      const countryCodeObj = parsePhoneCountryCode(phone);
+      if (countryCodeObj) {
+        setCountryCode({
+          name: countryCodeObj.name || "Unknown",
+          code: countryCodeObj.code,
+          flag: countryCodeObj.flag || "🏳️"
+        });
+        // Extract the phone number without country code
+        const phoneWithoutCode = phone.substring(countryCodeObj.code.length);
+        setPhoneNumber(phoneWithoutCode);
+      }
     }
-  , [code, phone, autoVerifiedAttempted]);
+    
+    // Auto-verify if token or code and phone are provided in URL
+    if ((token || code) && phone && !autoVerifiedAttempted) {
+      setAutoVerifiedAttempted(true);
+      handleVerify();
+    }
+  }, [token, code, phone, autoVerifiedAttempted]);
+
+  
+  const handleCountryChange = (country: {name: string, code: string, flag: string}) => {
+    setCountryCode(country);
+  };
 
   const handleVerify = async () => {
     if (!phoneNumber) {
@@ -51,8 +60,8 @@ export default function CustomerVerification() {
       return;
     }
 
-    if (!verificationCode) {
-      setError("Please enter the verification code");
+    if (!verificationCode && !token) {
+      setError("Please enter the verification code or use a verification link");
       return;
     }
 
@@ -60,16 +69,23 @@ export default function CustomerVerification() {
     setError("");
 
     try {
-      console.log("Sending verification request for phone:", phoneNumber, "code:", verificationCode);
-
-      const { data, error } = await supabase.functions.invoke("verify-whatsapp-otp", {
+      // Format the full phone number with country code
+      const formattedPhone = phoneNumber.startsWith('+') ? 
+        phoneNumber : 
+        `${countryCode.code.slice(1)}${phoneNumber.replace(/\s+/g, '')}`;
+      
+      console.log("Sending verification request for phone:", formattedPhone, "code:", verificationCode);
+      
+      const { data, error } = await supabase.functions.invoke("customer-verify-whatsapp-otp", {
         body: {
           code: verificationCode,
-          phoneNumber:phone, // Send phone number as is
-        },
+          phoneNumber: formattedPhone,
+          token
+        }
       });
 
       if (error) {
+        console.error("Verification error from function:", error);
         throw error;
       }
 
@@ -78,7 +94,7 @@ export default function CustomerVerification() {
       if (data.success) {
         setVerified(true);
         toast.success("Your account has been verified successfully!");
-
+        
         if (data.credentials) {
           // Sign in the user with the credentials
           try {
@@ -86,17 +102,15 @@ export default function CustomerVerification() {
               email: data.credentials.email,
               password: data.credentials.password,
             });
-
+            
             if (signInError) {
               console.error("Auto sign-in error:", signInError);
               toast.error("Verification succeeded, but automatic login failed. Please login manually.");
             } else {
               toast.success("You have been automatically logged in!");
-
-              // Redirect to home page after successful verification
               setTimeout(() => {
-                navigate("/customer/home");
-              }, 2000);
+                navigate("/services");
+              }, 1500);
             }
           } catch (signInErr) {
             console.error("Sign-in error:", signInErr);
@@ -117,9 +131,9 @@ export default function CustomerVerification() {
     <div className="min-h-screen flex justify-center items-center bg-slate-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Customer Verification</CardTitle>
+          <CardTitle className="text-2xl">Verification</CardTitle>
           <CardDescription>
-            Verify your number to activate your account
+            Verify your account to activate your profile
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -127,51 +141,45 @@ export default function CustomerVerification() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="phone" className="text-sm font-medium">
-                  Phone Number
+                  Your Phone Number
                 </label>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={countryCode.code}
-                    onValueChange={(value) => {
-                      const selected = countryCodes.find(c => c.code === value);
-                      if (selected) setCountryCode(selected);
-                    }}
-                    disabled={true}
-                  >
-                    <SelectTrigger id="country-code" className="w-32">
-                      <SelectValue placeholder="Select country">
-                        <span className="flex items-center">
-                          <span className="mr-2">{countryCode.flag}</span>
-                          <span>{countryCode.code}</span>
-                        </span>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {countryCodes.map((country) => (
-                        <SelectItem key={country.code} value={country.code}>
-                          <span className="flex items-center">
-                            <span className="mr-2">{country.flag}</span>
-                            <span>{country.name} ({country.code})</span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="9876543210"
-                    value={phoneNumber}
-                    onChange={(e) => {
-                      // Only allow digits
-                      const value = e.target.value.replace(/\D/g, "");
-                      setPhoneNumber(value);
-                    }}
-                    disabled={loading}
-                    className="flex-1"
-                  />
-                </div>
+                <PhoneInput
+                  id="phone"
+                  value={phoneNumber}
+                  onChange={(value) => setPhoneNumber(value)}
+                  selectedCountry={countryCode}
+                  onCountryChange={handleCountryChange}
+                  disabled={loading}
+                />
+                <p className="text-xs text-slate-500">
+                  Enter the phone number associated with your account
+                </p>
               </div>
+
+              {!token && (
+                <div className="space-y-2">
+                  <label htmlFor="code" className="text-sm font-medium">
+                    Verification Code
+                  </label>
+                  <Input
+                    id="code"
+                    placeholder="Enter verification code"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Enter the 6-digit code sent to your WhatsApp
+                  </p>
+                </div>
+              )}
+
+              {token && (
+                <div className="bg-blue-50 text-blue-600 p-3 rounded-md flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Verification link detected. Click the button below to verify your account.</span>
+                </div>
+              )}
+
               {error && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-md flex items-center gap-2">
                   <XCircle className="h-5 w-5" />
@@ -193,7 +201,7 @@ export default function CustomerVerification() {
           {!verified ? (
             <Button
               onClick={handleVerify}
-              disabled={loading || !phoneNumber || !verificationCode}
+              disabled={loading || (!phoneNumber || (!verificationCode && !token))}
               className="w-full"
             >
               {loading ? (
@@ -205,8 +213,8 @@ export default function CustomerVerification() {
               )}
             </Button>
           ) : (
-            <Button className="w-full" onClick={() => navigate("/")}>
-              Go to Login
+            <Button className="w-full" onClick={() => navigate("/services")}>
+              Go to Services
             </Button>
           )}
         </CardFooter>
