@@ -39,7 +39,7 @@ export function useLoyaltyInCheckout({
   subtotal,
   discountedSubtotal
 }: UseLoyaltyInCheckoutProps): UseLoyaltyInCheckoutResult {
-  const [usePoints, setUsePoints] = useState(false);
+  const [usePoints, setUsePoints] = useState(true);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [pointsExpiryDate, setPointsExpiryDate] = useState<Date | null>(null);
   
@@ -77,17 +77,19 @@ export function useLoyaltyInCheckout({
 
   // Handle maximum points to redeem based on settings
   const maxPointsToRedeem = settings?.enabled && settings.points_per_spend
-    ? getMaxRedeemablePoints(discountedSubtotal)
+    ? getMaxRedeemablePoints(subtotal) // Use subtotal directly, not discountedSubtotal
     : 0;
 
-  // When usePoints is toggled, set points to maximum automatically
+  // Automatically set points to maximum
   useEffect(() => {
-    if (usePoints) {
+    if (maxPointsToRedeem > 0 && walletBalance >= (settings?.min_redemption_points || 0)) {
+      setUsePoints(true);
       setPointsToRedeem(maxPointsToRedeem);
     } else {
+      setUsePoints(false);
       setPointsToRedeem(0);
     }
-  }, [usePoints, maxPointsToRedeem]);
+  }, [maxPointsToRedeem, walletBalance, settings?.min_redemption_points]);
 
   // Calculate discount amount from redeemed points
   const pointsDiscountAmount = usePoints && settings?.enabled && settings?.points_per_spend

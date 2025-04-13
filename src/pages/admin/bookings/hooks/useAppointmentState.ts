@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Customer } from "../types";
 
-export function useAppointmentState() {
+export const useAppointmentState = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null
   );
@@ -21,6 +21,12 @@ export function useAppointmentState() {
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [appointmentNotes, setAppointmentNotes] = useState("");
   const [customizedServices, setCustomizedServices] = useState({});
+  const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
+  const [taxAmount, setTaxAmount] = useState(0);
+  const [pointsEarned, setPointsEarned] = useState(0);
+  const [pointsRedeemed, setPointsRedeemed] = useState(0);
+  const [pointsDiscountAmount, setPointsDiscountAmount] = useState(0);
+
   const resetState = () => {
     setSelectedCustomer(null);
     setShowCreateForm(false);
@@ -35,6 +41,11 @@ export function useAppointmentState() {
     setDiscountValue(0);
     setAppointmentNotes("");
     setCustomizedServices({});
+    setAppliedTaxId(null);
+    setTaxAmount(0);
+    setPointsEarned(0);
+    setPointsRedeemed(0);
+    setPointsDiscountAmount(0);
   };
 
   return {
@@ -52,8 +63,6 @@ export function useAppointmentState() {
     setSelectedDate,
     selectedTime,
     setSelectedTime,
-    notes,
-    setNotes,
     paymentMethod,
     setPaymentMethod,
     discountType,
@@ -65,5 +74,15 @@ export function useAppointmentState() {
     resetState,
     customizedServices,
     setCustomizedServices,
+    appliedTaxId,
+    setAppliedTaxId,
+    taxAmount,
+    setTaxAmount,
+    pointsEarned,
+    setPointsEarned,
+    pointsRedeemed,
+    setPointsRedeemed,
+    pointsDiscountAmount,
+    setPointsDiscountAmount,
   };
-}
+};
