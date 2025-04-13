@@ -162,7 +162,7 @@ serve(async (req) => {
           user_metadata: { 
             full_name: fullName,
             phone_verified: true,
-            phone: `+${normalizedPhone}`, // Add + for metadata
+            phone: `${normalizedPhone}`, // Add + for metadata
             lead_source: lead_source
           }
         })
@@ -195,7 +195,7 @@ serve(async (req) => {
                 password: tempPassword,
                 user_metadata: {
                   ...authUser.user.user_metadata,
-                  phone: `+${normalizedPhone}`, // Add + for metadata
+                  phone: `${normalizedPhone}`, // Add + for metadata
                   lead_source: lead_source
                 }
               });
@@ -337,7 +337,7 @@ serve(async (req) => {
       // Update the user's metadata with lead_source if provided
       const updatedMetadata = {
         ...userData.user.user_metadata,
-        phone: `+${normalizedPhone}`, // Add + for metadata
+        phone: `${normalizedPhone}`, // Add + for metadata
       };
       
       // Only add lead_source if it exists and is not already set

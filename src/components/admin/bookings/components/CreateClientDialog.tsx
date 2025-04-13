@@ -1,37 +1,25 @@
+
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { adminSupabase } from "@/integrations/supabase/client";
+import { adminSupabase, supabase } from "@/integrations/supabase/client";
 import { Customer } from "@/pages/admin/bookings/types";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { countryCodes, CountryCode } from "@/lib/country-codes";
-import { Loader2 } from "lucide-react";
-
-// Lead source options
-const LEAD_SOURCES = [
-  "Friend/Family",
-  "Google",
-  "Instagram",
-  "Facebook",
-  "Twitter",
-  "Website",
-  "Walk-in",
-  "Advertisement",
-  "Other"
-];
+import { LoaderCircle } from "lucide-react";
+import { CountryCode } from "@/lib/country-codes";
 
 const createClientSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  phone_number: z.string().min(10, "Phone number must be at least 10 digits"),
-  lead_source: z.string().optional(),
+  phone_number: z.string().min(10, "Valid phone number is required"),
+  lead_source: z.string().min(1, "How did you hear about us is required"),
 });
 
 type CreateClientFormData = z.infer<typeof createClientSchema>;
@@ -47,11 +35,13 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(
-    countryCodes.find(c => c.name === "India") || countryCodes[0]
-  );
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>({ 
+    name: "India", 
+    code: "+91", 
+    flag: "🇮🇳" 
+  });
 
   const form = useForm<CreateClientFormData>({
     resolver: zodResolver(createClientSchema),
@@ -63,81 +53,79 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
     },
   });
 
-  const handleCountryChange = (country: CountryCode) => {
-    setSelectedCountry(country);
+  const sendWhatsAppVerification = async (phoneNumber: string) => {
+    try {
+      setIsSubmitting(true);
+      
+      // Format the phone number correctly for the API
+      // Removing the + from the country code
+      const countryCodeWithoutPlus = selectedCountry.code.replace("+", "");
+      const formattedPhoneNumber = phoneNumber.replace(/\s/g, ""); // Remove spaces
+      const fullPhoneNumber = `${countryCodeWithoutPlus}${formattedPhoneNumber}`;
+      const baseUrl = `${window.location.protocol}//${window.location.host}`;
+      
+      const { data, error } = await supabase.functions.invoke('send-whatsapp-otp', {
+        body: { 
+          phoneNumber: fullPhoneNumber,
+          fullName: form.getValues("full_name"),
+          lead_source: form.getValues("lead_source"),
+          baseUrl
+        }
+      });
+
+      if (error) {
+        toast.error("Failed to send verification: " + error.message);
+        setIsSubmitting(false);
+        return false;
+      }
+
+      if (data?.success) {
+        toast.success("Verification code sent to WhatsApp");
+        setOtpSent(true);
+        setIsSubmitting(false);
+        return true;
+      } else {
+        toast.error("Failed to send verification: " + (data?.error || "Unknown error"));
+        setIsSubmitting(false);
+        return false;
+      }
+    } catch (error: any) {
+      toast.error("Failed to send verification: " + error.message);
+      setIsSubmitting(false);
+      return false;
+    }
   };
 
   const onSubmit = async (data: CreateClientFormData) => {
     try {
-      setIsVerifying(true);
+      setIsSubmitting(true);
+
+      // Send WhatsApp verification with full name and lead source
+      const verificationSent = await sendWhatsAppVerification(data?.phone_number);
       
-      // Format phone number with country code but without + prefix
-      const formattedPhone = `${selectedCountry.code.substring(1)}${data.phone_number.replace(/\s+/g, '')}`;
-      
-      console.log("Sending verification for:", {
-        phoneNumber: formattedPhone,
-        fullName: data.full_name,
-        lead_source: data.lead_source || null
-      });
-      
-      // Get the current Supabase URL from the client
-      const { data: { origin } } = await adminSupabase.functions.invoke('get-app-url', {
-        method: 'GET',
-      });
-      
-      // Use the Supabase Functions URL for the API call
-      const functionUrl = `${origin}/functions/v1/send-whatsapp-otp`;
-      
-      // Send WhatsApp OTP
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminSupabase.auth.getSession().then(res => res.data.session?.access_token)}`
-        },
-        body: JSON.stringify({ 
-          phoneNumber: formattedPhone,
-          fullName: data.full_name,
-          lead_source: data.lead_source || null
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error response:", errorText);
-        throw new Error(`Failed to send verification: ${response.status} ${response.statusText}`);
+      if (!verificationSent) {
+        setIsSubmitting(false);
+        return;
       }
-      
-      const result = await response.json();
-      
-      if (result.error) {
-        throw new Error(result.error || 'Failed to send verification message');
-      }
-      
-      setVerificationSent(true);
-      setIsVerifying(false);
-      
-      toast.success("Verification message sent to WhatsApp. Ask the client to click the link to verify.");
-      
-      // Prepare the customer object to return
-      // We'll return this now so the UI can continue, even though verification is still pending
-      const customerData: Customer = {
-        id: "", // This will be filled after verification
-        full_name: data.full_name,
-        email: data.email || "",
-        phone_number: formattedPhone
-      };
-      
-      onSuccess(customerData);
+
+      toast.success("Verification sent to client's WhatsApp. User will be created after verification.");
       form.reset();
       onClose();
-      
     } catch (error: any) {
-      setIsVerifying(false);
-      console.error("Verification error:", error);
-      toast.error("Failed to send verification: " + error.message);
+      toast.error("Failed to create client: " + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const leadSourceOptions = [
+    { value: "social_media", label: "Social Media" },
+    { value: "friend_referral", label: "Friend Referral" },
+    { value: "google", label: "Google Search" },
+    { value: "advertisement", label: "Advertisement" },
+    { value: "walk_in", label: "Walk-in" },
+    { value: "other", label: "Other" },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -153,23 +141,9 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
               name="full_name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full Name</FormLabel>
+                  <FormLabel>Full Name *</FormLabel>
                   <FormControl>
                     <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email (Optional)</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="john@example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -181,14 +155,28 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
               name="phone_number"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
+                  <FormLabel>Phone Number *</FormLabel>
                   <FormControl>
                     <PhoneInput 
-                      placeholder="9876543210" 
-                      {...field} 
+                      placeholder="9876543210..." 
                       selectedCountry={selectedCountry}
-                      onCountryChange={handleCountryChange}
+                      onCountryChange={setSelectedCountry}
+                      {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="john@example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -200,17 +188,20 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
               name="lead_source"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>How did you hear about us?</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormLabel>How did you hear about us? *</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a source" />
+                        <SelectValue placeholder="Select source" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {LEAD_SOURCES.map((source) => (
-                        <SelectItem key={source} value={source}>
-                          {source}
+                      {leadSourceOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -221,17 +212,17 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
             />
 
             <div className="flex justify-end gap-4 pt-4">
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isVerifying}>
-                {isVerifying ? (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
                     Sending...
                   </>
                 ) : (
-                  'Send Verification'
+                  "Create Client"
                 )}
               </Button>
             </div>
@@ -240,4 +231,4 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       </DialogContent>
     </Dialog>
   );
-}
+};

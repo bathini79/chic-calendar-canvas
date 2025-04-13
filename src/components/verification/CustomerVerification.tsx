@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { countryCodes, CountryCode } from "@/lib/country-codes";
+import { parsePhoneCountryCode } from "@/enums/CountryCode";
 
 export default function CustomerVerification() {
   const [searchParams] = useSearchParams();
@@ -29,34 +29,21 @@ export default function CustomerVerification() {
   // Parse phone number from URL if present
   useEffect(() => {
     if (phone) {
-      // Extract phone number without country code
-      const countryCodeObj = countryCodes.find(c => 
-        phone.startsWith(c.code) || phone.startsWith(`+${c.code.substring(1)}`)
-      );
-      
-      if (countryCodeObj) {
-        setCountryCode(countryCodeObj);
-        
-        // Remove country code from phone
-        let phoneWithoutCode = phone;
-        if (phone.startsWith('+')) {
-          phoneWithoutCode = phone.substring(countryCodeObj.code.length);
-        } else if (phone.startsWith(countryCodeObj.code.substring(1))) {
-          phoneWithoutCode = phone.substring(countryCodeObj.code.length - 1);
-        }
-        
-        setPhoneNumber(phoneWithoutCode.replace(/\s+/g, ''));
-      } else {
-        setPhoneNumber(phone);
-      }
+         const countryCodeObj = parsePhoneCountryCode(phone);
+            if (countryCodeObj) {
+              setCountryCode({
+                name: countryCodeObj.name || "Unknown",
+                code: countryCodeObj.code,
+                flag: countryCodeObj.flag || "🏳️"
+              });
+              // Extract the phone number without country code
+              const phoneWithoutCode = phone.substring(countryCodeObj.code.length);
+              setPhoneNumber(phoneWithoutCode);
+            }
+          }
+          
     }
-    
-    // Auto-verify if code and phone are provided in URL
-    if (code && phone && !autoVerifiedAttempted) {
-      setAutoVerifiedAttempted(true);
-      handleVerify();
-    }
-  }, [code, phone, autoVerifiedAttempted]);
+  , [code, phone, autoVerifiedAttempted]);
 
   const handleVerify = async () => {
     if (!phoneNumber) {
@@ -73,16 +60,13 @@ export default function CustomerVerification() {
     setError("");
 
     try {
-      // Format phone number WITHOUT + prefix
-      const formattedPhone = `${countryCode.code.substring(1)}${phoneNumber.replace(/\s+/g, '')}`;
-      
-      console.log("Sending verification request for phone:", formattedPhone, "code:", verificationCode);
-      
+      console.log("Sending verification request for phone:", phoneNumber, "code:", verificationCode);
+
       const { data, error } = await supabase.functions.invoke("verify-whatsapp-otp", {
         body: {
           code: verificationCode,
-          phoneNumber: formattedPhone
-        }
+          phoneNumber:phone, // Send phone number as is
+        },
       });
 
       if (error) {
@@ -94,7 +78,7 @@ export default function CustomerVerification() {
       if (data.success) {
         setVerified(true);
         toast.success("Your account has been verified successfully!");
-        
+
         if (data.credentials) {
           // Sign in the user with the credentials
           try {
@@ -102,13 +86,13 @@ export default function CustomerVerification() {
               email: data.credentials.email,
               password: data.credentials.password,
             });
-            
+
             if (signInError) {
               console.error("Auto sign-in error:", signInError);
               toast.error("Verification succeeded, but automatic login failed. Please login manually.");
             } else {
               toast.success("You have been automatically logged in!");
-              
+
               // Redirect to home page after successful verification
               setTimeout(() => {
                 navigate("/customer/home");
@@ -142,75 +126,52 @@ export default function CustomerVerification() {
           {!verified ? (
             <div className="space-y-4">
               <div className="space-y-2">
-                <label htmlFor="country-code" className="text-sm font-medium">
-                  Country
-                </label>
-                <Select
-                  value={countryCode.code}
-                  onValueChange={(value) => {
-                    const selected = countryCodes.find(c => c.code === value);
-                    if (selected) setCountryCode(selected);
-                  }}
-                  disabled={loading}
-                >
-                  <SelectTrigger id="country-code" className="w-full">
-                    <SelectValue placeholder="Select country">
-                      <span className="flex items-center">
-                        <span className="mr-2">{countryCode.flag}</span>
-                        <span>{countryCode.name} ({countryCode.code})</span>
-                      </span>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countryCodes.map((country) => (
-                      <SelectItem key={country.code} value={country.code}>
-                        <span className="flex items-center">
-                          <span className="mr-2">{country.flag}</span>
-                          <span>{country.name} ({country.code})</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
                 <label htmlFor="phone" className="text-sm font-medium">
-                  Phone Number (without country code)
+                  Phone Number
                 </label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="9876543210"
-                  value={phoneNumber}
-                  onChange={(e) => {
-                    // Only allow digits
-                    const value = e.target.value.replace(/\D/g, "");
-                    setPhoneNumber(value);
-                  }}
-                  disabled={loading}
-                />
-                <p className="text-xs text-slate-500">
-                  Enter only the digits without any spaces or country code
-                </p>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={countryCode.code}
+                    onValueChange={(value) => {
+                      const selected = countryCodes.find(c => c.code === value);
+                      if (selected) setCountryCode(selected);
+                    }}
+                    disabled={true}
+                  >
+                    <SelectTrigger id="country-code" className="w-32">
+                      <SelectValue placeholder="Select country">
+                        <span className="flex items-center">
+                          <span className="mr-2">{countryCode.flag}</span>
+                          <span>{countryCode.code}</span>
+                        </span>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countryCodes.map((country) => (
+                        <SelectItem key={country.code} value={country.code}>
+                          <span className="flex items-center">
+                            <span className="mr-2">{country.flag}</span>
+                            <span>{country.name} ({country.code})</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="9876543210"
+                    value={phoneNumber}
+                    onChange={(e) => {
+                      // Only allow digits
+                      const value = e.target.value.replace(/\D/g, "");
+                      setPhoneNumber(value);
+                    }}
+                    disabled={loading}
+                    className="flex-1"
+                  />
+                </div>
               </div>
-
-              <div className="space-y-2">
-                <label htmlFor="code" className="text-sm font-medium">
-                  Verification Code
-                </label>
-                <Input
-                  id="code"
-                  placeholder="Enter verification code"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  disabled={loading}
-                />
-                <p className="text-xs text-slate-500">
-                  Enter the code sent to your WhatsApp
-                </p>
-              </div>
-
               {error && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-md flex items-center gap-2">
                   <XCircle className="h-5 w-5" />
