@@ -212,6 +212,7 @@ export function useLoyaltyPoints(customerId?: string) {
     }
     
     // Calculate how many points needed to cover the full subtotal
+    // FIXED: Using point_value instead of points_per_spend for redemption calculation
     const maxPointsForFullSubtotal = Math.ceil(subtotal / settings.point_value);
     maxPoints = Math.min(maxPoints, maxPointsForFullSubtotal);
     console.log(`Limiting by subtotal: max points = ${maxPointsForFullSubtotal}`);
