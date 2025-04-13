@@ -165,10 +165,12 @@ export function useLoyaltyPoints(customerId?: string) {
   };
 
   const calculateAmountFromPoints = (points: number): number => {
-    if (!settings || !settings.enabled || !settings.point_value) return 0;
+    if (!settings || !settings.enabled || !settings.points_per_spend) return 0;
     
-    const amount = points * settings.point_value;
-    console.log(`Calculated amount from points: ${points} × ${settings.point_value} = ${amount}`);
+    // Using points_per_spend to determine redemption value (100/points_per_spend gives value per point)
+    const pointValue = 100 / settings.points_per_spend;
+    const amount = points * (pointValue / 100);
+    console.log(`Calculated amount from points: ${points} × ${pointValue/100} = ${amount}`);
     return amount;
   };
 
@@ -181,8 +183,8 @@ export function useLoyaltyPoints(customerId?: string) {
   };
 
   const getMaxRedeemablePoints = (subtotal: number): number => {
-    if (!settings || !settings.enabled || !customerPoints || !settings.point_value) {
-      console.log('Cannot calculate max redeemable points: settings not loaded, no customer points, or no point value defined');
+    if (!settings || !settings.enabled || !settings.points_per_spend || !customerPoints) {
+      console.log('Cannot calculate max redeemable points: settings not loaded, no customer points, or no points_per_spend defined');
       return 0;
     }
     
@@ -194,7 +196,7 @@ export function useLoyaltyPoints(customerId?: string) {
     console.log('Calculating max redeemable points with settings:', settings);
     console.log('Customer wallet balance:', customerPoints.walletBalance);
     console.log('Subtotal for calculation:', subtotal);
-    console.log('Point value:', settings.point_value);
+    console.log('Points per spend:', settings.points_per_spend);
     
     let maxPoints = customerPoints.walletBalance;
     console.log('Starting with available points:', maxPoints);
@@ -205,15 +207,18 @@ export function useLoyaltyPoints(customerId?: string) {
     } 
     else if (settings.max_redemption_type === "percentage" && settings.max_redemption_percentage) {
       const maxDiscountAmount = subtotal * (settings.max_redemption_percentage / 100);
-      const maxPointsFromPercentage = Math.floor(maxDiscountAmount / settings.point_value);
+      // Calculate points based on points_per_spend
+      const pointValue = 100 / settings.points_per_spend;
+      const maxPointsFromPercentage = Math.floor(maxDiscountAmount / (pointValue / 100));
       
       maxPoints = Math.min(maxPoints, maxPointsFromPercentage);
       console.log(`Percentage limit (${settings.max_redemption_percentage}%): max points = ${maxPointsFromPercentage}`);
     }
     
     // Calculate how many points needed to cover the full subtotal
-    // FIXED: Using point_value instead of points_per_spend for redemption calculation
-    const maxPointsForFullSubtotal = Math.ceil(subtotal / settings.point_value);
+    // Using points_per_spend to determine conversion rate
+    const pointValue = 100 / settings.points_per_spend;
+    const maxPointsForFullSubtotal = Math.ceil(subtotal / (pointValue / 100));
     maxPoints = Math.min(maxPoints, maxPointsForFullSubtotal);
     console.log(`Limiting by subtotal: max points = ${maxPointsForFullSubtotal}`);
     
