@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
@@ -5,14 +6,13 @@ import { toast } from "sonner";
 
 interface CustomerPoints {
   walletBalance: number;
-  cashbackBalance: number;
+  lastUsed: Date | null;
 }
 
 export function useLoyaltyPoints(customerId?: string) {
   const [settings, setSettings] = useState<LoyaltyProgramSettings | null>(null);
   const [customerPoints, setCustomerPoints] = useState<CustomerPoints | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const autoTransferInProgressRef = useRef(false);
 
   const fetchSettings = async () => {
     try {
@@ -50,7 +50,7 @@ export function useLoyaltyPoints(customerId?: string) {
       
       const { data, error } = await supabase
         .from('profiles')
-        .select('wallet_balance, cashback_balance')
+        .select('wallet_balance, last_used')
         .eq('id', customerId)
         .single();
       
@@ -61,76 +61,20 @@ export function useLoyaltyPoints(customerId?: string) {
       
       if (data) {
         const walletBalance = Number(data.wallet_balance) || 0;
-        const cashbackBalance = Number(data.cashback_balance) || 0;
+        const lastUsed = data.last_used ? new Date(data.last_used) : null;
         
         console.log('Fetched wallet balance:', walletBalance);
-        console.log('Fetched cashback balance:', cashbackBalance);
+        console.log('Last used date:', lastUsed);
         
         setCustomerPoints({
           walletBalance,
-          cashbackBalance
+          lastUsed
         });
       }
     } catch (error) {
       console.error('Unexpected error fetching customer points:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const autoTransferCashbackToWallet = async (cashbackAmount: number) => {
-    if (!customerId || cashbackAmount <= 0 || autoTransferInProgressRef.current) return false;
-    
-    try {
-      autoTransferInProgressRef.current = true;
-      console.log('Auto-transferring cashback to wallet:', cashbackAmount);
-
-      const { data, error: fetchError } = await supabase
-        .from('profiles')
-        .select('wallet_balance, cashback_balance')
-        .eq('id', customerId)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching latest points for transfer:', fetchError);
-        return false;
-      }
-      
-      const currentWalletBalance = Number(data.wallet_balance) || 0;
-      const currentCashbackBalance = Number(data.cashback_balance) || 0;
-      
-      if (currentCashbackBalance <= 0) {
-        console.log('No cashback balance to transfer');
-        return false;
-      }
-
-      const newWalletBalance = currentWalletBalance + currentCashbackBalance;
-      
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          cashback_balance: 0,
-          wallet_balance: newWalletBalance
-        })
-        .eq('id', customerId);
-      
-      if (updateError) {
-        console.error('Error transferring cashback to wallet:', updateError);
-        return false;
-      }
-      
-      setCustomerPoints({
-        walletBalance: newWalletBalance,
-        cashbackBalance: 0
-      });
-      
-      console.log('Successfully auto-transferred cashback to wallet. New wallet balance:', newWalletBalance);
-      return true;
-    } catch (error) {
-      console.error('Unexpected error during auto-transfer:', error);
-      return false;
-    } finally {
-      autoTransferInProgressRef.current = false;
     }
   };
 
@@ -145,12 +89,6 @@ export function useLoyaltyPoints(customerId?: string) {
       setCustomerPoints(null);
     }
   }, [customerId]);
-
-  useEffect(() => {
-    if (customerId && customerPoints && customerPoints.cashbackBalance > 0 && !autoTransferInProgressRef.current) {
-      autoTransferCashbackToWallet(customerPoints.cashbackBalance);
-    }
-  }, [customerId, customerPoints?.cashbackBalance]);
 
   const isEligibleItem = (itemId: string, type: 'service' | 'package') => {
     if (!settings || !settings.enabled) return false;
@@ -273,55 +211,6 @@ export function useLoyaltyPoints(customerId?: string) {
     return maxPoints;
   };
 
-  const transferPointsToWallet = async (pointsToTransfer: number): Promise<boolean> => {
-    if (!customerId || !customerPoints) return false;
-    
-    try {
-      setIsLoading(true);
-      
-      if (pointsToTransfer > customerPoints.cashbackBalance) {
-        toast.error(`Cannot transfer more than available cashback balance (${customerPoints.cashbackBalance} points)`);
-        return false;
-      }
-      
-      if (settings?.min_redemption_points && pointsToTransfer < settings.min_redemption_points) {
-        toast.error(`Minimum transfer amount is ${settings.min_redemption_points} points`);
-        return false;
-      }
-      
-      const newCashbackBalance = customerPoints.cashbackBalance - pointsToTransfer;
-      const newWalletBalance = customerPoints.walletBalance + pointsToTransfer;
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          cashback_balance: newCashbackBalance,
-          wallet_balance: newWalletBalance
-        })
-        .eq('id', customerId);
-      
-      if (error) {
-        console.error('Error transferring points to wallet:', error);
-        toast.error('Failed to transfer points to wallet');
-        return false;
-      }
-      
-      setCustomerPoints({
-        cashbackBalance: newCashbackBalance,
-        walletBalance: newWalletBalance
-      });
-      
-      toast.success(`Successfully transferred ${pointsToTransfer} points to wallet`);
-      return true;
-    } catch (error) {
-      console.error('Unexpected error transferring points:', error);
-      toast.error('An unexpected error occurred');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return {
     settings,
     customerPoints,
@@ -334,9 +223,7 @@ export function useLoyaltyPoints(customerId?: string) {
     calculateAmountFromPoints,
     hasMinimumForRedemption,
     getMaxRedeemablePoints,
-    transferPointsToWallet,
     walletBalance: customerPoints?.walletBalance || 0,
-    cashbackBalance: customerPoints?.cashbackBalance || 0,
-    autoTransferCashbackToWallet
+    lastUsed: customerPoints?.lastUsed || null
   };
 }

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -43,7 +44,7 @@ interface SaveAppointmentProps {
   pointsDiscountAmount?: number;
 }
 
-export default function useSaveAppointment({
+export function useSaveAppointment({
   selectedDate,
   selectedTime,
   selectedCustomer,
@@ -383,8 +384,20 @@ export default function useSaveAppointment({
         .eq("id", createdAppointmentId);
 
       if (updateError) throw updateError;
+      
+      // Update the customer's last_used timestamp when appointment is completed
       if (appointmentStatus === "completed" && createdAppointmentId) {
         try {
+          // Update last_used field in customer profile
+          const { error: profileUpdateError } = await supabase
+            .from("profiles")
+            .update({ last_used: new Date().toISOString() })
+            .eq("id", selectedCustomer.id);
+
+          if (profileUpdateError) {
+            console.error("Failed to update customer's last_used timestamp:", profileUpdateError);
+          }
+          
           await sendNotification(createdAppointmentId, "completed");
         } catch (notificationError) {
           console.error(
@@ -394,11 +407,11 @@ export default function useSaveAppointment({
         }
       }
 
-      if (selectedCustomer && (pointsEarnedFromParams > 0 || pointsRedeemedFromParams > 0)) {
+      if (selectedCustomer && pointsEarnedFromParams > 0) {
         try {
           const { data: customerData, error: customerFetchError } = await supabase
             .from("profiles")
-            .select("wallet_balance, cashback_balance")
+            .select("wallet_balance")
             .eq("id", selectedCustomer.id)
             .single();
             
@@ -415,16 +428,16 @@ export default function useSaveAppointment({
           });
           
           const currentWalletBalance = typeof customerData.wallet_balance === 'number' ? customerData.wallet_balance : 0;
-          const currentCashbackBalance = typeof customerData.cashback_balance === 'number' ? customerData.cashback_balance : 0;
           
-          let newCashbackBalance = currentCashbackBalance + pointsEarnedFromParams;
+          // Add earned points directly to wallet balance
+          const newWalletBalance = currentWalletBalance + pointsEarnedFromParams;
           
-          console.log(`Cashback Balance Increment: ${currentCashbackBalance} -> ${newCashbackBalance}`);
+          console.log(`Wallet Balance Update: ${currentWalletBalance} -> ${newWalletBalance}`);
           
           const { error: updateError } = await supabase
             .from("profiles")
             .update({
-              cashback_balance: newCashbackBalance
+              wallet_balance: newWalletBalance
             })
             .eq("id", selectedCustomer.id);
           
@@ -432,7 +445,7 @@ export default function useSaveAppointment({
             console.error("Error updating customer loyalty points:", updateError);
             toast.error("Failed to update loyalty points");
           } else {
-            console.log(`Loyalty Points Updated: Cashback Balance: ${currentCashbackBalance} -> ${newCashbackBalance}`);
+            console.log(`Loyalty Points Updated: Wallet Balance: ${currentWalletBalance} -> ${newWalletBalance}`);
           }
         } catch (error) {
           console.error("Comprehensive loyalty points processing error:", error);

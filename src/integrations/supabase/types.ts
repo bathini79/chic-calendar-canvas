@@ -1674,7 +1674,6 @@ export type Database = {
           anniversary_date: string | null
           avatar_url: string | null
           birth_date: string | null
-          cashback_balance: number | null
           created_at: string
           email: string | null
           facebook_url: string | null
@@ -1682,6 +1681,7 @@ export type Database = {
           gender: string | null
           id: string
           instagram_url: string | null
+          last_used: string | null
           lead_source: string | null
           phone_number: string | null
           phone_verified: boolean | null
@@ -1696,7 +1696,6 @@ export type Database = {
           anniversary_date?: string | null
           avatar_url?: string | null
           birth_date?: string | null
-          cashback_balance?: number | null
           created_at?: string
           email?: string | null
           facebook_url?: string | null
@@ -1704,6 +1703,7 @@ export type Database = {
           gender?: string | null
           id: string
           instagram_url?: string | null
+          last_used?: string | null
           lead_source?: string | null
           phone_number?: string | null
           phone_verified?: boolean | null
@@ -1718,7 +1718,6 @@ export type Database = {
           anniversary_date?: string | null
           avatar_url?: string | null
           birth_date?: string | null
-          cashback_balance?: number | null
           created_at?: string
           email?: string | null
           facebook_url?: string | null
@@ -1726,6 +1725,7 @@ export type Database = {
           gender?: string | null
           id?: string
           instagram_url?: string | null
+          last_used?: string | null
           lead_source?: string | null
           phone_number?: string | null
           phone_verified?: boolean | null
