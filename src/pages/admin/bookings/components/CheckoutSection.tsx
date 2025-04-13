@@ -464,7 +464,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       discountType,
       discountValue,
       membershipDiscount,
-      couponDiscount
+      couponDiscount,
+      loyalty.pointsDiscountAmount
     );
   }, [
     selectedServices,
@@ -476,9 +477,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     discountValue,
     membershipDiscount,
     couponDiscount,
+    loyalty.pointsDiscountAmount
   ]);
 
   const getServiceDisplayPrice = (serviceId: string) => {
+    if (loyalty.adjustedServicePrices[serviceId] !== undefined) {
+      return loyalty.adjustedServicePrices[serviceId];
+    }
     return adjustedPrices[serviceId] !== undefined
       ? adjustedPrices[serviceId]
       : services?.find((s) => s.id === serviceId)?.selling_price || 0;
@@ -577,7 +582,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               selectedStylists[packageId] ||
               null,
             stylistName: getStylistName(
-              selectedStylists[serviceId] || selectedStylists[packageId] || ""
+              selectedStylists[serviceId] ||
+                selectedStylists[packageId] ||
+                ""
             ),
             isCustomized: false,
           };
@@ -660,7 +667,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         membershipName,
         membershipDiscount,
         total,
-        adjustedPrices,
+        adjustedPrices: loyalty.adjustedServicePrices && Object.keys(loyalty.adjustedServicePrices).length > 0 
+          ? { ...adjustedPrices, ...loyalty.adjustedServicePrices } 
+          : adjustedPrices,
         couponName:
           availableCoupons?.filter((c) => c.id === selectedCouponId)?.[0]
             ?.code || null,
@@ -982,6 +991,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   pointValue={loyalty.pointValue}
                   maxRedemptionType={loyalty.maxRedemptionType}
                   maxRedemptionValue={loyalty.maxRedemptionValue}
+                  pointsExpiryDate={loyalty.pointsExpiryDate}
                 />
               </div>
             )}

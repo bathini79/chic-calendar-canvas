@@ -28,6 +28,7 @@ interface UseLoyaltyInCheckoutResult {
   setPointsToRedeem: (points: number) => void;
   customerPoints: { walletBalance: number; lastUsed: Date | null } | null;
   pointsExpiryDate: Date | null;
+  adjustedServicePrices: Record<string, number>;
 }
 
 export function useLoyaltyInCheckout({
@@ -42,6 +43,7 @@ export function useLoyaltyInCheckout({
   const [usePoints, setUsePoints] = useState(true); // Default to true to always redeem points
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [pointsExpiryDate, setPointsExpiryDate] = useState<Date | null>(null);
+  const [adjustedServicePrices, setAdjustedServicePrices] = useState<Record<string, number>>({});
   
   const {
     settings,
@@ -99,6 +101,51 @@ export function useLoyaltyInCheckout({
   // Calculate from points_per_spend (100/points_per_spend gives value per point)
   const pointValue = settings?.points_per_spend ? (100 / settings.points_per_spend) / 100 : 0;
 
+  // Calculate adjusted service prices with loyalty discount applied proportionally
+  useEffect(() => {
+    if (pointsDiscountAmount > 0 && subtotal > 0) {
+      const discountRatio = pointsDiscountAmount / subtotal;
+      const newAdjustedPrices: Record<string, number> = {};
+      
+      // Apply discount to individual services proportionally
+      selectedServices.forEach((serviceId) => {
+        const service = Array.isArray(services) ? services.find((s) => s.id === serviceId) : null;
+        if (service) {
+          const originalPrice = service.selling_price;
+          const discountAmount = originalPrice * discountRatio;
+          newAdjustedPrices[serviceId] = originalPrice - discountAmount;
+        }
+      });
+
+      // Apply discount to package services proportionally
+      selectedPackages.forEach((packageId) => {
+        const pkg = Array.isArray(packages) ? packages.find((p) => p.id === packageId) : null;
+        if (pkg) {
+          const packagePrice = pkg.price;
+          const discountAmount = packagePrice * discountRatio;
+          
+          if (pkg.package_services) {
+            pkg.package_services.forEach((ps) => {
+              const serviceId = ps.service.id;
+              const servicePrice = ps.package_selling_price !== undefined ? 
+                ps.package_selling_price : ps.service.selling_price;
+              
+              // Calculate service's proportion of package price
+              const proportion = servicePrice / packagePrice;
+              const serviceDiscountAmount = discountAmount * proportion;
+              
+              newAdjustedPrices[serviceId] = servicePrice - serviceDiscountAmount;
+            });
+          }
+        }
+      });
+      
+      setAdjustedServicePrices(newAdjustedPrices);
+    } else {
+      setAdjustedServicePrices({});
+    }
+  }, [pointsDiscountAmount, subtotal, selectedServices, selectedPackages, services, packages]);
+
   return {
     isLoyaltyEnabled: settings?.enabled || false,
     pointsToEarn,
@@ -119,6 +166,7 @@ export function useLoyaltyInCheckout({
     setUsePoints,
     setPointsToRedeem,
     customerPoints,
-    pointsExpiryDate
+    pointsExpiryDate,
+    adjustedServicePrices
   };
 }

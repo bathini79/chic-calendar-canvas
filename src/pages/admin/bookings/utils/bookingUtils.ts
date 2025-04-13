@@ -239,7 +239,8 @@ export const getAdjustedServicePrices = (
   discountType: 'none' | 'percentage' | 'fixed' = 'none',
   discountValue: number = 0,
   membershipDiscount: number = 0,
-  couponDiscount: number = 0
+  couponDiscount: number = 0,
+  loyaltyPointsDiscount: number = 0
 ) => {
   // Ensure services and packages are arrays
   const servicesArray = Array.isArray(services) ? services : [];
@@ -252,7 +253,7 @@ export const getAdjustedServicePrices = (
   const afterManualDiscount = getFinalPrice(originalTotal, discountType, discountValue);
   
   // Calculate final total after all discounts
-  const finalTotal = Math.max(0, afterManualDiscount - membershipDiscount - couponDiscount);
+  const finalTotal = Math.max(0, afterManualDiscount - membershipDiscount - couponDiscount - loyaltyPointsDiscount);
   
   // If there's no discount at all, return original prices
   if (originalTotal === finalTotal) {
