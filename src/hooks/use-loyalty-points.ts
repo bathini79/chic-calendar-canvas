@@ -1,11 +1,13 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
 
 export function useLoyaltyPoints(customerId?: string) {
   const [settings, setSettings] = useState<LoyaltyProgramSettings | null>(null);
-  const [customerPoints, setCustomerPoints] = useState<number | null>(null);
+  const [customerPoints, setCustomerPoints] = useState<{
+    walletBalance: number;
+    cashbackBalance: number;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchSettings = async () => {
@@ -53,10 +55,16 @@ export function useLoyaltyPoints(customerId?: string) {
       }
       
       if (data) {
-        // Ensure wallet_balance is always a number
         const walletBalance = typeof data.wallet_balance === 'number' ? data.wallet_balance : 0;
+        const cashbackBalance = typeof data.cashback_balance === 'number' ? data.cashback_balance : 0;
+        
         console.log('Fetched wallet balance:', walletBalance);
-        setCustomerPoints(walletBalance);
+        console.log('Fetched cashback balance:', cashbackBalance);
+        
+        setCustomerPoints({
+          walletBalance,
+          cashbackBalance
+        });
       }
     } catch (error) {
       console.error('Unexpected error fetching customer points:', error);
@@ -77,14 +85,11 @@ export function useLoyaltyPoints(customerId?: string) {
     }
   }, [customerId]);
 
-  // Check if a service or package is eligible for points
   const isEligibleItem = (itemId: string, type: 'service' | 'package') => {
     if (!settings) return false;
     
-    // If apply_to_all is true, all services and packages are eligible
     if (settings.apply_to_all) return true;
     
-    // Otherwise, check if the specific service or package is in the applicable list
     if (type === 'service' && settings.applicable_services) {
       return settings.applicable_services.includes(itemId);
     }
@@ -96,7 +101,6 @@ export function useLoyaltyPoints(customerId?: string) {
     return false;
   };
 
-  // Calculate eligible amount for earning points
   const getEligibleAmount = (
     selectedServices: string[],
     selectedPackages: string[],
@@ -106,15 +110,12 @@ export function useLoyaltyPoints(customerId?: string) {
   ): number => {
     if (!settings || !settings.enabled) return 0;
     
-    // If there's a minimum billing amount and subtotal is less than that, return 0
     if (settings.min_billing_amount && subtotal < settings.min_billing_amount) {
       return 0;
     }
     
-    // If all services and packages are eligible
     if (settings.apply_to_all) return subtotal;
     
-    // Otherwise, calculate total for eligible items only
     let eligibleAmount = 0;
     
     selectedServices.forEach(serviceId => {
@@ -138,34 +139,28 @@ export function useLoyaltyPoints(customerId?: string) {
     return eligibleAmount;
   };
 
-  // Calculate points earned from an amount
   const calculatePointsFromAmount = (amount: number): number => {
     if (!settings || !settings.enabled) return 0;
     return Math.floor(amount * settings.points_per_spend);
   };
 
-  // Calculate amount from points to be redeemed
   const calculateAmountFromPoints = (points: number): number => {
     if (!settings || !settings.enabled) return 0;
     return points * settings.point_value;
   };
 
-  // Check if customer has minimum points for redemption
   const hasMinimumForRedemption = (points: number): boolean => {
     if (!settings || !settings.enabled) return false;
     return points >= settings.min_redemption_points;
   };
 
-  // Calculate max redeemable points based on settings and subtotal
   const getMaxRedeemablePoints = (subtotal: number): number => {
     if (!settings || !settings.enabled || !customerPoints) return 0;
     
-    // First check if customer has minimum required points
     if (!hasMinimumForRedemption(customerPoints)) {
       return 0;
     }
     
-    // Calculate maximum based on redemption type if set
     let maxPoints = customerPoints;
     
     if (settings.max_redemption_type === "fixed" && settings.max_redemption_points) {
@@ -190,6 +185,8 @@ export function useLoyaltyPoints(customerId?: string) {
     calculatePointsFromAmount,
     calculateAmountFromPoints,
     hasMinimumForRedemption,
-    getMaxRedeemablePoints
+    getMaxRedeemablePoints,
+    walletBalance: customerPoints?.walletBalance || 0,
+    cashbackBalance: customerPoints?.cashbackBalance || 0
   };
 }
