@@ -194,23 +194,23 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
 
   const selectedServiceObjects = selectedServices
-    .map((id) => services.find((s) => s.id === id))
+    .map((id) => services?.find((s) => s.id === id))
     .filter(Boolean);
 
   const selectedPackageObjects = selectedPackages
-    .map((id) => packages.find((p) => p.id === id))
+    .map((id) => packages?.find((p) => p.id === id))
     .filter(Boolean);
 
   const subtotal = getTotalPrice(
-    selectedServiceObjects,
-    selectedPackageObjects,
-    "none",
-    0
+    selectedServices,
+    selectedPackages,
+    services || [],
+    packages || [],
+    customizedServices
   );
 
-  const afterDiscountedSubtotal = getTotalPrice(
-    selectedServiceObjects,
-    selectedPackageObjects,
+  const afterDiscountedSubtotal = getFinalPrice(
+    subtotal,
     discountType,
     discountValue
   );
@@ -219,8 +219,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     customerId: selectedCustomer?.id,
     selectedServices,
     selectedPackages,
-    services,
-    packages,
+    services: services || [],
+    packages: packages || [],
     subtotal,
     discountedSubtotal: afterDiscountedSubtotal
   });
@@ -428,8 +428,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       getTotalDuration(
         selectedServices,
         selectedPackages,
-        services,
-        packages,
+        services || [],
+        packages || [],
         customizedServices
       ),
     [selectedServices, selectedPackages, services, packages, customizedServices]
@@ -443,7 +443,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     appliedTaxRate,
   ]);
 
-  const finalTotal = afterDiscountedSubtotal - pointsDiscountAmount + taxAmount;
+  const finalTotal = afterDiscountedSubtotal - loyalty.pointsDiscountAmount + taxAmount;
 
   const discountAmount = useMemo(
     () =>
@@ -455,8 +455,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     return getAdjustedServicePrices(
       selectedServices,
       selectedPackages,
-      services,
-      packages,
+      services || [],
+      packages || [],
       customizedServices,
       discountType,
       discountValue,
@@ -1025,7 +1025,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
 
             <div className="flex justify-between text-lg font-bold pt-2">
               <span>Total</span>
-              <span>₹{total.toFixed(2)}</span>
+              <span>₹{finalTotal.toFixed(2)}</span>
             </div>
           </div>
 

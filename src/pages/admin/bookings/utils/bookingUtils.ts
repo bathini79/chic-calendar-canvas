@@ -12,7 +12,7 @@ export const getTotalPrice = (
 
   // Calculate price for individual services
   selectedServices.forEach((serviceId) => {
-    const service = services?.find((s) => s.id === serviceId);
+    const service = Array.isArray(services) ? services.find((s) => s.id === serviceId) : null;
     if (service) {
       total += service.selling_price;
     }
@@ -20,7 +20,7 @@ export const getTotalPrice = (
 
   // Calculate price for packages including customizations
   selectedPackages.forEach((packageId) => {
-    const pkg = packages?.find((p) => p.id === packageId);
+    const pkg = Array.isArray(packages) ? packages.find((p) => p.id === packageId) : null;
     if (pkg) {
       // Add base package price
       total += pkg.price;
@@ -28,7 +28,7 @@ export const getTotalPrice = (
       // Add price for additional customized services
       if (pkg.is_customizable && customizedServices[packageId]) {
         customizedServices[packageId].forEach((serviceId) => {
-          const service = services?.find((s) => s.id === serviceId);
+          const service = Array.isArray(services) ? services.find((s) => s.id === serviceId) : null;
           if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
             total += service.selling_price;
           }
@@ -51,7 +51,7 @@ export const getTotalDuration = (
 
   // Calculate duration for individual services
   selectedServices.forEach((serviceId) => {
-    const service = services?.find((s) => s.id === serviceId);
+    const service = Array.isArray(services) ? services.find((s) => s.id === serviceId) : null;
     if (service) {
       totalDuration += service.duration;
     }
@@ -59,7 +59,7 @@ export const getTotalDuration = (
 
   // Calculate duration for packages including customizations
   selectedPackages.forEach((packageId) => {
-    const pkg = packages?.find((p) => p.id === packageId);
+    const pkg = Array.isArray(packages) ? packages.find((p) => p.id === packageId) : null;
     if (pkg) {
       // Add durations of all included services
       pkg.package_services?.forEach((ps) => {
@@ -69,7 +69,7 @@ export const getTotalDuration = (
       // Add duration for additional customized services
       if (pkg.is_customizable && customizedServices[packageId]) {
         customizedServices[packageId].forEach((serviceId) => {
-          const service = services?.find((s) => s.id === serviceId);
+          const service = Array.isArray(services) ? services.find((s) => s.id === serviceId) : null;
           if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
             totalDuration += service.duration;
           }
@@ -115,7 +115,7 @@ export const calculatePackagePrice = (
   customizedServices: string[],
   services: Service[]
 ) => {
-  if (!pkg || !services) return 0;
+  if (!pkg || !Array.isArray(services)) return 0;
   
   let total = pkg?.price || 0;
 
@@ -123,7 +123,7 @@ export const calculatePackagePrice = (
   if (pkg?.is_customizable && customizedServices?.length > 0) {
     customizedServices.forEach((serviceId) => {
       // Find the service in the complete list of services
-      const service = services?.find((s) => s.id === serviceId);
+      const service = services.find((s) => s.id === serviceId);
       
       // Check if this service is not already in the package
       const isInPackage = pkg.package_services?.some(ps => ps.service.id === serviceId);
@@ -175,7 +175,7 @@ export const calculatePackageDuration = (
   customizedServices: string[],
   services: Service[]
 ) => {
-  if (!pkg || !services) return 0;
+  if (!pkg || !Array.isArray(services)) return 0;
   
   // Initialize duration with the sum of all package service durations
   let duration = 0;
@@ -193,7 +193,7 @@ export const calculatePackageDuration = (
   if (pkg?.is_customizable && customizedServices?.length > 0) {
     customizedServices.forEach((serviceId) => {
       // Find the service in the complete list of services
-      const service = services?.find((s) => s.id === serviceId);
+      const service = services.find((s) => s.id === serviceId);
       
       // Check if this service is not already in the package
       const isInPackage = pkg.package_services?.some(ps => ps.service.id === serviceId);
