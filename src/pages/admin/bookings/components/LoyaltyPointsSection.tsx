@@ -1,11 +1,16 @@
 
-import React from "react";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import React from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Label } from "@/components/ui/label";
-import { Info, Star } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Award, HelpCircle } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface LoyaltyPointsSectionProps {
   isEnabled: boolean;
@@ -23,7 +28,7 @@ interface LoyaltyPointsSectionProps {
   maxRedemptionValue: number | null;
 }
 
-export default function LoyaltyPointsSection({
+const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
   isEnabled,
   customerPoints,
   pointsToEarn,
@@ -36,115 +41,110 @@ export default function LoyaltyPointsSection({
   pointsDiscountAmount,
   pointValue,
   maxRedemptionType,
-  maxRedemptionValue
-}: LoyaltyPointsSectionProps) {
+  maxRedemptionValue,
+}) => {
   if (!isEnabled) {
     return null;
   }
 
   const canUsePoints = customerPoints >= minRedemptionPoints;
-  const hasMaxRedemptionLimit = maxRedemptionType && maxRedemptionValue;
+  const formatValue = (value: number) => `${Math.round(value)}`;
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2
-    }).format(amount);
-  };
-
-  const getMaxRedemptionLabel = () => {
-    if (!maxRedemptionType || !maxRedemptionValue) return null;
+  const getMaxRedemptionText = () => {
+    if (!maxRedemptionType) return null;
     
-    if (maxRedemptionType === "fixed") {
-      return `Maximum ${maxRedemptionValue} points can be redeemed per transaction`;
-    } else {
-      return `Points can cover up to ${maxRedemptionValue}% of the total`;
-    }
+    return maxRedemptionType === 'fixed' 
+      ? `Maximum ${maxRedemptionValue} points can be redeemed per transaction.`
+      : `Maximum ${maxRedemptionValue}% of bill amount can be paid with points.`;
   };
 
   return (
-    <Card className="mb-4">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-md flex items-center">
-          <Star className="h-4 w-4 mr-2 text-amber-500" />
-          Loyalty Points
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pb-2 space-y-3">
-        <div className="flex justify-between text-sm">
-          <span>Current Balance:</span>
-          <span className="font-medium">{customerPoints} points</span>
+    <Card className="border border-green-100 bg-green-50">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Award className="h-5 w-5 text-green-600 mr-2" />
+            <h3 className="font-medium text-green-800">Loyalty Points</h3>
+          </div>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80">
+                <p>Customers earn points for eligible purchases and can redeem them for discounts.</p>
+                <p className="mt-1">Each point is worth ₹{pointValue}.</p>
+                {getMaxRedemptionText() && (
+                  <p className="mt-1">{getMaxRedemptionText()}</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         
-        <div className="flex justify-between text-sm">
-          <span>Points to Earn:</span>
-          <span className="font-medium text-green-600">+{pointsToEarn} points</span>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <span className="text-muted-foreground">Available Balance:</span>
+            <span className="ml-1 font-semibold">{customerPoints} points</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Will Earn:</span>
+            <span className="ml-1 font-semibold text-green-600">+{pointsToEarn} points</span>
+          </div>
         </div>
-
-        {canUsePoints && (
-          <>
-            <div className="flex items-center justify-between pt-2">
-              <Label htmlFor="use-points" className="cursor-pointer">Use points for this purchase</Label>
+        
+        {customerPoints > 0 && (
+          <div className="pt-2 border-t border-green-200">
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="use-points" className="cursor-pointer">
+                Apply points for discount
+              </Label>
               <Switch 
                 id="use-points" 
-                checked={usePoints} 
-                onCheckedChange={setUsePoints} 
+                checked={usePoints}
+                onCheckedChange={setUsePoints}
                 disabled={!canUsePoints}
               />
             </div>
             
             {usePoints && (
-              <div className="space-y-3 pt-1">
-                <div className="flex justify-between text-sm items-center">
-                  <Label>Points to redeem: {pointsToRedeem}</Label>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent side="left">
-                        <p>Value: {formatCurrency(pointsDiscountAmount)}</p>
-                        {hasMaxRedemptionLimit && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {getMaxRedemptionLabel()}
-                          </p>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+              <div className="space-y-2 mt-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Points to redeem:</span>
+                  <span className="text-sm font-semibold">{pointsToRedeem}</span>
                 </div>
+                
                 <Slider
                   value={[pointsToRedeem]}
                   min={minRedemptionPoints}
                   max={maxPointsToRedeem}
                   step={10}
                   onValueChange={(values) => setPointsToRedeem(values[0])}
+                  aria-label="Points to redeem"
                 />
-                <div className="flex justify-between text-xs">
+                
+                <div className="flex justify-between text-xs text-muted-foreground">
                   <span>{minRedemptionPoints}</span>
                   <span>{maxPointsToRedeem}</span>
                 </div>
+                
+                <div className="mt-1 text-sm text-green-600 font-medium">
+                  Discount value: ₹{pointsDiscountAmount.toFixed(2)}
+                </div>
               </div>
             )}
-          </>
-        )}
-
-        {!canUsePoints && customerPoints > 0 && (
-          <div className="text-sm text-amber-600">
-            You need at least {minRedemptionPoints} points to redeem.
+            
+            {!canUsePoints && (
+              <div className="text-xs text-muted-foreground mt-1">
+                Minimum {minRedemptionPoints} points required to redeem.
+              </div>
+            )}
           </div>
         )}
       </CardContent>
-      
-      {usePoints && pointsToRedeem > 0 && (
-        <CardFooter className="pt-0">
-          <div className="w-full flex justify-between text-sm font-medium">
-            <span>Discount Applied:</span>
-            <span className="text-green-600">-{formatCurrency(pointsDiscountAmount)}</span>
-          </div>
-        </CardFooter>
-      )}
     </Card>
   );
-}
+};
+
+export default LoyaltyPointsSection;
