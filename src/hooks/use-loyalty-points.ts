@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
+import { toast } from "sonner";
 
 interface CustomerPoints {
   walletBalance: number;

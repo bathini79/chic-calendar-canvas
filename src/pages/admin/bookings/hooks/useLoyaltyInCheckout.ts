@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLoyaltyPoints } from "@/hooks/use-loyalty-points";
 import { Service, Package } from "@/pages/admin/bookings/types";
 
@@ -41,7 +41,6 @@ export function useLoyaltyInCheckout({
 }: UseLoyaltyInCheckoutProps): UseLoyaltyInCheckoutResult {
   const {
     settings,
-    isEligibleForPoints,
     customerPoints,
     getEligibleAmount,
     calculatePointsFromAmount,
@@ -54,13 +53,17 @@ export function useLoyaltyInCheckout({
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   
-  // Force refresh customer points to ensure up-to-date data
-  useEffect(() => {
+  // Force refresh customer points to ensure up-to-date data - but using useCallback to prevent infinite loops
+  const refreshCustomerPoints = useCallback(() => {
     if (customerId) {
       console.log('Refreshing points in checkout for customer:', customerId);
       fetchCustomerPoints();
     }
   }, [customerId, fetchCustomerPoints]);
+  
+  useEffect(() => {
+    refreshCustomerPoints();
+  }, [refreshCustomerPoints]);
   
   // Eligible amount for earning points - based on selected services and packages
   const eligibleAmount = getEligibleAmount(
@@ -86,24 +89,27 @@ export function useLoyaltyInCheckout({
   useEffect(() => {
     if (settings && customerPoints) {
       console.log('Settings or points changed, recalculating. Available points:', customerPoints);
+      
+      // Reset points to redeem when usePoints is false
+      if (!usePoints) {
+        setPointsToRedeem(0);
+        return;
+      }
+      
       // If user has enough points, default to minimum redemption points or zero
       if (hasMinimumForRedemption(customerPoints)) {
-        setPointsToRedeem(Math.min(settings.min_redemption_points, customerPoints.walletBalance));
+        const minimumRedemption = Math.min(
+          settings.min_redemption_points, 
+          customerPoints.walletBalance,
+          maxPointsToRedeem || Infinity
+        );
+        setPointsToRedeem(minimumRedemption);
       } else {
         setUsePoints(false);
         setPointsToRedeem(0);
       }
     }
-  }, [settings, customerPoints, hasMinimumForRedemption]);
-  
-  // When usePoints changes, reset or set pointsToRedeem
-  useEffect(() => {
-    if (!usePoints) {
-      setPointsToRedeem(0);
-    } else if (settings && customerPoints && hasMinimumForRedemption(customerPoints)) {
-      setPointsToRedeem(Math.min(settings.min_redemption_points, customerPoints.walletBalance));
-    }
-  }, [usePoints, settings, customerPoints, hasMinimumForRedemption]);
+  }, [settings, customerPoints, hasMinimumForRedemption, usePoints, maxPointsToRedeem]);
   
   return {
     isLoyaltyEnabled: Boolean(settings?.enabled),

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
@@ -45,28 +45,34 @@ export function ProfileMenu() {
       
       return data;
     },
-    enabled: !!session?.user?.id
+    enabled: !!session?.user?.id,
+    staleTime: 5 * 60 * 1000, // Cache profile data for 5 minutes to prevent frequent refetches
   });
 
+  const generateInitials = useCallback((fullName: string) => {
+    if (!fullName) return "";
+    
+    return fullName
+      .split(" ")
+      .map(part => part.charAt(0))
+      .join("")
+      .toUpperCase();
+  }, []);
+  
   useEffect(() => {
     if (profile) {
       const fullName = profile.full_name || "";
       
       if (fullName) {
         // Generate initials from name
-        const nameInitials = fullName
-          .split(" ")
-          .map(part => part.charAt(0))
-          .join("")
-          .toUpperCase();
-        setInitials(nameInitials);
+        setInitials(generateInitials(fullName));
       } else if (profile.email) {
         // If no name, use the first part of email
         const emailName = profile.email.split("@")[0];
         setInitials(emailName.charAt(0).toUpperCase());
       }
     }
-  }, [profile]);
+  }, [profile, generateInitials]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -97,7 +103,7 @@ export function ProfileMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{profile?.full_name || 'User'}</p>
-            <p className="text-xs leading-none text-muted-foreground">{profile?.phone_number || session.user.phone_number}</p>
+            <p className="text-xs leading-none text-muted-foreground">{profile?.phone_number}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
