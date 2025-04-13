@@ -1213,6 +1213,7 @@ export type Database = {
           applicable_packages: string[] | null
           applicable_services: string[] | null
           apply_to_all: boolean | null
+          cashback_validity_days: number | null
           created_at: string | null
           enabled: boolean | null
           id: string
@@ -1229,6 +1230,7 @@ export type Database = {
           applicable_packages?: string[] | null
           applicable_services?: string[] | null
           apply_to_all?: boolean | null
+          cashback_validity_days?: number | null
           created_at?: string | null
           enabled?: boolean | null
           id?: string
@@ -1245,6 +1247,7 @@ export type Database = {
           applicable_packages?: string[] | null
           applicable_services?: string[] | null
           apply_to_all?: boolean | null
+          cashback_validity_days?: number | null
           created_at?: string | null
           enabled?: boolean | null
           id?: string

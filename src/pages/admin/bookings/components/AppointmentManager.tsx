@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { SummaryView } from "./SummaryView";
 import { useAppointmentState } from "../hooks/useAppointmentState";
 import { useActiveServices } from "../hooks/useActiveServices";
 import { useActivePackages } from "../hooks/useActivePackages";
-import { useSaveAppointment } from "../hooks/useSaveAppointment";
+import  useSaveAppointment  from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
 import {
@@ -16,6 +15,7 @@ import {
   SCREEN,
   Service,
   Package,
+  PaymentMethod,
   AppointmentStatus,
 } from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
