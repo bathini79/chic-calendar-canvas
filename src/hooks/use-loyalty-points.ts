@@ -1,24 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Service, Package } from "@/pages/admin/bookings/types";
-
-interface LoyaltyProgramSettings {
-  id: string;
-  enabled: boolean;
-  points_per_spend: number;
-  point_value: number;
-  min_redemption_points: number;
-  min_billing_amount?: number | null;
-  apply_to_all: boolean;
-  applicable_services?: string[] | null;
-  applicable_packages?: string[] | null;
-  points_validity_days?: number | null;
-  cashback_validity_days?: number | null;
-  max_redemption_points: number | null;
-  max_redemption_percentage: number | null;
-  max_redemption_type: "fixed" | "percentage" | null;
-}
+import { Service, Package, LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
 
 interface UseLoyaltyPointsResult {
   isLoading: boolean;
@@ -66,13 +48,31 @@ export function useLoyaltyPoints(customerId?: string): UseLoyaltyPointsResult {
         }
         
         if (settingsData) {
-          setSettings(settingsData);
+          // Convert the data to the expected LoyaltyProgramSettings type
+          const typedSettings: LoyaltyProgramSettings = {
+            id: settingsData.id,
+            enabled: settingsData.enabled,
+            points_per_spend: settingsData.points_per_spend,
+            point_value: settingsData.point_value,
+            min_redemption_points: settingsData.min_redemption_points,
+            min_billing_amount: settingsData.min_billing_amount,
+            apply_to_all: settingsData.apply_to_all,
+            applicable_services: settingsData.applicable_services,
+            applicable_packages: settingsData.applicable_packages,
+            points_validity_days: settingsData.points_validity_days,
+            cashback_validity_days: settingsData.cashback_validity_days,
+            max_redemption_type: settingsData.max_redemption_type,
+            max_redemption_points: settingsData.max_redemption_points,
+            max_redemption_percentage: settingsData.max_redemption_percentage
+          };
+          
+          setSettings(typedSettings);
           
           // Program is eligible if it's enabled
-          setIsEligibleForPoints(settingsData?.enabled || false);
+          setIsEligibleForPoints(typedSettings?.enabled || false);
           
           // If we have a customer ID, fetch their points balance
-          if (customerId && settingsData?.enabled) {
+          if (customerId && typedSettings?.enabled) {
             const { data: customerData, error: customerError } = await supabase
               .from("profiles")
               .select("wallet_balance, cashback_balance")

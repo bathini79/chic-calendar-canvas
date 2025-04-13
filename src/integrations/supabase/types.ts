@@ -1217,6 +1217,9 @@ export type Database = {
           created_at: string | null
           enabled: boolean | null
           id: string
+          max_redemption_percentage: number | null
+          max_redemption_points: number | null
+          max_redemption_type: string | null
           min_billing_amount: number | null
           min_redemption_points: number
           point_value: number
@@ -1232,6 +1235,9 @@ export type Database = {
           created_at?: string | null
           enabled?: boolean | null
           id?: string
+          max_redemption_percentage?: number | null
+          max_redemption_points?: number | null
+          max_redemption_type?: string | null
           min_billing_amount?: number | null
           min_redemption_points?: number
           point_value?: number
@@ -1247,6 +1253,9 @@ export type Database = {
           created_at?: string | null
           enabled?: boolean | null
           id?: string
+          max_redemption_percentage?: number | null
+          max_redemption_points?: number | null
+          max_redemption_type?: string | null
           min_billing_amount?: number | null
           min_redemption_points?: number
           point_value?: number

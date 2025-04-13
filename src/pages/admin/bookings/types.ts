@@ -1,4 +1,3 @@
-
 export type Appointment = {
   id: string;
   customer_id: string;
@@ -91,3 +90,20 @@ export enum SCREEN {
   SERVICES,
   CHECKOUT,
 }
+
+export type LoyaltyProgramSettings = {
+  id: string;
+  enabled: boolean;
+  points_per_spend: number;
+  point_value: number;
+  min_redemption_points: number;
+  min_billing_amount: number | null;
+  apply_to_all: boolean;
+  applicable_services: string[] | null;
+  applicable_packages: string[] | null;
+  points_validity_days: number | null;
+  cashback_validity_days: number | null;
+  max_redemption_type: "fixed" | "percentage" | null;
+  max_redemption_points: number | null;
+  max_redemption_percentage: number | null;
+};

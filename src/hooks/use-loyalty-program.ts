@@ -1,93 +1,95 @@
 
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { LoyaltyProgramSettings } from '@/pages/admin/bookings/types';
 
-export type LoyaltyProgramSettings = {
-  id: string;
+export type LoyaltyProgramFormValues = {
   enabled: boolean;
-  points_validity_days: number | null;
-  cashback_validity_days: number | null;
+  points_per_spend: number;
   point_value: number;
   min_redemption_points: number;
-  apply_to_all: boolean;
-  points_per_spend: number;
   min_billing_amount: number | null;
+  apply_to_all: boolean;
   applicable_services: string[];
   applicable_packages: string[];
-  created_at: string;
-  updated_at: string;
+  points_validity_days: number | null;
+  cashback_validity_days: number | null;
+  max_redemption_type: "fixed" | "percentage" | null;
   max_redemption_points: number | null;
   max_redemption_percentage: number | null;
-  max_redemption_type: "fixed" | "percentage" | null;
 };
-
-export type LoyaltyProgramFormValues = Omit<LoyaltyProgramSettings, 'id' | 'created_at' | 'updated_at'>;
 
 export function useLoyaltyProgram() {
   const [settings, setSettings] = useState<LoyaltyProgramSettings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchSettings = async () => {
-    setIsLoading(true);
     try {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from('loyalty_program_settings')
         .select('*')
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
+        .single();
+      
+      if (error) {
+        console.error('Error fetching loyalty program settings:', error);
+        return;
+      }
+      
       if (data) {
         setSettings(data as LoyaltyProgramSettings);
-      } else {
-        setSettings(null);
       }
-    } catch (error: any) {
-      toast.error(`Error fetching loyalty program settings: ${error.message}`);
-      console.error("Error fetching loyalty program settings:", error);
+    } catch (error) {
+      console.error('Unexpected error in fetchSettings:', error);
     } finally {
       setIsLoading(false);
     }
   };
-
-  const updateSettings = async (values: Partial<LoyaltyProgramFormValues>): Promise<LoyaltyProgramSettings | null> => {
+  
+  const updateSettings = async (values: LoyaltyProgramFormValues) => {
     try {
-      if (!settings || !settings.id) {
-        // Create new settings if none exist
-        const { data, error } = await supabase
+      setIsLoading(true);
+      
+      // If no settings exist, create a new record
+      if (!settings) {
+        const { error } = await supabase
           .from('loyalty_program_settings')
-          .insert([values])
-          .select()
-          .single();
-
-        if (error) throw error;
-        toast.success("Loyalty program settings created successfully");
-        const newSettings = data as LoyaltyProgramSettings;
-        setSettings(newSettings);
-        return newSettings;
+          .insert([values]);
+          
+        if (error) {
+          toast.error('Failed to create loyalty program settings');
+          console.error('Error creating loyalty program settings:', error);
+          return;
+        }
+        
+        toast.success('Loyalty program settings created successfully');
       } else {
         // Update existing settings
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('loyalty_program_settings')
           .update(values)
-          .eq('id', settings.id)
-          .select()
-          .single();
-
-        if (error) throw error;
-        toast.success("Loyalty program settings updated successfully");
-        const updatedSettings = data as LoyaltyProgramSettings;
-        setSettings(updatedSettings);
-        return updatedSettings;
+          .eq('id', settings.id);
+          
+        if (error) {
+          toast.error('Failed to update loyalty program settings');
+          console.error('Error updating loyalty program settings:', error);
+          return;
+        }
+        
+        toast.success('Loyalty program settings updated successfully');
       }
-    } catch (error: any) {
-      toast.error(`Error updating loyalty program settings: ${error.message}`);
-      console.error("Error updating loyalty program settings:", error);
-      return null;
+      
+      // Refresh settings after update
+      fetchSettings();
+    } catch (error) {
+      console.error('Unexpected error in updateSettings:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
   };
-
+  
   return {
     settings,
     isLoading,

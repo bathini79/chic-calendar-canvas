@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -105,7 +104,6 @@ export default function LoyaltyProgram() {
   };
   
   const onSubmit = async (values: LoyaltyProgramFormValues) => {
-    // Ensure we include the service and package selections
     const dataToSubmit = {
       ...values,
       applicable_services: values.apply_to_all ? [] : selectedServices,
@@ -396,7 +394,7 @@ export default function LoyaltyProgram() {
                         <FormControl>
                           <Select 
                             value={field.value || ""} 
-                            onValueChange={(value) => field.onChange(value || null)}
+                            onValueChange={(value) => field.onChange(value === "none" ? null : value)}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="No limit" />
