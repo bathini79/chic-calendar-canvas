@@ -52,9 +52,11 @@ function App() {
             <Route path="inventory" element={<Inventory />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="settings/business-setup" element={<BusinessSetup />} />
-        <Route path="settings/third-party" element={<ThirdParty />} />
-        <Route path="settings/sales" element={<Sales />} />
+            <Route path="settings/business-setup/*" element={<BusinessSetup />} />
+            <Route path="settings/sales" element={<Sales />} />
+            <Route path="settings/sales/*" element={<Sales />} />
+            <Route path="settings/third-party" element={<ThirdParty />} />
+            <Route path="settings/third-party/*" element={<ThirdParty />} />
           </Route>
           
           {/* Customer routes */}
