@@ -58,15 +58,14 @@ export function useLoyaltyInCheckout({
   // Force refresh customer points to ensure up-to-date data - but using useCallback to prevent infinite loops
   const refreshCustomerPoints = useCallback(() => {
     if (customerId) {
-      console.log('Refreshing points in checkout for customer:', customerId);
       fetchCustomerPoints();
     }
-  }, [customerId, fetchCustomerPoints]);
+  }, [customerId]);
   
   // Only fetch points when component mounts or customerId changes
   useEffect(() => {
     refreshCustomerPoints();
-  }, [refreshCustomerPoints]);
+  }, [customerId]);
   
   // Auto-transfer cashback to wallet when component loads and whenever customer points change
   // Using refs to prevent infinite loops caused by the effect dependency on autoTransferCashbackToWallet

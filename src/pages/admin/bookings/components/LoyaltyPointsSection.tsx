@@ -50,7 +50,7 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
   }
 
   const canUsePoints = walletBalance >= minRedemptionPoints && maxPointsToRedeem > 0;
-
+  console.log("walletBalance < minRedemptionPoints",walletBalance , "  ", minRedemptionPoints,"  ",maxPointsToRedeem)
   return (
     <Card className="bg-gray-50 border">
       <CardContent className="pt-4 space-y-4">
