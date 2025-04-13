@@ -46,11 +46,19 @@ export function useLoyaltyInCheckout({
     calculatePointsFromAmount,
     calculateAmountFromPoints,
     hasMinimumForRedemption,
-    getMaxRedeemablePoints
+    getMaxRedeemablePoints,
+    fetchCustomerPoints
   } = useLoyaltyPoints(customerId);
   
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  
+  // Force refresh customer points to ensure up-to-date data
+  useEffect(() => {
+    if (customerId) {
+      fetchCustomerPoints();
+    }
+  }, [customerId]);
   
   // Eligible amount for earning points - based on selected services and packages
   const eligibleAmount = getEligibleAmount(
@@ -74,10 +82,10 @@ export function useLoyaltyInCheckout({
   
   // When loyalty settings or available points change, reset the points to redeem
   useEffect(() => {
-    if (settings && availablePoints) {
-      // If user has enough points, default to minimum redemption points
+    if (settings && availablePoints !== null) {
+      // If user has enough points, default to minimum redemption points or zero
       if (hasMinimumForRedemption(availablePoints)) {
-        setPointsToRedeem(settings.min_redemption_points);
+        setPointsToRedeem(Math.min(settings.min_redemption_points, availablePoints));
       } else {
         setUsePoints(false);
         setPointsToRedeem(0);
@@ -89,8 +97,8 @@ export function useLoyaltyInCheckout({
   useEffect(() => {
     if (!usePoints) {
       setPointsToRedeem(0);
-    } else if (settings && availablePoints && hasMinimumForRedemption(availablePoints)) {
-      setPointsToRedeem(settings.min_redemption_points);
+    } else if (settings && availablePoints !== null && hasMinimumForRedemption(availablePoints)) {
+      setPointsToRedeem(Math.min(settings.min_redemption_points, availablePoints));
     }
   }, [usePoints, settings, availablePoints, hasMinimumForRedemption]);
   

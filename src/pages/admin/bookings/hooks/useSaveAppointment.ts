@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -196,7 +195,6 @@ export default function useSaveAppointment({
           ? summaryParams.pointsDiscountAmount
           : pointsDiscountAmount;
 
-      // Create appointment data without points_discount_amount if it doesn't exist in schema
       const appointmentData: any = {
         customer_id: selectedCustomer.id,
         start_time: startTime.toISOString(),
@@ -406,12 +404,15 @@ export default function useSaveAppointment({
         if (customerFetchError) {
           console.error("Error fetching customer points:", customerFetchError);
         } else {
-          let newWalletBalance = customerData.wallet_balance || 0;
+          const currentWalletBalance = typeof customerData.wallet_balance === 'number' ? customerData.wallet_balance : 0;
+          const currentCashbackBalance = typeof customerData.cashback_balance === 'number' ? customerData.cashback_balance : 0;
+          
+          let newWalletBalance = currentWalletBalance;
           if (pointsRedeemedFromParams > 0) {
             newWalletBalance = Math.max(0, newWalletBalance - pointsRedeemedFromParams);
           }
           
-          let newCashbackBalance = customerData.cashback_balance || 0;
+          let newCashbackBalance = currentCashbackBalance;
           if (pointsEarnedFromParams > 0) {
             newCashbackBalance += pointsEarnedFromParams;
           }
@@ -426,6 +427,8 @@ export default function useSaveAppointment({
             
           if (updateError) {
             console.error("Error updating customer points:", updateError);
+          } else {
+            console.log(`Updated customer loyalty balance: wallet=${newWalletBalance}, cashback=${newCashbackBalance}`);
           }
         }
       }
