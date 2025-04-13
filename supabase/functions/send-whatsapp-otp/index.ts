@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0';
 const corsHeaders = {
@@ -24,7 +25,7 @@ serve(async (req)=>{
     });
   }
   try {
-    const { phoneNumber, fullName, lead_source,baseUrl } = await req.json();
+    const { phoneNumber, fullName, lead_source, baseUrl } = await req.json();
     if (!phoneNumber) {
       return new Response(JSON.stringify({
         error: "Missing phoneNumber parameter"
@@ -37,6 +38,29 @@ serve(async (req)=>{
       });
     }
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    
+    // Check if the user already exists
+    const { data: existingUser, error: existingUserError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, phone_number, wallet_balance')
+      .eq('phone_number', phoneNumber)
+      .single();
+      
+    if (existingUser) {
+      // Return success with existing user
+      return new Response(JSON.stringify({
+        success: true,
+        message: "User already exists",
+        user: existingUser
+      }), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      });
+    }
+    
     // Generate a random 6-digit OTP code
     const generateOTP = ()=>{
       return Math.floor(100000 + Math.random() * 900000).toString();
