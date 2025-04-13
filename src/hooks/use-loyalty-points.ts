@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
@@ -68,6 +69,7 @@ export function useLoyaltyPoints(customerId?: string) {
           
           if (expiryDate < new Date()) {
             walletBalance = 0;
+            console.log('Points have expired on:', expiryDate);
           } else {
             console.log('Points valid until:', expiryDate);
           }
@@ -98,7 +100,7 @@ export function useLoyaltyPoints(customerId?: string) {
     } else {
       setCustomerPoints(null);
     }
-  }, [customerId]);
+  }, [customerId, settings?.points_validity_days]);
 
   const isEligibleItem = (itemId: string, type: 'service' | 'package') => {
     if (!settings || !settings.enabled) return false;
@@ -163,7 +165,7 @@ export function useLoyaltyPoints(customerId?: string) {
   };
 
   const calculateAmountFromPoints = (points: number): number => {
-    if (!settings || !settings.enabled) return 0;
+    if (!settings || !settings.enabled || !settings.point_value) return 0;
     
     const amount = points * settings.point_value;
     console.log(`Calculated amount from points: ${points} × ${settings.point_value} = ${amount}`);
@@ -179,8 +181,8 @@ export function useLoyaltyPoints(customerId?: string) {
   };
 
   const getMaxRedeemablePoints = (subtotal: number): number => {
-    if (!settings || !settings.enabled || !customerPoints) {
-      console.log('Cannot calculate max redeemable points: settings not loaded or no customer points');
+    if (!settings || !settings.enabled || !customerPoints || !settings.point_value) {
+      console.log('Cannot calculate max redeemable points: settings not loaded, no customer points, or no point value defined');
       return 0;
     }
     
@@ -192,6 +194,7 @@ export function useLoyaltyPoints(customerId?: string) {
     console.log('Calculating max redeemable points with settings:', settings);
     console.log('Customer wallet balance:', customerPoints.walletBalance);
     console.log('Subtotal for calculation:', subtotal);
+    console.log('Point value:', settings.point_value);
     
     let maxPoints = customerPoints.walletBalance;
     console.log('Starting with available points:', maxPoints);
@@ -208,6 +211,7 @@ export function useLoyaltyPoints(customerId?: string) {
       console.log(`Percentage limit (${settings.max_redemption_percentage}%): max points = ${maxPointsFromPercentage}`);
     }
     
+    // Calculate how many points needed to cover the full subtotal
     const maxPointsForFullSubtotal = Math.ceil(subtotal / settings.point_value);
     maxPoints = Math.min(maxPoints, maxPointsForFullSubtotal);
     console.log(`Limiting by subtotal: max points = ${maxPointsForFullSubtotal}`);

@@ -971,7 +971,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 <LoyaltyPointsSection
                   isEnabled={loyalty.isLoyaltyEnabled}
                   walletBalance={loyalty.walletBalance}
-                  cashbackBalance={loyalty.cashbackBalance}
                   pointsToEarn={loyalty.pointsToEarn}
                   usePoints={loyalty.usePoints}
                   setUsePoints={loyalty.setUsePoints}

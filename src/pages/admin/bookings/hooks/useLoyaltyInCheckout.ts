@@ -76,8 +76,8 @@ export function useLoyaltyInCheckout({
   }, [settings, pointsToEarn]);
 
   // Handle maximum points to redeem based on settings
-  const maxPointsToRedeem = settings?.enabled
-    ? getMaxRedeemablePoints(subtotal)
+  const maxPointsToRedeem = settings?.enabled && settings.point_value
+    ? getMaxRedeemablePoints(discountedSubtotal)
     : 0;
 
   // Reset points to redeem if greater than maximum
@@ -88,7 +88,7 @@ export function useLoyaltyInCheckout({
   }, [maxPointsToRedeem, pointsToRedeem]);
 
   // Calculate discount amount from redeemed points
-  const pointsDiscountAmount = usePoints && settings?.enabled
+  const pointsDiscountAmount = usePoints && settings?.enabled && settings?.point_value
     ? calculateAmountFromPoints(pointsToRedeem)
     : 0;
 
