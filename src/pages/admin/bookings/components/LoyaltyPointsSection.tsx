@@ -1,9 +1,11 @@
+
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Award, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { format, addDays } from "date-fns";
 
 interface LoyaltyPointsSectionProps {
   isEnabled: boolean;
@@ -50,6 +52,11 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
 
   const canUsePoints = walletBalance >= minRedemptionPoints && maxPointsToRedeem > 0;
   
+  // Calculate future expiry date (for informational purposes)
+  const today = new Date();
+  const futureDate = addDays(today, 365); // Using 365 as default, could be fetched from settings
+  const expiryDateFormatted = format(futureDate, 'MMM dd, yyyy');
+  
   return (
     <Card className="bg-gray-50 border">
       <CardContent className="pt-4 space-y-4">
@@ -77,6 +84,13 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
           </div>
         )}
 
+        {pointsToEarn > 0 && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Points Earned with this Purchase</span>
+            <span className="font-medium text-green-600">{pointsToEarn}</span>
+          </div>
+        )}
+
         {canUsePoints ? (
           <>
             <div className="flex items-center justify-between">
@@ -95,7 +109,9 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
                           ? `Points worth up to ${maxRedemptionValue}% of the subtotal can be redeemed.`
                           : `Redeem your points for a discount.`}
                         <br />
-                        Each point is worth ₹{pointValue.toFixed(2)}.
+                        Each point is worth 1 currency unit.
+                        <br />
+                        Points earned today will expire on {expiryDateFormatted}.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -112,7 +128,7 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Points to redeem</span>
-                  <span>{pointsToRedeem} points (₹{pointsDiscountAmount.toFixed(2)})</span>
+                  <span>{pointsToRedeem} points ({pointsDiscountAmount.toFixed(2)})</span>
                 </div>
                 <Slider
                   value={[pointsToRedeem]}
