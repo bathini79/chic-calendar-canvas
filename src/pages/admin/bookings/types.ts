@@ -1,3 +1,4 @@
+
 export type AppointmentStatus = 
   | 'pending' 
   | 'confirmed' 
@@ -15,6 +16,7 @@ export type Appointment = {
   customer_id: string;
   location_id: string | null;
   location?: string | null;
+  location_name?: string | null;
   start_time: string;
   end_time: string;
   status: AppointmentStatus;
@@ -28,6 +30,9 @@ export type Appointment = {
   membership_discount: number;
   membership_id: string | null;
   membership_name: string | null;
+  points_earned?: number;
+  points_redeemed?: number; 
+  points_discount_amount?: number;
   created_at?: string;
   updated_at?: string;
   transaction_type?: string;
@@ -161,6 +166,8 @@ export type SummaryViewProps = {
     name: string;
     price: number;
     type: string;
+    employee?: any;
+    duration?: number;
   }>;
   paymentMethod?: PaymentMethod;
   onAddAnother?: () => void;

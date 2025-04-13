@@ -15,7 +15,8 @@ import {
   Clock,
   Package,
   MapPin,
-  Percent
+  Percent,
+  Star
 } from "lucide-react";
 import { format } from 'date-fns';
 import {
@@ -94,11 +95,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     if (details) {
       setTransactionDetails(details);
       
-      // Initialize selected bookings if we have transaction details
       if (details.originalSale && details.originalSale.bookings) {
         setSelectedBookings(details.originalSale.bookings);
         
-        // Initialize selected stylists with current values
         const initialStylists: {[key: string]: string} = {};
         details.originalSale.bookings.forEach(booking => {
           if (booking.employee_id) {
@@ -167,14 +166,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     if (!appointmentId) return;
     
     try {
-      // Update each booking's stylist
       const updatePromises = Object.entries(selectedEmployees).map(([bookingId, employeeId]) => {
         return updateBookingStylelist(bookingId, employeeId);
       });
       
       await Promise.all(updatePromises);
-      await loadAppointmentDetails(); // Reload the details to show updated information
-      
+      await loadAppointmentDetails();
       setShowEditSaleDialog(false);
       toast.success('Sale details updated successfully');
     } catch (error) {
@@ -238,7 +235,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           </div>
 
           <div className="space-y-1 pt-2 border-t">
-            {/* Original Amount (Subtotal) */}
             {subTotal !== undefined && (
               <div className="flex justify-between text-sm">
                 <span>Subtotal</span>
@@ -246,7 +242,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               </div>
             )}
             
-            {/* Tax Name & Amount */}
             {taxAmount !== undefined && taxAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Tax</span>
@@ -254,7 +249,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               </div>
             )}
             
-            {/* Membership Discount */}
             {membershipName && membershipDiscount && membershipDiscount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span className="flex items-center gap-1">
@@ -265,7 +259,16 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               </div>
             )}
             
-            {/* Other Discount */}
+            {appointment && appointment.points_discount_amount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span className="flex items-center gap-1">
+                  <Star className="h-3 w-3 text-amber-500" />
+                  Loyalty Points Discount
+                </span>
+                <span>-{formatPrice(appointment.points_discount_amount)}</span>
+              </div>
+            )}
+            
             {appointment && appointment.discount_type !== 'none' && appointment.discount_value > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>
@@ -284,7 +287,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               </div>
             )}
             
-            {/* Total Amount */}
             <div className="flex justify-between text-lg font-bold pt-2">
               <span>Total</span>
               <span>{formatPrice(totalPrice || 0)}</span>
@@ -467,7 +469,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             const groupedBookings = getGroupedBookings(transaction);
             const locationName = getLocationNameById(transaction.location);
             const taxName = getTaxNameById(transaction.tax_id);
-            // Calculate subtotal (without taxes, discounts, etc.)
             const subtotal = transaction.bookings.reduce((sum, booking) => sum + (booking.price_paid || 0), 0);
             
             return (
@@ -608,49 +609,38 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                   </div>
   
                   <div className="space-y-1 pt-2 border-t">
-                    {/* Original Amount (Subtotal) */}
                     <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
                       <span>₹{subtotal.toFixed(2)}</span>
                     </div>
                     
-                    {/* Tax Name & Amount */}
-                    {transaction.tax_amount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span>{taxName ? `Tax (${taxName})` : 'Tax'}</span>
-                        <span>₹{transaction.tax_amount.toFixed(2)}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between text-sm">
+                      <span>{taxName ? `Tax (${taxName})` : 'Tax'}</span>
+                      <span>₹{transaction.tax_amount.toFixed(2)}</span>
+                    </div>
                     
-                    {/* Membership Discount */}
-                    {transaction.membership_discount > 0 && transaction.membership_name && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span className="flex items-center gap-1">
-                          <Percent className="h-3 w-3" />
-                          {transaction.membership_name} Discount
-                        </span>
-                        <span>-₹{transaction.membership_discount.toFixed(2)}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span className="flex items-center gap-1">
+                        <Percent className="h-3 w-3" />
+                        {transaction.membership_name} Discount
+                      </span>
+                      <span>-₹{transaction.membership_discount.toFixed(2)}</span>
+                    </div>
                     
-                    {/* Other Discount */}
-                    {transaction.discount_type !== 'none' && transaction.discount_value > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>
-                          Discount ({transaction.discount_type === 'percentage' ? 
-                            `${transaction.discount_value}%` : 
-                            '₹' + transaction.discount_value
-                          })
-                        </span>
-                        <span>
-                          -{transaction.discount_type === 'percentage' 
-                            ? '₹' + (subtotal * (transaction.discount_value / 100)).toFixed(2)
-                            : '₹' + transaction.discount_value.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>
+                        Discount ({transaction.discount_type === 'percentage' ? 
+                          `${transaction.discount_value}%` : 
+                          '₹' + transaction.discount_value
+                        })
+                      </span>
+                      <span>
+                        -{transaction.discount_type === 'percentage' 
+                          ? '₹' + (subtotal * (transaction.discount_value / 100)).toFixed(2)
+                          : '₹' + transaction.discount_value.toFixed(2)}
+                      </span>
+                    </div>
                     
-                    {/* Total Amount */}
                     <div className="flex justify-between text-lg font-bold pt-2">
                       <span>Total</span>
                       <span className={isRefund ? 'text-red-600' : ''}>
@@ -674,6 +664,29 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                       </div>
                     </div>
                   </div>
+  
+                  {(transaction.points_earned > 0 || transaction.points_redeemed > 0) && (
+                    <div className="pt-2 border-t text-xs text-gray-600">
+                      {transaction.points_earned > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="flex items-center gap-1">
+                            <Star className="h-3 w-3 text-amber-500" />
+                            Points Earned
+                          </span>
+                          <span className="text-green-600">+{transaction.points_earned}</span>
+                        </div>
+                      )}
+                      {transaction.points_redeemed > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="flex items-center gap-1">
+                            <Star className="h-3 w-3 text-amber-500" />
+                            Points Redeemed
+                          </span>
+                          <span className="text-amber-600">-{transaction.points_redeemed}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
   
                   {isRefund && transaction.refund_reason && (
                     <div className="space-y-2 pt-4 border-t">

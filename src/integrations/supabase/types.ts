@@ -28,6 +28,7 @@ export type Database = {
           number_of_bookings: number | null
           original_appointment_id: string | null
           payment_method: string | null
+          points_discount_amount: number | null
           refund_notes: string | null
           refund_reason: string | null
           refunded_by: string | null
@@ -58,6 +59,7 @@ export type Database = {
           number_of_bookings?: number | null
           original_appointment_id?: string | null
           payment_method?: string | null
+          points_discount_amount?: number | null
           refund_notes?: string | null
           refund_reason?: string | null
           refunded_by?: string | null
@@ -88,6 +90,7 @@ export type Database = {
           number_of_bookings?: number | null
           original_appointment_id?: string | null
           payment_method?: string | null
+          points_discount_amount?: number | null
           refund_notes?: string | null
           refund_reason?: string | null
           refunded_by?: string | null
