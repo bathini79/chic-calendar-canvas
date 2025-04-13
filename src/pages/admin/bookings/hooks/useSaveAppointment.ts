@@ -44,7 +44,7 @@ interface SaveAppointmentProps {
   pointsDiscountAmount?: number;
 }
 
-export function useSaveAppointment({
+export default function useSaveAppointment({
   selectedDate,
   selectedTime,
   selectedCustomer,
