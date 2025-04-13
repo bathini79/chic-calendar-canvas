@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
@@ -38,6 +39,8 @@ export function useLoyaltyPoints(customerId?: string) {
     
     try {
       setIsLoading(true);
+      console.log('Fetching points for customer:', customerId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('wallet_balance, cashback_balance')
@@ -52,6 +55,7 @@ export function useLoyaltyPoints(customerId?: string) {
       if (data) {
         // Ensure wallet_balance is always a number
         const walletBalance = typeof data.wallet_balance === 'number' ? data.wallet_balance : 0;
+        console.log('Fetched wallet balance:', walletBalance);
         setCustomerPoints(walletBalance);
       }
     } catch (error) {
@@ -68,6 +72,8 @@ export function useLoyaltyPoints(customerId?: string) {
   useEffect(() => {
     if (customerId) {
       fetchCustomerPoints();
+    } else {
+      setCustomerPoints(null);
     }
   }, [customerId]);
 

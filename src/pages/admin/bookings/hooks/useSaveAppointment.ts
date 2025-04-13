@@ -395,41 +395,49 @@ export default function useSaveAppointment({
       }
 
       if (selectedCustomer && (pointsEarnedFromParams > 0 || pointsRedeemedFromParams > 0)) {
-        const { data: customerData, error: customerFetchError } = await supabase
-          .from("profiles")
-          .select("wallet_balance, cashback_balance")
-          .eq("id", selectedCustomer.id)
-          .single();
-          
-        if (customerFetchError) {
-          console.error("Error fetching customer points:", customerFetchError);
-        } else {
-          const currentWalletBalance = typeof customerData.wallet_balance === 'number' ? customerData.wallet_balance : 0;
-          const currentCashbackBalance = typeof customerData.cashback_balance === 'number' ? customerData.cashback_balance : 0;
-          
-          let newWalletBalance = currentWalletBalance;
-          if (pointsRedeemedFromParams > 0) {
-            newWalletBalance = Math.max(0, newWalletBalance - pointsRedeemedFromParams);
-          }
-          
-          let newCashbackBalance = currentCashbackBalance;
-          if (pointsEarnedFromParams > 0) {
-            newCashbackBalance += pointsEarnedFromParams;
-          }
-          
-          const { error: updateError } = await supabase
+        try {
+          const { data: customerData, error: customerFetchError } = await supabase
             .from("profiles")
-            .update({
-              wallet_balance: newWalletBalance,
-              cashback_balance: newCashbackBalance
-            })
-            .eq("id", selectedCustomer.id);
+            .select("wallet_balance, cashback_balance")
+            .eq("id", selectedCustomer.id)
+            .single();
             
-          if (updateError) {
-            console.error("Error updating customer points:", updateError);
+          if (customerFetchError) {
+            console.error("Error fetching customer points:", customerFetchError);
           } else {
-            console.log(`Updated customer loyalty balance: wallet=${newWalletBalance}, cashback=${newCashbackBalance}`);
+            console.log("Current customer points data:", customerData);
+            
+            const currentWalletBalance = typeof customerData.wallet_balance === 'number' ? customerData.wallet_balance : 0;
+            const currentCashbackBalance = typeof customerData.cashback_balance === 'number' ? customerData.cashback_balance : 0;
+            
+            let newWalletBalance = currentWalletBalance;
+            if (pointsRedeemedFromParams > 0) {
+              newWalletBalance = Math.max(0, newWalletBalance - pointsRedeemedFromParams);
+            }
+            
+            let newCashbackBalance = currentCashbackBalance;
+            if (pointsEarnedFromParams > 0) {
+              newCashbackBalance += pointsEarnedFromParams;
+            }
+            
+            console.log(`Updating customer points: wallet ${currentWalletBalance} -> ${newWalletBalance}, cashback ${currentCashbackBalance} -> ${newCashbackBalance}`);
+            
+            const { error: updateError } = await supabase
+              .from("profiles")
+              .update({
+                wallet_balance: newWalletBalance,
+                cashback_balance: newCashbackBalance
+              })
+              .eq("id", selectedCustomer.id);
+              
+            if (updateError) {
+              console.error("Error updating customer points:", updateError);
+            } else {
+              console.log(`Updated customer loyalty balance: wallet=${newWalletBalance}, cashback=${newCashbackBalance}`);
+            }
           }
+        } catch (error) {
+          console.error("Error processing loyalty points:", error);
         }
       }
 

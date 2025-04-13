@@ -56,9 +56,10 @@ export function useLoyaltyInCheckout({
   // Force refresh customer points to ensure up-to-date data
   useEffect(() => {
     if (customerId) {
+      console.log('Refreshing points in checkout for customer:', customerId);
       fetchCustomerPoints();
     }
-  }, [customerId]);
+  }, [customerId, fetchCustomerPoints]);
   
   // Eligible amount for earning points - based on selected services and packages
   const eligibleAmount = getEligibleAmount(
@@ -83,6 +84,7 @@ export function useLoyaltyInCheckout({
   // When loyalty settings or available points change, reset the points to redeem
   useEffect(() => {
     if (settings && availablePoints !== null) {
+      console.log('Settings or points changed, recalculating. Available points:', availablePoints);
       // If user has enough points, default to minimum redemption points or zero
       if (hasMinimumForRedemption(availablePoints)) {
         setPointsToRedeem(Math.min(settings.min_redemption_points, availablePoints));
