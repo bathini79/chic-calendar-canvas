@@ -89,6 +89,8 @@ export type AppointmentStatus =
 export enum SCREEN {
   SERVICES,
   CHECKOUT,
+  SUMMARY,
+  SERVICE_SELECTION
 }
 
 export type LoyaltyProgramSettings = {

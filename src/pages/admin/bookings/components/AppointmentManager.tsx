@@ -7,7 +7,7 @@ import { SummaryView } from "./SummaryView";
 import { useAppointmentState } from "../hooks/useAppointmentState";
 import { useActiveServices } from "../hooks/useActiveServices";
 import { useActivePackages } from "../hooks/useActivePackages";
-import { useSaveAppointment } from "../hooks/useSaveAppointment";
+import  useSaveAppointment  from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
 import {
@@ -113,9 +113,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setCustomizedServices,
     appliedTaxId,
     taxAmount,
-    pointsEarned,
-    pointsRedeemed,
-    pointsDiscountAmount,
   } = useAppointmentState();
 
   useEffect(() => {
@@ -272,10 +269,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     membership_id: existingAppointment?.membership_id,
     membership_name: existingAppointment?.membership_name,
     coupon_name: existingAppointment?.coupon_name,
-    coupon_amount: existingAppointment?.coupon_amount,
-    pointsEarned,
-    pointsRedeemed,
-    pointsDiscountAmount
+    coupon_amount: existingAppointment?.coupon_amount
   });
 
   const handleProceedToCheckout = async () => {

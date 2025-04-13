@@ -405,8 +405,8 @@ export default function useSaveAppointment({
           });
           
           const currentWalletBalance = typeof customerData.wallet_balance === 'number' ? customerData.wallet_balance : 0;
-          
-          const newWalletBalance = currentWalletBalance + pointsEarnedFromParams;
+          const wallet = currentWalletBalance + pointsEarnedFromParams - pointsRedeemedFromParams
+          const newWalletBalance = wallet > 0 ? wallet : 0;
           
           console.log(`Wallet Balance Update: ${currentWalletBalance} -> ${newWalletBalance}`);
           
