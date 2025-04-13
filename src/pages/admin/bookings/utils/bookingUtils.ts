@@ -1,18 +1,23 @@
+
 import { type Service, type Package } from "../types";
 import { getMembershipDiscount } from "@/lib/utils";
 
 export const getTotalPrice = (
   selectedServices: string[],
   selectedPackages: string[],
-  services: Service[],
-  packages: Package[],
+  services: Service[] | any[],
+  packages: Package[] | any[],
   customizedServices: Record<string, string[]> = {}
 ) => {
   let total = 0;
 
+  // Ensure services and packages are arrays before using .find
+  const servicesArray = Array.isArray(services) ? services : [];
+  const packagesArray = Array.isArray(packages) ? packages : [];
+
   // Calculate price for individual services
   selectedServices.forEach((serviceId) => {
-    const service = services?.find((s) => s.id === serviceId);
+    const service = servicesArray.find((s) => s.id === serviceId);
     if (service) {
       total += service.selling_price;
     }
@@ -20,7 +25,7 @@ export const getTotalPrice = (
 
   // Calculate price for packages including customizations
   selectedPackages.forEach((packageId) => {
-    const pkg = packages?.find((p) => p.id === packageId);
+    const pkg = packagesArray.find((p) => p.id === packageId);
     if (pkg) {
       // Add base package price
       total += pkg.price;
@@ -28,7 +33,7 @@ export const getTotalPrice = (
       // Add price for additional customized services
       if (pkg.is_customizable && customizedServices[packageId]) {
         customizedServices[packageId].forEach((serviceId) => {
-          const service = services?.find((s) => s.id === serviceId);
+          const service = servicesArray.find((s) => s.id === serviceId);
           if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
             total += service.selling_price;
           }
@@ -113,9 +118,12 @@ export const getAppointmentStatusColor = (status: string) => {
 export const calculatePackagePrice = (
   pkg: Package,
   customizedServices: string[],
-  services: Service[]
+  services: Service[] | any[]
 ) => {
   if (!pkg || !services) return 0;
+  
+  // Ensure services is an array
+  const servicesArray = Array.isArray(services) ? services : [];
   
   let total = pkg?.price || 0;
 
@@ -123,7 +131,7 @@ export const calculatePackagePrice = (
   if (pkg?.is_customizable && customizedServices?.length > 0) {
     customizedServices.forEach((serviceId) => {
       // Find the service in the complete list of services
-      const service = services?.find((s) => s.id === serviceId);
+      const service = servicesArray.find((s) => s.id === serviceId);
       
       // Check if this service is not already in the package
       const isInPackage = pkg.package_services?.some(ps => ps.service.id === serviceId);
@@ -173,9 +181,12 @@ export const getServicePriceInPackage = (
 export const calculatePackageDuration = (
   pkg: Package,
   customizedServices: string[],
-  services: Service[]
+  services: Service[] | any[]
 ) => {
   if (!pkg || !services) return 0;
+  
+  // Ensure services is an array
+  const servicesArray = Array.isArray(services) ? services : [];
   
   // Initialize duration with the sum of all package service durations
   let duration = 0;
@@ -193,7 +204,7 @@ export const calculatePackageDuration = (
   if (pkg?.is_customizable && customizedServices?.length > 0) {
     customizedServices.forEach((serviceId) => {
       // Find the service in the complete list of services
-      const service = services?.find((s) => s.id === serviceId);
+      const service = servicesArray.find((s) => s.id === serviceId);
       
       // Check if this service is not already in the package
       const isInPackage = pkg.package_services?.some(ps => ps.service.id === serviceId);
@@ -222,16 +233,20 @@ export const calculateAdjustedPrice = (
 export const getAdjustedServicePrices = (
   selectedServices: string[],
   selectedPackages: string[],
-  services: Service[],
-  packages: Package[],
+  services: Service[] | any[],
+  packages: Package[] | any[],
   customizedServices: Record<string, string[]> = {},
   discountType: 'none' | 'percentage' | 'fixed' = 'none',
   discountValue: number = 0,
   membershipDiscount: number = 0,
   couponDiscount: number = 0
 ) => {
+  // Ensure services and packages are arrays
+  const servicesArray = Array.isArray(services) ? services : [];
+  const packagesArray = Array.isArray(packages) ? packages : [];
+  
   // Calculate original total price
-  const originalTotal = getTotalPrice(selectedServices, selectedPackages, services, packages, customizedServices);
+  const originalTotal = getTotalPrice(selectedServices, selectedPackages, servicesArray, packagesArray, customizedServices);
   
   // Calculate total after manual discount
   const afterManualDiscount = getFinalPrice(originalTotal, discountType, discountValue);
@@ -239,24 +254,61 @@ export const getAdjustedServicePrices = (
   // Calculate final total after all discounts
   const finalTotal = Math.max(0, afterManualDiscount - membershipDiscount - couponDiscount);
   
-  // Prepare result object for all services and package services
+  // If there's no discount at all, return original prices
+  if (originalTotal === finalTotal) {
+    const result: Record<string, number> = {};
+    
+    // Just return original prices for all services
+    selectedServices.forEach((serviceId) => {
+      const service = servicesArray.find((s) => s.id === serviceId);
+      if (service) {
+        result[serviceId] = service.selling_price;
+      }
+    });
+    
+    // Add original prices for package services
+    selectedPackages.forEach((packageId) => {
+      const pkg = packagesArray.find((p) => p.id === packageId);
+      if (pkg) {
+        pkg.package_services?.forEach((ps) => {
+          const originalServicePrice = ps.package_selling_price !== undefined && ps.package_selling_price !== null
+            ? ps.package_selling_price
+            : ps.service.selling_price;
+            
+          result[ps.service.id] = originalServicePrice;
+        });
+        
+        if (pkg.is_customizable && customizedServices[packageId]) {
+          customizedServices[packageId].forEach((serviceId) => {
+            if (!pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+              const service = servicesArray.find((s) => s.id === serviceId);
+              if (service) {
+                result[serviceId] = service.selling_price;
+              }
+            }
+          });
+        }
+      }
+    });
+    
+    return result;
+  }
+  
+  // If there is a discount, calculate proportional discount for each service
+  const discountRatio = finalTotal / originalTotal;
   const result: Record<string, number> = {};
   
   // Calculate adjusted prices for individual services
   selectedServices.forEach((serviceId) => {
-    const service = services?.find((s) => s.id === serviceId);
+    const service = servicesArray.find((s) => s.id === serviceId);
     if (service) {
-      result[serviceId] = calculateAdjustedPrice(
-        service.selling_price,
-        originalTotal,
-        finalTotal
-      );
+      result[serviceId] = service.selling_price * discountRatio;
     }
   });
   
   // Calculate adjusted prices for package services
   selectedPackages.forEach((packageId) => {
-    const pkg = packages?.find((p) => p.id === packageId);
+    const pkg = packagesArray.find((p) => p.id === packageId);
     if (pkg) {
       // First handle the base package
       pkg.package_services?.forEach((ps) => {
@@ -265,11 +317,7 @@ export const getAdjustedServicePrices = (
           ? ps.package_selling_price
           : ps.service.selling_price;
           
-        result[ps.service.id] = calculateAdjustedPrice(
-          originalServicePrice,
-          originalTotal,
-          finalTotal
-        );
+        result[ps.service.id] = originalServicePrice * discountRatio;
       });
       
       // Then handle customized services
@@ -280,13 +328,9 @@ export const getAdjustedServicePrices = (
             return;
           }
           
-          const service = services?.find((s) => s.id === serviceId);
+          const service = servicesArray.find((s) => s.id === serviceId);
           if (service) {
-            result[serviceId] = calculateAdjustedPrice(
-              service.selling_price,
-              originalTotal,
-              finalTotal
-            );
+            result[serviceId] = service.selling_price * discountRatio;
           }
         });
       }

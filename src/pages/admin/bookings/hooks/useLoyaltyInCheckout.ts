@@ -39,7 +39,7 @@ export function useLoyaltyInCheckout({
   subtotal,
   discountedSubtotal
 }: UseLoyaltyInCheckoutProps): UseLoyaltyInCheckoutResult {
-  const [usePoints, setUsePoints] = useState(false);
+  const [usePoints, setUsePoints] = useState(true); // Default to true to always redeem points
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [pointsExpiryDate, setPointsExpiryDate] = useState<Date | null>(null);
   
@@ -57,7 +57,7 @@ export function useLoyaltyInCheckout({
 
   // Calculate points to earn based on eligible amount
   const eligibleAmount = settings?.enabled
-    ? getEligibleAmount(selectedServices, selectedPackages, services, packages, discountedSubtotal)
+    ? getEligibleAmount(selectedServices, selectedPackages, services, packages, subtotal)
     : 0;
     
   const pointsToEarn = settings?.enabled
@@ -75,22 +75,23 @@ export function useLoyaltyInCheckout({
     }
   }, [settings, pointsToEarn]);
 
-  // Handle maximum points to redeem based on settings
+  // Handle maximum points to redeem based on settings - use subtotal directly
   const maxPointsToRedeem = settings?.enabled && settings.points_per_spend
-    ? getMaxRedeemablePoints(discountedSubtotal)
+    ? getMaxRedeemablePoints(subtotal) // Using subtotal instead of discounted subtotal
     : 0;
 
-  // When usePoints is toggled, set points to maximum automatically
+  // Automatically set maximum points to redeem if wallet balance allows
   useEffect(() => {
-    if (usePoints) {
+    // Always set to maximum if enabled and there are points available
+    if (settings?.enabled && walletBalance >= (settings?.min_redemption_points || 0) && maxPointsToRedeem > 0) {
       setPointsToRedeem(maxPointsToRedeem);
     } else {
       setPointsToRedeem(0);
     }
-  }, [usePoints, maxPointsToRedeem]);
+  }, [maxPointsToRedeem, settings, walletBalance]);
 
   // Calculate discount amount from redeemed points
-  const pointsDiscountAmount = usePoints && settings?.enabled && settings?.points_per_spend
+  const pointsDiscountAmount = settings?.enabled && settings?.points_per_spend && pointsToRedeem > 0
     ? calculateAmountFromPoints(pointsToRedeem)
     : 0;
 
@@ -102,7 +103,7 @@ export function useLoyaltyInCheckout({
     isLoyaltyEnabled: settings?.enabled || false,
     pointsToEarn,
     walletBalance,
-    usePoints,
+    usePoints: true, // Always true to always use points
     pointsToRedeem,
     pointsDiscountAmount,
     maxPointsToRedeem,

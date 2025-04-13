@@ -1,7 +1,6 @@
 
-import React, { useEffect } from "react";
+import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Award, Info, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
@@ -43,15 +42,6 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
     return null;
   }
 
-  // Automatically set points to redeem to max when toggle is switched on
-  useEffect(() => {
-    if (usePoints && maxPointsToRedeem > 0) {
-      setPointsToRedeem(maxPointsToRedeem);
-    } else {
-      setPointsToRedeem(0);
-    }
-  }, [usePoints, maxPointsToRedeem, setPointsToRedeem]);
-
   const canUsePoints = walletBalance >= minRedemptionPoints && maxPointsToRedeem > 0;
   
   return (
@@ -86,7 +76,7 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
           <>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <span className="text-sm">Redeem Points</span>
+                <span className="text-sm">Redeeming Points</span>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -106,21 +96,15 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <Switch
-                checked={usePoints}
-                onCheckedChange={setUsePoints}
-                disabled={!canUsePoints}
-              />
+              <span className="text-green-600 font-medium">Automatic</span>
             </div>
 
-            {usePoints && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Points to redeem</span>
-                  <span>{maxPointsToRedeem} points (₹{pointsDiscountAmount.toFixed(2)})</span>
-                </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Points being redeemed</span>
+                <span>{pointsToRedeem} points (₹{pointsDiscountAmount.toFixed(2)})</span>
               </div>
-            )}
+            </div>
           </>
         ) : (
           <div className="text-sm text-muted-foreground">

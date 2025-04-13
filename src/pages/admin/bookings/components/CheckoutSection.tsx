@@ -187,8 +187,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       getTotalPrice(
         selectedServices,
         selectedPackages,
-        services,
-        packages,
+        services || [],
+        packages || [],
         customizedServices
       ),
     [selectedServices, selectedPackages, services, packages, customizedServices]
@@ -220,8 +220,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     customerId: selectedCustomer?.id,
     selectedServices,
     selectedPackages,
-    services,
-    packages,
+    services: services || [],
+    packages: packages || [],
     subtotal,
     discountedSubtotal
   });
@@ -445,13 +445,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   ]);
 
   const total = useMemo(
-    () => Math.max(0, discountedSubtotal + taxAmount),
-    [discountedSubtotal, taxAmount]
+    () => Math.max(0, discountedSubtotal + taxAmount - loyalty.pointsDiscountAmount),
+    [discountedSubtotal, taxAmount, loyalty.pointsDiscountAmount]
   );
 
   const discountAmount = useMemo(
-    () => subtotal - discountedSubtotal + couponDiscount + membershipDiscount,
-    [subtotal, discountedSubtotal, couponDiscount, membershipDiscount]
+    () => subtotal - discountedSubtotal + couponDiscount + membershipDiscount + loyalty.pointsDiscountAmount,
+    [subtotal, discountedSubtotal, couponDiscount, membershipDiscount, loyalty.pointsDiscountAmount]
   );
 
   const adjustedPrices = useMemo(() => {
@@ -665,9 +665,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
           availableCoupons?.filter((c) => c.id === selectedCouponId)?.[0]
             ?.code || null,
         paymentMethod,
-        pointsEarned: 0,
-        pointsRedeemed: 0,
-        pointsDiscountAmount: 0
+        pointsEarned: loyalty.pointsToEarn,
+        pointsRedeemed: loyalty.pointsToRedeem,
+        pointsDiscountAmount: loyalty.pointsDiscountAmount
       };
 
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
@@ -986,7 +986,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               </div>
             )}
 
-            {loyalty.usePoints && loyalty.pointsDiscountAmount > 0 && (
+            {loyalty.pointsDiscountAmount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span className="flex items-center">
                   <Award className="mr-2 h-4 w-4" />
