@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
@@ -60,8 +59,19 @@ export function useLoyaltyPoints(customerId?: string) {
       }
       
       if (data) {
-        const walletBalance = Number(data.wallet_balance) || 0;
+        let walletBalance = Number(data.wallet_balance) || 0;
         const lastUsed = data.last_used ? new Date(data.last_used) : null;
+        
+        if (lastUsed && settings?.points_validity_days) {
+          const expiryDate = new Date(lastUsed);
+          expiryDate.setDate(expiryDate.getDate() + settings.points_validity_days);
+          
+          if (expiryDate < new Date()) {
+            walletBalance = 0;
+          } else {
+            console.log('Points valid until:', expiryDate);
+          }
+        }
         
         console.log('Fetched wallet balance:', walletBalance);
         console.log('Last used date:', lastUsed);

@@ -16,7 +16,6 @@ interface UseLoyaltyInCheckoutResult {
   isLoyaltyEnabled: boolean;
   pointsToEarn: number;
   walletBalance: number;
-  cashbackBalance: number;
   usePoints: boolean;
   pointsToRedeem: number;
   pointsDiscountAmount: number;
@@ -27,7 +26,7 @@ interface UseLoyaltyInCheckoutResult {
   maxRedemptionValue: number | null;
   setUsePoints: (usePoints: boolean) => void;
   setPointsToRedeem: (points: number) => void;
-  customerPoints: { walletBalance: number; cashbackBalance: number } | null;
+  customerPoints: { walletBalance: number; lastUsed: Date | null } | null;
   pointsExpiryDate: Date | null;
 }
 
@@ -53,7 +52,7 @@ export function useLoyaltyInCheckout({
     calculateAmountFromPoints,
     getMaxRedeemablePoints,
     walletBalance,
-    cashbackBalance
+    lastUsed
   } = useLoyaltyPoints(customerId);
 
   // Calculate points to earn based on eligible amount
@@ -100,7 +99,6 @@ export function useLoyaltyInCheckout({
     isLoyaltyEnabled: settings?.enabled || false,
     pointsToEarn,
     walletBalance,
-    cashbackBalance,
     usePoints,
     pointsToRedeem,
     pointsDiscountAmount,

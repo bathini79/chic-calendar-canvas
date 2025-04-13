@@ -10,7 +10,6 @@ import { format } from "date-fns";
 interface LoyaltyPointsSectionProps {
   isEnabled: boolean;
   walletBalance: number;
-  cashbackBalance: number;
   pointsToEarn: number;
   usePoints: boolean;
   setUsePoints: (usePoints: boolean) => void;
@@ -28,7 +27,6 @@ interface LoyaltyPointsSectionProps {
 const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
   isEnabled,
   walletBalance,
-  cashbackBalance,
   pointsToEarn,
   usePoints,
   setUsePoints,
@@ -81,13 +79,6 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
           <span className="text-muted-foreground">Available Points</span>
           <span className="font-medium">{walletBalance}</span>
         </div>
-
-        {cashbackBalance > 0 && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Cashback Points</span>
-            <span className="font-medium text-blue-600">{cashbackBalance} (auto-transferring)</span>
-          </div>
-        )}
 
         {canUsePoints ? (
           <>
