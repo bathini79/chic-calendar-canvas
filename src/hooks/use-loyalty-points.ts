@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
@@ -60,7 +59,6 @@ export function useLoyaltyPoints(customerId?: string) {
       }
       
       if (data) {
-        // Force convert to number type to avoid string issues
         const walletBalance = Number(data.wallet_balance) || 0;
         const cashbackBalance = Number(data.cashback_balance) || 0;
         
@@ -88,7 +86,6 @@ export function useLoyaltyPoints(customerId?: string) {
       autoTransferInProgressRef.current = true;
       console.log('Auto-transferring cashback to wallet:', cashbackAmount);
 
-      // Get fresh data from the database to ensure we have the most up-to-date values
       const { data, error: fetchError } = await supabase
         .from('profiles')
         .select('wallet_balance, cashback_balance')
@@ -100,7 +97,6 @@ export function useLoyaltyPoints(customerId?: string) {
         return;
       }
       
-      // Again force convert to Number type
       const currentWalletBalance = Number(data.wallet_balance) || 0;
       const currentCashbackBalance = Number(data.cashback_balance) || 0;
       
@@ -111,7 +107,6 @@ export function useLoyaltyPoints(customerId?: string) {
 
       const newWalletBalance = currentWalletBalance + currentCashbackBalance;
       
-      // Update database with new values
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
@@ -125,7 +120,6 @@ export function useLoyaltyPoints(customerId?: string) {
         return;
       }
       
-      // Update local state
       setCustomerPoints({
         walletBalance: newWalletBalance,
         cashbackBalance: 0
@@ -151,7 +145,6 @@ export function useLoyaltyPoints(customerId?: string) {
     }
   }, [customerId]);
 
-  // Separate effect for auto-transfer to avoid dependency cycles
   useEffect(() => {
     if (customerId && customerPoints && customerPoints.cashbackBalance > 0 && !autoTransferInProgressRef.current) {
       autoTransferCashbackToWallet(customerPoints.cashbackBalance);
@@ -234,28 +227,34 @@ export function useLoyaltyPoints(customerId?: string) {
       return 0;
     }
     
-    // Start with wallet balance as the max redeemable points
+    console.log('Calculating max redeemable points with settings:', settings);
+    console.log('Customer wallet balance:', customerPoints.walletBalance);
+    console.log('Subtotal for calculation:', subtotal);
+    
     let maxPoints = customerPoints.walletBalance;
     
-    // Apply fixed maximum if configured
+    const maxAmountFromPoints = maxPoints * settings.point_value;
+    console.log('Maximum amount possible from points:', maxAmountFromPoints);
+    
     if (settings.max_redemption_type === "fixed" && settings.max_redemption_points) {
       maxPoints = Math.min(maxPoints, settings.max_redemption_points);
+      console.log('Limited by fixed max points:', maxPoints);
     } 
-    // Apply percentage maximum if configured
     else if (settings.max_redemption_type === "percentage" && settings.max_redemption_percentage) {
-      const maxAmount = subtotal * (settings.max_redemption_percentage / 100);
-      const pointsEquivalent = Math.floor(maxAmount / settings.point_value);
+      const maxDiscountAmount = subtotal * (settings.max_redemption_percentage / 100);
+      const pointsEquivalent = Math.floor(maxDiscountAmount / settings.point_value);
       maxPoints = Math.min(maxPoints, pointsEquivalent);
+      console.log('Limited by percentage max:', maxPoints, 'from max discount amount:', maxDiscountAmount);
     }
     
-    // Ensure we don't exceed the minimum redemption points
+    const pointsForFullSubtotal = Math.floor(subtotal / settings.point_value);
+    maxPoints = Math.min(maxPoints, pointsForFullSubtotal);
+    console.log('Limited by subtotal:', maxPoints);
+    
     if (maxPoints < settings.min_redemption_points) {
-      return 0; // Cannot redeem any points
+      console.log('Below minimum redemption points, returning 0');
+      return 0;
     }
-    
-    // Make sure we're not allowing more points than would cover the full amount
-    const maxPointsForAmount = Math.floor(subtotal / settings.point_value);
-    maxPoints = Math.min(maxPoints, maxPointsForAmount);
     
     return maxPoints;
   };

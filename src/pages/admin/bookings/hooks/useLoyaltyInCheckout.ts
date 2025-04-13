@@ -55,29 +55,34 @@ export function useLoyaltyInCheckout({
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   
-  // Force refresh customer points to ensure up-to-date data - but using useCallback to prevent infinite loops
+  // Force refresh customer points to ensure up-to-date data
   const refreshCustomerPoints = useCallback(() => {
     if (customerId) {
       fetchCustomerPoints();
     }
-  }, [customerId]);
+  }, [customerId, fetchCustomerPoints]);
+  
+  // Auto-transfer tracking with ref to prevent infinite loops
+  const autoTransferInProgressRef = useRef(false);
   
   // Only fetch points when component mounts or customerId changes
   useEffect(() => {
     refreshCustomerPoints();
-  }, [customerId]);
+  }, [customerId, refreshCustomerPoints]);
   
   // Auto-transfer cashback to wallet when component loads and whenever customer points change
-  // Using refs to prevent infinite loops caused by the effect dependency on autoTransferCashbackToWallet
   useEffect(() => {
-    if (customerId && customerPoints && customerPoints.cashbackBalance > 0) {
+    if (customerId && customerPoints && customerPoints.cashbackBalance > 0 && !autoTransferInProgressRef.current) {
       console.log('Detected cashback balance, attempting auto-transfer');
+      autoTransferInProgressRef.current = true;
+      
       // Only transfer if there's actual cashback to transfer
-      if (customerPoints.cashbackBalance > 0) {
-        autoTransferCashbackToWallet(customerPoints.cashbackBalance);
-      }
+      autoTransferCashbackToWallet(customerPoints.cashbackBalance)
+        .finally(() => {
+          autoTransferInProgressRef.current = false;
+        });
     }
-  }, [customerId, customerPoints]);
+  }, [customerId, customerPoints, autoTransferCashbackToWallet]);
   
   // Eligible amount for earning points - based on selected services and packages
   const eligibleAmount = getEligibleAmount(
@@ -92,6 +97,7 @@ export function useLoyaltyInCheckout({
   const pointsToEarn = calculatePointsFromAmount(eligibleAmount);
   
   // Get the maximum points that can be redeemed based on settings and available points
+  // Using subtotal for redemption calculation, not discounted subtotal
   const maxPointsToRedeem = getMaxRedeemablePoints(subtotal);
   
   // Calculate the discount amount from redeemed points
@@ -102,7 +108,8 @@ export function useLoyaltyInCheckout({
   // When loyalty settings or available points change, reset the points to redeem
   useEffect(() => {
     if (settings && customerPoints) {
-      console.log('Settings or points changed, recalculating. Available points:', customerPoints);
+      console.log('Settings or points changed, recalculating. Available points:', customerPoints.walletBalance);
+      console.log('Max redeemable points:', maxPointsToRedeem);
       
       // Reset points to redeem when usePoints is false
       if (!usePoints) {
@@ -118,6 +125,7 @@ export function useLoyaltyInCheckout({
           maxPointsToRedeem || Infinity
         );
         setPointsToRedeem(minimumRedemption);
+        console.log('Setting initial points to redeem:', minimumRedemption);
       } else {
         setUsePoints(false);
         setPointsToRedeem(0);
