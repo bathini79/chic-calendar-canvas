@@ -47,7 +47,8 @@ export function useLoyaltyInCheckout({
     calculateAmountFromPoints,
     hasMinimumForRedemption,
     getMaxRedeemablePoints,
-    fetchCustomerPoints
+    fetchCustomerPoints,
+    autoTransferCashbackToWallet
   } = useLoyaltyPoints(customerId);
   
   const [usePoints, setUsePoints] = useState(false);
@@ -64,6 +65,14 @@ export function useLoyaltyInCheckout({
   useEffect(() => {
     refreshCustomerPoints();
   }, [refreshCustomerPoints]);
+  
+  // Auto-transfer cashback to wallet when component loads and whenever customer points change
+  useEffect(() => {
+    if (customerId && customerPoints && customerPoints.cashbackBalance > 0) {
+      console.log('Detected cashback balance, attempting auto-transfer');
+      autoTransferCashbackToWallet(customerPoints.cashbackBalance);
+    }
+  }, [customerId, customerPoints, autoTransferCashbackToWallet]);
   
   // Eligible amount for earning points - based on selected services and packages
   const eligibleAmount = getEligibleAmount(

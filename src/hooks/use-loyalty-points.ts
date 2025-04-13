@@ -68,11 +68,65 @@ export function useLoyaltyPoints(customerId?: string) {
           walletBalance,
           cashbackBalance
         });
+
+        if (cashbackBalance > 0) {
+          await autoTransferCashbackToWallet(cashbackBalance);
+        }
       }
     } catch (error) {
       console.error('Unexpected error fetching customer points:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const autoTransferCashbackToWallet = async (cashbackAmount: number) => {
+    if (!customerId || cashbackAmount <= 0) return;
+    
+    try {
+      console.log('Auto-transferring cashback to wallet:', cashbackAmount);
+
+      const { data, error: fetchError } = await supabase
+        .from('profiles')
+        .select('wallet_balance, cashback_balance')
+        .eq('id', customerId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching latest points for transfer:', fetchError);
+        return;
+      }
+      
+      const currentWalletBalance = typeof data.wallet_balance === 'number' ? data.wallet_balance : 0;
+      const currentCashbackBalance = typeof data.cashback_balance === 'number' ? data.cashback_balance : 0;
+      
+      if (currentCashbackBalance <= 0) {
+        console.log('No cashback balance to transfer');
+        return;
+      }
+
+      const newWalletBalance = currentWalletBalance + currentCashbackBalance;
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          cashback_balance: 0,
+          wallet_balance: newWalletBalance
+        })
+        .eq('id', customerId);
+      
+      if (updateError) {
+        console.error('Error transferring cashback to wallet:', updateError);
+        return;
+      }
+      
+      setCustomerPoints({
+        walletBalance: newWalletBalance,
+        cashbackBalance: 0
+      });
+      
+      console.log('Successfully auto-transferred cashback to wallet. New wallet balance:', newWalletBalance);
+    } catch (error) {
+      console.error('Unexpected error during auto-transfer:', error);
     }
   };
 
@@ -164,7 +218,6 @@ export function useLoyaltyPoints(customerId?: string) {
       return 0;
     }
     
-    // Only allow redemption from wallet balance, not cashback
     let maxPoints = customerPoints.walletBalance;
     
     if (settings.max_redemption_type === "fixed" && settings.max_redemption_points) {
@@ -189,13 +242,11 @@ export function useLoyaltyPoints(customerId?: string) {
         return false;
       }
       
-      // Validate against loyalty program settings
       if (settings?.min_redemption_points && pointsToTransfer < settings.min_redemption_points) {
         toast.error(`Minimum transfer amount is ${settings.min_redemption_points} points`);
         return false;
       }
       
-      // Calculate new balances
       const newCashbackBalance = customerPoints.cashbackBalance - pointsToTransfer;
       const newWalletBalance = customerPoints.walletBalance + pointsToTransfer;
       
@@ -213,7 +264,6 @@ export function useLoyaltyPoints(customerId?: string) {
         return false;
       }
       
-      // Update local state
       setCustomerPoints({
         cashbackBalance: newCashbackBalance,
         walletBalance: newWalletBalance
@@ -244,6 +294,7 @@ export function useLoyaltyPoints(customerId?: string) {
     getMaxRedeemablePoints,
     transferPointsToWallet,
     walletBalance: customerPoints?.walletBalance || 0,
-    cashbackBalance: customerPoints?.cashbackBalance || 0
+    cashbackBalance: customerPoints?.cashbackBalance || 0,
+    autoTransferCashbackToWallet
   };
 }
