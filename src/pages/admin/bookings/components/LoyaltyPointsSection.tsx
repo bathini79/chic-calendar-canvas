@@ -1,8 +1,7 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import { Award, Info, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
@@ -44,11 +43,14 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
     return null;
   }
 
-  const handleSliderChange = (values: number[]) => {
-    if (values.length > 0) {
-      setPointsToRedeem(Math.floor(values[0]));
+  // Automatically set points to redeem to max when toggle is switched on
+  useEffect(() => {
+    if (usePoints && maxPointsToRedeem > 0) {
+      setPointsToRedeem(maxPointsToRedeem);
+    } else {
+      setPointsToRedeem(0);
     }
-  };
+  }, [usePoints, maxPointsToRedeem, setPointsToRedeem]);
 
   const canUsePoints = walletBalance >= minRedemptionPoints && maxPointsToRedeem > 0;
   
@@ -115,18 +117,7 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Points to redeem</span>
-                  <span>{pointsToRedeem} points (₹{pointsDiscountAmount.toFixed(2)})</span>
-                </div>
-                <Slider
-                  value={[pointsToRedeem]}
-                  min={minRedemptionPoints}
-                  max={maxPointsToRedeem}
-                  step={1}
-                  onValueChange={handleSliderChange}
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Min: {minRedemptionPoints}</span>
-                  <span>Max: {maxPointsToRedeem}</span>
+                  <span>{maxPointsToRedeem} points (₹{pointsDiscountAmount.toFixed(2)})</span>
                 </div>
               </div>
             )}

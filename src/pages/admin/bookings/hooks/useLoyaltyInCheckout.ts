@@ -80,12 +80,14 @@ export function useLoyaltyInCheckout({
     ? getMaxRedeemablePoints(discountedSubtotal)
     : 0;
 
-  // Reset points to redeem if greater than maximum
+  // When usePoints is toggled, set points to maximum automatically
   useEffect(() => {
-    if (pointsToRedeem > maxPointsToRedeem) {
+    if (usePoints) {
       setPointsToRedeem(maxPointsToRedeem);
+    } else {
+      setPointsToRedeem(0);
     }
-  }, [maxPointsToRedeem, pointsToRedeem]);
+  }, [usePoints, maxPointsToRedeem]);
 
   // Calculate discount amount from redeemed points
   const pointsDiscountAmount = usePoints && settings?.enabled && settings?.points_per_spend
