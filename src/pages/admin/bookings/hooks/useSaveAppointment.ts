@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -221,12 +220,17 @@ export default function useSaveAppointment({
         points_redeemed: pointsRedeemedFromParams,
       };
       
-      // Check if points_discount_amount column exists in the appointments table
-      try {
-        // Only add points_discount_amount if DB schema check was successful
+      // Before inserting/updating, check if the column exists by making a small test query
+      const { error: schemaCheckError } = await supabase
+        .from("appointments")
+        .select("points_discount_amount")
+        .limit(1);
+        
+      // Only add points_discount_amount if the column exists in the schema
+      if (!schemaCheckError) {
         appointmentData.points_discount_amount = pointsDiscountAmountFromParams;
-      } catch (error) {
-        console.log("points_discount_amount column might not exist in schema, skipping field");
+      } else {
+        console.log("points_discount_amount column doesn't exist in schema, skipping field");
       }
 
       let createdAppointmentId;
