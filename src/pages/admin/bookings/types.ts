@@ -1,3 +1,4 @@
+
 export type Appointment = {
   id: string;
   customer_id: string;
@@ -22,6 +23,24 @@ export type Appointment = {
   points_earned: number;
   points_redeemed: number;
   points_discount_amount: number;
+  bookings?: Booking[];
+  customer?: Customer;
+};
+
+export type Booking = {
+  id: string;
+  appointment_id: string;
+  service_id?: string;
+  package_id?: string;
+  employee_id?: string;
+  start_time?: string;
+  end_time?: string;
+  status: string;
+  price_paid: number;
+  original_price: number;
+  service?: Service;
+  package?: Package;
+  employee?: Employee;
 };
 
 export type Service = {
@@ -45,6 +64,7 @@ export type Package = {
   duration: number;
   photo_url: string | null;
   package_services?: any[];
+  is_customizable?: boolean;
 };
 
 export type Employee = {
@@ -77,6 +97,15 @@ export type Location = {
   address: string;
   phone_number: string;
   is_active: boolean;
+};
+
+export type LocationHours = {
+  id: string;
+  location_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_closed: boolean;
 };
 
 export type AppointmentStatus =

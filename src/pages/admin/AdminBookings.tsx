@@ -20,7 +20,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Appointment, Employee } from "./bookings/types";
+import { Appointment, Employee, LocationHours } from "./bookings/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +54,9 @@ export default function AdminBookings() {
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [locationHours, setLocationHours] = useState<LocationHours[]>([]);
+  const [startHour, setStartHour] = useState<number>(START_HOUR);
+  const [endHour, setEndHour] = useState<number>(START_HOUR + TOTAL_HOURS);
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -89,6 +92,48 @@ export default function AdminBookings() {
       return data;
     },
   });
+
+  // Fetch location hours when the location changes
+  useEffect(() => {
+    const fetchLocationHours = async () => {
+      if (!selectedLocationId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('location_hours')
+          .select('*')
+          .eq('location_id', selectedLocationId);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setLocationHours(data as LocationHours[]);
+          
+          // Get today's business hours
+          const today = new Date();
+          const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+          const todayHours = data.find(hours => hours.day_of_week === dayOfWeek);
+          
+          if (todayHours && !todayHours.is_closed) {
+            // Parse the time strings into hours
+            const startTimeParts = todayHours.start_time.split(':');
+            const endTimeParts = todayHours.end_time.split(':');
+            
+            const startHourFromLocation = parseInt(startTimeParts[0], 10);
+            const endHourFromLocation = parseInt(endTimeParts[0], 10) + (parseInt(endTimeParts[1], 10) > 0 ? 1 : 0);
+            
+            // Update the start and end hours
+            setStartHour(startHourFromLocation);
+            setEndHour(endHourFromLocation);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching location hours:", error);
+      }
+    };
+    
+    fetchLocationHours();
+  }, [selectedLocationId]);
 
   useEffect(() => {
     if (!selectedLocationId && locations.length > 0) {
@@ -223,6 +268,44 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(true);
   };
 
+  // Get the current day's business hours based on location settings
+  const getBusinessHours = () => {
+    if (!locationHours.length) {
+      return {
+        start: START_HOUR,
+        end: START_HOUR + TOTAL_HOURS,
+        total: TOTAL_HOURS
+      };
+    }
+    
+    const dayOfWeek = currentDate.getDay();
+    const dayHours = locationHours.find(hours => hours.day_of_week === dayOfWeek);
+    
+    if (!dayHours || dayHours.is_closed) {
+      return {
+        start: START_HOUR,
+        end: START_HOUR + TOTAL_HOURS,
+        total: TOTAL_HOURS
+      };
+    }
+    
+    const startTimeParts = dayHours.start_time.split(':');
+    const endTimeParts = dayHours.end_time.split(':');
+    
+    const start = parseInt(startTimeParts[0], 10);
+    const end = parseInt(endTimeParts[0], 10) + (parseInt(endTimeParts[1], 10) > 0 ? 1 : 0);
+    
+    return {
+      start,
+      end,
+      total: end - start
+    };
+  };
+
+  const businessHours = getBusinessHours();
+  const START_HOUR = businessHours.start;
+  const TOTAL_BUSINESS_HOURS = businessHours.total;
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -277,14 +360,14 @@ export default function AdminBookings() {
         <TimeSlots
           employees={employees}
           formatTime={formatTime}
-          TOTAL_HOURS={TOTAL_HOURS}
+          TOTAL_HOURS={TOTAL_BUSINESS_HOURS}
           currentDate={currentDate}
           nowPosition={nowPosition}
           isSameDay={isSameDay}
           appointments={appointments}
           setSelectedAppointment={handleAppointmentClick}
           setClickedCell={handleCellClick}
-          hourLabels={timeUtilsHourLabels}
+          hourLabels={Array.from({ length: TOTAL_BUSINESS_HOURS }, (_, i) => i + START_HOUR)}
           PIXELS_PER_HOUR={60}
           handleColumnClick={() => {}}
           renderAppointmentBlock={() => null}
