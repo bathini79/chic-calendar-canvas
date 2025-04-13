@@ -12,9 +12,8 @@ import { Customer } from "@/pages/admin/bookings/types";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { LoaderCircle, Star } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { CountryCode } from "@/lib/country-codes";
-import { Card } from "@/components/ui/card";
 
 const createClientSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
@@ -43,7 +42,6 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
     code: "+91", 
     flag: "🇮🇳" 
   });
-  const [customerLoyaltyPoints, setCustomerLoyaltyPoints] = useState<number | null>(null);
 
   const form = useForm<CreateClientFormData>({
     resolver: zodResolver(createClientSchema),
@@ -65,22 +63,6 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       const formattedPhoneNumber = phoneNumber.replace(/\s/g, ""); // Remove spaces
       const fullPhoneNumber = `${countryCodeWithoutPlus}${formattedPhoneNumber}`;
       const baseUrl = `${window.location.protocol}//${window.location.host}`;
-      
-      // Check if customer already exists by phone number
-      const { data: existingCustomer, error: customerCheckError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('phone_number', fullPhoneNumber)
-        .single();
-        
-      if (existingCustomer) {
-        // If customer exists, set their loyalty points and return success without sending OTP
-        setCustomerLoyaltyPoints(existingCustomer.wallet_balance || 0);
-        toast.success("Customer already exists!");
-        onSuccess(existingCustomer as Customer);
-        setIsSubmitting(false);
-        return true;
-      }
       
       const { data, error } = await supabase.functions.invoke('send-whatsapp-otp', {
         body: { 
@@ -151,17 +133,6 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Add New Client</DialogTitle>
         </DialogHeader>
-        
-        {customerLoyaltyPoints !== null && (
-          <Card className="p-3 mb-3 bg-amber-50 border-amber-200">
-            <div className="flex items-center gap-2">
-              <Star className="h-4 w-4 text-amber-500" />
-              <span className="text-sm font-medium">
-                Customer has {customerLoyaltyPoints} loyalty points
-              </span>
-            </div>
-          </Card>
-        )}
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
