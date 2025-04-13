@@ -28,6 +28,7 @@ interface UseLoyaltyInCheckoutResult {
   setPointsToRedeem: (points: number) => void;
   customerPoints: { walletBalance: number; lastUsed: Date | null } | null;
   pointsExpiryDate: Date | null;
+  adjustedServicePrices: Record<string, number>;
 }
 
 export function useLoyaltyInCheckout({
@@ -42,6 +43,7 @@ export function useLoyaltyInCheckout({
   const [usePoints, setUsePoints] = useState(true); // Default to true to always redeem points
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [pointsExpiryDate, setPointsExpiryDate] = useState<Date | null>(null);
+  const [adjustedServicePrices, setAdjustedServicePrices] = useState<Record<string, number>>({});
   
   const {
     settings,
@@ -99,6 +101,55 @@ export function useLoyaltyInCheckout({
   // Calculate from points_per_spend (100/points_per_spend gives value per point)
   const pointValue = settings?.points_per_spend ? (100 / settings.points_per_spend) / 100 : 0;
 
+  // Calculate adjusted service prices with loyalty discount distributed proportionally
+  useEffect(() => {
+    const newAdjustedPrices: Record<string, number> = {};
+    
+    if (pointsDiscountAmount > 0 && subtotal > 0) {
+      // Calculate discount ratio to distribute the points discount proportionally
+      const discountRatio = pointsDiscountAmount / subtotal;
+      
+      // Ensure services and packages are arrays
+      const servicesArray = Array.isArray(services) ? services : [];
+      const packagesArray = Array.isArray(packages) ? packages : [];
+      
+      // Apply discount to individual services
+      selectedServices.forEach(serviceId => {
+        const service = servicesArray.find(s => s.id === serviceId);
+        if (service) {
+          const originalPrice = service.selling_price || 0;
+          const discountAmount = originalPrice * discountRatio;
+          newAdjustedPrices[serviceId] = originalPrice - discountAmount;
+        }
+      });
+      
+      // Apply discount to package services
+      selectedPackages.forEach(packageId => {
+        const pkg = packagesArray.find(p => p.id === packageId);
+        if (pkg) {
+          const originalPrice = pkg.price || 0;
+          const discountAmount = originalPrice * discountRatio;
+          newAdjustedPrices[packageId] = originalPrice - discountAmount;
+          
+          // If the package has services, distribute the discount among them too
+          if (pkg.package_services) {
+            pkg.package_services.forEach((ps: any) => {
+              if (ps.service?.id) {
+                const serviceOriginalPrice = ps.package_selling_price !== undefined 
+                  ? ps.package_selling_price 
+                  : ps.service.selling_price || 0;
+                const serviceDiscountAmount = serviceOriginalPrice * discountRatio;
+                newAdjustedPrices[ps.service.id] = serviceOriginalPrice - serviceDiscountAmount;
+              }
+            });
+          }
+        }
+      });
+    }
+    
+    setAdjustedServicePrices(newAdjustedPrices);
+  }, [pointsDiscountAmount, subtotal, services, packages, selectedServices, selectedPackages]);
+
   return {
     isLoyaltyEnabled: settings?.enabled || false,
     pointsToEarn,
@@ -119,6 +170,7 @@ export function useLoyaltyInCheckout({
     setUsePoints,
     setPointsToRedeem,
     customerPoints,
-    pointsExpiryDate
+    pointsExpiryDate,
+    adjustedServicePrices
   };
 }

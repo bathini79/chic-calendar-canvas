@@ -20,6 +20,7 @@ interface LoyaltyPointsSectionProps {
   maxRedemptionType: "fixed" | "percentage" | null;
   maxRedemptionValue: number | null;
   pointsExpiryDate?: Date | null;
+  adjustedServicePrices?: Record<string, number>;
 }
 
 const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
