@@ -7,7 +7,7 @@ import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
 import { MapPin, Calendar as CalendarIcon, Plus, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
-import { formatTime, formatTimeString, hourLabels as timeUtilsHourLabels, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
+import { formatTime, formatTimeString, isSameDay } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
@@ -37,6 +37,11 @@ const initialStats = [
   { label: "Today's Revenue", value: 1950 },
 ];
 
+// Default business hours constants
+const DEFAULT_START_HOUR = 8;
+const DEFAULT_TOTAL_HOURS = 12;
+const DEFAULT_PIXELS_PER_HOUR = 60;
+
 export default function AdminBookings() {
   const queryClient = useQueryClient();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -55,8 +60,12 @@ export default function AdminBookings() {
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [locationHours, setLocationHours] = useState<LocationHours[]>([]);
-  const [startHour, setStartHour] = useState<number>(START_HOUR);
-  const [endHour, setEndHour] = useState<number>(START_HOUR + TOTAL_HOURS);
+  const [businessHours, setBusinessHours] = useState({
+    startHour: DEFAULT_START_HOUR,
+    endHour: DEFAULT_START_HOUR + DEFAULT_TOTAL_HOURS,
+    totalHours: DEFAULT_TOTAL_HOURS,
+    pixelsPerHour: DEFAULT_PIXELS_PER_HOUR
+  });
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -110,7 +119,7 @@ export default function AdminBookings() {
           setLocationHours(data as LocationHours[]);
           
           // Get today's business hours
-          const today = new Date();
+          const today = currentDate;
           const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
           const todayHours = data.find(hours => hours.day_of_week === dayOfWeek);
           
@@ -121,10 +130,23 @@ export default function AdminBookings() {
             
             const startHourFromLocation = parseInt(startTimeParts[0], 10);
             const endHourFromLocation = parseInt(endTimeParts[0], 10) + (parseInt(endTimeParts[1], 10) > 0 ? 1 : 0);
+            const totalHours = endHourFromLocation - startHourFromLocation;
             
-            // Update the start and end hours
-            setStartHour(startHourFromLocation);
-            setEndHour(endHourFromLocation);
+            // Update the business hours state
+            setBusinessHours({
+              startHour: startHourFromLocation,
+              endHour: endHourFromLocation,
+              totalHours: totalHours,
+              pixelsPerHour: DEFAULT_PIXELS_PER_HOUR
+            });
+          } else {
+            // If the location is closed or no hours found, set to default
+            setBusinessHours({
+              startHour: DEFAULT_START_HOUR,
+              endHour: DEFAULT_START_HOUR + DEFAULT_TOTAL_HOURS,
+              totalHours: DEFAULT_TOTAL_HOURS,
+              pixelsPerHour: DEFAULT_PIXELS_PER_HOUR
+            });
           }
         }
       } catch (error) {
@@ -133,7 +155,7 @@ export default function AdminBookings() {
     };
     
     fetchLocationHours();
-  }, [selectedLocationId]);
+  }, [selectedLocationId, currentDate]);
 
   useEffect(() => {
     if (!selectedLocationId && locations.length > 0) {
@@ -268,43 +290,11 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(true);
   };
 
-  // Get the current day's business hours based on location settings
-  const getBusinessHours = () => {
-    if (!locationHours.length) {
-      return {
-        start: START_HOUR,
-        end: START_HOUR + TOTAL_HOURS,
-        total: TOTAL_HOURS
-      };
-    }
-    
-    const dayOfWeek = currentDate.getDay();
-    const dayHours = locationHours.find(hours => hours.day_of_week === dayOfWeek);
-    
-    if (!dayHours || dayHours.is_closed) {
-      return {
-        start: START_HOUR,
-        end: START_HOUR + TOTAL_HOURS,
-        total: TOTAL_HOURS
-      };
-    }
-    
-    const startTimeParts = dayHours.start_time.split(':');
-    const endTimeParts = dayHours.end_time.split(':');
-    
-    const start = parseInt(startTimeParts[0], 10);
-    const end = parseInt(endTimeParts[0], 10) + (parseInt(endTimeParts[1], 10) > 0 ? 1 : 0);
-    
-    return {
-      start,
-      end,
-      total: end - start
-    };
-  };
-
-  const businessHours = getBusinessHours();
-  const START_HOUR = businessHours.start;
-  const TOTAL_BUSINESS_HOURS = businessHours.total;
+  // Generate the hour labels for the time slots
+  const hourLabels = Array.from(
+    { length: businessHours.totalHours }, 
+    (_, i) => i + businessHours.startHour
+  );
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -360,15 +350,15 @@ export default function AdminBookings() {
         <TimeSlots
           employees={employees}
           formatTime={formatTime}
-          TOTAL_HOURS={TOTAL_BUSINESS_HOURS}
+          TOTAL_HOURS={businessHours.totalHours}
           currentDate={currentDate}
           nowPosition={nowPosition}
           isSameDay={isSameDay}
           appointments={appointments}
           setSelectedAppointment={handleAppointmentClick}
           setClickedCell={handleCellClick}
-          hourLabels={Array.from({ length: TOTAL_BUSINESS_HOURS }, (_, i) => i + START_HOUR)}
-          PIXELS_PER_HOUR={60}
+          hourLabels={hourLabels}
+          PIXELS_PER_HOUR={businessHours.pixelsPerHour}
           handleColumnClick={() => {}}
           renderAppointmentBlock={() => null}
         />
