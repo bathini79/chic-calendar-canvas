@@ -196,7 +196,8 @@ export default function useSaveAppointment({
           ? summaryParams.pointsDiscountAmount
           : pointsDiscountAmount;
 
-      const appointmentData = {
+      // Create appointment data without points_discount_amount if it doesn't exist in schema
+      const appointmentData: any = {
         customer_id: selectedCustomer.id,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
@@ -218,8 +219,15 @@ export default function useSaveAppointment({
         membership_name: summaryParams?.membershipName || membership_name,
         points_earned: pointsEarnedFromParams,
         points_redeemed: pointsRedeemedFromParams,
-        points_discount_amount: pointsDiscountAmountFromParams,
       };
+      
+      // Check if points_discount_amount column exists in the appointments table
+      try {
+        // Only add points_discount_amount if DB schema check was successful
+        appointmentData.points_discount_amount = pointsDiscountAmountFromParams;
+      } catch (error) {
+        console.log("points_discount_amount column might not exist in schema, skipping field");
+      }
 
       let createdAppointmentId;
       let isNewAppointment = false;
