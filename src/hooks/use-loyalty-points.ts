@@ -65,24 +65,26 @@ export function useLoyaltyPoints(customerId?: string): UseLoyaltyPointsResult {
           return;
         }
         
-        setSettings(settingsData);
-        
-        // Program is eligible if it's enabled
-        setIsEligibleForPoints(settingsData?.enabled || false);
-        
-        // If we have a customer ID, fetch their points balance
-        if (customerId && settingsData?.enabled) {
-          const { data: customerData, error: customerError } = await supabase
-            .from("profiles")
-            .select("wallet_balance, cashback_balance")
-            .eq("id", customerId)
-            .single();
-            
-          if (customerError) {
-            console.error("Error fetching customer points:", customerError);
-          } else {
-            // Use wallet_balance as the available points
-            setCustomerPoints(customerData?.wallet_balance || 0);
+        if (settingsData) {
+          setSettings(settingsData);
+          
+          // Program is eligible if it's enabled
+          setIsEligibleForPoints(settingsData?.enabled || false);
+          
+          // If we have a customer ID, fetch their points balance
+          if (customerId && settingsData?.enabled) {
+            const { data: customerData, error: customerError } = await supabase
+              .from("profiles")
+              .select("wallet_balance, cashback_balance")
+              .eq("id", customerId)
+              .single();
+              
+            if (customerError) {
+              console.error("Error fetching customer points:", customerError);
+            } else {
+              // Use wallet_balance as the available points
+              setCustomerPoints(customerData?.wallet_balance || 0);
+            }
           }
         }
       } catch (error) {

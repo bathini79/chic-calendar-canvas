@@ -1,3 +1,4 @@
+
 export type Appointment = {
   id: string;
   customer_id: string;
