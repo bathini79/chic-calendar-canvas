@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1024,4 +1025,97 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   {paymentMethodsLoading ? (
                     <SelectItem value="loading">Loading...</SelectItem>
                   ) : paymentMethods.length > 0 ? (
-                    paymentMethods.
+                    paymentMethods.map((method) => (
+                      <SelectItem key={method.id} value={method.name}>
+                        {method.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 flex items-center justify-center gap-2"
+                size="lg"
+                onClick={handlePayment}
+                disabled={selectedItems.length === 0 || loadingPayment}
+              >
+                {loadingPayment ? (
+                  <>
+                    <LoaderCircle
+                      className="animate-spin"
+                      size={16}
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    />
+                    Processing...
+                  </>
+                ) : (
+                  "Complete Payment"
+                )}
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="lg">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Discount</h3>
+                    <div className="flex gap-4">
+                      <Select
+                        value={discountType}
+                        onValueChange={onDiscountTypeChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Discount type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Discount</SelectItem>
+                          <SelectItem value="percentage">Percentage</SelectItem>
+                          <SelectItem value="fixed">Fixed Amount</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {discountType !== "none" && (
+                        <Input
+                          type="number"
+                          placeholder={
+                            discountType === "percentage"
+                              ? "Enter %"
+                              : "Enter amount"
+                          }
+                          value={discountValue}
+                          onChange={(e) =>
+                            onDiscountValueChange(Number(e.target.value))
+                          }
+                          className="w-24"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Notes</h3>
+                      <Textarea
+                        placeholder="Add appointment notes..."
+                        value={notes}
+                        onChange={(e) => onNotesChange(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};

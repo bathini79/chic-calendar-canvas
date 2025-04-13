@@ -8,7 +8,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 interface LoyaltyPointsSectionProps {
   isEnabled: boolean;
-  customerPoints: number;
+  walletBalance: number;
+  cashbackBalance: number;
   pointsToEarn: number;
   usePoints: boolean;
   setUsePoints: (usePoints: boolean) => void;
@@ -24,7 +25,8 @@ interface LoyaltyPointsSectionProps {
 
 const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
   isEnabled,
-  customerPoints,
+  walletBalance,
+  cashbackBalance,
   pointsToEarn,
   usePoints,
   setUsePoints,
@@ -47,7 +49,7 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
     return null;
   }
 
-  const canUsePoints = customerPoints >= minRedemptionPoints && maxPointsToRedeem > 0;
+  const canUsePoints = walletBalance >= minRedemptionPoints && maxPointsToRedeem > 0;
 
   return (
     <Card className="bg-gray-50 border">
@@ -66,8 +68,15 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
 
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Available Points</span>
-          <span className="font-medium">{customerPoints}</span>
+          <span className="font-medium">{walletBalance}</span>
         </div>
+
+        {cashbackBalance > 0 && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Cashback Points</span>
+            <span className="font-medium text-blue-600">{cashbackBalance} (auto-transferring)</span>
+          </div>
+        )}
 
         {canUsePoints ? (
           <>
@@ -122,7 +131,7 @@ const LoyaltyPointsSection: React.FC<LoyaltyPointsSectionProps> = ({
           </>
         ) : (
           <div className="text-sm text-muted-foreground">
-            {customerPoints < minRedemptionPoints
+            {walletBalance < minRedemptionPoints
               ? `Minimum ${minRedemptionPoints} points required to redeem.`
               : `Not enough points available to redeem.`}
           </div>
