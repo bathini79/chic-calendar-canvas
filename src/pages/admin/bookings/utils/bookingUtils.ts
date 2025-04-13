@@ -239,9 +239,7 @@ export const getAdjustedServicePrices = (
   discountType: 'none' | 'percentage' | 'fixed' = 'none',
   discountValue: number = 0,
   membershipDiscount: number = 0,
-  couponDiscount: number = 0,
-  loyaltyPointsDiscount: number = 0,
-  loyaltyAdjustedPrices: Record<string, number> = {}
+  couponDiscount: number = 0
 ) => {
   // Ensure services and packages are arrays
   const servicesArray = Array.isArray(services) ? services : [];
@@ -254,15 +252,10 @@ export const getAdjustedServicePrices = (
   const afterManualDiscount = getFinalPrice(originalTotal, discountType, discountValue);
   
   // Calculate final total after all discounts
-  const finalTotal = Math.max(0, afterManualDiscount - membershipDiscount - couponDiscount - loyaltyPointsDiscount);
+  const finalTotal = Math.max(0, afterManualDiscount - membershipDiscount - couponDiscount);
   
   // If there's no discount at all, return original prices
   if (originalTotal === finalTotal) {
-    // If there are loyalty point adjusted prices, use those
-    if (Object.keys(loyaltyAdjustedPrices).length > 0) {
-      return loyaltyAdjustedPrices;
-    }
-    
     const result: Record<string, number> = {};
     
     // Just return original prices for all services
@@ -309,12 +302,7 @@ export const getAdjustedServicePrices = (
   selectedServices.forEach((serviceId) => {
     const service = servicesArray.find((s) => s.id === serviceId);
     if (service) {
-      // Check if there's a loyalty-specific price for this service
-      if (loyaltyAdjustedPrices[serviceId]) {
-        result[serviceId] = loyaltyAdjustedPrices[serviceId];
-      } else {
-        result[serviceId] = service.selling_price * discountRatio;
-      }
+      result[serviceId] = service.selling_price * discountRatio;
     }
   });
   
@@ -328,13 +316,8 @@ export const getAdjustedServicePrices = (
         const originalServicePrice = ps.package_selling_price !== undefined && ps.package_selling_price !== null
           ? ps.package_selling_price
           : ps.service.selling_price;
-        
-        // Check if there's a loyalty-specific price for this service  
-        if (loyaltyAdjustedPrices[ps.service.id]) {
-          result[ps.service.id] = loyaltyAdjustedPrices[ps.service.id];
-        } else {
-          result[ps.service.id] = originalServicePrice * discountRatio;
-        }
+          
+        result[ps.service.id] = originalServicePrice * discountRatio;
       });
       
       // Then handle customized services
@@ -347,12 +330,7 @@ export const getAdjustedServicePrices = (
           
           const service = servicesArray.find((s) => s.id === serviceId);
           if (service) {
-            // Check if there's a loyalty-specific price for this service
-            if (loyaltyAdjustedPrices[serviceId]) {
-              result[serviceId] = loyaltyAdjustedPrices[serviceId];
-            } else {
-              result[serviceId] = service.selling_price * discountRatio;
-            }
+            result[serviceId] = service.selling_price * discountRatio;
           }
         });
       }

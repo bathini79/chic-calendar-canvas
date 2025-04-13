@@ -216,23 +216,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     couponDiscount,
   ]);
 
-  const {
-    isLoyaltyEnabled,
-    pointsToEarn,
-    walletBalance,
-    usePoints,
-    pointsToRedeem,
-    pointsDiscountAmount,
-    maxPointsToRedeem,
-    minRedemptionPoints,
-    pointValue,
-    maxRedemptionType,
-    maxRedemptionValue,
-    setUsePoints,
-    setPointsToRedeem,
-    pointsExpiryDate,
-    adjustedServicePrices
-  } = useLoyaltyInCheckout({
+  const loyalty = useLoyaltyInCheckout({
     customerId: selectedCustomer?.id,
     selectedServices,
     selectedPackages,
@@ -470,7 +454,19 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [subtotal, discountedSubtotal, couponDiscount, membershipDiscount, loyalty.pointsDiscountAmount]
   );
 
-  const adjustedPrices = getAdjustedServicePrices(
+  const adjustedPrices = useMemo(() => {
+    return getAdjustedServicePrices(
+      selectedServices,
+      selectedPackages,
+      services,
+      packages,
+      customizedServices,
+      discountType,
+      discountValue,
+      membershipDiscount,
+      couponDiscount
+    );
+  }, [
     selectedServices,
     selectedPackages,
     services,
@@ -480,9 +476,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     discountValue,
     membershipDiscount,
     couponDiscount,
-    pointsDiscountAmount,
-    adjustedServicePrices
-  );
+  ]);
 
   const getServiceDisplayPrice = (serviceId: string) => {
     return adjustedPrices[serviceId] !== undefined
