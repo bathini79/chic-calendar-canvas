@@ -36,7 +36,8 @@ import {
   BarChart2,
   BarChart3,
   PieChart as PieChartIcon,
-  LineChart as LineChartIcon
+  LineChart as LineChartIcon,
+  Calendar
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -46,13 +47,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { 
   ChartContainer, 
   ChartTooltip, 
   ChartTooltipContent 
 } from '@/components/ui/chart';
+import { TimeRangeFilter, DateRangeType, DateRange } from './TimeRangeFilter';
 
 type SalesByEmployeeProps = {
   onBack: () => void;
@@ -60,35 +62,24 @@ type SalesByEmployeeProps = {
   dateRange: string;
 };
 
-export function SalesByEmployee({ onBack, employeeId, dateRange }: SalesByEmployeeProps) {
+export function SalesByEmployee({ onBack, employeeId, dateRange: initialDateRange }: SalesByEmployeeProps) {
   const [activeTab, setActiveTab] = useState('report');
   const [activeChart, setActiveChart] = useState('revenue');
+  const [timeRangeType, setTimeRangeType] = useState<DateRangeType>('last30days');
   
-  // Parse the date range and calculate the start and end dates
-  const getDateRange = () => {
-    const today = new Date();
-    
-    if (dateRange === 'custom') {
-      // For custom range, we'd typically have date pickers
-      // For now, default to last 30 days
-      return {
-        startDate: subDays(today, 30),
-        endDate: today
-      };
-    }
-    
-    const days = parseInt(dateRange, 10);
-    return {
-      startDate: subDays(today, days),
-      endDate: today
-    };
-  };
+  // Initialize with last 30 days
+  const today = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
   
-  const { startDate, endDate } = getDateRange();
+  const [dateRangeValue, setDateRangeValue] = useState<DateRange>({
+    startDate: thirtyDaysAgo,
+    endDate: today
+  });
   
   // Fetch the sales by employee data
   const { data, isLoading } = useQuery({
-    queryKey: ['sales-by-employee', employeeId, dateRange],
+    queryKey: ['sales-by-employee', employeeId, timeRangeType, dateRangeValue],
     queryFn: async () => {
       let query = supabase
         .from('bookings')
@@ -120,12 +111,12 @@ export function SalesByEmployee({ onBack, employeeId, dateRange }: SalesByEmploy
             price
           ),
           employee_id,
-          employees(
+          employees!bookings_employee_id_fkey(
             name
           )
         `)
-        .gte('appointments.created_at', startOfDay(startDate).toISOString())
-        .lte('appointments.created_at', endOfDay(endDate).toISOString())
+        .gte('appointments.created_at', dateRangeValue.startDate.toISOString())
+        .lte('appointments.created_at', dateRangeValue.endDate.toISOString())
         .eq('status', 'completed');
       
       // If an employee is selected, filter by that employee
@@ -258,6 +249,15 @@ export function SalesByEmployee({ onBack, employeeId, dateRange }: SalesByEmploy
   
   const totals = calculateTotals();
   
+  // Handle time range changes
+  const handleTimeRangeChange = (type: DateRangeType) => {
+    setTimeRangeType(type);
+  };
+  
+  const handleDateRangeChange = (range: DateRange) => {
+    setDateRangeValue(range);
+  };
+  
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -271,6 +271,13 @@ export function SalesByEmployee({ onBack, employeeId, dateRange }: SalesByEmploy
           </Button>
           <h2 className="text-2xl font-bold">Sales by Employee</h2>
         </div>
+        
+        <TimeRangeFilter
+          value={timeRangeType}
+          dateRange={dateRangeValue}
+          onValueChange={handleTimeRangeChange}
+          onRangeChange={handleDateRangeChange}
+        />
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
