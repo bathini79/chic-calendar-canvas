@@ -93,7 +93,7 @@ export function useLoyaltyInCheckout({
   }, [maxPointsToRedeem, settings, walletBalance]);
 
   // Calculate discount amount from redeemed points
-  const pointsDiscountAmount = settings?.enabled && settings?.points_per_spend && pointsToRedeem > 0
+  const pointsDiscountAmount = settings?.enabled && settings?.points_per_spend && pointsToRedeem > 0 && usePoints
     ? calculateAmountFromPoints(pointsToRedeem)
     : 0;
 
@@ -150,7 +150,7 @@ export function useLoyaltyInCheckout({
     isLoyaltyEnabled: settings?.enabled || false,
     pointsToEarn,
     walletBalance,
-    usePoints: true, // Always true to always use points
+    usePoints, // Always true to always use points
     pointsToRedeem,
     pointsDiscountAmount,
     maxPointsToRedeem,
