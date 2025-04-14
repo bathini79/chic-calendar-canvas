@@ -271,7 +271,7 @@ export function BookingConfirmation() {
           status: "pending",
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          employee_id: null
+          employee_id: item.employee_id || null
         };
       });
       
