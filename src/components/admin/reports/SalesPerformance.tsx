@@ -5,6 +5,7 @@ import { ArrowLeft, Download, ChartBar, BarChart2, PieChart } from "lucide-react
 import { SalesPerformanceTable } from './sales-performance/SalesPerformanceTable';
 import { SalesPerformanceAnalytics } from './sales-performance/SalesPerformanceAnalytics';
 import { ServiceCategoryPerformance } from './sales-performance/ServiceCategoryPerformance';
+import { SalesByProduct } from './sales-performance/SalesByProduct';
 import { DateRangePicker } from './sales-performance/DateRangePicker';
 import { EmployeeSelector } from './sales-performance/EmployeeSelector';
 import { Card } from '@/components/ui/card';
@@ -45,6 +46,10 @@ export const SalesPerformance = ({ onBack }: SalesPerformanceProps) => {
             <TabsTrigger value="categories" className="flex items-center gap-2">
               <PieChart className="h-4 w-4" />
               <span>Service Categories</span>
+            </TabsTrigger>
+            <TabsTrigger value="products" className="flex items-center gap-2">
+              <ChartBar className="h-4 w-4" />
+              <span>Products</span>
             </TabsTrigger>
           </TabsList>
           
@@ -91,6 +96,13 @@ export const SalesPerformance = ({ onBack }: SalesPerformanceProps) => {
 
         <TabsContent value="categories" className="space-y-4">
           <ServiceCategoryPerformance
+            employeeId={selectedEmployeeId}
+            dateRange={dateRange}
+          />
+        </TabsContent>
+
+        <TabsContent value="products" className="space-y-4">
+          <SalesByProduct
             employeeId={selectedEmployeeId}
             dateRange={dateRange}
           />
