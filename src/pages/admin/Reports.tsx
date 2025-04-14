@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Card, 
@@ -28,6 +27,7 @@ import { FinancialSummary } from "@/components/admin/reports/FinancialSummary";
 import { CustomerList } from "@/components/admin/reports/CustomerList";
 import { CustomerRetentionDashboard } from "@/components/admin/reports/CustomerRetentionDashboard";
 import { SalesPerformance } from "@/components/admin/reports/SalesPerformance";
+import { PaymentBySource } from "@/components/admin/reports/PaymentBySource";
 
 const reportCategories = [
   {
@@ -182,6 +182,14 @@ export default function Reports() {
       return (
         <div className="space-y-4">
           <SalesPerformance onBack={() => setExpandedReport(null)} />
+        </div>
+      );
+    }
+    
+    if (expandedReport === "payment-source") {
+      return (
+        <div className="space-y-4">
+          <PaymentBySource onBack={() => setExpandedReport(null)} />
         </div>
       );
     }
