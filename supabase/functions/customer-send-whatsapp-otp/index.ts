@@ -59,11 +59,14 @@ serve(async (req) => {
     const expiresInMinutes = 15;
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
     
+    // Normalize the phone number - strip "+" prefix for consistent storage
+    const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber;
+    
     // Check if user already exists
     const { data: existingUser, error: userError } = await supabaseAdmin
       .from('profiles')
       .select('*')
-      .eq('phone_number', phoneNumber)
+      .eq('phone_number', normalizedPhone)
       .single();
     
     // Load GupShup configuration
@@ -79,7 +82,7 @@ serve(async (req) => {
     
     // Store the OTP in the database
     const { error: otpError } = await supabaseAdmin.from('phone_auth_codes').insert({
-      phone_number: phoneNumber,
+      phone_number: normalizedPhone,
       code: otp,
       expires_at: expiresAt.toISOString(),
       full_name: fullName,
@@ -94,7 +97,7 @@ serve(async (req) => {
     
     // Create message with OTP
     const MESSAGE_TEXT = `Your verification code for login is: ${otp}\n\nThis code will expire in ${expiresInMinutes} minutes.`;
-    console.log("Sending login OTP message to:", phoneNumber);
+    console.log("Sending login OTP message to:", normalizedPhone);
     
     const GUPSHUP_API_KEY = config.api_key;
     const SOURCE_NUMBER = config.source_mobile.startsWith('+') ? config.source_mobile.slice(1) : config.source_mobile;

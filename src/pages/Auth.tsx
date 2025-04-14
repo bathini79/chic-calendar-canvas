@@ -26,7 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Referral source options
 const referralSources = [
   { value: "google", label: "Google Search" },
   { value: "facebook", label: "Facebook" },
@@ -102,7 +101,6 @@ const Auth = () => {
   }, [otpSent, resendCountdown]);
 
   useEffect(() => {
-    // Set referral source from URL parameter if available
     if (referralSourceParam && referralSources.some(source => source.value === referralSourceParam)) {
       setReferralSource(referralSourceParam);
     }
@@ -133,7 +131,7 @@ const Auth = () => {
     } catch (error: any) {
       const errorMessage = error.message || "An unexpected error occurred. Please try again.";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       console.error("Authentication error:", error);
     } finally {
       setIsLoading(false);
@@ -148,7 +146,7 @@ const Auth = () => {
     if (!phoneNumber || phoneNumber.length < 10) {
       const errorMessage = "Please enter a valid phone number";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       return;
     }
 
@@ -159,7 +157,11 @@ const Auth = () => {
     setResendCountdown(30);
     
     try {
-      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      const fullPhoneNumber = phoneNumber.startsWith('+') ? 
+        phoneNumber : 
+        `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      
+      console.log("Sending OTP to phone number:", fullPhoneNumber);
       
       const response = await supabase.functions.invoke('customer-send-whatsapp-otp', {
         body: { 
@@ -184,7 +186,7 @@ const Auth = () => {
     } catch (error: any) {
       const errorMessage = error.message || "Failed to send OTP. Please try again.";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       setEdgeFunctionError(errorMessage);
       console.error("OTP send error:", error);
     } finally {
@@ -196,14 +198,14 @@ const Auth = () => {
     if (!otp || otp.length !== 6) {
       const errorMessage = "Please enter a valid 6-digit OTP";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       return;
     }
 
     if (needsFullName && !fullName.trim()) {
       const errorMessage = "Full name is required for new registrations";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       return;
     }
 
@@ -212,7 +214,11 @@ const Auth = () => {
     setEdgeFunctionError(null);
     
     try {
-      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      const fullPhoneNumber = phoneNumber.startsWith('+') ? 
+        phoneNumber : 
+        `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      
+      console.log("Verifying OTP for phone number:", fullPhoneNumber);
       
       const response = await supabase.functions.invoke('customer-verify-whatsapp-otp', {
         body: { 
@@ -243,7 +249,7 @@ const Auth = () => {
         
         const errorMessage = response.data.message || "Verification failed. Please try again.";
         toast.error(errorMessage);
-        setVerificationError(errorMessage); // Set error feedback
+        setVerificationError(errorMessage);
         setEdgeFunctionError(response.data.error);
         setIsLoading(false);
         return;
@@ -288,7 +294,7 @@ const Auth = () => {
       console.error("OTP verification error:", error);
       const errorMessage = error.message || "Connection error. Please try again.";
       toast.error(errorMessage);
-      setVerificationError(errorMessage); // Set error feedback
+      setVerificationError(errorMessage);
       setEdgeFunctionError("Network or server error occurred");
     } finally {
       setIsLoading(false);
@@ -474,8 +480,8 @@ const Auth = () => {
             className="w-1/2"
             onClick={() => {
               setOtpSent(false);
-              setOtp(""); // Clear the OTP state
-              document.querySelectorAll("input[data-otp-slot]").forEach(input => input.value = ""); // Clear OTP input fields
+              setOtp("");
+              document.querySelectorAll("input[data-otp-slot]").forEach(input => input.value = "");
               setVerificationError(null);
               setEdgeFunctionError(null);
             }}

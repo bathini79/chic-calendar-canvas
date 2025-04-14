@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0';
 
@@ -44,6 +45,8 @@ serve(async (req) => {
       ? phoneNumber.substring(1) 
       : phoneNumber;
     
+    console.log("Normalized phone for OTP verification:", normalizedPhone);
+    
     // Step 1: Verify OTP from database
     const { data: otpData, error: otpError } = await supabaseAdmin
       .from('phone_auth_codes')
@@ -54,6 +57,7 @@ serve(async (req) => {
       
     if (otpError || !otpData) {
       console.error('Customer OTP verification error:', otpError || "No matching OTP found");
+      console.log("Checking database for phone:", normalizedPhone, "code:", code);
       return new Response(
         JSON.stringify({ 
           error: 'invalid_code',
