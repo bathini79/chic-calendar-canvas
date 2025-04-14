@@ -98,7 +98,7 @@ export function CartSummary() {
   const afterMembershipDiscount = subtotal - membershipDiscount;
   const afterCouponSubtotal = afterMembershipDiscount - couponDiscount;
   // Apply loyalty points discount
-  const afterLoyaltyDiscount = afterCouponSubtotal - loyalty.pointsDiscountAmount;
+  const afterLoyaltyDiscount = afterCouponSubtotal - loyalty?.pointsDiscountAmount;
   const totalPrice = afterLoyaltyDiscount + taxAmount;
   
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
