@@ -242,7 +242,7 @@ export function BookingConfirmation() {
           location: selectedLocation,
           payment_method: paymentMethod,
           // Store loyalty points information without updating wallet balance
-          points_earned: loyalty.pointsToEarn,
+          points_earned: loyalty.pointsToEarn, // For display only
           points_redeemed: loyalty.pointsToRedeem,
           points_discount_amount: loyalty.pointsDiscountAmount
         })
