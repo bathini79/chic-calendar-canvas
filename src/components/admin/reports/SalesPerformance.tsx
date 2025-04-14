@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, ChartBar, BarChart2, PieChart, Coins } from "lucide-react";
+import { ArrowLeft, Download, ChartBar, BarChart2, PieChart, Coins, Users } from "lucide-react";
 import { SalesPerformanceTable } from './sales-performance/SalesPerformanceTable';
 import { SalesPerformanceAnalytics } from './sales-performance/SalesPerformanceAnalytics';
 import { ServiceCategoryPerformance } from './sales-performance/ServiceCategoryPerformance';
@@ -10,6 +10,7 @@ import { EmployeeSelector } from './sales-performance/EmployeeSelector';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { LoyaltyPerformance } from './sales-performance/LoyaltyPerformance';
+import { CustomerSalesReport } from './sales-performance/CustomerSalesReport';
 
 type SalesPerformanceProps = {
   onBack: () => void;
@@ -46,6 +47,10 @@ export const SalesPerformance = ({ onBack }: SalesPerformanceProps) => {
             <TabsTrigger value="categories" className="flex items-center gap-2">
               <PieChart className="h-4 w-4" />
               <span>Service Categories</span>
+            </TabsTrigger>
+            <TabsTrigger value="customer-sales" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span>Customer Sales</span>
             </TabsTrigger>
             <TabsTrigger value="loyalty" className="flex items-center gap-2">
               <Coins className="h-4 w-4" />
@@ -96,6 +101,13 @@ export const SalesPerformance = ({ onBack }: SalesPerformanceProps) => {
 
         <TabsContent value="categories" className="space-y-4">
           <ServiceCategoryPerformance
+            employeeId={selectedEmployeeId}
+            dateRange={dateRange}
+          />
+        </TabsContent>
+
+        <TabsContent value="customer-sales" className="space-y-4">
+          <CustomerSalesReport
             employeeId={selectedEmployeeId}
             dateRange={dateRange}
           />
