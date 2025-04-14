@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Card, 
@@ -17,7 +18,8 @@ import {
   Bell, 
   Calendar, 
   Search,
-  ArrowLeft
+  ArrowLeft,
+  UserCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -28,6 +30,7 @@ import { CustomerList } from "@/components/admin/reports/CustomerList";
 import { CustomerRetentionDashboard } from "@/components/admin/reports/CustomerRetentionDashboard";
 import { SalesPerformance } from "@/components/admin/reports/SalesPerformance";
 import { PaymentBySource } from "@/components/admin/reports/PaymentBySource";
+import { SalesByEmployee } from "@/components/admin/reports/sales-performance/SalesByEmployee";
 
 const reportCategories = [
   {
@@ -59,7 +62,8 @@ const reportCategories = [
     reports: [
       { id: "sales-trends", name: "Sales Trends", description: "Analyze sales performance over time" },
       { id: "service-popularity", name: "Service Popularity", description: "Most popular services and packages" },
-      { id: "revenue-growth", name: "Revenue Growth", description: "Month-over-month and year-over-year growth" }
+      { id: "revenue-growth", name: "Revenue Growth", description: "Month-over-month and year-over-year growth" },
+      { id: "sales-by-employee", name: "Sales by Employee", description: "Analyze sales performance by employee" }
     ]
   },
   {
@@ -194,6 +198,18 @@ export default function Reports() {
       );
     }
     
+    if (expandedReport === "sales-by-employee") {
+      return (
+        <div className="space-y-4">
+          <SalesByEmployee 
+            onBack={() => setExpandedReport(null)} 
+            employeeId="all"
+            dateRange="30"
+          />
+        </div>
+      );
+    }
+    
     if (expandedReport === "sales-trends" || expandedReport === "service-popularity" || expandedReport === "revenue-growth") {
       return (
         <div className="space-y-4">
@@ -287,18 +303,18 @@ export default function Reports() {
                     
                     <Card 
                       className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => handleReportClick("service-popularity")}
+                      onClick={() => handleReportClick("sales-by-employee")}
                     >
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                            <UserCheck className="h-4 w-4 text-muted-foreground" />
                             <p className="text-sm text-muted-foreground">Sales Performance</p>
                           </div>
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <CardTitle className="text-xl">Service Popularity</CardTitle>
-                        <CardDescription>Most popular services and revenue analysis</CardDescription>
+                        <CardTitle className="text-xl">Sales by Employee</CardTitle>
+                        <CardDescription>Analyze sales performance by employee</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="h-40 flex items-center justify-center bg-muted/30 rounded-md">
