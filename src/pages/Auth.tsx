@@ -159,7 +159,7 @@ const Auth = () => {
     try {
       const fullPhoneNumber = phoneNumber.startsWith('+') ? 
         phoneNumber : 
-        `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+        `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;
       
       console.log("Sending OTP to phone number:", fullPhoneNumber);
       
@@ -216,7 +216,7 @@ const Auth = () => {
     try {
       const fullPhoneNumber = phoneNumber.startsWith('+') ? 
         phoneNumber : 
-        `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+        `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;
       
       console.log("Verifying OTP for phone number:", fullPhoneNumber);
       
