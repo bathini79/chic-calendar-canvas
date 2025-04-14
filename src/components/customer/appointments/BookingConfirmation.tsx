@@ -246,8 +246,7 @@ export function BookingConfirmation() {
           points_redeemed: loyalty.pointsToRedeem,
           points_discount_amount: loyalty.pointsDiscountAmount
         })
-        .select()
-        .single();
+        .select();
       
       if (appointmentError) {
         throw appointmentError;
@@ -265,7 +264,7 @@ export function BookingConfirmation() {
         endTime.setMinutes(endTime.getMinutes() + (item.duration || 0));
         
         return {
-          appointment_id: appointmentData.id,
+          appointment_id: appointmentData[0].id,
           service_id: item.service_id || null,
           package_id: item.package_id || null,
           price_paid: item.selling_price || 0,
@@ -287,7 +286,7 @@ export function BookingConfirmation() {
       // Clear cart and navigate to success page
       await clearCart();
       
-      navigate(`/booking-success/${appointmentData.id}`);
+      navigate(`/booking-success/${appointmentData[0].id}`);
       
     } catch (error: any) {
       console.error("Booking error:", error);
