@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, ChartBar, BarChart2 } from "lucide-react";
+import { ArrowLeft, Download, ChartBar, BarChart2, PieChart } from "lucide-react";
 import { SalesPerformanceTable } from './sales-performance/SalesPerformanceTable';
 import { SalesPerformanceAnalytics } from './sales-performance/SalesPerformanceAnalytics';
+import { ServiceCategoryPerformance } from './sales-performance/ServiceCategoryPerformance';
 import { DateRangePicker } from './sales-performance/DateRangePicker';
 import { EmployeeSelector } from './sales-performance/EmployeeSelector';
 import { Card } from '@/components/ui/card';
@@ -17,6 +18,7 @@ export const SalesPerformance = ({ onBack }: SalesPerformanceProps) => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all");
   const [dateRange, setDateRange] = useState<"30" | "90" | "365" | "custom">("30");
   const [activeTab, setActiveTab] = useState<string>("report");
+  const [activeSection, setActiveSection] = useState<string>("services");
 
   return (
     <div className="space-y-4">
@@ -29,20 +31,20 @@ export const SalesPerformance = ({ onBack }: SalesPerformanceProps) => {
           >
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
-          <h2 className="text-2xl font-bold">Sales By Service Report</h2>
+          <h2 className="text-2xl font-bold">Sales Performance</h2>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeSection} onValueChange={setActiveSection} className="space-y-4">
         <div className="flex justify-between items-center">
           <TabsList>
-            <TabsTrigger value="report" className="flex items-center gap-2">
+            <TabsTrigger value="services" className="flex items-center gap-2">
               <BarChart2 className="h-4 w-4" />
-              <span>Report</span>
+              <span>Services</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <ChartBar className="h-4 w-4" />
-              <span>Analytics</span>
+            <TabsTrigger value="categories" className="flex items-center gap-2">
+              <PieChart className="h-4 w-4" />
+              <span>Service Categories</span>
             </TabsTrigger>
           </TabsList>
           
@@ -58,15 +60,37 @@ export const SalesPerformance = ({ onBack }: SalesPerformanceProps) => {
           </div>
         </div>
 
-        <TabsContent value="report" className="space-y-4">
-          <SalesPerformanceTable 
-            employeeId={selectedEmployeeId}
-            dateRange={dateRange}
-          />
+        <TabsContent value="services" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="report" className="flex items-center gap-2">
+                <BarChart2 className="h-4 w-4" />
+                <span>Report</span>
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <ChartBar className="h-4 w-4" />
+                <span>Analytics</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="report" className="space-y-4">
+              <SalesPerformanceTable 
+                employeeId={selectedEmployeeId}
+                dateRange={dateRange}
+              />
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-4">
+              <SalesPerformanceAnalytics 
+                employeeId={selectedEmployeeId}
+                dateRange={dateRange}
+              />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-4">
-          <SalesPerformanceAnalytics 
+        <TabsContent value="categories" className="space-y-4">
+          <ServiceCategoryPerformance
             employeeId={selectedEmployeeId}
             dateRange={dateRange}
           />
