@@ -41,6 +41,7 @@ export function CartSummary() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [membershipDiscount, setMembershipDiscount] = useState(0);
   const [activeMembership, setActiveMembership] = useState<any>(null);
+  const [customerData, setCustomerData] = useState<any>(null);
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
   const { taxRates, fetchTaxRates } = useTaxRates();
   const { coupons, fetchCoupons, isLoading: couponsLoading, getCouponById } = useCoupons();
@@ -67,6 +68,22 @@ export function CartSummary() {
   const membershipFetchedRef = useRef(false);
   const couponsFetchedRef = useRef(false);
   
+  // Fetch customer data and session
+  useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setCustomerData(session.user);
+        }
+      } catch (error) {
+        console.error("Error fetching session:", error);
+      }
+    };
+
+    fetchSession();
+  }, []);
+  
   // Fetch customer memberships when the component loads (if we're not in booking confirmation)
   const fetchMemberships = useCallback(async () => {
     if (isBookingConfirmation || membershipFetchedRef.current) return;
@@ -85,10 +102,6 @@ export function CartSummary() {
   useEffect(() => {
     fetchMemberships();
   }, [fetchMemberships]);
-
-  // Initialize the loyalty integration using the hook from admin
-  const { data: { session } } = await supabase.auth.getSession();
-  const customerData = session ? session.user : null;
   
   // Prepare data for loyalty integration
   const serviceIds = items
