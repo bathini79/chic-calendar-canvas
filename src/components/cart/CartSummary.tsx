@@ -1,3 +1,4 @@
+
 import { useCart } from "./CartContext";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,7 +21,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Award } from "lucide-react";
-import { useLoyaltyInCheckout } from "@/pages/admin/bookings/hooks/useLoyaltyInCheckout";
 
 export function CartSummary() {
   const { 
@@ -41,7 +41,6 @@ export function CartSummary() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [membershipDiscount, setMembershipDiscount] = useState(0);
   const [activeMembership, setActiveMembership] = useState<any>(null);
-  const [customerData, setCustomerData] = useState<any>(null);
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
   const { taxRates, fetchTaxRates } = useTaxRates();
   const { coupons, fetchCoupons, isLoading: couponsLoading, getCouponById } = useCoupons();
@@ -60,6 +59,7 @@ export function CartSummary() {
   const totalDuration = getTotalDuration();
   const afterMembershipDiscount = subtotal - membershipDiscount;
   const afterCouponSubtotal = afterMembershipDiscount - couponDiscount;
+  const totalPrice = afterCouponSubtotal + taxAmount;
   const isTimeSelected = Object.keys(selectedTimeSlots).length > 0;
   
   // Refs to prevent infinite loops
@@ -67,22 +67,6 @@ export function CartSummary() {
   const locationSettingsLoadedRef = useRef(false);
   const membershipFetchedRef = useRef(false);
   const couponsFetchedRef = useRef(false);
-  
-  // Fetch customer data and session
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setCustomerData(session.user);
-        }
-      } catch (error) {
-        console.error("Error fetching session:", error);
-      }
-    };
-
-    fetchSession();
-  }, []);
   
   // Fetch customer memberships when the component loads (if we're not in booking confirmation)
   const fetchMemberships = useCallback(async () => {
@@ -102,43 +86,6 @@ export function CartSummary() {
   useEffect(() => {
     fetchMemberships();
   }, [fetchMemberships]);
-  
-  // Prepare data for loyalty integration
-  const serviceIds = items
-    .filter(item => item.type === 'service' && item.service_id)
-    .map(item => item.service_id as string);
-  
-  const packageIds = items
-    .filter(item => item.type === 'package' && item.package_id)
-    .map(item => item.package_id as string);
-  
-  // Map cart items to service and package objects for loyalty hook
-  const servicesData = items
-    .filter(item => item.type === 'service')
-    .map(item => ({
-      id: item.service_id || '',
-      selling_price: item.selling_price || 0,
-      name: item.name || ''
-    }));
-  
-  const packagesData = items
-    .filter(item => item.type === 'package')
-    .map(item => ({
-      id: item.package_id || '',
-      price: item.selling_price || 0,
-      name: item.name || ''
-    }));
-  
-  // Use the loyalty hook
-  const loyalty = useLoyaltyInCheckout({
-    customerId: customerData?.id,
-    selectedServices: serviceIds,
-    selectedPackages: packageIds,
-    services: servicesData,
-    packages: packagesData,
-    subtotal: subtotal,
-    discountedSubtotal: afterCouponSubtotal
-  });
 
   // Calculate membership discounts for cart items with protection against infinite loops
   useEffect(() => {
@@ -222,14 +169,12 @@ export function CartSummary() {
     if (appliedTaxId && taxRates.length > 0) {
       const taxRate = taxRates.find(tax => tax.id === appliedTaxId);
       if (taxRate) {
-        // Apply tax after all discounts (including loyalty)
-        const finalSubtotal = afterCouponSubtotal - loyalty.pointsDiscountAmount;
-        setTaxAmount(finalSubtotal * (taxRate.percentage / 100));
+        setTaxAmount(afterCouponSubtotal * (taxRate.percentage / 100));
       }
     } else {
       setTaxAmount(0);
     }
-  }, [appliedTaxId, afterCouponSubtotal, taxRates, loyalty.pointsDiscountAmount]);
+  }, [appliedTaxId, afterCouponSubtotal, taxRates]);
   
   // Calculate coupon discount
   useEffect(() => {
@@ -278,9 +223,6 @@ export function CartSummary() {
     return aTime.localeCompare(bTime);
   });
 
-  // Calculate final price after all discounts and tax
-  const totalPrice = afterCouponSubtotal - loyalty.pointsDiscountAmount + taxAmount;
-
   const handleContinue = () => {
     if (isSchedulingPage) {
       if (selectedDate && isTimeSelected) {
@@ -311,18 +253,6 @@ export function CartSummary() {
     return coupons.find(c => c.id === appliedCouponId);
   };
 
-  const getItemPrice = (item: any) => {
-    if (!item) return 0;
-    
-    // First check if there's a loyalty-adjusted price for this item
-    if (item.service_id && loyalty.adjustedServicePrices[item.service_id]) {
-      return loyalty.adjustedServicePrices[item.service_id];
-    }
-    
-    // Otherwise return the regular price
-    return item.selling_price || item.service?.selling_price || item.package?.price || item.price || 0;
-  };
-
   const selectedCoupon = getSelectedCoupon();
 
   // Reset reference flags when location changes
@@ -350,9 +280,7 @@ export function CartSummary() {
           ) : (
             sortedItems.map((item) => {
               const itemDuration = item.duration || item.service?.duration || item.package?.duration || 0;
-              const itemPrice = getItemPrice(item);
-              const originalPrice = item.selling_price || item.service?.selling_price || item.package?.price || item.price || 0;
-              const isDiscounted = itemPrice < originalPrice;
+              const itemPrice = item.selling_price || item.service?.selling_price || item.package?.price || item.price || 0;
               
               return (
                 <div
@@ -367,22 +295,9 @@ export function CartSummary() {
                       <p className="text-sm text-muted-foreground">
                         Duration: {itemDuration} min
                       </p>
-                      <div>
-                        {isDiscounted ? (
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium line-through text-muted-foreground">
-                              {formatPrice(originalPrice)}
-                            </p>
-                            <p className="text-sm font-medium text-green-600">
-                              {formatPrice(itemPrice)}
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-sm font-medium">
-                            {formatPrice(itemPrice)}
-                          </p>
-                        )}
-                      </div>
+                      <p className="text-sm font-medium">
+                        {formatPrice(itemPrice)}
+                      </p>
                       {isSchedulingPage && selectedTimeSlots[item.id] && selectedDate && (
                         <p className="text-sm text-muted-foreground mt-2">
                           {format(selectedDate, "MMM d")} at {selectedTimeSlots[item.id]} - 
@@ -494,41 +409,6 @@ export function CartSummary() {
                   )}
                 </div>
               </div>
-
-              {/* Loyalty Points Section */}
-              {loyalty.isLoyaltyEnabled && (
-                <>
-                  <div className="flex justify-between text-sm items-baseline mt-2">
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      <Award className="h-4 w-4" />
-                      Loyalty Points Balance
-                    </span>
-                    <Badge variant="outline" className="font-medium">
-                      {loyalty.walletBalance} points
-                    </Badge>
-                  </div>
-                  
-                  {loyalty.pointsToRedeem > 0 && (
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span className="flex items-center gap-1">
-                        <Award className="h-4 w-4" />
-                        Points Redeemed ({loyalty.pointsToRedeem})
-                      </span>
-                      <span>-{formatPrice(loyalty.pointsDiscountAmount)}</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex justify-between text-sm items-baseline">
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      <Award className="h-4 w-4" />
-                      Points to Earn
-                    </span>
-                    <Badge variant="secondary" className="font-medium">
-                      +{loyalty.pointsToEarn} points
-                    </Badge>
-                  </div>
-                </>
-              )}
             </>
           )}
           
