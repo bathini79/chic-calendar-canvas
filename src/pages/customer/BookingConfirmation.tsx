@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, addMinutes, parseISO } from "date-fns";
 import { useCart } from "@/components/cart/CartContext";
-import CustomerNavbar from "@/components/customer/CustomerNavbar";
+import { CustomerNavbar } from "@/components/customer/CustomerNavbar";
 import { formatPrice } from "@/lib/utils";
 import { Award, CalendarDays, Clock, User, MapPin, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
