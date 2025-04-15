@@ -1,403 +1,420 @@
-import { useCart } from "@/components/cart/CartContext";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { format, addMinutes, parseISO } from "date-fns";
-import {
-  ArrowRight,
-  Calendar,
-  Clock,
-  MapPin,
-  Package,
-  Store,
-  Tag,
-  Search,
-  X,
-  Check,
-  Award,
-  Coins
-} from "lucide-react";
-import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
+import { useNavigate } from "react-router-dom";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useCart } from "@/components/cart/CartContext";
+import { CartSummary } from "@/components/cart/CartSummary";
+import { format, addMinutes } from "date-fns";
+import { formatPrice } from "@/lib/utils";
 import { useCoupons } from "@/hooks/use-coupons";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
-import confetti from "canvas-confetti";
-import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
-import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
+import { useTaxRates } from "@/hooks/use-tax-rates";
+import { useLocationTaxSettings } from "@/hooks/use-location-tax-settings";
+import { supabase } from "@/integrations/supabase/client";
+import { Award } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useLoyaltyPoints } from "@/hooks/use-loyalty-points";
+import { toast } from "sonner";
 
 export default function BookingConfirmation() {
+  const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [customerPoints, setCustomerPoints] = useState<{
+    walletBalance: number;
+    lastUsed: Date | null;
+  } | null>(null);
+  const [loyaltySettings, setLoyaltySettings] = useState<any>(null);
+  const [pointsToEarn, setPointsToEarn] = useState(0);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [pointsDiscountAmount, setPointsDiscountAmount] = useState(0);
+  const [isLoyaltyEnabled, setIsLoyaltyEnabled] = useState(false);
+  const [adjustedServicePrices, setAdjustedServicePrices] = useState<Record<string, number>>({});
+
+  const navigate = useNavigate();
   const {
     items,
-    selectedTimeSlots,
     selectedDate,
-    selectedStylists,
-    getTotalPrice,
-    getTotalDuration,
-    removeFromCart,
-    appliedTaxId,
-    setAppliedTaxId,
-    appliedCouponId,
-    setAppliedCouponId,
+    selectedTimeSlots,
     selectedLocation,
+    appliedTaxId,
+    appliedCouponId,
+    resetCart,
+    getTotalPrice,
   } = useCart();
-  const navigate = useNavigate();
-  const [notes, setNotes] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  const { taxRates, fetchTaxRates, isLoading: taxRatesLoading } = useTaxRates();
+  const { fetchLocationTaxSettings } = useLocationTaxSettings();
+  const { coupons, fetchCoupons, getCouponById } = useCoupons();
+  const {
+    settings,
+    customerPoints: loyaltyCustomerPoints,
+    isLoading: loyaltyLoading,
+    calculatePointsFromAmount,
+    calculateAmountFromPoints,
+    hasMinimumForRedemption,
+    getMaxRedeemablePoints,
+    isEligibleForPoints,
+    getEligibleAmount,
+  } = useLoyaltyPoints(userId);
+
   const [taxAmount, setTaxAmount] = useState(0);
   const [couponDiscount, setCouponDiscount] = useState(0);
-  const [tax, setTax] = useState(null);
-  const [coupon, setCoupon] = useState(null);
-  const [locationDetails, setLocationDetails] = useState(null);
-  const { fetchLocationTaxSettings, fetchTaxDetails } = useLocationTaxSettings();
-  const { coupons, isLoading: couponsLoading, validateCouponCode, getCouponById } = useCoupons();
-  const [couponSearchValue, setCouponSearchValue] = useState("");
-  const [openCouponPopover, setOpenCouponPopover] = useState(false);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
-  const confettiRef = useRef<ConfettiRef>(null);
-  const { customerMemberships, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
-  const [membershipDiscount, setMembershipDiscount] = useState(0);
-  const [activeMembership, setActiveMembership] = useState<any>(null);
-  const [hasFetchedMemberships, setHasFetchedMemberships] = useState(false);
-  const { sendNotification } = useAppointmentNotifications();
-  
-  const [customerId, setCustomerId] = useState<string | undefined>();
-  const [pointsToEarn, setPointsToEarn] = useState(0);
-  const { 
-    settings: loyaltySettings, 
-    customerPoints,
-    isLoading: loyaltyLoading,
-    fetchCustomerPoints,
-    getEligibleAmount,
-    calculatePointsFromAmount,
-    walletBalance
-  } = useLoyaltyPoints(customerId);
+  const [selectedCoupon, setSelectedCoupon] = useState<any>(null);
 
+  const subtotal = getTotalPrice();
+
+  // Initialize user data and fetch loyalty points
   useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id) {
-        setCustomerId(session.user.id);
+    async function initializeUserData() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          setUserId(session.user.id);
+        }
+      } catch (error) {
+        console.error("Error getting session:", error);
       }
-    };
-    
-    getCurrentUser();
+    }
+
+    initializeUserData();
   }, []);
 
+  // Fetch tax and coupon data
   useEffect(() => {
-    if (!loyaltySettings?.enabled || !items || items.length === 0 || !customerId) {
-      setPointsToEarn(0);
+    fetchTaxRates();
+    fetchCoupons();
+
+    if (selectedLocation && appliedTaxId) {
+      const loadTaxData = async () => {
+        const settings = await fetchLocationTaxSettings(selectedLocation);
+        if (settings && settings.service_tax_id) {
+          // Tax is already applied through cart context
+        }
+      };
+      loadTaxData();
+    }
+  }, [fetchTaxRates, fetchCoupons, selectedLocation, appliedTaxId, fetchLocationTaxSettings]);
+
+  // Calculate tax amount
+  useEffect(() => {
+    if (appliedTaxId && taxRates.length > 0) {
+      const taxRate = taxRates.find(tax => tax.id === appliedTaxId);
+      if (taxRate) {
+        // Apply tax after all discounts including loyalty points
+        const finalSubtotal = subtotal - couponDiscount - pointsDiscountAmount;
+        setTaxAmount(finalSubtotal * (taxRate.percentage / 100));
+      }
+    } else {
+      setTaxAmount(0);
+    }
+  }, [appliedTaxId, subtotal, couponDiscount, pointsDiscountAmount, taxRates]);
+
+  // Fetch coupon details
+  useEffect(() => {
+    if (appliedCouponId) {
+      const fetchCouponDetails = async () => {
+        // First check in already loaded coupons
+        const existingCoupon = coupons.find(c => c.id === appliedCouponId);
+        if (existingCoupon) {
+          setSelectedCoupon(existingCoupon);
+          calculateCouponDiscount(existingCoupon);
+          return;
+        }
+
+        // If not found, fetch it directly
+        try {
+          const coupon = await getCouponById(appliedCouponId);
+          if (coupon) {
+            setSelectedCoupon(coupon);
+            calculateCouponDiscount(coupon);
+          }
+        } catch (error) {
+          console.error("Error fetching coupon:", error);
+        }
+      };
+
+      fetchCouponDetails();
+    } else {
+      setSelectedCoupon(null);
+      setCouponDiscount(0);
+    }
+  }, [appliedCouponId, coupons, getCouponById]);
+
+  const calculateCouponDiscount = (coupon: any) => {
+    if (!coupon) return;
+
+    // Apply coupon to subtotal
+    const discount = coupon.discount_type === 'percentage'
+      ? subtotal * (coupon.discount_value / 100)
+      : Math.min(coupon.discount_value, subtotal);
+
+    setCouponDiscount(discount);
+  };
+
+  // Process loyalty points logic when customer points are loaded
+  useEffect(() => {
+    setLoyaltySettings(settings);
+    setCustomerPoints(loyaltyCustomerPoints);
+    setIsLoyaltyEnabled(!!settings?.enabled);
+
+    if (settings?.enabled && userId) {
+      // Calculate eligible amount for points earning
+      const serviceIds = items
+        .filter(item => item.type === 'service' && item.service_id)
+        .map(item => item.service_id);
+      
+      const packageIds = items
+        .filter(item => item.type === 'package' && item.package_id)
+        .map(item => item.package_id);
+
+      // Map cart items to service/package objects for loyalty calculations
+      const servicesData = items
+        .filter(item => item.type === 'service')
+        .map(item => ({
+          id: item.service_id || '',
+          selling_price: item.selling_price || item.service?.selling_price || 0
+        }));
+      
+      const packagesData = items
+        .filter(item => item.type === 'package')
+        .map(item => ({
+          id: item.package_id || '',
+          price: item.selling_price || item.package?.price || 0
+        }));
+
+      // Calculate eligible amount for points earning
+      const eligibleAmount = getEligibleAmount(
+        serviceIds,
+        packageIds,
+        servicesData,
+        packagesData,
+        subtotal
+      );
+
+      // Calculate points to earn
+      const pointsEarned = calculatePointsFromAmount(eligibleAmount);
+      setPointsToEarn(pointsEarned);
+
+      // Calculate max redeemable points based on settings
+      if (loyaltyCustomerPoints && hasMinimumForRedemption(loyaltyCustomerPoints)) {
+        const maxPoints = getMaxRedeemablePoints(subtotal);
+        setPointsToRedeem(maxPoints);
+        
+        // Calculate discount amount from redeemed points
+        if (maxPoints > 0) {
+          const discount = calculateAmountFromPoints(maxPoints);
+          setPointsDiscountAmount(discount);
+          
+          // Calculate adjusted service prices with loyalty discount
+          calculateAdjustedPrices(discount);
+        }
+      }
+    }
+  }, [
+    settings, 
+    loyaltyCustomerPoints, 
+    items, 
+    subtotal, 
+    userId, 
+    calculatePointsFromAmount, 
+    calculateAmountFromPoints, 
+    hasMinimumForRedemption, 
+    getMaxRedeemablePoints,
+    getEligibleAmount
+  ]);
+
+  // Calculate adjusted prices for each service based on loyalty discount
+  const calculateAdjustedPrices = (discountAmount: number) => {
+    if (discountAmount <= 0 || subtotal <= 0) {
+      setAdjustedServicePrices({});
       return;
     }
 
-    try {
-      const selectedServices = items
-        .filter(item => item.type === 'service' && item.service_id)
-        .map(item => item.service_id as string);
-      
-      const selectedPackages = items
-        .filter(item => item.type === 'package' && item.package_id)
-        .map(item => item.package_id as string);
-      
-      const subtotal = getTotalPrice();
-      const eligibleAmount = getEligibleAmount(
-        selectedServices,
-        selectedPackages,
-        items.filter(item => item.type === 'service').map(item => item.service),
-        items.filter(item => item.type === 'package').map(item => item.package),
-        subtotal
-      );
-      
-      const afterMembershipDiscount = eligibleAmount - 
-        (eligibleAmount / subtotal) * membershipDiscount;
-      
-      const afterCouponDiscount = afterMembershipDiscount - 
-        (afterMembershipDiscount / (subtotal - membershipDiscount)) * couponDiscount;
-      
-      const calculatedPoints = calculatePointsFromAmount(afterCouponDiscount);
-      setPointsToEarn(calculatedPoints);
-      
-    } catch (error) {
-      console.error("Error calculating points to earn:", error);
-      setPointsToEarn(0);
-    }
-  }, [
-    loyaltySettings, 
-    items, 
-    customerId, 
-    membershipDiscount, 
-    couponDiscount, 
-    getTotalPrice, 
-    getEligibleAmount, 
-    calculatePointsFromAmount
-  ]);
-
-  useEffect(() => {
-    const fetchLocationDetails = async () => {
-      if (selectedLocation) {
-        const { data, error } = await supabase
-          .from("locations")
-          .select("*")
-          .eq("id", selectedLocation)
-          .single();
-
-        if (!error && data) {
-          setLocationDetails(data);
-        }
-      }
-    };
-
-    fetchLocationDetails();
-  }, [selectedLocation]);
-
-  useEffect(() => {
-    const fetchTaxSettings = async () => {
-      if (!selectedLocation) return;
-
-      if (!appliedTaxId) {
-        const settings = await fetchLocationTaxSettings(selectedLocation);
-
-        if (settings && settings.service_tax_id) {
-          setAppliedTaxId(settings.service_tax_id);
-        }
-      }
-    };
-
-    fetchTaxSettings();
-  }, [
-    selectedLocation,
-    appliedTaxId,
-    setAppliedTaxId,
-    fetchLocationTaxSettings,
-  ]);
-
-  useEffect(() => {
-    const loadMemberships = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session && !hasFetchedMemberships) {
-        await fetchCustomerMemberships(session.user.id);
-        setHasFetchedMemberships(true);
-      }
-    };
-
-    loadMemberships();
-  }, [fetchCustomerMemberships, hasFetchedMemberships]);
-
-  useEffect(() => {
-    if (items && items.length > 0 && customerMemberships.length > 0) {
-      let totalMembershipDiscount = 0;
-      let bestMembership = null;
-      
-      items.forEach(item => {
-        if (item.type === 'service' && item.service_id) {
-          const servicePrice = item.selling_price || item.service?.selling_price || 0;
-          const discountInfo = getApplicableMembershipDiscount(item.service_id, null, servicePrice);
-          if (discountInfo && discountInfo.calculatedDiscount > 0) {
-            totalMembershipDiscount += discountInfo.calculatedDiscount;
-            if (!bestMembership) {
-              bestMembership = {
-                id: discountInfo.membershipId,
-                name: discountInfo.membershipName,
-              };
-            }
-          }
-        } else if (item.type === 'package' && item.package_id) {
-          const packagePrice = item.selling_price || item.package?.price || 0;
-          const discountInfo = getApplicableMembershipDiscount(null, item.package_id, packagePrice);
-          
-          if (discountInfo && discountInfo.calculatedDiscount > 0) {
-            totalMembershipDiscount += discountInfo.calculatedDiscount;
-            if (!bestMembership) {
-              bestMembership = {
-                id: discountInfo.membershipId,
-                name: discountInfo.membershipName,
-              };
-            }
-          }
-        }
-      });
-      
-      setMembershipDiscount(totalMembershipDiscount);
-      setActiveMembership(bestMembership);
-      
-    } else {
-      setMembershipDiscount(0);
-      setActiveMembership(null);
-    }
-  }, [items, customerMemberships, getApplicableMembershipDiscount]);
-
-  useEffect(() => {
-    const loadTaxDetails = async () => {
-      if (!appliedTaxId) {
-        setTax(null);
-        setTaxAmount(0);
-        return;
-      }
-      if(!tax){
-        try {
-          const taxData = await fetchTaxDetails(appliedTaxId);
-          if (taxData) {
-            setTax(taxData);
-
-            const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
-            const afterCouponAndMembership = subtotal - couponDiscount - membershipDiscount;
-            const newTaxAmount = afterCouponAndMembership * (taxData.percentage / 100);
-            setTaxAmount(newTaxAmount);
-          }
-        } catch (error) {
-          console.error("Error loading tax details:", error);
-        }
-      }
-    };
-
-    loadTaxDetails();
-  }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails, items, tax, membershipDiscount]);
-
-  useEffect(() => {
-    const loadCouponDetails = async () => {
-      if (!appliedCouponId) {
-        setCoupon(null);
-        setCouponDiscount(0);
-        return;
-      }
-
-      try {
-        const couponData = await getCouponById(appliedCouponId);
-        if (couponData) {
-          processCouponData(couponData);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from("coupons")
-          .select("*")
-          .eq("id", appliedCouponId)
-          .single();
-
-        if (error) {
-          console.error("Error fetching coupon:", error);
-          setCoupon(null);
-          setCouponDiscount(0);
-          return;
-        }
-
-        if (data) {
-          processCouponData(data);
-        }
-      } catch (error) {
-        console.error("Error in loadCouponDetails:", error);
-        setCoupon(null);
-        setCouponDiscount(0);
-      }
-    };
-
-    const processCouponData = (data: any) => {
-      setCoupon((prevCoupon) => {
-        if (prevCoupon?.id === data.id) return prevCoupon; // Prevent unnecessary updates
-        return data;
-      });
-
-      if (!items || items.length === 0) {
-        setCouponDiscount(0);
-        return;
-      }
-
-      const subtotal = getTotalPrice();
-      const afterMembershipDiscount = subtotal - membershipDiscount;
-      const newDiscount =
-        data.discount_type === "percentage"
-          ? afterMembershipDiscount * (data.discount_value / 100)
-          : Math.min(data.discount_value, afterMembershipDiscount);
-
-      setCouponDiscount(newDiscount);
-
-      if (tax) {
-        const afterAllDiscounts = subtotal - membershipDiscount - newDiscount;
-        const newTaxAmount = afterAllDiscounts * (tax.percentage / 100);
-        setTaxAmount(newTaxAmount);
-      }
-    };
-
-    loadCouponDetails();
-  }, [appliedCouponId, getTotalPrice, tax, getCouponById, items, membershipDiscount]);
-
-  useEffect(() => {
-    if (!selectedDate || !items || items.length === 0 || Object.keys(selectedTimeSlots).length === 0) {
-      navigate("/schedule");
-    }
-  }, [selectedDate, selectedTimeSlots, items, navigate]);
-
-  useEffect(() => {
-    if (bookingSuccess) {
-      if (confettiRef.current) {
-        confettiRef.current.fire();
-      }
-      
-      const end = Date.now() + 5 * 1000;
-      const colors = ["#a786ff", "#fd8bbc", "#eca184", "#f8deb1"];
-
-      const frame = () => {
-        if (Date.now() > end) return;
-
-        confetti({
-          particleCount: 1,
-          angle: 60,
-          spread: 55,
-          startVelocity: 45,
-          origin: { x: 0, y: 0.5 },
-          colors: colors,
-          gravity: 0.7,
-          ticks: 300,
-        });
+    const discountRatio = discountAmount / subtotal;
+    const newAdjustedPrices: Record<string, number> = {};
+    
+    // Apply discount to individual services proportionally
+    items.forEach((item) => {
+      if (item.type === 'service' && item.service_id) {
+        const originalPrice = item.selling_price || item.service?.selling_price || 0;
+        const itemDiscount = originalPrice * discountRatio;
+        newAdjustedPrices[item.service_id] = originalPrice - itemDiscount;
+      } else if (item.type === 'package' && item.package_id) {
+        const packagePrice = item.selling_price || item.package?.price || 0;
+        const packageDiscount = packagePrice * discountRatio;
         
-        confetti({
-          particleCount: 1,
-          angle: 120,
-          spread: 55,
-          startVelocity: 45,
-          origin: { x: 1, y: 0.5 },
-          colors: colors,
-          gravity: 0.7,
-          ticks: 300,
-        });
+        if (item.package?.package_services) {
+          item.package.package_services.forEach((ps) => {
+            const serviceId = ps.service.id;
+            const servicePrice = ps.package_selling_price !== undefined ? 
+              ps.package_selling_price : ps.service.selling_price;
+            
+            // Calculate service's proportion of package price
+            const proportion = servicePrice / packagePrice;
+            const serviceDiscountAmount = packageDiscount * proportion;
+            
+            newAdjustedPrices[serviceId] = servicePrice - serviceDiscountAmount;
+          });
+        }
+      }
+    });
+    
+    setAdjustedServicePrices(newAdjustedPrices);
+  };
 
-        setTimeout(() => {
-          requestAnimationFrame(frame);
-        }, 150);
+  // Calculate final price after all discounts and tax
+  const finalPrice = subtotal - couponDiscount - pointsDiscountAmount + taxAmount;
+
+  // Get the displayed price for an item (either original or adjusted with loyalty discount)
+  const getItemPrice = (item: any) => {
+    if (!item) return 0;
+    
+    // First check if there's a loyalty-adjusted price for this item
+    if (item.service_id && adjustedServicePrices[item.service_id]) {
+      return adjustedServicePrices[item.service_id];
+    }
+    
+    // Otherwise return the regular price
+    return item.selling_price || item.service?.selling_price || item.package?.price || 0;
+  };
+
+  const handleBookNow = async () => {
+    if (!selectedDate || Object.keys(selectedTimeSlots).length === 0) {
+      toast.error("Please select a date and time");
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.error("Your cart is empty");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Get current user
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("You must be logged in to book");
+        navigate("/auth");
+        return;
+      }
+
+      const userId = session.user.id;
+
+      // Create appointment
+      const appointmentData = {
+        customer_id: userId,
+        start_time: new Date(`${format(selectedDate, "yyyy-MM-dd")} ${
+          Object.values(selectedTimeSlots)[0]
+        }`),
+        end_time: addMinutes(
+          new Date(`${format(selectedDate, "yyyy-MM-dd")} ${
+            Object.values(selectedTimeSlots)[0]
+          }`),
+          items.reduce(
+            (acc, item) =>
+              acc +
+              (item.duration ||
+                item.service?.duration ||
+                item.package?.duration ||
+                0),
+            0
+          )
+        ),
+        total_price: finalPrice,
+        status: "pending",
+        location: selectedLocation,
+        payment_method: "online",
+        tax_id: appliedTaxId,
+        tax_amount: taxAmount,
+        coupon_id: appliedCouponId,
+        coupon_amount: couponDiscount,
+        coupon_name: selectedCoupon?.code,
+        points_earned: pointsToEarn,
+        points_redeemed: pointsToRedeem,
+        points_discount_amount: pointsDiscountAmount
       };
 
-      frame();
-      
-      const timer = setTimeout(() => {
-        navigate("/profile");
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [bookingSuccess, navigate]);
+      const { data: appointment, error: appointmentError } = await supabase
+        .from("appointments")
+        .insert([appointmentData])
+        .select()
+        .single();
 
-  if (!items || items.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-bold mb-2">No items in your cart</h2>
-          <p className="text-muted-foreground mb-4">Please add services to continue</p>
-          <Button onClick={() => navigate("/services")}>Browse Services</Button>
-        </div>
-      </div>
-    );
-  }
+      if (appointmentError) {
+        throw new Error(`Error creating appointment: ${appointmentError.message}`);
+      }
+
+      // Create bookings for each item
+      for (const item of items) {
+        const bookingData = {
+          appointment_id: appointment.id,
+          service_id: item.type === "service" ? item.service_id : null,
+          package_id: item.type === "package" ? item.package_id : null,
+          start_time: new Date(`${format(selectedDate, "yyyy-MM-dd")} ${
+            selectedTimeSlots[item.id]
+          }`),
+          end_time: addMinutes(
+            new Date(
+              `${format(selectedDate, "yyyy-MM-dd")} ${selectedTimeSlots[item.id]}`
+            ),
+            item.duration || item.service?.duration || item.package?.duration || 0
+          ),
+          price_paid: getItemPrice(item)
+        };
+
+        const { error: bookingError } = await supabase
+          .from("bookings")
+          .insert([bookingData]);
+
+        if (bookingError) {
+          throw new Error(`Error creating booking: ${bookingError.message}`);
+        }
+      }
+
+      // If loyalty is enabled and points are redeemed, update user's wallet balance
+      if (isLoyaltyEnabled && pointsToRedeem > 0) {
+        const newBalance = (loyaltyCustomerPoints?.walletBalance || 0) - pointsToRedeem;
+        
+        const { error: pointsError } = await supabase
+          .from("profiles")
+          .update({ 
+            wallet_balance: newBalance,
+            last_used: new Date().toISOString()
+          })
+          .eq("id", userId);
+          
+        if (pointsError) {
+          console.error("Error updating points balance:", pointsError);
+        }
+      }
+
+      // Add points earned to customer wallet
+      if (isLoyaltyEnabled && pointsToEarn > 0) {
+        const currentBalance = loyaltyCustomerPoints?.walletBalance || 0;
+        const newBalance = currentBalance + pointsToEarn;
+        
+        const { error: pointsError } = await supabase
+          .from("profiles")
+          .update({ wallet_balance: newBalance })
+          .eq("id", userId);
+          
+        if (pointsError) {
+          console.error("Error updating points earned:", pointsError);
+        }
+      }
+
+      toast.success("Booking successful!");
+      resetCart();
+      navigate("/");
+    } catch (error: any) {
+      console.error("Error booking:", error);
+      toast.error(error.message || "Error booking");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const sortedItems = [...items].sort((a, b) => {
     const aTime = selectedTimeSlots[a.id] || "00:00";
@@ -405,698 +422,177 @@ export default function BookingConfirmation() {
     return aTime.localeCompare(bTime);
   });
 
-  const firstStartTime = Object.values(selectedTimeSlots)[0];
-  const totalDuration = getTotalDuration();
-  const totalHours = Math.floor(totalDuration / 60);
-  const remainingMinutes = totalDuration % 60;
-  const durationDisplay =
-    totalHours > 0
-      ? `${totalHours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ""}`
-      : `${remainingMinutes}m`;
-
-  const calculateEndTime = (startTime: string, duration: number) => {
-    if (!selectedDate) return "";
-    const dateTimeString = `${format(selectedDate, "yyyy-MM-dd")} ${startTime}`;
-    const startDateTime = new Date(dateTimeString);
-    const endDateTime = addMinutes(startDateTime, duration);
-    return format(endDateTime, "HH:mm");
-  };
-
-  const firstItemStartTime = selectedTimeSlots[sortedItems[0]?.id] || "00:00";
-  const lastItemEndTime = addMinutes(
-    new Date(`${format(selectedDate, "yyyy-MM-dd")} ${firstItemStartTime}`),
-    totalDuration
-  );
-
-  const subtotal = getTotalPrice();
-  const afterMembershipDiscount = subtotal - membershipDiscount;
-  const discountedSubtotal = afterMembershipDiscount - couponDiscount;
-  const totalPrice = discountedSubtotal + taxAmount;
-
-  const calculateItemDiscountedPrice = (itemOriginalPrice: number, serviceId: string | undefined, packageId: string | undefined) => {
-    if ((membershipDiscount <= 0 && couponDiscount <= 0) || subtotal <= 0) {
-      return itemOriginalPrice;
-    }
-    
-    let itemMembershipDiscount = 0;
-    if ((serviceId || packageId) && membershipDiscount > 0) {
-      const discountInfo = getApplicableMembershipDiscount(
-        serviceId || null, 
-        packageId || null, 
-        itemOriginalPrice
-      );
-      
-      if (discountInfo) {
-        itemMembershipDiscount = discountInfo.calculatedDiscount;
-      }
-    }
-    
-    const afterMembershipPrice = Math.max(0, itemOriginalPrice - itemMembershipDiscount);
-    
-    if (couponDiscount <= 0 || afterMembershipDiscount <= 0) {
-      return afterMembershipPrice;
-    }
-    
-    const priceRatio = afterMembershipPrice / afterMembershipDiscount;
-    const itemCouponDiscount = couponDiscount * priceRatio;
-    
-    return Math.max(0, afterMembershipPrice - itemCouponDiscount);
-  };
-
-  const handleCouponSelect = async (couponId: string) => {
-    try {
-      if (couponId === appliedCouponId) {
-        setAppliedCouponId(null);
-        setCouponSearchValue("");
-        setOpenCouponPopover(false);
-        return;
-      }
-
-      const selectedCoupon = coupons.find(c => c.id === couponId);
-      if (!selectedCoupon) {
-        throw new Error("Coupon not found");
-      }
-
-      setAppliedCouponId(couponId);
-      setCouponSearchValue("");
-      setOpenCouponPopover(false);
-      toast.success(`Coupon ${selectedCoupon.code} applied!`);
-    } catch (error) {
-      console.error("Error applying coupon:", error);
-      toast.error("Error applying coupon");
-    }
-  };
-
-  const removeCoupon = () => {
-    setAppliedCouponId(null);
-    setCoupon(null);
-    setCouponDiscount(0);
-    toast.success("Coupon removed");
-  };
-
-  const handleBookingConfirmation = async () => {
-    setIsLoading(true);
-    setBookingError(null);
-    
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please login to continue");
-        setBookingError("Authentication error. Please login to continue.");
-        setIsLoading(false);
-        return;
-      }
-
-      const customer_id = session.user.id;
-
-      const firstStartTime = selectedTimeSlots[sortedItems[0]?.id] || "00:00";
-      const startDateTime = new Date(
-        `${format(selectedDate, "yyyy-MM-dd")} ${firstStartTime}`
-      );
-      if (isNaN(startDateTime.getTime())) {
-        console.error(
-          `Invalid date generated, date: ${format(
-            selectedDate,
-            "yyyy-MM-dd"
-          )}, time: ${firstStartTime}`
-        );
-        return;
-      }
-      const endDateTime = addMinutes(startDateTime, totalDuration);
-      
-      const { data: appointmentData, error: appointmentError } = await supabase
-        .from("appointments")
-        .insert({
-          customer_id: customer_id,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          notes: notes,
-          status: "booked",
-          number_of_bookings: items.length,
-          total_price: totalPrice,
-          total_duration: totalDuration,
-          tax_amount: taxAmount,
-          tax_id: appliedTaxId,
-          coupon_id: appliedCouponId,
-          discount_type: coupon?.discount_type || null,
-          discount_value: coupon?.discount_value || 0,
-          location: selectedLocation,
-          membership_id: activeMembership?.id || null,
-          membership_name: activeMembership?.name || null,
-          membership_discount: membershipDiscount || 0,
-          points_earned: pointsToEarn,
-          points_redeemed: 0,
-          points_discount_amount: 0
-        })
-        .select();
-
-      if (appointmentError) {
-        console.error("Error inserting appointment:", appointmentError);
-        toast.error("Failed to create appointment. Please try again.");
-        setBookingError("Failed to create your appointment. Please try again.");
-        setIsLoading(false);
-        throw appointmentError;
-      }
-
-      const appointmentId = appointmentData[0].id;
-
-      const bookingPromises = [];
-
-      for (const item of sortedItems) {
-        const itemStartTimeString = selectedTimeSlots[item.id];
-        if (!itemStartTimeString) {
-          console.error(`No start time found for item ${item.id}`);
-          continue;
-        }
-        
-        let currentStartTime = new Date(
-          `${format(selectedDate, "yyyy-MM-dd")} ${itemStartTimeString}`
-        );
-
-        if (item.service_id) {
-          const stylistId =
-            selectedStylists[item.id] && selectedStylists[item.id] !== "any"
-              ? selectedStylists[item.id]
-              : null;
-          const itemDuration = item.service?.duration || 0;
-          const itemEndTime = addMinutes(currentStartTime, itemDuration);
-
-          const originalPrice = item.selling_price || item.service?.selling_price || 0;
-          const discountedPrice = calculateItemDiscountedPrice(originalPrice, item.service_id, null);
-          const bookingPromise = supabase.from("bookings").insert({
-            appointment_id: appointmentId,
-            service_id: item.service_id,
-            employee_id: stylistId,
-            status: "booked",
-            price_paid: discountedPrice,
-            original_price: item.service?.original_price || originalPrice,
-            start_time: currentStartTime.toISOString(),
-            end_time: itemEndTime.toISOString(),
-          });
-
-          bookingPromises.push(bookingPromise);
-        } else if (item.package_id) {
-          if (
-            item.package?.package_services &&
-            item.package.package_services.length > 0
-          ) {
-            const packageTotalPrice = item.selling_price || item.package?.price || 0;
-            const discountedPackagePrice = calculateItemDiscountedPrice(packageTotalPrice, null, item.package_id);
-            const packageDiscountRatio = packageTotalPrice > 0 
-              ? discountedPackagePrice / packageTotalPrice 
-              : 1;
-
-            for (const packageService of item.package.package_services) {
-              const stylistId =
-                selectedStylists[packageService?.service?.id] &&
-                selectedStylists[packageService.service?.id] !== "any"
-                  ? selectedStylists[packageService?.service?.id]
-                  : null;
-              const serviceDuration = packageService.service?.duration || 0;
-              const serviceEndTime = addMinutes(
-                currentStartTime,
-                serviceDuration
-              );
-
-              const servicePriceInPackage =
-                packageService.package_selling_price !== undefined &&
-                packageService.package_selling_price !== null
-                  ? packageService.package_selling_price
-                  : packageService.service.selling_price;
-                  
-              const adjustedServicePrice = servicePriceInPackage * packageDiscountRatio;
-              const bookingPromise = supabase.from("bookings").insert({
-                appointment_id: appointmentId,
-                service_id: packageService.service.id,
-                package_id: item.package_id,
-                employee_id: stylistId,
-                status: "booked",
-                price_paid: adjustedServicePrice,
-                original_price: servicePriceInPackage,
-                start_time: currentStartTime.toISOString(),
-                end_time: serviceEndTime.toISOString(),
-              });
-
-              bookingPromises.push(bookingPromise);
-
-              currentStartTime = serviceEndTime;
-            }
-          }
-
-          if (item.customized_services && item.customized_services.length > 0) {
-            const { data: allServices } = await supabase
-              .from("services")
-              .select("*")
-              .in("id", item.customized_services);
-
-            if (allServices) {
-              for (const serviceId of item.customized_services) {
-                const isBaseService = item.package?.package_services.some(
-                  (ps: any) => ps.service.id === serviceId
-                );
-
-                if (!isBaseService) {
-                  const customService = allServices.find(
-                    (s) => s.id === serviceId
-                  );
-
-                  if (customService) {
-                    const serviceDuration = customService.duration || 0;
-                    const serviceEndTime = addMinutes(
-                      currentStartTime,
-                      serviceDuration
-                    );
-                    const stylistId =
-                      selectedStylists[serviceId] &&
-                      selectedStylists[serviceId] !== "any"
-                        ? selectedStylists[serviceId]
-                        : null;
-
-                    const originalCustomPrice = customService.selling_price || 0;
-                    const discountedCustomPrice = calculateItemDiscountedPrice(originalCustomPrice, serviceId, item.package_id);
-                    const bookingPromise = supabase.from("bookings").insert({
-                      appointment_id: appointmentId,
-                      service_id: serviceId,
-                      package_id: item.package_id,
-                      employee_id: stylistId,
-                      status: "confirmed",
-                      price_paid: discountedCustomPrice,
-                      original_price: originalCustomPrice,
-                      start_time: currentStartTime.toISOString(),
-                      end_time: serviceEndTime.toISOString(),
-                    });
-
-                    bookingPromises.push(bookingPromise);
-
-                    currentStartTime = serviceEndTime;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      const bookingResults = await Promise.all(bookingPromises);
-
-      const bookingErrors = bookingResults.filter((result) => result.error);
-      if (bookingErrors.length > 0) {
-        console.error("Errors inserting bookings:", bookingErrors);
-        throw new Error("Failed to create some bookings. Please try again.");
-      }
-      
-      try {
-        const notificationResult = await sendConfirmation(
-          appointmentId,
-          sendNotification
-        );
-      } catch (notificationError) {
-        console.error("Error sending confirmation:", notificationError);
-        // Don't fail the booking if notification fails
-      }
-      
-      toast.success("Booking confirmed successfully!");
-      
-      setBookingSuccess(true);
-      
-      setTimeout(() => {
-        clearCart();
-      }, 5000);
-      
-    } catch (error: any) {
-      console.error("Booking error:", error);
-      toast.error(error.message || "Failed to confirm booking");
-      setBookingError(error.message || "Failed to confirm your booking. Please try again.");
-      setIsLoading(false);
-    }
-  };
-
-  const clearCart = async () => {
-    if (!items) return;
-    
-    for (const item of items) {
-      await removeFromCart(item.id);
-    }
-  };
-
-  const filteredCoupons = couponsLoading
-    ? []
-    : coupons.filter((coupon) =>
-        coupon.code.toLowerCase().includes(couponSearchValue.toLowerCase())
-      );
-
   return (
-    <div className="min-h-screen pb-24 relative">
-      <Confetti 
-        ref={confettiRef}
-        className="fixed inset-0 z-[100] pointer-events-none"
-        manualstart={true}
-        options={{
-          particleCount: 100,
-          spread: 160,
-          origin: { y: 0.3 },
-          gravity: 0.7,
-          ticks: 400,
-        }}
-      />
-      
-      <div className="container max-w-2xl mx-auto py-6 px-4">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold">Make Sure Everything's Right</h1>
-            <div className="flex items-center gap-2 text-muted-foreground mt-2">
-              <Calendar className="h-4 w-4" />
-              <p>{format(selectedDate, "EEEE d MMMM")}</p>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>
-                {format(
-                  new Date(`2000/01/01 ${firstItemStartTime}`),
-                  "hh:mm a"
+    <div className="container mx-auto py-8 px-4 md:py-12">
+      <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold mb-6">Confirm your booking</h1>
+          
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Your Appointment Details</h2>
+            {selectedDate && (
+              <div className="p-4 bg-muted rounded-lg mb-4">
+                <p className="font-medium">
+                  {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                </p>
+                {items.length > 0 && Object.keys(selectedTimeSlots).length > 0 && (
+                  <p className="text-muted-foreground">
+                    Starting at {Object.values(selectedTimeSlots)[0]}
+                  </p>
                 )}
-              </span>
-              <ArrowRight className="h-4 w-4" />
-              <span>
-                {format(lastItemEndTime, "hh:mm a")}
-                <span className="ml-1 text-sm">({durationDisplay})</span>
-              </span>
-            </div>
-            {locationDetails && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                <span>{locationDetails.name}</span>
-                {locationDetails.address && (
-                  <span className="text-xs">• {locationDetails.address}</span>
-                )}
+              </div>
+            )}
+
+            {selectedLocation && (
+              <div className="p-4 bg-muted rounded-lg mb-4">
+                <p className="font-medium">Location</p>
+                <p className="text-muted-foreground">{selectedLocation}</p>
               </div>
             )}
           </div>
 
-          <div className="space-y-4">
-            {sortedItems.map((item, index) => {
-              const itemStartTime = selectedTimeSlots[item.id] || "00:00";
-              const itemDuration =
-                item.service?.duration ||
-                item.duration ||
-                item.package?.duration ||
-                0;
-              const itemEndTime = calculateEndTime(itemStartTime, itemDuration);
-
-              const hours = Math.floor(itemDuration / 60);
-              const minutes = itemDuration % 60;
-              const itemDurationDisplay =
-                hours > 0
-                  ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`
-                  : `${minutes}m`;
-
-              const originalPrice = item.selling_price || 
-                item.service?.selling_price || 
-                item.package?.price || 0;
-              const discountedPrice = calculateItemDiscountedPrice(
-                originalPrice, 
-                item.service_id, 
-                item.package_id
-              );
-              const hasDiscount = discountedPrice < originalPrice;
-
-              return (
-                <div
-                  key={item.id}
-                  className="flex justify-between items-start py-4 border-b"
-                >
-                  <div className="space-y-1">
-                    <h3 className="text-sm">
-                      {item.service?.name || item.package?.name}
-                    </h3>
-                    <div className="space-y-0.5">
-                      {selectedStylists[item.id] &&
-                        selectedStylists[item.id] !== "any" && (
-                          <p className="text-sm text-muted-foreground">
-                            with {selectedStylists[item.id]}
-                          </p>
-                        )}
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {format(
-                          new Date(`2000/01/01 ${itemStartTime}`),
-                          "hh:mm a"
-                        )}{" "}
-                        -{" "}
-                        {format(
-                          new Date(`2000/01/01 ${itemEndTime}`),
-                          "hh:mm a"
-                        )}{" "}
-                        ({itemDurationDisplay})
-                      </p>
-                    </div>
-                  </div>
-                  <div className="font-medium">
-                    {hasDiscount ? (
-                      <div className="text-right">
-                        <span className="text-muted-foreground line-through text-xs mr-1">
-                          ₹{originalPrice.toFixed(0)}
-                        </span>
-                        <span className="text-green-600">₹{discountedPrice.toFixed(0)}</span>
-                      </div>
-                    ) : (
-                      <span>₹{originalPrice.toFixed(0)}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            <Card className="p-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <Store className="h-4 w-4" />
-                <span className="font-bold">Pay at Salon</span>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>₹{subtotal.toFixed(2)}</span>
-                </div>
-                
-                {activeMembership && membershipDiscount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span className="flex items-center gap-1">
-                      <Award className="h-4 w-4" />
-                      Membership ({activeMembership.name})
-                    </span>
-                    <span>-₹{membershipDiscount.toFixed(2)}</span>
-                  </div>
-                )}
-                
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Coupon</span>
-                    
-                    {coupon ? (
-                      <div className="flex items-center gap-2">
-                        <Badge 
-                          variant="outline" 
-                          className="px-2 py-1 text-xs flex items-center gap-1 text-green-600 border-green-200 bg-green-50"
-                        >
-                          <Tag className="h-3 w-3" />
-                          {coupon.code}
-                          <button 
-                            onClick={removeCoupon}
-                            className="ml-1 rounded-full hover:bg-green-100"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      </div>
-                    ) : (
-                      <Popover open={openCouponPopover} onOpenChange={setOpenCouponPopover}>
-                      <PopoverTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 text-xs border-dashed border-muted-foreground/50"
-                        >
-                          Apply coupon
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="p-0 w-72" align="end">
-                        <Command>
-                          <CommandInput 
-                            placeholder="Search for coupons..." 
-                            value={couponSearchValue}
-                            onValueChange={setCouponSearchValue}
-                          />
-                          <CommandList>
-                            {couponsLoading ? (
-                              <div className="py-6 text-center text-sm">Loading coupons...</div>
-                            ) : (
-                              <>
-                                {filteredCoupons?.length === 0 ? (
-                                  <CommandEmpty>No coupons found</CommandEmpty>
-                                ) : (
-                                  <CommandGroup>
-                                    {filteredCoupons.map((c) => (
-                                      <CommandItem 
-                                        key={c.id} 
-                                        value={c.code}
-                                        onSelect={() => handleCouponSelect(c.id)}
-                                        className="flex justify-between"
-                                      >
-                                        <div className="flex items-center">
-                                          <Tag className="mr-2 h-3 w-3 text-green-600" />
-                                          <span>{c.code}</span>
-                                        </div>
-                                        <span className="text-xs text-muted-foreground">
-                                          {c.discount_type === "percentage" 
-                                            ? `${c.discount_value}% off` 
-                                            : `₹${c.discount_value} off`}
-                                        </span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                )}
-                              </>
-                            )}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    )}
-                  </div>
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Selected Services</h2>
+            <ScrollArea className="h-[400px] rounded-lg border">
+              <div className="p-4 space-y-4">
+                {sortedItems.map((item) => {
+                  const itemDuration = item.duration || item.service?.duration || item.package?.duration || 0;
+                  const originalPrice = item.selling_price || item.service?.selling_price || item.package?.price || 0;
+                  const discountedPrice = getItemPrice(item);
+                  const isDiscounted = discountedPrice < originalPrice;
                   
-                  {coupon && couponDiscount > 0 && (
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span>Discount</span>
-                      <span>-₹{couponDiscount.toFixed(2)}</span>
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-start justify-between border-b pb-4"
+                    >
+                      <div>
+                        <h3 className="font-medium">
+                          {item.name || item.service?.name || item.package?.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Duration: {itemDuration} min
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(selectedDate, "MMM d")} at{" "}
+                          {selectedTimeSlots[item.id]} -{" "}
+                          {format(
+                            addMinutes(
+                              new Date(
+                                `${format(selectedDate, "yyyy-MM-dd")} ${
+                                  selectedTimeSlots[item.id]
+                                }`
+                              ),
+                              itemDuration
+                            ),
+                            "HH:mm"
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        {isDiscounted ? (
+                          <div className="flex flex-col items-end">
+                            <span className="text-sm line-through text-muted-foreground">
+                              {formatPrice(originalPrice)}
+                            </span>
+                            <span className="text-sm font-medium text-green-600">
+                              {formatPrice(discountedPrice)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm font-medium">
+                            {formatPrice(originalPrice)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Price Summary */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Payment Summary</h2>
+            <div className="space-y-2 bg-muted p-4 rounded-lg">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+              
+              {couponDiscount > 0 && selectedCoupon && (
+                <div className="flex justify-between text-green-600">
+                  <span>
+                    Coupon ({selectedCoupon.code})
+                  </span>
+                  <span>-{formatPrice(couponDiscount)}</span>
+                </div>
+              )}
+              
+              {isLoyaltyEnabled && pointsToRedeem > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span className="flex items-center gap-1">
+                    <Award className="h-4 w-4" />
+                    Loyalty Points ({pointsToRedeem} points)
+                  </span>
+                  <span>-{formatPrice(pointsDiscountAmount)}</span>
+                </div>
+              )}
+              
+              {taxAmount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tax</span>
+                  <span>{formatPrice(taxAmount)}</span>
+                </div>
+              )}
+              
+              <div className="flex justify-between pt-2 border-t text-lg font-semibold">
+                <span>Total</span>
+                <span>{formatPrice(finalPrice)}</span>
+              </div>
+              
+              {isLoyaltyEnabled && (
+                <div className="pt-2 border-t mt-2">
+                  <div className="flex justify-between text-sm items-center">
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Award className="h-4 w-4" />
+                      Current Points Balance
+                    </span>
+                    <Badge variant="outline">
+                      {loyaltyCustomerPoints?.walletBalance || 0} points
+                    </Badge>
+                  </div>
+                  {pointsToEarn > 0 && (
+                    <div className="flex justify-between text-sm items-center mt-1">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Award className="h-4 w-4" />
+                        Points to Earn
+                      </span>
+                      <Badge variant="secondary" className="text-green-600">
+                        +{pointsToEarn} points
+                      </Badge>
                     </div>
                   )}
                 </div>
-
-                {tax && taxAmount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {tax.name} ({tax.percentage}%)
-                    </span>
-                    <span>₹{taxAmount.toFixed(2)}</span>
-                  </div>
-                )}
-
-                {loyaltySettings?.enabled && customerId && (
-                  <>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="flex items-center gap-1 text-muted-foreground">
-                        <Coins className="h-4 w-4" />
-                        Current Points
-                      </span>
-                      <span className="font-medium">{walletBalance || 0}</span>
-                    </div>
-                    
-                    {pointsToEarn > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span className="flex items-center gap-1">
-                          <Coins className="h-4 w-4" />
-                          Points You'll Earn
-                        </span>
-                        <span>+{pointsToEarn}</span>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                <div className="flex justify-between text-base font-medium pt-1 border-t">
-                  <span>Total</span>
-                  <span>₹{totalPrice.toFixed(2)}</span>
-                </div>
-              </div>
-            </Card>
-
-            <div className="space-y-2 mt-8">
-              <span className="font-medium">Booking Notes</span>
-              <Textarea
-                placeholder="Add any special requests or notes for your booking..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="resize-none"
-                rows={4}
-              />
+              )}
             </div>
           </div>
-        </div>
-      </div>
 
-      {bookingSuccess && (
-        <div className="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-50">
-          <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
-            <Check className="h-8 w-8 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold mb-2 text-gray-900">Appointment Booked!</h2>
-          <p className="text-gray-600">Redirecting to your bookings...</p>
-        </div>
-      )}
-
-      {bookingError && (
-        <div className="fixed inset-0 bg-red-50/95 flex flex-col items-center justify-center z-50">
-          <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mb-4">
-            <X className="h-8 w-8 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold mb-2 text-gray-900">Booking Failed</h2>
-          {bookingError}
           <Button 
-            variant="default"
-            onClick={() => setBookingError(null)}
+            className="w-full" 
+            size="lg" 
+            onClick={handleBookNow}
+            disabled={loading}
           >
-            Try Again
+            {loading ? "Processing..." : "Confirm Booking"}
           </Button>
-           <h4>or reach to the Salon employee </h4>
         </div>
-      )}
 
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-background">
-        <div className="container max-w-2xl mx-auto px-4">
-          <div className="py-4 space-y-3">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <div className="text-2xl font-bold text-foreground">
-                ₹{totalPrice.toFixed(2)}
-              </div>
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                <span>{items?.length} services</span>
-                <span>•</span>
-                <Clock className="h-4 w-4" />
-                <span>{durationDisplay}</span>
-              </div>
-            </div>
-            <Button
-              size="lg"
-              className="w-full"
-              onClick={handleBookingConfirmation}
-              disabled={isLoading || bookingSuccess || !!bookingError}
-            >
-              {isLoading ? "Confirming..." : bookingSuccess ? "Sale Completed" : "Confirm"}
-            </Button>
-          </div>
+        <div className="w-full lg:w-1/3 h-auto">
+          <CartSummary />
         </div>
       </div>
     </div>
   );
 }
-
-
-const sendConfirmation = async (
-  appointmentId: string,
-  sendNotification: (appointmentId: string, type: string) => Promise<any>
-) => {
-  try {
-    if (sendNotification) {
-      return await sendNotification(appointmentId, "booking_confirmation");
-    }
-    return null;
-  } catch (error) {
-    console.error("Error sending confirmation:", error);
-    // Don't show error to user since this is a background task
-    return null;
-  }
-};
