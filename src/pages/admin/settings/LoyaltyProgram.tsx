@@ -192,9 +192,6 @@ export default function LoyaltyProgram() {
                         <FormControl>
                           <Input type="number" step="0.01" {...field} />
                         </FormControl>
-                        <FormDescription>
-                          Example: 1 point per $1 spent
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -261,9 +258,7 @@ export default function LoyaltyProgram() {
                             }}
                           />
                         </FormControl>
-                        <FormDescription>
-                          Example: Must spend at least $10 to earn points
-                        </FormDescription>
+                     
                         <FormMessage />
                       </FormItem>
                     )}
