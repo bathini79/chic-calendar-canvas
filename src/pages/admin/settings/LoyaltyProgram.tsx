@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -127,6 +128,14 @@ export default function LoyaltyProgram() {
   };
 
   const maxRedemptionType = form.watch("max_redemption_type");
+  
+  // Calculate the point value for the description
+  const pointsPerSpend = form.watch("points_per_spend");
+  const pointValue = pointsPerSpend ? (1 / pointsPerSpend).toFixed(4) : "0";
+  
+  // Calculate how many points would be earned for an example transaction
+  const exampleAmount = 100; // Example of $100 spent
+  const examplePoints = pointsPerSpend * exampleAmount;
 
   return (
     <div className="container py-6">
@@ -192,6 +201,9 @@ export default function LoyaltyProgram() {
                         <FormControl>
                           <Input type="number" step="0.01" {...field} />
                         </FormControl>
+                        <FormDescription>
+                          Example: {field.value} point(s) per $1 spent (customer gets {examplePoints} points for $100)
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -221,7 +233,7 @@ export default function LoyaltyProgram() {
                           <Input type="number" {...field} />
                         </FormControl>
                         <FormDescription>
-                          Example: 100 points minimum
+                          Example: {field.value} points minimum
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -258,7 +270,9 @@ export default function LoyaltyProgram() {
                             }}
                           />
                         </FormControl>
-                     
+                        <FormDescription>
+                          {field.value ? `Customers must spend at least $${field.value} to earn points` : 'No minimum spending required'}
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -294,7 +308,7 @@ export default function LoyaltyProgram() {
                           />
                         </FormControl>
                         <FormDescription>
-                          Example: Points expire after 365 days
+                          {field.value ? `Points expire after ${field.value} days of inactivity` : 'Points never expire'}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -374,7 +388,7 @@ export default function LoyaltyProgram() {
                             />
                           </FormControl>
                           <FormDescription>
-                            Example: Maximum 1000 points per transaction
+                            Example: Maximum {field.value || 1000} points per transaction
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -414,13 +428,27 @@ export default function LoyaltyProgram() {
                             />
                           </FormControl>
                           <FormDescription>
-                            Example: Points can cover up to 50% of the total
+                            Example: Points can cover up to {field.value || 50}% of the total
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   )}
+                  
+                  <div className="col-span-2">
+                    <FormItem>
+                      <FormLabel>
+                        Point Value
+                      </FormLabel>
+                      <div className="p-3 border rounded-md bg-gray-50">
+                        <p>Each point is worth ${pointValue}</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          (This is automatically calculated based on Points Per Spend)
+                        </p>
+                      </div>
+                    </FormItem>
+                  </div>
                 </div>
 
                 <FormField
