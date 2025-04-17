@@ -1,3 +1,4 @@
+
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,6 +36,8 @@ import confetti from "canvas-confetti";
 import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 import { useLoyaltyPoints } from "@/hooks/use-loyalty-points";
+import { useLoyaltyInCheckout } from "@/pages/admin/bookings/hooks/useLoyaltyInCheckout";
+import { Switch } from "@/components/ui/switch";
 
 export default function BookingConfirmation() {
   const {
@@ -74,6 +77,10 @@ export default function BookingConfirmation() {
   
   const [customerId, setCustomerId] = useState<string | undefined>();
   const [pointsToEarn, setPointsToEarn] = useState(0);
+  
+  // State for loyalty points handling
+  const [usePointsForDiscount, setUsePointsForDiscount] = useState(true);
+  
   const { 
     settings: loyaltySettings, 
     customerPoints,
@@ -83,6 +90,38 @@ export default function BookingConfirmation() {
     calculatePointsFromAmount,
     walletBalance
   } = useLoyaltyPoints(customerId);
+
+  // Use the loyalty checkout hook
+  const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
+  const selectedServicesIds = items
+    ?.filter(item => item.type === 'service' && item.service_id)
+    .map(item => item.service_id as string) || [];
+    
+  const selectedPackagesIds = items
+    ?.filter(item => item.type === 'package' && item.package_id)
+    .map(item => item.package_id as string) || [];
+    
+  const allServices = items?.filter(item => item.type === 'service').map(item => item.service) || [];
+  const allPackages = items?.filter(item => item.type === 'package').map(item => item.package) || [];
+  
+  const loyalty = useLoyaltyInCheckout({
+    customerId,
+    selectedServices: selectedServicesIds,
+    selectedPackages: selectedPackagesIds,
+    services: allServices,
+    packages: allPackages,
+    subtotal,
+    discountedSubtotal: subtotal - membershipDiscount - couponDiscount
+  });
+
+  // Set initial points to redeem
+  useEffect(() => {
+    if (loyalty.maxPointsToRedeem > 0 && usePointsForDiscount) {
+      loyalty.setPointsToRedeem(loyalty.maxPointsToRedeem);
+    } else {
+      loyalty.setPointsToRedeem(0);
+    }
+  }, [loyalty.maxPointsToRedeem, usePointsForDiscount]);
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -125,7 +164,13 @@ export default function BookingConfirmation() {
       const afterCouponDiscount = afterMembershipDiscount - 
         (afterMembershipDiscount / (subtotal - membershipDiscount)) * couponDiscount;
       
-      const calculatedPoints = calculatePointsFromAmount(afterCouponDiscount);
+      // Also consider the loyalty points discount when calculating points to earn
+      const afterLoyaltyDiscount = usePointsForDiscount && loyalty.pointsDiscountAmount > 0
+        ? afterCouponDiscount - 
+          (afterCouponDiscount / (subtotal - membershipDiscount - couponDiscount)) * loyalty.pointsDiscountAmount
+        : afterCouponDiscount;
+      
+      const calculatedPoints = calculatePointsFromAmount(afterLoyaltyDiscount);
       setPointsToEarn(calculatedPoints);
       
     } catch (error) {
@@ -138,6 +183,8 @@ export default function BookingConfirmation() {
     customerId, 
     membershipDiscount, 
     couponDiscount, 
+    loyalty.pointsDiscountAmount,
+    usePointsForDiscount,
     getTotalPrice, 
     getEligibleAmount, 
     calculatePointsFromAmount
@@ -251,8 +298,15 @@ export default function BookingConfirmation() {
             setTax(taxData);
 
             const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
-            const afterCouponAndMembership = subtotal - couponDiscount - membershipDiscount;
-            const newTaxAmount = afterCouponAndMembership * (taxData.percentage / 100);
+            const afterMembershipDiscount = subtotal - membershipDiscount;
+            
+            // Include loyalty discount when calculating tax
+            const afterCouponAndMembership = afterMembershipDiscount - couponDiscount;
+            const afterAllDiscounts = usePointsForDiscount ? 
+              afterCouponAndMembership - loyalty.pointsDiscountAmount : 
+              afterCouponAndMembership;
+              
+            const newTaxAmount = afterAllDiscounts * (taxData.percentage / 100);
             setTaxAmount(newTaxAmount);
           }
         } catch (error) {
@@ -262,7 +316,17 @@ export default function BookingConfirmation() {
     };
 
     loadTaxDetails();
-  }, [appliedTaxId, couponDiscount, getTotalPrice, fetchTaxDetails, items, tax, membershipDiscount]);
+  }, [
+    appliedTaxId, 
+    couponDiscount, 
+    getTotalPrice, 
+    fetchTaxDetails, 
+    items, 
+    tax, 
+    membershipDiscount, 
+    usePointsForDiscount, 
+    loyalty.pointsDiscountAmount
+  ]);
 
   useEffect(() => {
     const loadCouponDetails = async () => {
@@ -295,7 +359,7 @@ export default function BookingConfirmation() {
         if (data) {
           processCouponData(data);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error in loadCouponDetails:", error);
         setCoupon(null);
         setCouponDiscount(0);
@@ -323,14 +387,28 @@ export default function BookingConfirmation() {
       setCouponDiscount(newDiscount);
 
       if (tax) {
-        const afterAllDiscounts = subtotal - membershipDiscount - newDiscount;
+        const afterAllDiscounts = 
+          subtotal - 
+          membershipDiscount - 
+          newDiscount - 
+          (usePointsForDiscount ? loyalty.pointsDiscountAmount : 0);
+          
         const newTaxAmount = afterAllDiscounts * (tax.percentage / 100);
         setTaxAmount(newTaxAmount);
       }
     };
 
     loadCouponDetails();
-  }, [appliedCouponId, getTotalPrice, tax, getCouponById, items, membershipDiscount]);
+  }, [
+    appliedCouponId, 
+    getTotalPrice, 
+    tax, 
+    getCouponById, 
+    items, 
+    membershipDiscount, 
+    usePointsForDiscount, 
+    loyalty.pointsDiscountAmount
+  ]);
 
   useEffect(() => {
     if (!selectedDate || !items || items.length === 0 || Object.keys(selectedTimeSlots).length === 0) {
@@ -428,13 +506,17 @@ export default function BookingConfirmation() {
     totalDuration
   );
 
-  const subtotal = getTotalPrice();
-  const afterMembershipDiscount = subtotal - membershipDiscount;
-  const discountedSubtotal = afterMembershipDiscount - couponDiscount;
+  const subtotalAmount = getTotalPrice();
+  const afterMembershipDiscount = subtotalAmount - membershipDiscount;
+  const afterCouponDiscount = afterMembershipDiscount - couponDiscount;
+  
+  // Include loyalty points discount in the calculation
+  const pointsDiscount = usePointsForDiscount ? loyalty.pointsDiscountAmount : 0;
+  const discountedSubtotal = afterCouponDiscount - pointsDiscount;
   const totalPrice = discountedSubtotal + taxAmount;
 
   const calculateItemDiscountedPrice = (itemOriginalPrice: number, serviceId: string | undefined, packageId: string | undefined) => {
-    if ((membershipDiscount <= 0 && couponDiscount <= 0) || subtotal <= 0) {
+    if ((membershipDiscount <= 0 && couponDiscount <= 0 && pointsDiscount <= 0) || subtotalAmount <= 0) {
       return itemOriginalPrice;
     }
     
@@ -453,14 +535,22 @@ export default function BookingConfirmation() {
     
     const afterMembershipPrice = Math.max(0, itemOriginalPrice - itemMembershipDiscount);
     
-    if (couponDiscount <= 0 || afterMembershipDiscount <= 0) {
-      return afterMembershipPrice;
+    // Apply coupon discount proportionally
+    let afterCouponPrice = afterMembershipPrice;
+    if (couponDiscount > 0 && afterMembershipDiscount > 0) {
+      const priceRatio = afterMembershipPrice / afterMembershipDiscount;
+      const itemCouponDiscount = couponDiscount * priceRatio;
+      afterCouponPrice = Math.max(0, afterMembershipPrice - itemCouponDiscount);
     }
     
-    const priceRatio = afterMembershipPrice / afterMembershipDiscount;
-    const itemCouponDiscount = couponDiscount * priceRatio;
+    // Apply loyalty points discount proportionally
+    if (pointsDiscount > 0 && afterCouponDiscount > 0 && usePointsForDiscount) {
+      const priceRatio = afterCouponPrice / afterCouponDiscount;
+      const itemPointsDiscount = pointsDiscount * priceRatio;
+      return Math.max(0, afterCouponPrice - itemPointsDiscount);
+    }
     
-    return Math.max(0, afterMembershipPrice - itemCouponDiscount);
+    return afterCouponPrice;
   };
 
   const handleCouponSelect = async (couponId: string) => {
@@ -526,6 +616,10 @@ export default function BookingConfirmation() {
       }
       const endDateTime = addMinutes(startDateTime, totalDuration);
       
+      // Include loyalty points information in the appointment
+      const pointsToUse = usePointsForDiscount ? loyalty.pointsToRedeem : 0;
+      const loyaltyDiscountAmount = usePointsForDiscount ? loyalty.pointsDiscountAmount : 0;
+      
       const { data: appointmentData, error: appointmentError } = await supabase
         .from("appointments")
         .insert({
@@ -547,8 +641,8 @@ export default function BookingConfirmation() {
           membership_name: activeMembership?.name || null,
           membership_discount: membershipDiscount || 0,
           points_earned: pointsToEarn,
-          points_redeemed: 0,
-          points_discount_amount: 0
+          points_redeemed: pointsToUse,
+          points_discount_amount: loyaltyDiscountAmount
         })
         .select();
 
@@ -705,6 +799,25 @@ export default function BookingConfirmation() {
       if (bookingErrors.length > 0) {
         console.error("Errors inserting bookings:", bookingErrors);
         throw new Error("Failed to create some bookings. Please try again.");
+      }
+      
+      // Update loyalty points in the profile if points were redeemed
+      if (usePointsForDiscount && loyalty.pointsToRedeem > 0) {
+        const currentDate = new Date();
+        const updatedWalletBalance = Math.max(0, walletBalance - loyalty.pointsToRedeem);
+        
+        const { error: pointsError } = await supabase
+          .from("profiles")
+          .update({
+            wallet_balance: updatedWalletBalance,
+            last_used: currentDate.toISOString()
+          })
+          .eq("id", customer_id);
+          
+        if (pointsError) {
+          console.error("Error updating loyalty points:", pointsError);
+          // Don't fail the booking if points update fails
+        }
       }
       
       try {
@@ -878,7 +991,7 @@ export default function BookingConfirmation() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>₹{subtotal.toFixed(2)}</span>
+                  <span>₹{subtotalAmount.toFixed(2)}</span>
                 </div>
                 
                 {activeMembership && membershipDiscount > 0 && (
@@ -994,6 +1107,30 @@ export default function BookingConfirmation() {
                       <span className="font-medium">{walletBalance || 0}</span>
                     </div>
                     
+                    {loyalty.walletBalance > 0 && loyalty.maxPointsToRedeem > 0 && (
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={usePointsForDiscount}
+                            onCheckedChange={setUsePointsForDiscount}
+                            id="use-points"
+                          />
+                          <label
+                            htmlFor="use-points"
+                            className="text-sm cursor-pointer"
+                          >
+                            Use {loyalty.pointsToRedeem} points
+                          </label>
+                        </div>
+                        
+                        {usePointsForDiscount && loyalty.pointsDiscountAmount > 0 && (
+                          <span className="text-sm text-green-600">
+                            -₹{loyalty.pointsDiscountAmount.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
                     {pointsToEarn > 0 && (
                       <div className="flex justify-between text-sm text-green-600">
                         <span className="flex items-center gap-1">
@@ -1100,3 +1237,4 @@ const sendConfirmation = async (
     return null;
   }
 };
+
