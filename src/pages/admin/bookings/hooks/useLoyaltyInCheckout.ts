@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLoyaltyPoints } from "@/hooks/use-loyalty-points";
 
 interface UseLoyaltyInCheckoutProps {
@@ -58,13 +57,17 @@ export function useLoyaltyInCheckout({
   } = useLoyaltyPoints(customerId);
 
   // Calculate points to earn based on eligible amount
-  const eligibleAmount = settings?.enabled
-    ? getEligibleAmount(selectedServices, selectedPackages, services, packages, subtotal)
-    : 0;
+  const eligibleAmount = useMemo(() => 
+    settings?.enabled
+      ? getEligibleAmount(selectedServices, selectedPackages, services, packages, subtotal)
+      : 0,
+    [settings?.enabled, selectedServices, selectedPackages, services, packages, subtotal, getEligibleAmount]
+  );
     
-  const pointsToEarn = settings?.enabled
-    ? calculatePointsFromAmount(eligibleAmount)
-    : 0;
+  const pointsToEarn = useMemo(() => 
+    settings?.enabled ? calculatePointsFromAmount(eligibleAmount) : 0,
+    [settings?.enabled, calculatePointsFromAmount, eligibleAmount]
+  );
 
   // Calculate expiry date based on points validity days
   useEffect(() => {
@@ -78,9 +81,11 @@ export function useLoyaltyInCheckout({
   }, [settings, pointsToEarn]);
 
   // Handle maximum points to redeem based on settings - use subtotal directly
-  const maxPointsToRedeem = settings?.enabled && settings.points_per_spend
-    ? getMaxRedeemablePoints(subtotal) // Using subtotal instead of discounted subtotal
-    : 0;
+  const maxPointsToRedeem = useMemo(() => {
+    return settings?.enabled && settings.points_per_spend
+      ? getMaxRedeemablePoints(subtotal)
+      : 0;
+  }, [settings?.enabled, settings?.points_per_spend, subtotal]);  // Removed getMaxRedeemablePoints from dependencies
 
   // Automatically set maximum points to redeem if wallet balance allows
   useEffect(() => {
@@ -93,50 +98,44 @@ export function useLoyaltyInCheckout({
   }, [maxPointsToRedeem, settings, walletBalance]);
 
   // Calculate discount amount from redeemed points
-  const pointsDiscountAmount = settings?.enabled && settings?.points_per_spend && pointsToRedeem > 0 && usePoints
-    ? calculateAmountFromPoints(pointsToRedeem)
-    : 0;
+  const pointsDiscountAmount = useMemo(() => 
+    settings?.enabled && settings?.points_per_spend && pointsToRedeem > 0 && usePoints
+      ? calculateAmountFromPoints(pointsToRedeem)
+      : 0,
+    [settings?.enabled, settings?.points_per_spend, pointsToRedeem, usePoints, calculateAmountFromPoints]
+  );
 
   // Determine the point value (how much 1 point is worth)
-  // Calculate from points_per_spend (100/points_per_spend gives value per point)
-  const pointValue = settings?.points_per_spend ? (100 / settings.points_per_spend) / 100 : 0;
+  const pointValue = useMemo(() => 
+    settings?.points_per_spend ? (100 / settings.points_per_spend) / 100 : 0,
+    [settings?.points_per_spend]
+  );
 
-  // Calculate adjusted service prices with loyalty discount applied proportionally
+  // Calculate adjusted service prices with loyalty discount
   useEffect(() => {
     if (pointsDiscountAmount > 0 && subtotal > 0) {
       const discountRatio = pointsDiscountAmount / subtotal;
       const newAdjustedPrices: Record<string, number> = {};
       
-      // Apply discount to individual services proportionally
       selectedServices.forEach((serviceId) => {
-        const service = Array.isArray(services) ? services.find((s) => s.id === serviceId) : null;
+        const service = services.find((s) => s.id === serviceId);
         if (service) {
           const originalPrice = service.selling_price;
-          const discountAmount = originalPrice * discountRatio;
-          newAdjustedPrices[serviceId] = originalPrice - discountAmount;
+          newAdjustedPrices[serviceId] = originalPrice - (originalPrice * discountRatio);
         }
       });
 
-      // Apply discount to package services proportionally
       selectedPackages.forEach((packageId) => {
-        const pkg = Array.isArray(packages) ? packages.find((p) => p.id === packageId) : null;
-        if (pkg) {
+        const pkg = packages.find((p) => p.id === packageId);
+        if (pkg?.package_services) {
           const packagePrice = pkg.price;
           const discountAmount = packagePrice * discountRatio;
           
-          if (pkg.package_services) {
-            pkg.package_services.forEach((ps) => {
-              const serviceId = ps.service.id;
-              const servicePrice = ps.package_selling_price !== undefined ? 
-                ps.package_selling_price : ps.service.selling_price;
-              
-              // Calculate service's proportion of package price
-              const proportion = servicePrice / packagePrice;
-              const serviceDiscountAmount = discountAmount * proportion;
-              
-              newAdjustedPrices[serviceId] = servicePrice - serviceDiscountAmount;
-            });
-          }
+          pkg.package_services.forEach((ps) => {
+            const servicePrice = ps.package_selling_price ?? ps.service.selling_price;
+            const proportion = servicePrice / packagePrice;
+            newAdjustedPrices[ps.service.id] = servicePrice - (discountAmount * proportion);
+          });
         }
       });
       

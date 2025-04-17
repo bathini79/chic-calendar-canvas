@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
 import { toast } from "sonner";
@@ -14,7 +13,7 @@ export function useLoyaltyPoints(customerId?: string) {
   const [customerPoints, setCustomerPoints] = useState<CustomerPoints | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
@@ -29,16 +28,15 @@ export function useLoyaltyPoints(customerId?: string) {
       
       if (data) {
         setSettings(data as LoyaltyProgramSettings);
-        console.log('Fetched loyalty settings:', data);
       }
     } catch (error) {
       console.error('Unexpected error fetching loyalty settings:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchCustomerPoints = async () => {
+  const fetchCustomerPoints = useCallback(async () => {
     if (!customerId) {
       setCustomerPoints(null);
       return;
@@ -46,7 +44,6 @@ export function useLoyaltyPoints(customerId?: string) {
     
     try {
       setIsLoading(true);
-      console.log('Fetching points for customer:', customerId);
       
       const { data, error } = await supabase
         .from('profiles')
@@ -69,14 +66,8 @@ export function useLoyaltyPoints(customerId?: string) {
           
           if (expiryDate < new Date()) {
             walletBalance = 0;
-            console.log('Points have expired on:', expiryDate);
-          } else {
-            console.log('Points valid until:', expiryDate);
           }
         }
-        
-        console.log('Fetched wallet balance:', walletBalance);
-        console.log('Last used date:', lastUsed);
         
         setCustomerPoints({
           walletBalance,
@@ -88,11 +79,11 @@ export function useLoyaltyPoints(customerId?: string) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [customerId, settings?.points_validity_days]);
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [fetchSettings]);
 
   useEffect(() => {
     if (customerId) {
@@ -100,11 +91,10 @@ export function useLoyaltyPoints(customerId?: string) {
     } else {
       setCustomerPoints(null);
     }
-  }, [customerId, settings?.points_validity_days]);
+  }, [customerId, fetchCustomerPoints]);
 
-  const isEligibleItem = (itemId: string, type: 'service' | 'package') => {
+  const isEligibleItem = useCallback((itemId: string, type: 'service' | 'package') => {
     if (!settings || !settings.enabled) return false;
-    
     if (settings.apply_to_all) return true;
     
     if (type === 'service' && settings.applicable_services) {
@@ -116,9 +106,9 @@ export function useLoyaltyPoints(customerId?: string) {
     }
     
     return false;
-  };
+  }, [settings]);
 
-  const getEligibleAmount = (
+  const getEligibleAmount = useCallback((
     selectedServices: string[],
     selectedPackages: string[],
     services: any[],
@@ -126,15 +116,12 @@ export function useLoyaltyPoints(customerId?: string) {
     subtotal: number
   ): number => {
     if (!settings || !settings.enabled) return 0;
-    
     if (settings.min_billing_amount && subtotal < settings.min_billing_amount) {
       return 0;
     }
-    
     if (settings.apply_to_all) return subtotal;
     
     let eligibleAmount = 0;
-    
     selectedServices.forEach(serviceId => {
       if (isEligibleItem(serviceId, 'service')) {
         const service = services.find(s => s.id === serviceId);
@@ -154,89 +141,43 @@ export function useLoyaltyPoints(customerId?: string) {
     });
     
     return eligibleAmount;
-  };
+  }, [settings, isEligibleItem]);
 
-  const calculatePointsFromAmount = (amount: number): number => {
+  const calculatePointsFromAmount = useCallback((amount: number): number => {
     if (!settings || !settings.enabled) return 0;
-    
-    const earnedPoints = Math.floor(amount * (settings.points_per_spend / 100));
-    console.log(`Calculated points from amount: ${amount} × (${settings.points_per_spend}/100) = ${earnedPoints}`);
-    return earnedPoints;
-  };
+    return Math.floor(amount * (settings.points_per_spend / 100));
+  }, [settings]);
 
-  const calculateAmountFromPoints = (points: number): number => {
+  const calculateAmountFromPoints = useCallback((points: number): number => {
     if (!settings || !settings.enabled || !settings.points_per_spend) return 0;
-    
-    // Using points_per_spend to determine redemption value (100/points_per_spend gives value per point)
     const pointValue = 100 / settings.points_per_spend;
-    const amount = points * (pointValue / 100);
-    console.log(`Calculated amount from points: ${points} × ${pointValue/100} = ${amount}`);
-    return amount;
-  };
+    return points * (pointValue / 100);
+  }, [settings]);
 
-  const hasMinimumForRedemption = (points: CustomerPoints | null): boolean => {
+  const hasMinimumForRedemption = useCallback((points: CustomerPoints | null): boolean => {
     if (!settings || !settings.enabled || !points) return false;
-    
-    const hasMinimum = points.walletBalance >= settings.min_redemption_points;
-    console.log(`Checking minimum redemption: ${points.walletBalance} >= ${settings.min_redemption_points} = ${hasMinimum}`);
-    return hasMinimum;
-  };
+    return points.walletBalance >= settings.min_redemption_points;
+  }, [settings]);
 
-  const getMaxRedeemablePoints = (subtotal: number): number => {
-    if (!settings || !settings.enabled || !settings.points_per_spend || !customerPoints) {
-      console.log('Cannot calculate max redeemable points: settings not loaded, no customer points, or no points_per_spend defined');
-      return 0;
+  const getMaxRedeemablePoints = useCallback((amount: number): number => {
+    if (!settings?.enabled || !settings.points_per_spend) return 0;
+
+    const maxPoints = Math.floor(amount * settings.points_per_spend / 100);
+    
+    if (settings.max_redemption_type === "fixed") {
+      return Math.min(maxPoints, settings.max_redemption_points || maxPoints);
+    } else if (settings.max_redemption_type === "percentage") {
+      const maxPointsByPercentage = Math.floor((amount * (settings.max_redemption_percentage || 100)) / 100 * settings.points_per_spend / 100);
+      return Math.min(maxPoints, maxPointsByPercentage);
     }
     
-    if (!hasMinimumForRedemption(customerPoints)) {
-      console.log('Customer does not meet minimum points for redemption');
-      return 0;
-    }
-    
-    console.log('Calculating max redeemable points with settings:', settings);
-    console.log('Customer wallet balance:', customerPoints.walletBalance);
-    console.log('Subtotal for calculation:', subtotal);
-    console.log('Points per spend:', settings.points_per_spend);
-    
-    let maxPoints = customerPoints.walletBalance;
-    console.log('Starting with available points:', maxPoints);
-    
-    if (settings.max_redemption_type === "fixed" && settings.max_redemption_points) {
-      maxPoints = Math.min(maxPoints, settings.max_redemption_points);
-      console.log('Limited by fixed maximum points:', maxPoints);
-    } 
-    else if (settings.max_redemption_type === "percentage" && settings.max_redemption_percentage) {
-      const maxDiscountAmount = subtotal * (settings.max_redemption_percentage / 100);
-      // Calculate points based on points_per_spend
-      const pointValue = 100 / settings.points_per_spend;
-      const maxPointsFromPercentage = Math.floor(maxDiscountAmount / (pointValue / 100));
-      
-      maxPoints = Math.min(maxPoints, maxPointsFromPercentage);
-      console.log(`Percentage limit (${settings.max_redemption_percentage}%): max points = ${maxPointsFromPercentage}`);
-    }
-    
-    // Calculate how many points needed to cover the full subtotal
-    // Using points_per_spend to determine conversion rate
-    const pointValue = 100 / settings.points_per_spend;
-    const maxPointsForFullSubtotal = Math.ceil(subtotal / (pointValue / 100));
-    maxPoints = Math.min(maxPoints, maxPointsForFullSubtotal);
-    console.log(`Limiting by subtotal: max points = ${maxPointsForFullSubtotal}`);
-    
-    if (maxPoints < settings.min_redemption_points) {
-      console.log(`Max points (${maxPoints}) is below minimum redemption threshold (${settings.min_redemption_points})`);
-      return 0;
-    }
-    
-    console.log('Final max redeemable points:', maxPoints);
     return maxPoints;
-  };
+  }, [settings]);
 
-  return {
+  const memoizedValues = useMemo(() => ({
     settings,
     customerPoints,
     isLoading,
-    fetchSettings,
-    fetchCustomerPoints,
     isEligibleForPoints: isEligibleItem,
     getEligibleAmount,
     calculatePointsFromAmount,
@@ -245,5 +186,17 @@ export function useLoyaltyPoints(customerId?: string) {
     getMaxRedeemablePoints,
     walletBalance: customerPoints?.walletBalance || 0,
     lastUsed: customerPoints?.lastUsed || null
-  };
+  }), [
+    settings,
+    customerPoints,
+    isLoading,
+    isEligibleItem,
+    getEligibleAmount,
+    calculatePointsFromAmount,
+    calculateAmountFromPoints,
+    hasMinimumForRedemption,
+    getMaxRedeemablePoints
+  ]);
+
+  return memoizedValues;
 }
