@@ -1,4 +1,3 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,7 +15,7 @@ import {
   X,
   Check,
   Award,
-  Coins
+  Coins,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -30,7 +29,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
 import confetti from "canvas-confetti";
 import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
@@ -63,47 +69,65 @@ export default function BookingConfirmation() {
   const [tax, setTax] = useState(null);
   const [coupon, setCoupon] = useState(null);
   const [locationDetails, setLocationDetails] = useState(null);
-  const { fetchLocationTaxSettings, fetchTaxDetails } = useLocationTaxSettings();
-  const { coupons, isLoading: couponsLoading, validateCouponCode, getCouponById } = useCoupons();
+  const { fetchLocationTaxSettings, fetchTaxDetails } =
+    useLocationTaxSettings();
+  const {
+    coupons,
+    isLoading: couponsLoading,
+    validateCouponCode,
+    getCouponById,
+  } = useCoupons();
   const [couponSearchValue, setCouponSearchValue] = useState("");
   const [openCouponPopover, setOpenCouponPopover] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const confettiRef = useRef<ConfettiRef>(null);
-  const { customerMemberships, fetchCustomerMemberships, getApplicableMembershipDiscount } = useCustomerMemberships();
+  const {
+    customerMemberships,
+    fetchCustomerMemberships,
+    getApplicableMembershipDiscount,
+  } = useCustomerMemberships();
   const [membershipDiscount, setMembershipDiscount] = useState(0);
   const [activeMembership, setActiveMembership] = useState<any>(null);
   const [hasFetchedMemberships, setHasFetchedMemberships] = useState(false);
   const { sendNotification } = useAppointmentNotifications();
-  
+
   const [customerId, setCustomerId] = useState<string | undefined>();
   const [pointsToEarn, setPointsToEarn] = useState(0);
-  
+
   // State for loyalty points handling
   const [usePointsForDiscount, setUsePointsForDiscount] = useState(true);
-  
-  const { 
-    settings: loyaltySettings, 
+
+  const {
+    settings: loyaltySettings,
     customerPoints,
     isLoading: loyaltyLoading,
     fetchCustomerPoints,
     getEligibleAmount,
     calculatePointsFromAmount,
-    walletBalance
+    walletBalance,
   } = useLoyaltyPoints(customerId);
 
   // Use the loyalty checkout hook
   const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
-  const selectedServicesIds = items
-    ?.filter(item => item.type === 'service' && item.service_id)
-    .map(item => item.service_id as string) || [];
-    
-  const selectedPackagesIds = items
-    ?.filter(item => item.type === 'package' && item.package_id)
-    .map(item => item.package_id as string) || [];
-    
-  const allServices = items?.filter(item => item.type === 'service').map(item => item.service) || [];
-  const allPackages = items?.filter(item => item.type === 'package').map(item => item.package) || [];
-  
+  const selectedServicesIds =
+    items
+      ?.filter((item) => item.type === "service" && item.service_id)
+      .map((item) => item.service_id as string) || [];
+
+  const selectedPackagesIds =
+    items
+      ?.filter((item) => item.type === "package" && item.package_id)
+      .map((item) => item.package_id as string) || [];
+
+  const allServices =
+    items
+      ?.filter((item) => item.type === "service")
+      .map((item) => item.service) || [];
+  const allPackages =
+    items
+      ?.filter((item) => item.type === "package")
+      .map((item) => item.package) || [];
+
   const loyalty = useLoyaltyInCheckout({
     customerId,
     selectedServices: selectedServicesIds,
@@ -111,7 +135,7 @@ export default function BookingConfirmation() {
     services: allServices,
     packages: allPackages,
     subtotal,
-    discountedSubtotal: subtotal - membershipDiscount - couponDiscount
+    discountedSubtotal: subtotal - membershipDiscount - couponDiscount,
   });
 
   // Set initial points to redeem
@@ -125,69 +149,84 @@ export default function BookingConfirmation() {
 
   useEffect(() => {
     const getCurrentUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session?.user?.id) {
         setCustomerId(session.user.id);
       }
     };
-    
+
     getCurrentUser();
   }, []);
 
   useEffect(() => {
-    if (!loyaltySettings?.enabled || !items || items.length === 0 || !customerId) {
+    if (
+      !loyaltySettings?.enabled ||
+      !items ||
+      items.length === 0 ||
+      !customerId
+    ) {
       setPointsToEarn(0);
       return;
     }
 
     try {
       const selectedServices = items
-        .filter(item => item.type === 'service' && item.service_id)
-        .map(item => item.service_id as string);
-      
+        .filter((item) => item.type === "service" && item.service_id)
+        .map((item) => item.service_id as string);
+
       const selectedPackages = items
-        .filter(item => item.type === 'package' && item.package_id)
-        .map(item => item.package_id as string);
-      
+        .filter((item) => item.type === "package" && item.package_id)
+        .map((item) => item.package_id as string);
+
       const subtotal = getTotalPrice();
       const eligibleAmount = getEligibleAmount(
         selectedServices,
         selectedPackages,
-        items.filter(item => item.type === 'service').map(item => item.service),
-        items.filter(item => item.type === 'package').map(item => item.package),
+        items
+          .filter((item) => item.type === "service")
+          .map((item) => item.service),
+        items
+          .filter((item) => item.type === "package")
+          .map((item) => item.package),
         subtotal
       );
-      
-      const afterMembershipDiscount = eligibleAmount - 
-        (eligibleAmount / subtotal) * membershipDiscount;
-      
-      const afterCouponDiscount = afterMembershipDiscount - 
-        (afterMembershipDiscount / (subtotal - membershipDiscount)) * couponDiscount;
-      
+
+      const afterMembershipDiscount =
+        eligibleAmount - (eligibleAmount / subtotal) * membershipDiscount;
+
+      const afterCouponDiscount =
+        afterMembershipDiscount -
+        (afterMembershipDiscount / (subtotal - membershipDiscount)) *
+          couponDiscount;
+
       // Also consider the loyalty points discount when calculating points to earn
-      const afterLoyaltyDiscount = usePointsForDiscount && loyalty.pointsDiscountAmount > 0
-        ? afterCouponDiscount - 
-          (afterCouponDiscount / (subtotal - membershipDiscount - couponDiscount)) * loyalty.pointsDiscountAmount
-        : afterCouponDiscount;
-      
+      const afterLoyaltyDiscount =
+        usePointsForDiscount && loyalty.pointsDiscountAmount > 0
+          ? afterCouponDiscount -
+            (afterCouponDiscount /
+              (subtotal - membershipDiscount - couponDiscount)) *
+              loyalty.pointsDiscountAmount
+          : afterCouponDiscount;
+
       const calculatedPoints = calculatePointsFromAmount(afterLoyaltyDiscount);
       setPointsToEarn(calculatedPoints);
-      
     } catch (error) {
       console.error("Error calculating points to earn:", error);
       setPointsToEarn(0);
     }
   }, [
-    loyaltySettings, 
-    items, 
-    customerId, 
-    membershipDiscount, 
-    couponDiscount, 
+    loyaltySettings,
+    items,
+    customerId,
+    membershipDiscount,
+    couponDiscount,
     loyalty.pointsDiscountAmount,
     usePointsForDiscount,
-    getTotalPrice, 
-    getEligibleAmount, 
-    calculatePointsFromAmount
+    getTotalPrice,
+    getEligibleAmount,
+    calculatePointsFromAmount,
   ]);
 
   useEffect(() => {
@@ -231,7 +270,9 @@ export default function BookingConfirmation() {
 
   useEffect(() => {
     const loadMemberships = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session && !hasFetchedMemberships) {
         await fetchCustomerMemberships(session.user.id);
         setHasFetchedMemberships(true);
@@ -245,11 +286,16 @@ export default function BookingConfirmation() {
     if (items && items.length > 0 && customerMemberships.length > 0) {
       let totalMembershipDiscount = 0;
       let bestMembership = null;
-      
-      items.forEach(item => {
-        if (item.type === 'service' && item.service_id) {
-          const servicePrice = item.selling_price || item.service?.selling_price || 0;
-          const discountInfo = getApplicableMembershipDiscount(item.service_id, null, servicePrice);
+
+      items.forEach((item) => {
+        if (item.type === "service" && item.service_id) {
+          const servicePrice =
+            item.selling_price || item.service?.selling_price || 0;
+          const discountInfo = getApplicableMembershipDiscount(
+            item.service_id,
+            null,
+            servicePrice
+          );
           if (discountInfo && discountInfo.calculatedDiscount > 0) {
             totalMembershipDiscount += discountInfo.calculatedDiscount;
             if (!bestMembership) {
@@ -259,10 +305,14 @@ export default function BookingConfirmation() {
               };
             }
           }
-        } else if (item.type === 'package' && item.package_id) {
+        } else if (item.type === "package" && item.package_id) {
           const packagePrice = item.selling_price || item.package?.price || 0;
-          const discountInfo = getApplicableMembershipDiscount(null, item.package_id, packagePrice);
-          
+          const discountInfo = getApplicableMembershipDiscount(
+            null,
+            item.package_id,
+            packagePrice
+          );
+
           if (discountInfo && discountInfo.calculatedDiscount > 0) {
             totalMembershipDiscount += discountInfo.calculatedDiscount;
             if (!bestMembership) {
@@ -274,10 +324,9 @@ export default function BookingConfirmation() {
           }
         }
       });
-      
+
       setMembershipDiscount(totalMembershipDiscount);
       setActiveMembership(bestMembership);
-      
     } else {
       setMembershipDiscount(0);
       setActiveMembership(null);
@@ -291,7 +340,7 @@ export default function BookingConfirmation() {
         setTaxAmount(0);
         return;
       }
-      if(!tax){
+      if (!tax) {
         try {
           const taxData = await fetchTaxDetails(appliedTaxId);
           if (taxData) {
@@ -299,13 +348,14 @@ export default function BookingConfirmation() {
 
             const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
             const afterMembershipDiscount = subtotal - membershipDiscount;
-            
+
             // Include loyalty discount when calculating tax
-            const afterCouponAndMembership = afterMembershipDiscount - couponDiscount;
-            const afterAllDiscounts = usePointsForDiscount ? 
-              afterCouponAndMembership - loyalty.pointsDiscountAmount : 
-              afterCouponAndMembership;
-              
+            const afterCouponAndMembership =
+              afterMembershipDiscount - couponDiscount;
+            const afterAllDiscounts = usePointsForDiscount
+              ? afterCouponAndMembership - loyalty.pointsDiscountAmount
+              : afterCouponAndMembership;
+
             const newTaxAmount = afterAllDiscounts * (taxData.percentage / 100);
             setTaxAmount(newTaxAmount);
           }
@@ -317,15 +367,15 @@ export default function BookingConfirmation() {
 
     loadTaxDetails();
   }, [
-    appliedTaxId, 
-    couponDiscount, 
-    getTotalPrice, 
-    fetchTaxDetails, 
-    items, 
-    tax, 
-    membershipDiscount, 
-    usePointsForDiscount, 
-    loyalty.pointsDiscountAmount
+    appliedTaxId,
+    couponDiscount,
+    getTotalPrice,
+    fetchTaxDetails,
+    items,
+    tax,
+    membershipDiscount,
+    usePointsForDiscount,
+    loyalty.pointsDiscountAmount,
   ]);
 
   useEffect(() => {
@@ -387,12 +437,12 @@ export default function BookingConfirmation() {
       setCouponDiscount(newDiscount);
 
       if (tax) {
-        const afterAllDiscounts = 
-          subtotal - 
-          membershipDiscount - 
-          newDiscount - 
+        const afterAllDiscounts =
+          subtotal -
+          membershipDiscount -
+          newDiscount -
           (usePointsForDiscount ? loyalty.pointsDiscountAmount : 0);
-          
+
         const newTaxAmount = afterAllDiscounts * (tax.percentage / 100);
         setTaxAmount(newTaxAmount);
       }
@@ -400,18 +450,23 @@ export default function BookingConfirmation() {
 
     loadCouponDetails();
   }, [
-    appliedCouponId, 
-    getTotalPrice, 
-    tax, 
-    getCouponById, 
-    items, 
-    membershipDiscount, 
-    usePointsForDiscount, 
-    loyalty.pointsDiscountAmount
+    appliedCouponId,
+    getTotalPrice,
+    tax,
+    getCouponById,
+    items,
+    membershipDiscount,
+    usePointsForDiscount,
+    loyalty.pointsDiscountAmount,
   ]);
 
   useEffect(() => {
-    if (!selectedDate || !items || items.length === 0 || Object.keys(selectedTimeSlots).length === 0) {
+    if (
+      !selectedDate ||
+      !items ||
+      items.length === 0 ||
+      Object.keys(selectedTimeSlots).length === 0
+    ) {
       navigate("/schedule");
     }
   }, [selectedDate, selectedTimeSlots, items, navigate]);
@@ -421,7 +476,7 @@ export default function BookingConfirmation() {
       if (confettiRef.current) {
         confettiRef.current.fire();
       }
-      
+
       const end = Date.now() + 5 * 1000;
       const colors = ["#a786ff", "#fd8bbc", "#eca184", "#f8deb1"];
 
@@ -438,7 +493,7 @@ export default function BookingConfirmation() {
           gravity: 0.7,
           ticks: 300,
         });
-        
+
         confetti({
           particleCount: 1,
           angle: 120,
@@ -456,11 +511,11 @@ export default function BookingConfirmation() {
       };
 
       frame();
-      
+
       const timer = setTimeout(() => {
         navigate("/profile");
       }, 5000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [bookingSuccess, navigate]);
@@ -470,7 +525,9 @@ export default function BookingConfirmation() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-bold mb-2">No items in your cart</h2>
-          <p className="text-muted-foreground mb-4">Please add services to continue</p>
+          <p className="text-muted-foreground mb-4">
+            Please add services to continue
+          </p>
           <Button onClick={() => navigate("/services")}>Browse Services</Button>
         </div>
       </div>
@@ -509,32 +566,44 @@ export default function BookingConfirmation() {
   const subtotalAmount = getTotalPrice();
   const afterMembershipDiscount = subtotalAmount - membershipDiscount;
   const afterCouponDiscount = afterMembershipDiscount - couponDiscount;
-  
+
   // Include loyalty points discount in the calculation
-  const pointsDiscount = usePointsForDiscount ? loyalty.pointsDiscountAmount : 0;
+  const pointsDiscount = usePointsForDiscount
+    ? loyalty.pointsDiscountAmount
+    : 0;
   const discountedSubtotal = afterCouponDiscount - pointsDiscount;
   const totalPrice = discountedSubtotal + taxAmount;
 
-  const calculateItemDiscountedPrice = (itemOriginalPrice: number, serviceId: string | undefined, packageId: string | undefined) => {
-    if ((membershipDiscount <= 0 && couponDiscount <= 0 && pointsDiscount <= 0) || subtotalAmount <= 0) {
+  const calculateItemDiscountedPrice = (
+    itemOriginalPrice: number,
+    serviceId: string | undefined,
+    packageId: string | undefined
+  ) => {
+    if (
+      (membershipDiscount <= 0 && couponDiscount <= 0 && pointsDiscount <= 0) ||
+      subtotalAmount <= 0
+    ) {
       return itemOriginalPrice;
     }
-    
+
     let itemMembershipDiscount = 0;
     if ((serviceId || packageId) && membershipDiscount > 0) {
       const discountInfo = getApplicableMembershipDiscount(
-        serviceId || null, 
-        packageId || null, 
+        serviceId || null,
+        packageId || null,
         itemOriginalPrice
       );
-      
+
       if (discountInfo) {
         itemMembershipDiscount = discountInfo.calculatedDiscount;
       }
     }
-    
-    const afterMembershipPrice = Math.max(0, itemOriginalPrice - itemMembershipDiscount);
-    
+
+    const afterMembershipPrice = Math.max(
+      0,
+      itemOriginalPrice - itemMembershipDiscount
+    );
+
     // Apply coupon discount proportionally
     let afterCouponPrice = afterMembershipPrice;
     if (couponDiscount > 0 && afterMembershipDiscount > 0) {
@@ -542,14 +611,14 @@ export default function BookingConfirmation() {
       const itemCouponDiscount = couponDiscount * priceRatio;
       afterCouponPrice = Math.max(0, afterMembershipPrice - itemCouponDiscount);
     }
-    
+
     // Apply loyalty points discount proportionally
     if (pointsDiscount > 0 && afterCouponDiscount > 0 && usePointsForDiscount) {
       const priceRatio = afterCouponPrice / afterCouponDiscount;
       const itemPointsDiscount = pointsDiscount * priceRatio;
       return Math.max(0, afterCouponPrice - itemPointsDiscount);
     }
-    
+
     return afterCouponPrice;
   };
 
@@ -562,7 +631,7 @@ export default function BookingConfirmation() {
         return;
       }
 
-      const selectedCoupon = coupons.find(c => c.id === couponId);
+      const selectedCoupon = coupons.find((c) => c.id === couponId);
       if (!selectedCoupon) {
         throw new Error("Coupon not found");
       }
@@ -587,7 +656,7 @@ export default function BookingConfirmation() {
   const handleBookingConfirmation = async () => {
     setIsLoading(true);
     setBookingError(null);
-    
+
     try {
       const {
         data: { session },
@@ -615,11 +684,13 @@ export default function BookingConfirmation() {
         return;
       }
       const endDateTime = addMinutes(startDateTime, totalDuration);
-      
+
       // Include loyalty points information in the appointment
       const pointsToUse = usePointsForDiscount ? loyalty.pointsToRedeem : 0;
-      const loyaltyDiscountAmount = usePointsForDiscount ? loyalty.pointsDiscountAmount : 0;
-      
+      const loyaltyDiscountAmount = usePointsForDiscount
+        ? loyalty.pointsDiscountAmount
+        : 0;
+
       const { data: appointmentData, error: appointmentError } = await supabase
         .from("appointments")
         .insert({
@@ -642,7 +713,7 @@ export default function BookingConfirmation() {
           membership_discount: membershipDiscount || 0,
           points_earned: pointsToEarn,
           points_redeemed: pointsToUse,
-          points_discount_amount: loyaltyDiscountAmount
+          points_discount_amount: loyaltyDiscountAmount,
         })
         .select();
 
@@ -664,7 +735,7 @@ export default function BookingConfirmation() {
           console.error(`No start time found for item ${item.id}`);
           continue;
         }
-        
+
         let currentStartTime = new Date(
           `${format(selectedDate, "yyyy-MM-dd")} ${itemStartTimeString}`
         );
@@ -677,8 +748,13 @@ export default function BookingConfirmation() {
           const itemDuration = item.service?.duration || 0;
           const itemEndTime = addMinutes(currentStartTime, itemDuration);
 
-          const originalPrice = item.selling_price || item.service?.selling_price || 0;
-          const discountedPrice = calculateItemDiscountedPrice(originalPrice, item.service_id, null);
+          const originalPrice =
+            item.selling_price || item.service?.selling_price || 0;
+          const discountedPrice = calculateItemDiscountedPrice(
+            originalPrice,
+            item.service_id,
+            null
+          );
           const bookingPromise = supabase.from("bookings").insert({
             appointment_id: appointmentId,
             service_id: item.service_id,
@@ -696,11 +772,17 @@ export default function BookingConfirmation() {
             item.package?.package_services &&
             item.package.package_services.length > 0
           ) {
-            const packageTotalPrice = item.selling_price || item.package?.price || 0;
-            const discountedPackagePrice = calculateItemDiscountedPrice(packageTotalPrice, null, item.package_id);
-            const packageDiscountRatio = packageTotalPrice > 0 
-              ? discountedPackagePrice / packageTotalPrice 
-              : 1;
+            const packageTotalPrice =
+              item.selling_price || item.package?.price || 0;
+            const discountedPackagePrice = calculateItemDiscountedPrice(
+              packageTotalPrice,
+              null,
+              item.package_id
+            );
+            const packageDiscountRatio =
+              packageTotalPrice > 0
+                ? discountedPackagePrice / packageTotalPrice
+                : 1;
 
             for (const packageService of item.package.package_services) {
               const stylistId =
@@ -719,8 +801,9 @@ export default function BookingConfirmation() {
                 packageService.package_selling_price !== null
                   ? packageService.package_selling_price
                   : packageService.service.selling_price;
-                  
-              const adjustedServicePrice = servicePriceInPackage * packageDiscountRatio;
+
+              const adjustedServicePrice =
+                servicePriceInPackage * packageDiscountRatio;
               const bookingPromise = supabase.from("bookings").insert({
                 appointment_id: appointmentId,
                 service_id: packageService.service.id,
@@ -768,8 +851,13 @@ export default function BookingConfirmation() {
                         ? selectedStylists[serviceId]
                         : null;
 
-                    const originalCustomPrice = customService.selling_price || 0;
-                    const discountedCustomPrice = calculateItemDiscountedPrice(originalCustomPrice, serviceId, item.package_id);
+                    const originalCustomPrice =
+                      customService.selling_price || 0;
+                    const discountedCustomPrice = calculateItemDiscountedPrice(
+                      originalCustomPrice,
+                      serviceId,
+                      item.package_id
+                    );
                     const bookingPromise = supabase.from("bookings").insert({
                       appointment_id: appointmentId,
                       service_id: serviceId,
@@ -800,26 +888,29 @@ export default function BookingConfirmation() {
         console.error("Errors inserting bookings:", bookingErrors);
         throw new Error("Failed to create some bookings. Please try again.");
       }
-      
+
       // Update loyalty points in the profile if points were redeemed
       if (usePointsForDiscount && loyalty.pointsToRedeem > 0) {
         const currentDate = new Date();
-        const updatedWalletBalance = Math.max(0, walletBalance - loyalty.pointsToRedeem);
-        
+        const updatedWalletBalance = Math.max(
+          0,
+          walletBalance - loyalty.pointsToRedeem
+        );
+
         const { error: pointsError } = await supabase
           .from("profiles")
           .update({
             wallet_balance: updatedWalletBalance,
-            last_used: currentDate.toISOString()
+            last_used: currentDate.toISOString(),
           })
           .eq("id", customer_id);
-          
+
         if (pointsError) {
           console.error("Error updating loyalty points:", pointsError);
           // Don't fail the booking if points update fails
         }
       }
-      
+
       try {
         const notificationResult = await sendConfirmation(
           appointmentId,
@@ -829,26 +920,27 @@ export default function BookingConfirmation() {
         console.error("Error sending confirmation:", notificationError);
         // Don't fail the booking if notification fails
       }
-      
+
       toast.success("Booking confirmed successfully!");
-      
+
       setBookingSuccess(true);
-      
+
       setTimeout(() => {
         clearCart();
       }, 5000);
-      
     } catch (error: any) {
       console.error("Booking error:", error);
       toast.error(error.message || "Failed to confirm booking");
-      setBookingError(error.message || "Failed to confirm your booking. Please try again.");
+      setBookingError(
+        error.message || "Failed to confirm your booking. Please try again."
+      );
       setIsLoading(false);
     }
   };
 
   const clearCart = async () => {
     if (!items) return;
-    
+
     for (const item of items) {
       await removeFromCart(item.id);
     }
@@ -862,7 +954,7 @@ export default function BookingConfirmation() {
 
   return (
     <div className="min-h-screen pb-24 relative">
-      <Confetti 
+      <Confetti
         ref={confettiRef}
         className="fixed inset-0 z-[100] pointer-events-none"
         manualstart={true}
@@ -874,7 +966,7 @@ export default function BookingConfirmation() {
           ticks: 400,
         }}
       />
-      
+
       <div className="container max-w-2xl mx-auto py-6 px-4">
         <div className="space-y-6">
           <div>
@@ -925,12 +1017,14 @@ export default function BookingConfirmation() {
                   ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`
                   : `${minutes}m`;
 
-              const originalPrice = item.selling_price || 
-                item.service?.selling_price || 
-                item.package?.price || 0;
+              const originalPrice =
+                item.selling_price ||
+                item.service?.selling_price ||
+                item.package?.price ||
+                0;
               const discountedPrice = calculateItemDiscountedPrice(
-                originalPrice, 
-                item.service_id, 
+                originalPrice,
+                item.service_id,
                 item.package_id
               );
               const hasDiscount = discountedPrice < originalPrice;
@@ -972,7 +1066,9 @@ export default function BookingConfirmation() {
                         <span className="text-muted-foreground line-through text-xs mr-1">
                           ₹{originalPrice.toFixed(0)}
                         </span>
-                        <span className="text-green-600">₹{discountedPrice.toFixed(0)}</span>
+                        <span className="text-green-600">
+                          ₹{discountedPrice.toFixed(0)}
+                        </span>
                       </div>
                     ) : (
                       <span>₹{originalPrice.toFixed(0)}</span>
@@ -993,7 +1089,7 @@ export default function BookingConfirmation() {
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>₹{subtotalAmount.toFixed(2)}</span>
                 </div>
-                
+
                 {activeMembership && membershipDiscount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span className="flex items-center gap-1">
@@ -1003,20 +1099,22 @@ export default function BookingConfirmation() {
                     <span>-₹{membershipDiscount.toFixed(2)}</span>
                   </div>
                 )}
-                
+
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Coupon</span>
-                    
+                    <span className="text-sm text-muted-foreground">
+                      Coupon
+                    </span>
+
                     {coupon ? (
                       <div className="flex items-center gap-2">
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className="px-2 py-1 text-xs flex items-center gap-1 text-green-600 border-green-200 bg-green-50"
                         >
                           <Tag className="h-3 w-3" />
                           {coupon.code}
-                          <button 
+                          <button
                             onClick={removeCoupon}
                             className="ml-1 rounded-full hover:bg-green-100"
                           >
@@ -1025,61 +1123,70 @@ export default function BookingConfirmation() {
                         </Badge>
                       </div>
                     ) : (
-                      <Popover open={openCouponPopover} onOpenChange={setOpenCouponPopover}>
-                      <PopoverTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 text-xs border-dashed border-muted-foreground/50"
-                        >
-                          Apply coupon
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="p-0 w-72" align="end">
-                        <Command>
-                          <CommandInput 
-                            placeholder="Search for coupons..." 
-                            value={couponSearchValue}
-                            onValueChange={setCouponSearchValue}
-                          />
-                          <CommandList>
-                            {couponsLoading ? (
-                              <div className="py-6 text-center text-sm">Loading coupons...</div>
-                            ) : (
-                              <>
-                                {filteredCoupons?.length === 0 ? (
-                                  <CommandEmpty>No coupons found</CommandEmpty>
-                                ) : (
-                                  <CommandGroup>
-                                    {filteredCoupons.map((c) => (
-                                      <CommandItem 
-                                        key={c.id} 
-                                        value={c.code}
-                                        onSelect={() => handleCouponSelect(c.id)}
-                                        className="flex justify-between"
-                                      >
-                                        <div className="flex items-center">
-                                          <Tag className="mr-2 h-3 w-3 text-green-600" />
-                                          <span>{c.code}</span>
-                                        </div>
-                                        <span className="text-xs text-muted-foreground">
-                                          {c.discount_type === "percentage" 
-                                            ? `${c.discount_value}% off` 
-                                            : `₹${c.discount_value} off`}
-                                        </span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                )}
-                              </>
-                            )}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                      <Popover
+                        open={openCouponPopover}
+                        onOpenChange={setOpenCouponPopover}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs border-dashed border-muted-foreground/50"
+                          >
+                            Apply coupon
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 w-72" align="end">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search for coupons..."
+                              value={couponSearchValue}
+                              onValueChange={setCouponSearchValue}
+                            />
+                            <CommandList>
+                              {couponsLoading ? (
+                                <div className="py-6 text-center text-sm">
+                                  Loading coupons...
+                                </div>
+                              ) : (
+                                <>
+                                  {filteredCoupons?.length === 0 ? (
+                                    <CommandEmpty>
+                                      No coupons found
+                                    </CommandEmpty>
+                                  ) : (
+                                    <CommandGroup>
+                                      {filteredCoupons.map((c) => (
+                                        <CommandItem
+                                          key={c.id}
+                                          value={c.code}
+                                          onSelect={() =>
+                                            handleCouponSelect(c.id)
+                                          }
+                                          className="flex justify-between"
+                                        >
+                                          <div className="flex items-center">
+                                            <Tag className="mr-2 h-3 w-3 text-green-600" />
+                                            <span>{c.code}</span>
+                                          </div>
+                                          <span className="text-xs text-muted-foreground">
+                                            {c.discount_type === "percentage"
+                                              ? `${c.discount_value}% off`
+                                              : `₹${c.discount_value} off`}
+                                          </span>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  )}
+                                </>
+                              )}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     )}
                   </div>
-                  
+
                   {coupon && couponDiscount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Discount</span>
@@ -1106,22 +1213,23 @@ export default function BookingConfirmation() {
                       </span>
                       <span className="font-medium">{walletBalance || 0}</span>
                     </div>
-                    
-                    {loyalty.walletBalance > 0 && loyalty.maxPointsToRedeem > 0 && (
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                         
+
+                    {loyalty.walletBalance > 0 &&
+                      loyalty.maxPointsToRedeem > 0 && (
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
                             Use {loyalty.pointsToRedeem} points
+                          </div>
+
+                          {usePointsForDiscount &&
+                            loyalty.pointsDiscountAmount > 0 && (
+                              <span className="text-sm text-green-600">
+                                -₹{loyalty.pointsDiscountAmount.toFixed(2)}
+                              </span>
+                            )}
                         </div>
-                        
-                        {usePointsForDiscount && loyalty.pointsDiscountAmount > 0 && (
-                          <span className="text-sm text-green-600">
-                            -₹{loyalty.pointsDiscountAmount.toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    
+                      )}
+
                     {pointsToEarn > 0 && (
                       <div className="flex justify-between text-sm text-green-600">
                         <span className="flex items-center gap-1">
@@ -1160,7 +1268,9 @@ export default function BookingConfirmation() {
           <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
             <Check className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold mb-2 text-gray-900">Appointment Booked!</h2>
+          <h2 className="text-3xl font-bold mb-2 text-gray-900">
+            Appointment Booked!
+          </h2>
           <p className="text-gray-600">Redirecting to your bookings...</p>
         </div>
       )}
@@ -1170,15 +1280,14 @@ export default function BookingConfirmation() {
           <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mb-4">
             <X className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold mb-2 text-gray-900">Booking Failed</h2>
+          <h2 className="text-3xl font-bold mb-2 text-gray-900">
+            Booking Failed
+          </h2>
           {bookingError}
-          <Button 
-            variant="default"
-            onClick={() => setBookingError(null)}
-          >
+          <Button variant="default" onClick={() => setBookingError(null)}>
             Try Again
           </Button>
-           <h4>or reach to the Salon employee </h4>
+          <h4>or reach to the Salon employee </h4>
         </div>
       )}
 
@@ -1203,7 +1312,11 @@ export default function BookingConfirmation() {
               onClick={handleBookingConfirmation}
               disabled={isLoading || bookingSuccess || !!bookingError}
             >
-              {isLoading ? "Confirming..." : bookingSuccess ? "Sale Completed" : "Confirm"}
+              {isLoading
+                ? "Confirming..."
+                : bookingSuccess
+                ? "Sale Completed"
+                : "Confirm"}
             </Button>
           </div>
         </div>
@@ -1211,7 +1324,6 @@ export default function BookingConfirmation() {
     </div>
   );
 }
-
 
 const sendConfirmation = async (
   appointmentId: string,
@@ -1228,4 +1340,3 @@ const sendConfirmation = async (
     return null;
   }
 };
-
