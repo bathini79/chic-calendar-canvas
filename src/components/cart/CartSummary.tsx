@@ -67,7 +67,6 @@ export function CartSummary() {
   const locationSettingsLoadedRef = useRef(false);
   const membershipFetchedRef = useRef(false);
   const couponsFetchedRef = useRef(false);
-  const sessionFetchedRef = useRef(false);
   
   // Fetch customer memberships when the component loads (if we're not in booking confirmation)
   const fetchMemberships = useCallback(async () => {
