@@ -1110,17 +1110,8 @@ export default function BookingConfirmation() {
                     {loyalty.walletBalance > 0 && loyalty.maxPointsToRedeem > 0 && (
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          <Switch
-                            checked={usePointsForDiscount}
-                            onCheckedChange={setUsePointsForDiscount}
-                            id="use-points"
-                          />
-                          <label
-                            htmlFor="use-points"
-                            className="text-sm cursor-pointer"
-                          >
+                         
                             Use {loyalty.pointsToRedeem} points
-                          </label>
                         </div>
                         
                         {usePointsForDiscount && loyalty.pointsDiscountAmount > 0 && (
