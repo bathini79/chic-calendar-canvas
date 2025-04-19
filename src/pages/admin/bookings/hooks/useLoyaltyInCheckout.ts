@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { useLoyaltyPoints } from "@/hooks/use-loyalty-points";
 
@@ -83,18 +82,14 @@ export function useLoyaltyInCheckout({
 
   // Handle maximum points to redeem based on settings - use subtotal directly
   const maxPointsToRedeem = useMemo(() => {
-    if (!settings?.enabled || !walletBalance) return 0;
-    
-    // Get maximum redeemable points based on price and loyalty settings
-    const maxPoints = getMaxRedeemablePoints(discountedSubtotal || subtotal);
-    
-    // Don't let user redeem more than they have
-    return Math.min(maxPoints, walletBalance);
-  }, [settings?.enabled, discountedSubtotal, subtotal, walletBalance, getMaxRedeemablePoints]);
+    return settings?.enabled && settings.points_per_spend
+      ? getMaxRedeemablePoints(subtotal)
+      : 0;
+  }, [settings?.enabled, settings?.points_per_spend, subtotal]);  // Removed getMaxRedeemablePoints from dependencies
 
   // Automatically set maximum points to redeem if wallet balance allows
   useEffect(() => {
-    // Only set if the loyalty program is enabled, user has enough points, and there's a maximum to redeem
+    // Always set to maximum if enabled and there are points available
     if (settings?.enabled && walletBalance >= (settings?.min_redemption_points || 0) && maxPointsToRedeem > 0) {
       setPointsToRedeem(maxPointsToRedeem);
     } else {
@@ -112,7 +107,7 @@ export function useLoyaltyInCheckout({
 
   // Determine the point value (how much 1 point is worth)
   const pointValue = useMemo(() => 
-    settings?.points_per_spend ? (1 / settings.points_per_spend) : 0,
+    settings?.points_per_spend ? (100 / settings.points_per_spend) / 100 : 0,
     [settings?.points_per_spend]
   );
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
@@ -146,16 +145,13 @@ export function useLoyaltyPoints(customerId?: string) {
 
   const calculatePointsFromAmount = useCallback((amount: number): number => {
     if (!settings || !settings.enabled) return 0;
-    // Fixed: Multiply by points_per_spend directly (instead of dividing by 100 first)
-    // The settings show 60 points per $1, not 60 points per $100
-    return Math.floor(amount * settings.points_per_spend);
+    return Math.floor(amount * (settings.points_per_spend / 100));
   }, [settings]);
 
   const calculateAmountFromPoints = useCallback((points: number): number => {
     if (!settings || !settings.enabled || !settings.points_per_spend) return 0;
-    // Fixed: The value of each point should be 1 divided by points_per_spend
-    // If we get 60 points per $1, then each point is worth $1/60 = $0.01667
-    return points / settings.points_per_spend;
+    const pointValue = 100 / settings.points_per_spend;
+    return points * (pointValue / 100);
   }, [settings]);
 
   const hasMinimumForRedemption = useCallback((points: CustomerPoints | null): boolean => {
@@ -166,19 +162,16 @@ export function useLoyaltyPoints(customerId?: string) {
   const getMaxRedeemablePoints = useCallback((amount: number): number => {
     if (!settings?.enabled || !settings.points_per_spend) return 0;
 
-    // Calculate total possible points based on amount and settings
-    const pointValueInCurrency = 1 / settings.points_per_spend;
-    const maxPointsByAmount = Math.floor(amount / pointValueInCurrency);
+    const maxPoints = Math.floor(amount * settings.points_per_spend / 100);
     
     if (settings.max_redemption_type === "fixed") {
-      return Math.min(maxPointsByAmount, settings.max_redemption_points || maxPointsByAmount);
+      return Math.min(maxPoints, settings.max_redemption_points || maxPoints);
     } else if (settings.max_redemption_type === "percentage") {
-      const maxAmountByPercentage = amount * (settings.max_redemption_percentage || 100) / 100;
-      const maxPointsByPercentage = Math.floor(maxAmountByPercentage / pointValueInCurrency);
-      return Math.min(maxPointsByAmount, maxPointsByPercentage);
+      const maxPointsByPercentage = Math.floor((amount * (settings.max_redemption_percentage || 100)) / 100 * settings.points_per_spend / 100);
+      return Math.min(maxPoints, maxPointsByPercentage);
     }
     
-    return maxPointsByAmount;
+    return maxPoints;
   }, [settings]);
 
   const memoizedValues = useMemo(() => ({
