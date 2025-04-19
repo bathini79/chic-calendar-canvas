@@ -113,7 +113,7 @@ export function useLoyaltyInCheckout({
 
   // Determine the point value (how much 1 point is worth)
   const pointValue = useMemo(() => 
-    settings?.points_per_spend ? (100 / settings.points_per_spend) : 0,
+    settings?.points_per_spend ? (1 / settings.points_per_spend) : 0,
     [settings?.points_per_spend]
   );
 

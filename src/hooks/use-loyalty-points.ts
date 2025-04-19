@@ -145,23 +145,21 @@ export function useLoyaltyPoints(customerId?: string) {
   }, [settings, isEligibleItem]);
 
   // Calculate points to earn from an amount
-  // If points_per_spend is 60, that means 60 points per ₹100 spent (0.6 points per rupee)
+  // If points_per_spend is 60, that means 60 points per ₹1 spent
   const calculatePointsFromAmount = useCallback((amount: number): number => {
     if (!settings || !settings.enabled || !settings.points_per_spend) return 0;
     
     // Calculate points based on the configured points_per_spend value
-    const pointsPerRupee = settings.points_per_spend / 100;
-    return Math.floor(amount * pointsPerRupee);
+    return Math.floor(amount * settings.points_per_spend);
   }, [settings]);
 
   // Calculate the amount that points can redeem
-  // If points_per_spend is 60, then 60 points = ₹100, so 1 point = ₹1.67
+  // If points_per_spend is 60, then 60 points = ₹1, so 1 point = ₹0.0166
   const calculateAmountFromPoints = useCallback((points: number): number => {
     if (!settings || !settings.enabled || !settings.points_per_spend) return 0;
     
     // Convert points to currency value
-    const pointValue = 100 / settings.points_per_spend;
-    return points * pointValue;
+    return points / settings.points_per_spend;
   }, [settings]);
 
   const hasMinimumForRedemption = useCallback((points: CustomerPoints | null): boolean => {
@@ -176,9 +174,8 @@ export function useLoyaltyPoints(customerId?: string) {
     if (amount <= 0) return 0;
 
     // How many points would it take to cover the transaction amount
-    // If 60 points = ₹100, then covering ₹500 would take 300 points
-    const pointsPerRupee = settings.points_per_spend / 100;
-    const amountInPoints = Math.floor(amount * pointsPerRupee);
+    // If 60 points = ₹1, then covering ₹500 would take 30,000 points
+    const amountInPoints = Math.floor(amount * settings.points_per_spend);
 
     if (settings.max_redemption_type === "fixed") {
       // For fixed maximum, use the configured maximum
@@ -192,7 +189,7 @@ export function useLoyaltyPoints(customerId?: string) {
       // Calculate max discount based on percentage of transaction amount
       const maxDiscountAmount = amount * (settings.max_redemption_percentage / 100);
       // Convert back to points
-      const maxPointsByPercentage = Math.floor(maxDiscountAmount * pointsPerRupee);
+      const maxPointsByPercentage = Math.floor(maxDiscountAmount * settings.points_per_spend);
       return Math.min(amountInPoints, maxPointsByPercentage);
     }
     
