@@ -145,7 +145,7 @@ export function useLoyaltyPoints(customerId?: string) {
   }, [settings, isEligibleItem]);
 
   // Calculate points to earn from an amount
-  // Based on configuration of 60 points per ₹100 spend (0.6 points per rupee)
+  // If points_per_spend is 60, that means 60 points per ₹100 spent (0.6 points per rupee)
   const calculatePointsFromAmount = useCallback((amount: number): number => {
     if (!settings || !settings.enabled || !settings.points_per_spend) return 0;
     
@@ -172,32 +172,32 @@ export function useLoyaltyPoints(customerId?: string) {
   const getMaxRedeemablePoints = useCallback((amount: number): number => {
     if (!settings?.enabled || !settings.points_per_spend) return 0;
 
-    // How many points the transaction amount would generate (for reference)
-    const pointsPerRupee = settings.points_per_spend / 100;
-    const amountBasedPoints = Math.floor(amount * pointsPerRupee);
+    // If no amount, no points can be redeemed
+    if (amount <= 0) return 0;
 
     // How many points would it take to cover the transaction amount
     // If 60 points = ₹100, then covering ₹500 would take 300 points
-    const maxPointsBasedOnAmount = Math.floor(amount * (settings.points_per_spend / 100));
+    const pointsPerRupee = settings.points_per_spend / 100;
+    const amountInPoints = Math.floor(amount * pointsPerRupee);
 
     if (settings.max_redemption_type === "fixed") {
-      // For fixed maximum, use the configured maximum (2000 in this case)
+      // For fixed maximum, use the configured maximum
       return Math.min(
         // Don't let them redeem more points than the maximum set
         settings.max_redemption_points || Number.MAX_SAFE_INTEGER,
         // Don't let them redeem more points than needed to cover the transaction
-        maxPointsBasedOnAmount
+        amountInPoints
       );
     } else if (settings.max_redemption_type === "percentage" && settings.max_redemption_percentage) {
       // Calculate max discount based on percentage of transaction amount
       const maxDiscountAmount = amount * (settings.max_redemption_percentage / 100);
       // Convert back to points
-      const maxPointsByPercentage = Math.floor(maxDiscountAmount / (100 / settings.points_per_spend));
-      return Math.min(maxPointsBasedOnAmount, maxPointsByPercentage);
+      const maxPointsByPercentage = Math.floor(maxDiscountAmount * pointsPerRupee);
+      return Math.min(amountInPoints, maxPointsByPercentage);
     }
     
     // If no redemption limit set, allow up to the amount-based maximum
-    return maxPointsBasedOnAmount;
+    return amountInPoints;
   }, [settings]);
 
   const memoizedValues = useMemo(() => ({
