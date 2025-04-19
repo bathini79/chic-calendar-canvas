@@ -119,7 +119,7 @@ export function useLoyaltyInCheckout({
 
   // Calculate adjusted service prices with loyalty discount
   useEffect(() => {
-    if (pointsDiscountAmount > 0 && subtotal > 0) {
+    if (pointsDiscountAmount > 0 && discountedSubtotal > 0) {
       const discountRatio = pointsDiscountAmount / discountedSubtotal;
       const newAdjustedPrices: Record<string, number> = {};
       
