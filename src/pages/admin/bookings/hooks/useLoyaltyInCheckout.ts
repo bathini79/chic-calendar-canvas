@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { useLoyaltyPoints } from "@/hooks/use-loyalty-points";
 
@@ -80,14 +81,19 @@ export function useLoyaltyInCheckout({
     }
   }, [settings, pointsToEarn]);
 
-  // Handle maximum points to redeem based on settings - use subtotal directly
+  // Handle maximum points to redeem based on transaction amount and settings
   const maxPointsToRedeem = useMemo(() => {
-    return settings?.enabled && settings.points_per_spend
-      ? getMaxRedeemablePoints(subtotal)
-      : 0;
-  }, [settings?.enabled, settings?.points_per_spend, subtotal]);  // Removed getMaxRedeemablePoints from dependencies
+    if (!settings?.enabled || !settings.points_per_spend) return 0;
+    
+    // Use discountedSubtotal (after other discounts) for redemption calculation
+    // This ensures loyalty points are applied after other discounts
+    return Math.min(
+      walletBalance, 
+      getMaxRedeemablePoints(discountedSubtotal)
+    );
+  }, [settings?.enabled, settings?.points_per_spend, discountedSubtotal, walletBalance, getMaxRedeemablePoints]);
 
-  // Automatically set maximum points to redeem if wallet balance allows
+  // Automatically set points to redeem when the maximum changes
   useEffect(() => {
     // Always set to maximum if enabled and there are points available
     if (settings?.enabled && walletBalance >= (settings?.min_redemption_points || 0) && maxPointsToRedeem > 0) {
@@ -107,14 +113,14 @@ export function useLoyaltyInCheckout({
 
   // Determine the point value (how much 1 point is worth)
   const pointValue = useMemo(() => 
-    settings?.points_per_spend ? (100 / settings.points_per_spend) / 100 : 0,
+    settings?.points_per_spend ? (100 / settings.points_per_spend) : 0,
     [settings?.points_per_spend]
   );
 
   // Calculate adjusted service prices with loyalty discount
   useEffect(() => {
     if (pointsDiscountAmount > 0 && subtotal > 0) {
-      const discountRatio = pointsDiscountAmount / subtotal;
+      const discountRatio = pointsDiscountAmount / discountedSubtotal;
       const newAdjustedPrices: Record<string, number> = {};
       
       selectedServices.forEach((serviceId) => {
@@ -143,13 +149,13 @@ export function useLoyaltyInCheckout({
     } else {
       setAdjustedServicePrices({});
     }
-  }, [pointsDiscountAmount, subtotal, selectedServices, selectedPackages, services, packages]);
+  }, [pointsDiscountAmount, discountedSubtotal, subtotal, selectedServices, selectedPackages, services, packages]);
 
   return {
     isLoyaltyEnabled: settings?.enabled || false,
     pointsToEarn,
     walletBalance,
-    usePoints, // Always true to always use points
+    usePoints,
     pointsToRedeem,
     pointsDiscountAmount,
     maxPointsToRedeem,

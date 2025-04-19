@@ -94,7 +94,6 @@ export default function BookingConfirmation() {
   const [customerId, setCustomerId] = useState<string | undefined>();
   const [pointsToEarn, setPointsToEarn] = useState(0);
 
-  // State for loyalty points handling
   const [usePointsForDiscount, setUsePointsForDiscount] = useState(true);
 
   const {
@@ -107,7 +106,6 @@ export default function BookingConfirmation() {
     walletBalance,
   } = useLoyaltyPoints(customerId);
 
-  // Use the loyalty checkout hook
   const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
   const selectedServicesIds =
     items
@@ -128,6 +126,8 @@ export default function BookingConfirmation() {
       ?.filter((item) => item.type === "package")
       .map((item) => item.package) || [];
 
+  const discountedSubtotal = subtotal - membershipDiscount - couponDiscount;
+
   const loyalty = useLoyaltyInCheckout({
     customerId,
     selectedServices: selectedServicesIds,
@@ -135,10 +135,9 @@ export default function BookingConfirmation() {
     services: allServices,
     packages: allPackages,
     subtotal,
-    discountedSubtotal: subtotal - membershipDiscount - couponDiscount,
+    discountedSubtotal: discountedSubtotal,
   });
 
-  // Set initial points to redeem
   useEffect(() => {
     if (loyalty.maxPointsToRedeem > 0 && usePointsForDiscount) {
       loyalty.setPointsToRedeem(loyalty.maxPointsToRedeem);
@@ -201,7 +200,6 @@ export default function BookingConfirmation() {
         (afterMembershipDiscount / (subtotal - membershipDiscount)) *
           couponDiscount;
 
-      // Also consider the loyalty points discount when calculating points to earn
       const afterLoyaltyDiscount =
         usePointsForDiscount && loyalty.pointsDiscountAmount > 0
           ? afterCouponDiscount -
@@ -349,7 +347,6 @@ export default function BookingConfirmation() {
             const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
             const afterMembershipDiscount = subtotal - membershipDiscount;
 
-            // Include loyalty discount when calculating tax
             const afterCouponAndMembership =
               afterMembershipDiscount - couponDiscount;
             const afterAllDiscounts = usePointsForDiscount
@@ -567,7 +564,6 @@ export default function BookingConfirmation() {
   const afterMembershipDiscount = subtotalAmount - membershipDiscount;
   const afterCouponDiscount = afterMembershipDiscount - couponDiscount;
 
-  // Include loyalty points discount in the calculation
   const pointsDiscount = usePointsForDiscount
     ? loyalty.pointsDiscountAmount
     : 0;
@@ -604,7 +600,6 @@ export default function BookingConfirmation() {
       itemOriginalPrice - itemMembershipDiscount
     );
 
-    // Apply coupon discount proportionally
     let afterCouponPrice = afterMembershipPrice;
     if (couponDiscount > 0 && afterMembershipDiscount > 0) {
       const priceRatio = afterMembershipPrice / afterMembershipDiscount;
@@ -612,7 +607,6 @@ export default function BookingConfirmation() {
       afterCouponPrice = Math.max(0, afterMembershipPrice - itemCouponDiscount);
     }
 
-    // Apply loyalty points discount proportionally
     if (pointsDiscount > 0 && afterCouponDiscount > 0 && usePointsForDiscount) {
       const priceRatio = afterCouponPrice / afterCouponDiscount;
       const itemPointsDiscount = pointsDiscount * priceRatio;
@@ -685,7 +679,6 @@ export default function BookingConfirmation() {
       }
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
-      // Include loyalty points information in the appointment
       const pointsToUse = usePointsForDiscount ? loyalty.pointsToRedeem : 0;
       const loyaltyDiscountAmount = usePointsForDiscount
         ? loyalty.pointsDiscountAmount
@@ -749,7 +742,10 @@ export default function BookingConfirmation() {
           const itemEndTime = addMinutes(currentStartTime, itemDuration);
 
           const originalPrice =
-            item.selling_price || item.service?.selling_price || 0;
+            item.selling_price ||
+            item.service?.selling_price ||
+            item.package?.price ||
+            0;
           const discountedPrice = calculateItemDiscountedPrice(
             originalPrice,
             item.service_id,
@@ -889,7 +885,6 @@ export default function BookingConfirmation() {
         throw new Error("Failed to create some bookings. Please try again.");
       }
 
-      // Update loyalty points in the profile if points were redeemed
       if (usePointsForDiscount && loyalty.pointsToRedeem > 0) {
         const currentDate = new Date();
         const updatedWalletBalance = Math.max(
@@ -907,7 +902,6 @@ export default function BookingConfirmation() {
 
         if (pointsError) {
           console.error("Error updating loyalty points:", pointsError);
-          // Don't fail the booking if points update fails
         }
       }
 
@@ -918,7 +912,6 @@ export default function BookingConfirmation() {
         );
       } catch (notificationError) {
         console.error("Error sending confirmation:", notificationError);
-        // Don't fail the booking if notification fails
       }
 
       toast.success("Booking confirmed successfully!");
@@ -1336,7 +1329,6 @@ const sendConfirmation = async (
     return null;
   } catch (error) {
     console.error("Error sending confirmation:", error);
-    // Don't show error to user since this is a background task
     return null;
   }
 };

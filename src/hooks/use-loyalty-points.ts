@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
@@ -143,15 +144,24 @@ export function useLoyaltyPoints(customerId?: string) {
     return eligibleAmount;
   }, [settings, isEligibleItem]);
 
+  // Corrected formula - matching the 60 points per $100 spend from config
   const calculatePointsFromAmount = useCallback((amount: number): number => {
-    if (!settings || !settings.enabled) return 0;
-    return Math.floor(amount * (settings.points_per_spend / 100));
+    if (!settings || !settings.enabled || !settings.points_per_spend) return 0;
+    
+    // Calculate points based on the configured points_per_spend value
+    // Convert the rate to points per unit currency (points_per_spend is points per 100 currency units)
+    const pointsPerUnit = settings.points_per_spend / 100;
+    return Math.floor(amount * pointsPerUnit);
   }, [settings]);
 
+  // Corrected formula for calculating amount from points
   const calculateAmountFromPoints = useCallback((points: number): number => {
     if (!settings || !settings.enabled || !settings.points_per_spend) return 0;
+    
+    // Calculate the currency value of points
+    // If points_per_spend is 60, then 1 point = 100/60 = 1.67 currency units
     const pointValue = 100 / settings.points_per_spend;
-    return points * (pointValue / 100);
+    return points * pointValue;
   }, [settings]);
 
   const hasMinimumForRedemption = useCallback((points: CustomerPoints | null): boolean => {
@@ -162,16 +172,22 @@ export function useLoyaltyPoints(customerId?: string) {
   const getMaxRedeemablePoints = useCallback((amount: number): number => {
     if (!settings?.enabled || !settings.points_per_spend) return 0;
 
-    const maxPoints = Math.floor(amount * settings.points_per_spend / 100);
-    
+    // Calculate the maximum points based on the transaction amount
+    // For a $100 transaction with 60 points per $100, the max would be 60 points
+    const pointsPerUnit = settings.points_per_spend / 100;
+    const amountBasedMaxPoints = Math.floor(amount * pointsPerUnit);
+
     if (settings.max_redemption_type === "fixed") {
-      return Math.min(maxPoints, settings.max_redemption_points || maxPoints);
-    } else if (settings.max_redemption_type === "percentage") {
-      const maxPointsByPercentage = Math.floor((amount * (settings.max_redemption_percentage || 100)) / 100 * settings.points_per_spend / 100);
-      return Math.min(maxPoints, maxPointsByPercentage);
+      // If fixed maximum, take the smaller of the amount-based points and fixed maximum
+      return Math.min(amountBasedMaxPoints, settings.max_redemption_points || amountBasedMaxPoints);
+    } else if (settings.max_redemption_type === "percentage" && settings.max_redemption_percentage) {
+      // If percentage-based maximum, calculate based on the percentage of the transaction amount
+      const maxDiscountAmount = amount * (settings.max_redemption_percentage / 100);
+      const maxPointsByPercentage = Math.floor(maxDiscountAmount * pointsPerUnit);
+      return Math.min(amountBasedMaxPoints, maxPointsByPercentage);
     }
     
-    return maxPoints;
+    return amountBasedMaxPoints;
   }, [settings]);
 
   const memoizedValues = useMemo(() => ({
