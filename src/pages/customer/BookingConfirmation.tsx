@@ -126,7 +126,8 @@ export default function BookingConfirmation() {
       ?.filter((item) => item.type === "package")
       .map((item) => item.package) || [];
 
-  const discountedSubtotal = subtotal - membershipDiscount - couponDiscount;
+  // Renamed this variable to initialDiscountedSubtotal to avoid duplication
+  const initialDiscountedSubtotal = subtotal - membershipDiscount - couponDiscount;
 
   const loyalty = useLoyaltyInCheckout({
     customerId,
@@ -135,7 +136,7 @@ export default function BookingConfirmation() {
     services: allServices,
     packages: allPackages,
     subtotal,
-    discountedSubtotal: discountedSubtotal,
+    discountedSubtotal: initialDiscountedSubtotal,
   });
 
   useEffect(() => {
@@ -567,6 +568,7 @@ export default function BookingConfirmation() {
   const pointsDiscount = usePointsForDiscount
     ? loyalty.pointsDiscountAmount
     : 0;
+  // This is now our final discountedSubtotal - keep the name as it's used in various calculations
   const discountedSubtotal = afterCouponDiscount - pointsDiscount;
   const totalPrice = discountedSubtotal + taxAmount;
 
