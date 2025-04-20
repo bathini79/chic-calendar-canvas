@@ -94,13 +94,9 @@ export default function BookingConfirmation() {
   const [customerId, setCustomerId] = useState<string | undefined>();
   const [pointsToEarn, setPointsToEarn] = useState(0);
 
-  const [usePointsForDiscount, setUsePointsForDiscount] = useState(true);
 
   const {
     settings: loyaltySettings,
-    customerPoints,
-    isLoading: loyaltyLoading,
-    fetchCustomerPoints,
     getEligibleAmount,
     calculatePointsFromAmount,
     walletBalance,
@@ -139,12 +135,12 @@ export default function BookingConfirmation() {
   });
 
   useEffect(() => {
-    if (loyalty.maxPointsToRedeem > 0 && usePointsForDiscount) {
+    if (loyalty.maxPointsToRedeem > 0) {
       loyalty.setPointsToRedeem(loyalty.maxPointsToRedeem);
     } else {
       loyalty.setPointsToRedeem(0);
     }
-  }, [loyalty.maxPointsToRedeem, usePointsForDiscount]);
+  }, [loyalty.maxPointsToRedeem]);
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -201,7 +197,7 @@ export default function BookingConfirmation() {
           couponDiscount;
 
       const afterLoyaltyDiscount =
-        usePointsForDiscount && loyalty.pointsDiscountAmount > 0
+         loyalty.pointsDiscountAmount > 0
           ? afterCouponDiscount -
             (afterCouponDiscount /
               (subtotal - membershipDiscount - couponDiscount)) *
@@ -221,7 +217,6 @@ export default function BookingConfirmation() {
     membershipDiscount,
     couponDiscount,
     loyalty.pointsDiscountAmount,
-    usePointsForDiscount,
     getTotalPrice,
     getEligibleAmount,
     calculatePointsFromAmount,
@@ -349,11 +344,8 @@ export default function BookingConfirmation() {
 
             const afterCouponAndMembership =
               afterMembershipDiscount - couponDiscount;
-            const afterAllDiscounts = usePointsForDiscount
-              ? afterCouponAndMembership - loyalty.pointsDiscountAmount
-              : afterCouponAndMembership;
 
-            const newTaxAmount = afterAllDiscounts * (taxData.percentage / 100);
+            const newTaxAmount = afterCouponAndMembership * (taxData.percentage / 100);
             setTaxAmount(newTaxAmount);
           }
         } catch (error) {
@@ -371,7 +363,6 @@ export default function BookingConfirmation() {
     items,
     tax,
     membershipDiscount,
-    usePointsForDiscount,
     loyalty.pointsDiscountAmount,
   ]);
 
@@ -437,8 +428,7 @@ export default function BookingConfirmation() {
         const afterAllDiscounts =
           subtotal -
           membershipDiscount -
-          newDiscount -
-          (usePointsForDiscount ? loyalty.pointsDiscountAmount : 0);
+          newDiscount ;
 
         const newTaxAmount = afterAllDiscounts * (tax.percentage / 100);
         setTaxAmount(newTaxAmount);
@@ -453,7 +443,6 @@ export default function BookingConfirmation() {
     getCouponById,
     items,
     membershipDiscount,
-    usePointsForDiscount,
     loyalty.pointsDiscountAmount,
   ]);
 
@@ -564,9 +553,9 @@ export default function BookingConfirmation() {
   const afterMembershipDiscount = subtotalAmount - membershipDiscount;
   const afterCouponDiscount = afterMembershipDiscount - couponDiscount;
 
-  const pointsDiscount = usePointsForDiscount
-    ? loyalty.pointsDiscountAmount
-    : 0;
+  const pointsDiscount = 
+    loyalty.pointsDiscountAmount
+
   const finalDiscountedSubtotal = afterCouponDiscount - pointsDiscount;
   const totalPrice = finalDiscountedSubtotal + taxAmount;
 
@@ -607,7 +596,7 @@ export default function BookingConfirmation() {
       afterCouponPrice = Math.max(0, afterMembershipPrice - itemCouponDiscount);
     }
 
-    if (pointsDiscount > 0 && afterCouponDiscount > 0 && usePointsForDiscount) {
+    if (pointsDiscount > 0 && afterCouponDiscount > 0) {
       const priceRatio = afterCouponPrice / afterCouponDiscount;
       const itemPointsDiscount = pointsDiscount * priceRatio;
       return Math.max(0, afterCouponPrice - itemPointsDiscount);
@@ -679,10 +668,10 @@ export default function BookingConfirmation() {
       }
       const endDateTime = addMinutes(startDateTime, totalDuration);
 
-      const pointsToUse = usePointsForDiscount ? loyalty.pointsToRedeem : 0;
-      const loyaltyDiscountAmount = usePointsForDiscount
-        ? loyalty.pointsDiscountAmount
-        : 0;
+      const pointsToUse =  loyalty.pointsToRedeem ;
+      const loyaltyDiscountAmount = 
+         loyalty.pointsDiscountAmount
+      
 
       const { data: appointmentData, error: appointmentError } = await supabase
         .from("appointments")
@@ -885,7 +874,7 @@ export default function BookingConfirmation() {
         throw new Error("Failed to create some bookings. Please try again.");
       }
 
-      if (usePointsForDiscount && loyalty.pointsToRedeem > 0) {
+      if ( loyalty.pointsToRedeem > 0) {
         const currentDate = new Date();
         const updatedWalletBalance = Math.max(
           0,
@@ -1213,13 +1202,6 @@ export default function BookingConfirmation() {
                           <div className="flex items-center gap-2">
                             Use {loyalty.pointsToRedeem} points
                           </div>
-
-                          {usePointsForDiscount &&
-                            loyalty.pointsDiscountAmount > 0 && (
-                              <span className="text-sm text-green-600">
-                                -₹{loyalty.pointsDiscountAmount.toFixed(2)}
-                              </span>
-                            )}
                         </div>
                       )}
 
