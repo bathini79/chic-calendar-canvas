@@ -96,7 +96,7 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
                 </Badge>
               )}
             </h3>
-            <p className="text-sm text-muted-foreground">{selectedCustomer.email}</p>
+            <p className="text-sm text-muted-foreground">{selectedCustomer.phone_number}</p>
           </div>
         
           {/* Change Customer Button */}
