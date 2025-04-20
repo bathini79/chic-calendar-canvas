@@ -226,7 +226,14 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     coupons.couponDiscount,
     loyalty.pointsDiscountAmount
   ]);
-
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ""}`;
+    }
+    return `${minutes}m`;
+  };
   const getServiceDisplayPrice = (serviceId: string) => {
     if (loyalty.adjustedServicePrices[serviceId] !== undefined) {
       return loyalty.adjustedServicePrices[serviceId];
