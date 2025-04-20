@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { calculatePackagePrice } from '../utils/bookingUtils';
+import { calculatePackagePrice, getTotalPrice } from '../utils/bookingUtils';
 import type { Service, Package, Customer } from '../types';
 
 interface UseMembershipInCheckoutProps {
@@ -41,6 +41,8 @@ export const useMembershipInCheckout = ({
             name, 
             discount_type, 
             discount_value,
+            max_discount_value,
+            min_billing_amount,
             applicable_services, 
             applicable_packages
           )
@@ -64,6 +66,15 @@ export const useMembershipInCheckout = ({
       customerMemberships.length > 0 &&
       (selectedServices.length > 0 || selectedPackages.length > 0)
     ) {
+      // Calculate total bill amount first
+      const totalBillAmount = getTotalPrice(
+        selectedServices,
+        selectedPackages,
+        services,
+        packages,
+        customizedServices
+      );
+
       selectedServices.forEach((serviceId) => {
         const service = services.find((s) => s.id === serviceId);
         if (!service) return;
@@ -72,16 +83,33 @@ export const useMembershipInCheckout = ({
           const membershipData = membership.membership;
           if (!membershipData) return;
 
+          // Check minimum billing amount before proceeding
+          if (membershipData.min_billing_amount && totalBillAmount < membershipData.min_billing_amount) {
+            return;
+          }
+
           const isServiceEligible =
             membershipData.applicable_services?.includes(serviceId) ||
             membershipData.applicable_services?.length === 0;
 
           if (isServiceEligible) {
-            const discountAmount =
-              membershipData.discount_type === "percentage"
-                ? service.selling_price * (membershipData.discount_value / 100)
-                : Math.min(membershipData.discount_value, service.selling_price);
+            // 1. Calculate raw discount
+            let discountAmount = 0;
+            if (membershipData.discount_type === "percentage") {
+              discountAmount = service.selling_price * (membershipData.discount_value / 100);
+            } else {
+              discountAmount = membershipData.discount_value;
+            }
 
+            // 2. Apply max discount cap for both percentage and fixed discounts
+            if (membershipData.max_discount_value) {
+              discountAmount = Math.min(discountAmount, membershipData.max_discount_value);
+            }
+
+            // 3. Ensure we never discount more than the service price
+            discountAmount = Math.min(discountAmount, service.selling_price);
+
+            // 4. Update best discount if this one is better
             if (discountAmount > bestDiscount) {
               bestDiscount = discountAmount;
               bestMembershipId = membershipData.id;
@@ -95,26 +123,39 @@ export const useMembershipInCheckout = ({
         const pkg = packages.find((p) => p.id === packageId);
         if (!pkg) return;
 
-        const packagePrice = calculatePackagePrice(
-          pkg,
-          customizedServices[packageId] || [],
-          services
-        );
+        const packagePrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
 
         customerMemberships.forEach((membership) => {
           const membershipData = membership.membership;
           if (!membershipData) return;
+
+          // Check minimum billing amount before proceeding
+          if (membershipData.min_billing_amount && totalBillAmount < membershipData.min_billing_amount) {
+            return;
+          }
 
           const isPackageEligible =
             membershipData.applicable_packages?.includes(packageId) ||
             membershipData.applicable_packages?.length === 0;
 
           if (isPackageEligible) {
-            const discountAmount =
-              membershipData.discount_type === "percentage"
-                ? packagePrice * (membershipData.discount_value / 100)
-                : Math.min(membershipData.discount_value, packagePrice);
+            // 1. Calculate raw discount
+            let discountAmount = 0;
+            if (membershipData.discount_type === "percentage") {
+              discountAmount = packagePrice * (membershipData.discount_value / 100);
+            } else {
+              discountAmount = membershipData.discount_value;
+            }
 
+            // 2. Apply max discount cap for both percentage and fixed discounts
+            if (membershipData.max_discount_value) {
+              discountAmount = Math.min(discountAmount, membershipData.max_discount_value);
+            }
+
+            // 3. Ensure we never discount more than the package price
+            discountAmount = Math.min(discountAmount, packagePrice);
+
+            // 4. Update best discount if this one is better
             if (discountAmount > bestDiscount) {
               bestDiscount = discountAmount;
               bestMembershipId = membershipData.id;
@@ -140,6 +181,7 @@ export const useMembershipInCheckout = ({
   return {
     membershipDiscount,
     membershipId,
-    membershipName
+    membershipName,
+    customerMemberships
   };
 };

@@ -2,6 +2,47 @@ import { useMemo } from 'react';
 import type { Service, Package } from '../types';
 import { getTotalDuration, calculatePackagePrice } from '../utils/bookingUtils';
 
+interface ServiceItem {
+  id: string;
+  name: string;
+  price: number;
+  adjustedPrice: number;
+  duration: number;
+  type: "service";
+  packageId: string | null;
+  stylist: string;
+  stylistName: string;
+  time: string;
+  formattedDuration: string;
+}
+
+interface PackageItem {
+  id: string;
+  name: string;
+  price: number;
+  adjustedPrice: number;
+  duration: number;
+  type: "package";
+  packageId: string | null;
+  stylist: string;
+  stylistName: string;
+  time: string;
+  formattedDuration: string;
+  services: Array<{
+    id: string;
+    name: string;
+    price: number;
+    adjustedPrice: number;
+    duration: number;
+    stylist: string;
+    stylistName: string;
+    time: string;
+    isCustomized: boolean;
+  }>;
+}
+
+type CheckoutItem = ServiceItem | PackageItem;
+
 interface UseSelectedItemsInCheckoutProps {
   selectedServices: string[];
   selectedPackages: string[];
@@ -30,148 +71,85 @@ export const useSelectedItemsInCheckout = ({
   formatDuration,
 }: UseSelectedItemsInCheckoutProps) => {
   const selectedItems = useMemo(() => {
-    const individualServices = selectedServices
-      .map((id) => {
-        const service = services.find((s) => s.id === id);
-        return service
-          ? {
-              id,
-              name: service.name,
-              price: service.selling_price,
-              adjustedPrice: getServiceDisplayPrice(id),
-              duration: service.duration,
-              type: "service" as const,
-              packageId: null as string | null,
-              stylist: selectedStylists[id],
-              stylistName: getStylistName(selectedStylists[id]),
-              time:
-                selectedTimeSlots[id] || selectedTimeSlots[appointmentId || ""],
-              formattedDuration: formatDuration(service.duration),
-            }
-          : null;
+    const items = [
+      ...selectedServices.map((serviceId) => {
+        const service = services?.find((s) => s.id === serviceId);
+        if (!service) return null;
+
+        return {
+          id: serviceId,
+          name: service.name,
+          price: service.selling_price,
+          adjustedPrice: getServiceDisplayPrice(serviceId),
+          duration: service.duration,
+          type: "service" as const,
+          packageId: null as string | null,
+          stylist: selectedStylists[serviceId] || "",
+          stylistName: selectedStylists[serviceId] ? getStylistName(selectedStylists[serviceId]) : "",
+          time: selectedTimeSlots[serviceId] || "",
+          formattedDuration: formatDuration(service.duration)
+        };
+      }),
+      ...selectedPackages.map((packageId) => {
+        const pkg = packages?.find((p) => p.id === packageId);
+        if (!pkg) return null;
+
+        const packageServices = pkg.package_services?.map(ps => ({
+          id: ps.service.id,
+          name: ps.service.name,
+          price: ps.package_selling_price || ps.service.selling_price,
+          adjustedPrice: getServiceDisplayPrice(ps.service.id),
+          duration: ps.service.duration,
+          stylist: selectedStylists[ps.service.id] || "",
+          stylistName: selectedStylists[ps.service.id] ? getStylistName(selectedStylists[ps.service.id]) : "",
+          time: selectedTimeSlots[ps.service.id] || "",
+          isCustomized: false
+        })) || [];
+
+        // Add customized services
+        if (pkg.is_customizable && customizedServices[packageId]) {
+          const additionalServices = customizedServices[packageId]
+            .filter(serviceId => !packageServices.some(ps => ps.id === serviceId))
+            .map(serviceId => {
+              const service = services?.find(s => s.id === serviceId);
+              if (!service) return null;
+              return {
+                id: service.id,
+                name: service.name,
+                price: service.selling_price,
+                adjustedPrice: getServiceDisplayPrice(service.id),
+                duration: service.duration,
+                stylist: selectedStylists[service.id] || "",
+                stylistName: selectedStylists[service.id] ? getStylistName(selectedStylists[service.id]) : "",
+                time: selectedTimeSlots[service.id] || "",
+                isCustomized: true
+              };
+            })
+            .filter(Boolean);
+
+          packageServices.push(...(additionalServices as any[]));
+        }
+
+        const totalDuration = packageServices.reduce((sum, s) => sum + s.duration, 0);
+
+        return {
+          id: packageId,
+          name: pkg.name,
+          price: pkg.price,
+          adjustedPrice: packageServices.reduce((sum, s) => sum + s.adjustedPrice, 0),
+          duration: totalDuration,
+          type: "package" as const,
+          packageId: null as string | null,
+          stylist: "",
+          stylistName: "",
+          time: "",
+          services: packageServices,
+          formattedDuration: formatDuration(totalDuration)
+        };
       })
-      .filter(Boolean);
+    ].filter(Boolean);
 
-    const packageItems = selectedPackages.flatMap((packageId) => {
-      const pkg = packages.find((p) => p.id === packageId);
-      if (!pkg) return [];
-
-      const packageTotalPrice = calculatePackagePrice(
-        pkg,
-        customizedServices[packageId] || [],
-        services
-      );
-
-      const packageItem = {
-        id: packageId,
-        name: pkg.name,
-        price: packageTotalPrice,
-        duration: getTotalDuration(
-          [],
-          [packageId],
-          services,
-          packages,
-          customizedServices
-        ),
-        type: "package" as const,
-        packageId: null as string | null,
-        stylist: selectedStylists[packageId],
-        stylistName: getStylistName(selectedStylists[packageId]),
-        time:
-          selectedTimeSlots[packageId] ||
-          selectedTimeSlots[appointmentId || ""],
-        formattedDuration: formatDuration(
-          getTotalDuration(
-            [],
-            [packageId],
-            services,
-            packages,
-            customizedServices
-          )
-        ),
-        services: [] as Array<{
-          id: string;
-          name: string;
-          price: number;
-          adjustedPrice: number;
-          duration: number;
-          stylist: string | null;
-          stylistName: string | null;
-          isCustomized: boolean;
-        }>,
-      };
-
-      if (pkg.package_services) {
-        packageItem.services = pkg.package_services.map((ps) => {
-          const serviceId = ps.service.id;
-          const adjustedPrice = getServiceDisplayPrice(serviceId);
-          const originalPrice =
-            ps.package_selling_price !== undefined &&
-            ps.package_selling_price !== null
-              ? ps.package_selling_price
-              : ps.service.selling_price;
-
-          return {
-            id: serviceId,
-            name: ps.service.name,
-            price: originalPrice,
-            adjustedPrice: adjustedPrice,
-            duration: ps.service.duration,
-            stylist:
-              selectedStylists[serviceId] ||
-              selectedStylists[packageId] ||
-              null,
-            stylistName: getStylistName(
-              selectedStylists[serviceId] ||
-                selectedStylists[packageId] ||
-                ""
-            ),
-            isCustomized: false,
-          };
-        });
-      }
-
-      if (
-        customizedServices[packageId] &&
-        customizedServices[packageId].length > 0
-      ) {
-        const additionalServices = customizedServices[packageId]
-          .filter((serviceId) => {
-            return !pkg.package_services.some(
-              (ps) => ps.service.id === serviceId
-            );
-          })
-          .map((serviceId) => {
-            const service = services.find((s) => s.id === serviceId);
-            if (!service) return null;
-
-            return {
-              id: service.id,
-              name: service.name,
-              price: service.selling_price,
-              adjustedPrice: getServiceDisplayPrice(service.id),
-              duration: service.duration,
-              stylist:
-                selectedStylists[service.id] ||
-                selectedStylists[packageId] ||
-                null,
-              stylistName: getStylistName(
-                selectedStylists[service.id] ||
-                  selectedStylists[packageId] ||
-                  ""
-              ),
-              isCustomized: true,
-            };
-          })
-          .filter(Boolean);
-
-        packageItem.services.push(...additionalServices);
-      }
-
-      return [packageItem];
-    });
-
-    return [...individualServices, ...packageItems];
+    return items as unknown as CheckoutItem[];
   }, [
     selectedServices,
     selectedPackages,
@@ -179,14 +157,11 @@ export const useSelectedItemsInCheckout = ({
     packages,
     selectedStylists,
     selectedTimeSlots,
-    appointmentId,
     customizedServices,
     getServiceDisplayPrice,
     getStylistName,
-    formatDuration,
+    formatDuration
   ]);
 
-  return {
-    selectedItems,
-  };
+  return { selectedItems };
 };

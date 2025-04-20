@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   Award,
   LoaderCircle,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Service, Package, Customer } from "../types";
@@ -418,6 +419,17 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   Membership ({membership.membershipName})
                 </span>
                 <span>-₹{membership.membershipDiscount.toFixed(2)}</span>
+              </div>
+            )}
+
+            {/* Show minimum billing amount warning */}
+            {selectedCustomer && membership.customerMemberships?.length > 0 && subtotal > 0 && !membership.membershipDiscount && (
+              <div className="flex justify-between text-sm text-yellow-600">
+                <span className="flex items-center">
+                  <Info className="mr-2 h-4 w-4" />
+                  Minimum bill amount not met for membership discount
+                </span>
+                <span></span>
               </div>
             )}
 
