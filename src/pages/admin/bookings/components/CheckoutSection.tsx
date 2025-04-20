@@ -41,6 +41,7 @@ import { useMembershipInCheckout } from "../hooks/useMembershipInCheckout";
 import { useCouponsInCheckout } from "../hooks/useCouponsInCheckout";
 import { useTaxesInCheckout } from "../hooks/useTaxesInCheckout";
 import { useSelectedItemsInCheckout } from '../hooks/useSelectedItemsInCheckout';
+import { usePaymentHandler } from '../hooks/usePaymentHandler';
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -253,53 +254,35 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     formatDuration,
   });
 
-  const handlePayment = async () => {
-    try {
-      if (!selectedCustomer) {
-        toast.error("Please select a customer");
-        return;
-      }
-
-      if (!paymentMethod) {
-        toast.error("Please select a payment method");
-        return;
-      }
-
-      const saveAppointmentParams = {
-        appointmentId,
-        appliedTaxId: taxes.appliedTaxId,
-        taxAmount: taxes.taxAmount,
-        couponId: coupons.selectedCouponId,
-        couponDiscount: coupons.couponDiscount,
-        couponName: coupons.availableCoupons?.filter(
-          (c) => c.id === coupons.selectedCouponId
-        )?.[0]?.code || null,
-        membershipId: membership.membershipId,
-        membershipName: membership.membershipName,
-        membershipDiscount: membership.membershipDiscount,
-        total,
-        adjustedPrices: loyalty.adjustedServicePrices && Object.keys(loyalty.adjustedServicePrices).length > 0 
-          ? { ...adjustedPrices, ...loyalty.adjustedServicePrices } 
-          : adjustedPrices,
-        paymentMethod,
-        pointsEarned: loyalty.pointsToEarn,
-        pointsRedeemed: loyalty.pointsToRedeem,
-        pointsDiscountAmount: loyalty.pointsDiscountAmount
-      };
-
-      const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
-      if (!savedAppointmentId) {
-        toast.error("Failed to complete payment");
-        return;
-      }
-
-      toast.success("Payment completed successfully");
-      onPaymentComplete(savedAppointmentId);
-    } catch (error: any) {
-      console.error("Error completing payment:", error);
-      toast.error(error.message || "Failed to complete payment");
-    }
-  };
+  const { handlePayment } = usePaymentHandler({
+    selectedCustomer,
+    paymentMethod,
+    appointmentId,
+    taxes: {
+      appliedTaxId: taxes.appliedTaxId,
+      taxAmount: taxes.taxAmount,
+    },
+    coupons: {
+      selectedCouponId: coupons.selectedCouponId,
+      couponDiscount: coupons.couponDiscount,
+      availableCoupons: coupons.availableCoupons,
+    },
+    membership: {
+      membershipId: membership.membershipId,
+      membershipName: membership.membershipName,
+      membershipDiscount: membership.membershipDiscount,
+    },
+    loyalty: {
+      adjustedServicePrices: loyalty.adjustedServicePrices,
+      pointsToEarn: loyalty.pointsToEarn,
+      pointsToRedeem: loyalty.pointsToRedeem,
+      pointsDiscountAmount: loyalty.pointsDiscountAmount,
+    },
+    total,
+    adjustedPrices,
+    onSaveAppointment,
+    onPaymentComplete,
+  });
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
