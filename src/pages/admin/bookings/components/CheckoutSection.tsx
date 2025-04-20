@@ -47,6 +47,7 @@ import { SelectedItem } from './SelectedItem';
 import LoyaltyPointsSection from "./LoyaltyPointsSection";
 import { useLoyaltyInCheckout } from "../hooks/useLoyaltyInCheckout";
 import { useMembershipInCheckout } from "../hooks/useMembershipInCheckout";
+import { useCouponsInCheckout } from "../hooks/useCouponsInCheckout";
 
 interface CheckoutSectionProps {
   appointmentId?: string;
@@ -146,42 +147,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       },
     });
 
-  const { data: customerMemberships = [] } = useQuery({
-    queryKey: ["customer-memberships", selectedCustomer?.id],
-    queryFn: async () => {
-      if (!selectedCustomer) return [];
-
-      const { data, error } = await supabase
-        .from("customer_memberships")
-        .select(
-          `
-          id,
-          status,
-          membership:memberships(
-            id, 
-            name, 
-            discount_type, 
-            discount_value,
-            applicable_services, 
-            applicable_packages
-          )
-        `
-        )
-        .eq("customer_id", selectedCustomer.id)
-        .eq("status", "active");
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedCustomer,
-  });
-
-  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
-  const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
-  const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
-  const [couponDiscount, setCouponDiscount] = useState<number>(0);
-  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
-
   const subtotal = useMemo(
     () =>
       getTotalPrice(
@@ -194,6 +159,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
+  const coupons = useCouponsInCheckout({
+    subtotal,
+  });
+
   const discountedSubtotal = useMemo(() => {
     const regularDiscountedPrice = getFinalPrice(
       subtotal,
@@ -205,15 +174,15 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       regularDiscountedPrice - membership.membershipDiscount
     );
 
-    return couponDiscount > 0
-      ? Math.max(0, afterMembershipDiscount - couponDiscount)
+    return coupons.couponDiscount > 0
+      ? Math.max(0, afterMembershipDiscount - coupons.couponDiscount)
       : afterMembershipDiscount;
   }, [
     subtotal,
     discountType,
     discountValue,
     membership.membershipDiscount,
-    couponDiscount,
+    coupons.couponDiscount,
   ]);
 
   const loyalty = useLoyaltyInCheckout({
@@ -255,61 +224,12 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     }
   }, [appliedTaxId, taxRates]);
 
-  useEffect(() => {
-    const fetchCoupons = async () => {
-      setIsLoadingCoupons(true);
-      try {
-        const { data, error } = await supabase
-          .from("coupons")
-          .select("*")
-          .eq("is_active", true)
-          .order("code");
-
-        if (error) throw error;
-        setAvailableCoupons(data || []);
-      } catch (error) {
-        console.error("Error fetching coupons:", error);
-      } finally {
-        setIsLoadingCoupons(false);
-      }
-    };
-
-    fetchCoupons();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCouponId && availableCoupons.length > 0) {
-      const coupon = availableCoupons.find((c) => c.id === selectedCouponId);
-      if (coupon) {
-        setSelectedCoupon(coupon);
-
-        const discountAmount =
-          coupon.discount_type === "percentage"
-            ? subtotal * (coupon.discount_value / 100)
-            : Math.min(coupon.discount_value, subtotal);
-
-        setCouponDiscount(discountAmount);
-      }
-    } else {
-      setSelectedCoupon(null);
-      setCouponDiscount(0);
-    }
-  }, [selectedCouponId, availableCoupons, subtotal]);
-
   const handleTaxChange = (taxId: string) => {
     if (taxId === "none") {
       setAppliedTaxId(null);
       return;
     }
     setAppliedTaxId(taxId);
-  };
-
-  const handleCouponChange = (couponId: string) => {
-    if (couponId === "none") {
-      setSelectedCouponId(null);
-      return;
-    }
-    setSelectedCouponId(couponId);
   };
 
   const formatDuration = (minutes: number) => {
@@ -365,8 +285,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   );
 
   const discountAmount = useMemo(
-    () => subtotal - discountedSubtotal + couponDiscount + membership.membershipDiscount + loyalty.pointsDiscountAmount,
-    [subtotal, discountedSubtotal, couponDiscount, membership.membershipDiscount, loyalty.pointsDiscountAmount]
+    () => subtotal - discountedSubtotal + coupons.couponDiscount + membership.membershipDiscount + loyalty.pointsDiscountAmount,
+    [subtotal, discountedSubtotal, coupons.couponDiscount, membership.membershipDiscount, loyalty.pointsDiscountAmount]
   );
 
   const adjustedPrices = useMemo(() => {
@@ -379,7 +299,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       discountType,
       discountValue,
       membership.membershipDiscount,
-      couponDiscount,
+      coupons.couponDiscount,
       loyalty.pointsDiscountAmount
     );
   }, [
@@ -391,7 +311,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     discountType,
     discountValue,
     membership.membershipDiscount,
-    couponDiscount,
+    coupons.couponDiscount,
     loyalty.pointsDiscountAmount
   ]);
 
@@ -576,8 +496,11 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         appointmentId,
         appliedTaxId,
         taxAmount,
-        couponId: selectedCouponId,
-        couponDiscount,
+        couponId: coupons.selectedCouponId,
+        couponDiscount: coupons.couponDiscount,
+        couponName: coupons.availableCoupons?.filter(
+          (c) => c.id === coupons.selectedCouponId
+        )?.[0]?.code || null,
         membershipId: membership.membershipId,
         membershipName: membership.membershipName,
         membershipDiscount: membership.membershipDiscount,
@@ -585,9 +508,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         adjustedPrices: loyalty.adjustedServicePrices && Object.keys(loyalty.adjustedServicePrices).length > 0 
           ? { ...adjustedPrices, ...loyalty.adjustedServicePrices } 
           : adjustedPrices,
-        couponName:
-          availableCoupons?.filter((c) => c.id === selectedCouponId)?.[0]
-            ?.code || null,
         paymentMethod,
         pointsEarned: loyalty.pointsToEarn,
         pointsRedeemed: loyalty.pointsToRedeem,
@@ -703,16 +623,16 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Coupon</span>
                 <Select
-                  value={selectedCouponId || "none"}
-                  onValueChange={handleCouponChange}
-                  disabled={isLoadingCoupons}
+                  value={coupons.selectedCouponId || "none"}
+                  onValueChange={coupons.handleCouponChange}
+                  disabled={coupons.isLoadingCoupons}
                 >
                   <SelectTrigger className="h-7 w-[120px]">
                     <SelectValue placeholder="No Coupon" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No Coupon</SelectItem>
-                    {availableCoupons.map((coupon) => (
+                    {coupons.availableCoupons.map((coupon) => (
                       <SelectItem key={coupon.id} value={coupon.id}>
                         {coupon.code}
                       </SelectItem>
@@ -721,16 +641,16 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                 </Select>
               </div>
               <span>
-                {selectedCoupon ? `-₹${couponDiscount.toFixed(2)}` : "₹0.00"}
+                {coupons.selectedCoupon ? `-₹${coupons.couponDiscount.toFixed(2)}` : "₹0.00"}
               </span>
             </div>
 
-            {selectedCoupon && (
+            {coupons.selectedCoupon && (
               <div className="flex justify-between text-xs text-green-600 -mt-2 ml-16">
                 <span>
-                  {selectedCoupon.discount_type === "percentage"
-                    ? `${selectedCoupon.discount_value}% off`
-                    : `Fixed ₹${selectedCoupon.discount_value} off`}
+                  {coupons.selectedCoupon.discount_type === "percentage"
+                    ? `${coupons.selectedCoupon.discount_value}% off`
+                    : `Fixed ₹${coupons.selectedCoupon.discount_value} off`}
                 </span>
               </div>
             )}
