@@ -143,15 +143,15 @@ export const useSelectedItemsInCheckout = ({
         const totalDuration = packageServices.reduce((sum, s) => sum + s.duration, 0);
         const packageTotalPrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
         
-        // Calculate the adjusted price for the entire package based on the sum of adjusted service prices
-        // This ensures that any discounts applied to services (from coupons or memberships) will be reflected in the package total
+        // FIX: Calculate the adjusted price for the entire package based on the sum of adjusted service prices
+        // This ensures that any discounts applied to services are correctly reflected in the package total
         const packageAdjustedPrice = packageServices.reduce((sum, s) => sum + s.adjustedPrice, 0);
 
         return {
           id: packageId,
           name: pkg.name,
           price: packageTotalPrice,
-          adjustedPrice: packageAdjustedPrice,
+          adjustedPrice: packageAdjustedPrice, // Use the sum of adjusted service prices
           duration: totalDuration,
           type: "package" as const,
           packageId: null as string | null,
