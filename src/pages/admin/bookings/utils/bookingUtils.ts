@@ -1,4 +1,3 @@
-
 import { type Service, type Package } from "../types";
 import { getMembershipDiscount } from "@/lib/utils";
 
