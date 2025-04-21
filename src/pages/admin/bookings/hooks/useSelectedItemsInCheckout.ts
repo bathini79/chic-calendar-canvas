@@ -95,17 +95,22 @@ export const useSelectedItemsInCheckout = ({
         const pkg = packages?.find((p) => p.id === packageId);
         if (!pkg) return null;
 
-        const packageServices = pkg.package_services?.map(ps => ({
-          id: ps.service.id,
-          name: ps.service.name,
-          price: ps.package_selling_price || ps.service.selling_price,
-          adjustedPrice: getServiceDisplayPrice(ps.service.id),
-          duration: ps.service.duration,
-          stylist: selectedStylists[ps.service.id] || "",
-          stylistName: selectedStylists[ps.service.id] ? getStylistName(selectedStylists[ps.service.id]) : "",
-          time: selectedTimeSlots[ps.service.id] || "",
-          isCustomized: false
-        })) || [];
+        const packageServices = pkg.package_services?.map(ps => {
+          const servicePrice = ps.package_selling_price || ps.service.selling_price;
+          const adjustedServicePrice = getServiceDisplayPrice(ps.service.id);
+          
+          return {
+            id: ps.service.id,
+            name: ps.service.name,
+            price: servicePrice,
+            adjustedPrice: adjustedServicePrice,
+            duration: ps.service.duration,
+            stylist: selectedStylists[ps.service.id] || "",
+            stylistName: selectedStylists[ps.service.id] ? getStylistName(selectedStylists[ps.service.id]) : "",
+            time: selectedTimeSlots[ps.service.id] || "",
+            isCustomized: false
+          };
+        }) || [];
 
         // Add customized services
         if (pkg.is_customizable && customizedServices[packageId]) {
@@ -114,11 +119,15 @@ export const useSelectedItemsInCheckout = ({
             .map(serviceId => {
               const service = services?.find(s => s.id === serviceId);
               if (!service) return null;
+              
+              const servicePrice = service.selling_price;
+              const adjustedServicePrice = getServiceDisplayPrice(serviceId);
+              
               return {
                 id: service.id,
                 name: service.name,
-                price: service.selling_price,
-                adjustedPrice: getServiceDisplayPrice(service.id),
+                price: servicePrice,
+                adjustedPrice: adjustedServicePrice,
                 duration: service.duration,
                 stylist: selectedStylists[service.id] || "",
                 stylistName: selectedStylists[service.id] ? getStylistName(selectedStylists[service.id]) : "",
@@ -135,6 +144,7 @@ export const useSelectedItemsInCheckout = ({
         const packageTotalPrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
         
         // Calculate the adjusted price for the entire package based on the sum of adjusted service prices
+        // This ensures that any discounts applied to services (from coupons or memberships) will be reflected in the package total
         const packageAdjustedPrice = packageServices.reduce((sum, s) => sum + s.adjustedPrice, 0);
 
         return {
