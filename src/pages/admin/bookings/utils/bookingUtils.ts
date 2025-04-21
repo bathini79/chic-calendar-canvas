@@ -1,3 +1,4 @@
+
 import { type Service, type Package } from "../types";
 import { getMembershipDiscount } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ export const getTotalPrice = (
       if (pkg.is_customizable && customizedServices[packageId]) {
         customizedServices[packageId].forEach((serviceId) => {
           const service = servicesArray.find((s) => s.id === serviceId);
+          // Only add price if this service is not already in the package
           if (service && !pkg.package_services?.some(ps => ps.service.id === serviceId)) {
             total += service.selling_price;
           }

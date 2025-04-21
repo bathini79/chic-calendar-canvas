@@ -1,3 +1,4 @@
+
 import { useMemo } from 'react';
 import type { Service, Package } from '../types';
 import { getTotalDuration, calculatePackagePrice } from '../utils/bookingUtils';
@@ -131,11 +132,12 @@ export const useSelectedItemsInCheckout = ({
         }
 
         const totalDuration = packageServices.reduce((sum, s) => sum + s.duration, 0);
+        const packageTotalPrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
 
         return {
           id: packageId,
           name: pkg.name,
-          price: pkg.price,
+          price: packageTotalPrice,
           adjustedPrice: packageServices.reduce((sum, s) => sum + s.adjustedPrice, 0),
           duration: totalDuration,
           type: "package" as const,
