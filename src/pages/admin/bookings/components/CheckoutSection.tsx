@@ -210,7 +210,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       discountValue,
       membership.membershipDiscount,
       coupons.couponDiscount,
-      loyalty.pointsDiscountAmount
+      0 // Don't include loyalty points in individual price adjustments
     );
   }, [
     selectedServices,
@@ -221,8 +221,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     discountType,
     discountValue,
     membership.membershipDiscount,
-    coupons.couponDiscount,
-    loyalty.pointsDiscountAmount
+    coupons.couponDiscount
   ]);
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -233,9 +232,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     return `${minutes}m`;
   };
   const getServiceDisplayPrice = (serviceId: string) => {
-    if (loyalty.adjustedServicePrices[serviceId] !== undefined) {
-      return loyalty.adjustedServicePrices[serviceId];
-    }
     return adjustedPrices[serviceId] !== undefined
       ? adjustedPrices[serviceId]
       : services?.find((s) => s.id === serviceId)?.selling_price || 0;

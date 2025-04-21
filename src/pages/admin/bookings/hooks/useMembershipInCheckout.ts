@@ -29,7 +29,7 @@ export const useMembershipInCheckout = ({
     queryKey: ["customer-memberships", selectedCustomer?.id],
     queryFn: async () => {
       if (!selectedCustomer) return [];
-
+      
       const { data, error } = await supabase
         .from("customer_memberships")
         .select(
@@ -75,94 +75,80 @@ export const useMembershipInCheckout = ({
         customizedServices
       );
 
-      selectedServices.forEach((serviceId) => {
-        const service = services.find((s) => s.id === serviceId);
-        if (!service) return;
+      // Process each membership to find the best discount
+      customerMemberships.forEach((membership) => {
+        const membershipData = membership.membership;
+        if (!membershipData) return;
 
-        customerMemberships.forEach((membership) => {
-          const membershipData = membership.membership;
-          if (!membershipData) return;
+        // Check minimum billing amount first
+        if (membershipData.min_billing_amount && totalBillAmount < membershipData.min_billing_amount) {
+          return;
+        }
 
-          // Check minimum billing amount before proceeding
-          if (membershipData.min_billing_amount && totalBillAmount < membershipData.min_billing_amount) {
-            return;
-          }
+        let currentMembershipDiscount = 0;
+
+        // Calculate discounts for individual services
+        selectedServices.forEach((serviceId) => {
+          const service = services.find((s) => s.id === serviceId);
+          if (!service) return;
 
           const isServiceEligible =
             membershipData.applicable_services?.includes(serviceId) ||
             membershipData.applicable_services?.length === 0;
 
           if (isServiceEligible) {
-            // 1. Calculate raw discount
-            let discountAmount = 0;
+            let serviceDiscount = 0;
             if (membershipData.discount_type === "percentage") {
-              discountAmount = service.selling_price * (membershipData.discount_value / 100);
-            } else {
-              discountAmount = membershipData.discount_value;
+              serviceDiscount = service.selling_price * (membershipData.discount_value / 100);
+            } else if (membershipData.discount_type === "fixed") {
+              // For fixed discount, distribute it proportionally based on price
+              const serviceRatio = service.selling_price / totalBillAmount;
+              serviceDiscount = membershipData.discount_value * serviceRatio;
             }
-
-            // 2. Apply max discount cap for both percentage and fixed discounts
-            if (membershipData.max_discount_value) {
-              discountAmount = Math.min(discountAmount, membershipData.max_discount_value);
-            }
-
-            // 3. Ensure we never discount more than the service price
-            discountAmount = Math.min(discountAmount, service.selling_price);
-
-            // 4. Update best discount if this one is better
-            if (discountAmount > bestDiscount) {
-              bestDiscount = discountAmount;
-              bestMembershipId = membershipData.id;
-              bestMembershipName = membershipData.name;
-            }
+            currentMembershipDiscount += serviceDiscount;
           }
         });
-      });
 
-      selectedPackages.forEach((packageId) => {
-        const pkg = packages.find((p) => p.id === packageId);
-        if (!pkg) return;
-
-        const packagePrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
-
-        customerMemberships.forEach((membership) => {
-          const membershipData = membership.membership;
-          if (!membershipData) return;
-
-          // Check minimum billing amount before proceeding
-          if (membershipData.min_billing_amount && totalBillAmount < membershipData.min_billing_amount) {
-            return;
-          }
+        // Calculate discounts for packages
+        selectedPackages.forEach((packageId) => {
+          const pkg = packages.find((p) => p.id === packageId);
+          if (!pkg) return;
 
           const isPackageEligible =
             membershipData.applicable_packages?.includes(packageId) ||
             membershipData.applicable_packages?.length === 0;
 
           if (isPackageEligible) {
-            // 1. Calculate raw discount
-            let discountAmount = 0;
+            // Calculate total package price including customized services
+            const packagePrice = calculatePackagePrice(pkg, customizedServices[packageId] || [], services);
+
+            // Calculate discount for the entire package
+            let packageDiscount = 0;
             if (membershipData.discount_type === "percentage") {
-              discountAmount = packagePrice * (membershipData.discount_value / 100);
-            } else {
-              discountAmount = membershipData.discount_value;
+              packageDiscount = packagePrice * (membershipData.discount_value / 100);
+            } else if (membershipData.discount_type === "fixed") {
+              // For fixed discount, distribute it proportionally based on total bill
+              const packageRatio = packagePrice / totalBillAmount;
+              packageDiscount = membershipData.discount_value * packageRatio;
             }
-
-            // 2. Apply max discount cap for both percentage and fixed discounts
-            if (membershipData.max_discount_value) {
-              discountAmount = Math.min(discountAmount, membershipData.max_discount_value);
-            }
-
-            // 3. Ensure we never discount more than the package price
-            discountAmount = Math.min(discountAmount, packagePrice);
-
-            // 4. Update best discount if this one is better
-            if (discountAmount > bestDiscount) {
-              bestDiscount = discountAmount;
-              bestMembershipId = membershipData.id;
-              bestMembershipName = membershipData.name;
-            }
+            currentMembershipDiscount += packageDiscount;
           }
         });
+
+        // Apply max discount cap if set
+        if (membershipData.max_discount_value) {
+          currentMembershipDiscount = Math.min(currentMembershipDiscount, membershipData.max_discount_value);
+        }
+
+        // Ensure we never discount more than the total bill amount
+        currentMembershipDiscount = Math.min(currentMembershipDiscount, totalBillAmount);
+
+        // Update best discount if this membership gives better discount
+        if (currentMembershipDiscount > bestDiscount) {
+          bestDiscount = currentMembershipDiscount;
+          bestMembershipId = membershipData.id;
+          bestMembershipName = membershipData.name;
+        }
       });
     }
 

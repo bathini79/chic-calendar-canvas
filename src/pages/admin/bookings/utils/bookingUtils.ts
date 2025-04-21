@@ -1,4 +1,3 @@
-
 import { type Service, type Package } from "../types";
 import { getMembershipDiscount } from "@/lib/utils";
 
@@ -252,11 +251,11 @@ export const getAdjustedServicePrices = (
   // Calculate total after manual discount
   const afterManualDiscount = getFinalPrice(originalTotal, discountType, discountValue);
   
-  // Calculate final total after all discounts
-  const finalTotal = Math.max(0, afterManualDiscount - membershipDiscount - couponDiscount - loyaltyPointsDiscount);
+  // Calculate total after membership and coupon only (not including loyalty points)
+  const priceForServiceAdjustment = Math.max(0, afterManualDiscount - membershipDiscount - couponDiscount);
   
   // If there's no discount at all, return original prices
-  if (originalTotal === finalTotal) {
+  if (originalTotal === priceForServiceAdjustment) {
     const result: Record<string, number> = {};
     
     // Just return original prices for all services
@@ -295,8 +294,8 @@ export const getAdjustedServicePrices = (
     return result;
   }
   
-  // If there is a discount, calculate proportional discount for each service
-  const discountRatio = finalTotal / originalTotal;
+  // Calculate discount ratio without loyalty points
+  const discountRatio = priceForServiceAdjustment / originalTotal;
   const result: Record<string, number> = {};
   
   // Calculate adjusted prices for individual services
@@ -311,9 +310,7 @@ export const getAdjustedServicePrices = (
   selectedPackages.forEach((packageId) => {
     const pkg = packagesArray.find((p) => p.id === packageId);
     if (pkg) {
-      // First handle the base package
       pkg.package_services?.forEach((ps) => {
-        // Use package_selling_price if available, otherwise service's selling_price
         const originalServicePrice = ps.package_selling_price !== undefined && ps.package_selling_price !== null
           ? ps.package_selling_price
           : ps.service.selling_price;
@@ -321,17 +318,13 @@ export const getAdjustedServicePrices = (
         result[ps.service.id] = originalServicePrice * discountRatio;
       });
       
-      // Then handle customized services
       if (pkg.is_customizable && customizedServices[packageId]) {
         customizedServices[packageId].forEach((serviceId) => {
-          // Skip if already in package
-          if (pkg.package_services?.some(ps => ps.service.id === serviceId)) {
-            return;
-          }
-          
-          const service = servicesArray.find((s) => s.id === serviceId);
-          if (service) {
-            result[serviceId] = service.selling_price * discountRatio;
+          if (!pkg.package_services?.some(ps => ps.service.id === serviceId)) {
+            const service = servicesArray.find((s) => s.id === serviceId);
+            if (service) {
+              result[serviceId] = service.selling_price * discountRatio;
+            }
           }
         });
       }
