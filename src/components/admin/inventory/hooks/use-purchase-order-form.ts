@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,9 +9,11 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
   const [open, setOpen] = useState(false);
   const { create, update } = useSupabaseCrud("purchase_orders");
 
+  const defaultInvoiceNumber = `PO-${format(new Date(), 'yyyyMMdd-HHmmss')}`;
+
   const defaultValues: PurchaseOrderFormValues = {
     supplier_id: purchaseOrder?.supplier_id || "",
-    invoice_number: purchaseOrder?.invoice_number || "",
+    invoice_number: purchaseOrder?.invoice_number || defaultInvoiceNumber,
     receipt_number: purchaseOrder?.receipt_number || "",
     order_date: purchaseOrder?.order_date ? new Date(purchaseOrder.order_date) : new Date(),
     tax_inclusive: purchaseOrder?.tax_inclusive || false,
@@ -29,7 +30,7 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
         order_date: format(values.order_date, 'yyyy-MM-dd'),
         tax_inclusive: values.tax_inclusive,
         notes: values.notes,
-        status: 'pending',
+        status: purchaseOrder ? purchaseOrder.status : 'draft',
       };
 
       let savedOrder;
@@ -59,7 +60,7 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
           tax_rate: item.tax_rate || 0,
           expiry_date: item.expiry_date ? format(item.expiry_date, 'yyyy-MM-dd') : null,
           received_quantity: item.received_quantity || null,
-          unit_price: item.purchase_price, // Added to match the required schema
+          unit_price: item.purchase_price,
         }));
 
         const { error: itemsError } = await supabase

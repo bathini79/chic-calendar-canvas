@@ -11,6 +11,8 @@ import { PurchaseOrdersList } from "@/components/admin/inventory/components/Purc
 import { HeaderActions } from "@/components/admin/inventory/components/HeaderActions";
 import { AutoConsumption } from "@/components/admin/inventory/components/AutoConsumption";
 import { ItemDialog } from "@/components/admin/inventory/ItemDialog";
+import { LowStockManager } from "@/components/admin/inventory/LowStockManager";
+import { AutoDraftGenerator } from "@/components/admin/inventory/components/purchase-order/AutoDraftGenerator";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,6 +38,7 @@ export default function Inventory() {
                 <TabsTrigger value="categories">Categories</TabsTrigger>
                 <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
                 <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
+                <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
                 <TabsTrigger value="auto-consumption">Auto Consumption</TabsTrigger>
               </TabsList>
             </div>
@@ -60,7 +63,14 @@ export default function Inventory() {
               </TabsContent>
 
               <TabsContent value="purchase-orders" className="m-0">
+                <div className="flex justify-end mb-4">
+                  <AutoDraftGenerator />
+                </div>
                 <PurchaseOrdersList />
+              </TabsContent>
+              
+              <TabsContent value="low-stock" className="m-0">
+                <LowStockManager />
               </TabsContent>
               
               <TabsContent value="auto-consumption" className="m-0">

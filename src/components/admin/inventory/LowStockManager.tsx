@@ -13,110 +13,33 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { format } from "date-fns";
-
-type InventoryItem = {
-  id: string;
-  name: string;
-  quantity: number;
-  minimum_quantity: number;
-  max_quantity: number;
-  supplier: {
-    id: string;
-    name: string;
-  };
-};
+import { AutoDraftGenerator } from "./components/purchase-order/AutoDraftGenerator";
 
 export function LowStockManager() {
-  const [isGenerating, setIsGenerating] = useState(false);
-
   const { data: lowStockItems, isLoading } = useQuery({
     queryKey: ["low-stock-items"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("inventory_items")
+        .from("inventory_location_items")
         .select(`
-          *,
-          supplier:suppliers(*)
+          id,
+          item_id,
+          location_id,
+          quantity,
+          minimum_quantity,
+          max_quantity,
+          unit_price,
+          supplier_id,
+          inventory_items!inner(id, name, unit_of_quantity),
+          suppliers(id, name)
         `)
         .lte("quantity", "minimum_quantity")
         .eq("status", "active");
 
       if (error) throw error;
-      return data as InventoryItem[];
+      return data;
     },
   });
-
-  const generatePurchaseOrder = async () => {
-    if (!lowStockItems?.length) {
-      toast.error("No low stock items to order");
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      // Group items by supplier
-      const supplierGroups = lowStockItems.reduce((acc: any, item: any) => {
-        if (!acc[item.supplier.id]) {
-          acc[item.supplier.id] = {
-            supplier: item.supplier,
-            items: [],
-          };
-        }
-        acc[item.supplier.id].items.push(item);
-        return acc;
-      }, {});
-
-      // Create POs for each supplier
-      for (const group of Object.values(supplierGroups) as any[]) {
-        // Create PO
-        const { data: po, error: poError } = await supabase
-          .from("purchase_orders")
-          .insert({
-            supplier_id: group.supplier.id,
-            status: "pending",
-            invoice_number: `PO-${format(new Date(), "yyyyMMdd-HHmmss")}`,
-            order_date: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (poError) throw poError;
-
-        // Add items to PO
-        const poItems = group.items.map((item: any) => ({
-          purchase_order_id: po.id,
-          item_id: item.id,
-          quantity: Math.max(item.max_quantity - item.quantity, 0),
-          purchase_price: item.unit_price,
-          unit_price: item.unit_price,
-        }));
-
-        const { error: itemsError } = await supabase
-          .from("purchase_order_items")
-          .insert(poItems);
-
-        if (itemsError) throw itemsError;
-
-        // Send email
-        const { error: emailError } = await supabase.functions.invoke(
-          "send-po-email",
-          {
-            body: { purchaseOrderId: po.id },
-          }
-        );
-
-        if (emailError) throw emailError;
-
-        toast.success(
-          `Purchase order created and sent to ${group.supplier.name}`
-        );
-      }
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -126,12 +49,7 @@ export function LowStockManager() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Low Stock Items</h2>
-        <Button
-          onClick={generatePurchaseOrder}
-          disabled={isGenerating || !lowStockItems?.length}
-        >
-          {isGenerating ? "Generating..." : "Generate Purchase Orders"}
-        </Button>
+        <AutoDraftGenerator />
       </div>
 
       <div className="border rounded-lg">
@@ -144,21 +62,36 @@ export function LowStockManager() {
               <TableHead>Maximum Stock</TableHead>
               <TableHead>Supplier</TableHead>
               <TableHead>Required Quantity</TableHead>
+              <TableHead>Unit Price</TableHead>
+              <TableHead>Total Cost</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {lowStockItems?.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{item.quantity}</TableCell>
-                <TableCell>{item.minimum_quantity}</TableCell>
-                <TableCell>{item.max_quantity}</TableCell>
-                <TableCell>{item.supplier.name}</TableCell>
-                <TableCell>
-                  {Math.max(item.max_quantity - item.quantity, 0)}
+            {lowStockItems?.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                  No low stock items found.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              lowStockItems?.map((item: any) => {
+                const requiredQuantity = Math.max(item.max_quantity - item.quantity, 0);
+                const totalCost = requiredQuantity * item.unit_price;
+                
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.inventory_items.name}</TableCell>
+                    <TableCell>{item.quantity} {item.inventory_items.unit_of_quantity}</TableCell>
+                    <TableCell>{item.minimum_quantity} {item.inventory_items.unit_of_quantity}</TableCell>
+                    <TableCell>{item.max_quantity} {item.inventory_items.unit_of_quantity}</TableCell>
+                    <TableCell>{item.suppliers?.name || 'No supplier'}</TableCell>
+                    <TableCell>{requiredQuantity} {item.inventory_items.unit_of_quantity}</TableCell>
+                    <TableCell>${item.unit_price.toFixed(2)}</TableCell>
+                    <TableCell>${totalCost.toFixed(2)}</TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </div>
