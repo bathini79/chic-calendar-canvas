@@ -14,15 +14,46 @@ interface DraftPurchaseOrdersProps {
 }
 
 export function DraftPurchaseOrders({ setEditingPurchaseOrder }: DraftPurchaseOrdersProps) {
-  const { data: purchaseOrders, remove: removePurchaseOrder, refetch } = useSupabaseCrud('purchase_orders');
+  const { data: purchaseOrders, refetch } = useSupabaseCrud('purchase_orders');
   const [confirmingOrder, setConfirmingOrder] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Filter for draft orders (status = 'draft')
   const draftOrders = purchaseOrders?.filter(order => order.status === 'draft') || [];
 
   const handleDeletePurchaseOrder = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this draft purchase order?')) {
-      await removePurchaseOrder(id);
+      try {
+        setIsDeleting(true);
+        
+        // First, delete all associated order items
+        const { error: itemsError } = await supabase
+          .from('purchase_order_items')
+          .delete()
+          .eq('purchase_order_id', id);
+          
+        if (itemsError) {
+          throw itemsError;
+        }
+        
+        // Then delete the purchase order
+        const { error: orderError } = await supabase
+          .from('purchase_orders')
+          .delete()
+          .eq('id', id);
+          
+        if (orderError) {
+          throw orderError;
+        }
+        
+        toast.success("Purchase order deleted successfully");
+        refetch();
+      } catch (error: any) {
+        toast.error(`Error deleting purchase order: ${error.message}`);
+        console.error("Error deleting purchase order:", error);
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -118,6 +149,7 @@ export function DraftPurchaseOrders({ setEditingPurchaseOrder }: DraftPurchaseOr
                 variant="ghost" 
                 size="sm"
                 onClick={() => handleDeletePurchaseOrder(order.id)}
+                disabled={isDeleting}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete

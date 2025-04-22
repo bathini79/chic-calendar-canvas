@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +8,7 @@ import { format } from "date-fns";
 
 export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) {
   const [open, setOpen] = useState(false);
-  const { create, update } = useSupabaseCrud("purchase_orders");
+  const { create, update, refetch } = useSupabaseCrud("purchase_orders");
 
   const defaultInvoiceNumber = `PO-${format(new Date(), 'yyyyMMdd-HHmmss')}`;
 
@@ -35,8 +36,20 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
 
       let savedOrder;
       if (purchaseOrder) {
+        // Update existing purchase order
         savedOrder = await update(purchaseOrder.id, orderData);
+        
+        // Delete existing items and add new ones
+        const { error: deleteError } = await supabase
+          .from('purchase_order_items')
+          .delete()
+          .eq('purchase_order_id', purchaseOrder.id);
+          
+        if (deleteError) {
+          throw new Error("Error removing existing purchase order items");
+        }
       } else {
+        // Create new purchase order
         savedOrder = await create(orderData);
       }
 
@@ -45,13 +58,6 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
       }
 
       if (values.items && values.items.length > 0) {
-        if (purchaseOrder) {
-          await supabase
-            .from('purchase_order_items')
-            .delete()
-            .eq('purchase_order_id', savedOrder.id);
-        }
-
         const purchaseOrderItems = values.items.map(item => ({
           purchase_order_id: savedOrder.id,
           item_id: item.item_id,
@@ -74,6 +80,7 @@ export function usePurchaseOrderForm(purchaseOrder?: any, onClose?: () => void) 
 
       toast.success(purchaseOrder ? "Purchase order updated" : "Purchase order created");
       setOpen(false);
+      refetch();
       if (onClose) onClose();
     } catch (error: any) {
       toast.error(error.message || "Error saving purchase order");

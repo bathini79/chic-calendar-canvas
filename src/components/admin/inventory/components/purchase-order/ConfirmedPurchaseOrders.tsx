@@ -5,13 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { EyeIcon, Printer, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ConfirmedPurchaseOrdersProps {
   setEditingPurchaseOrder: (order: any) => void;
 }
 
 export function ConfirmedPurchaseOrders({ setEditingPurchaseOrder }: ConfirmedPurchaseOrdersProps) {
-  const { data: purchaseOrders, remove: removePurchaseOrder } = useSupabaseCrud('purchase_orders');
+  const { data: purchaseOrders, refetch } = useSupabaseCrud('purchase_orders');
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Filter for confirmed orders (status = 'confirmed' or 'pending')
   const confirmedOrders = purchaseOrders?.filter(order => 
@@ -20,7 +23,37 @@ export function ConfirmedPurchaseOrders({ setEditingPurchaseOrder }: ConfirmedPu
 
   const handleDeletePurchaseOrder = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this purchase order?')) {
-      await removePurchaseOrder(id);
+      try {
+        setIsDeleting(true);
+        
+        // First, delete all associated order items
+        const { error: itemsError } = await supabase
+          .from('purchase_order_items')
+          .delete()
+          .eq('purchase_order_id', id);
+          
+        if (itemsError) {
+          throw itemsError;
+        }
+        
+        // Then delete the purchase order
+        const { error: orderError } = await supabase
+          .from('purchase_orders')
+          .delete()
+          .eq('id', id);
+          
+        if (orderError) {
+          throw orderError;
+        }
+        
+        toast.success("Purchase order deleted successfully");
+        refetch();
+      } catch (error: any) {
+        toast.error(`Error deleting purchase order: ${error.message}`);
+        console.error("Error deleting purchase order:", error);
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -79,6 +112,7 @@ export function ConfirmedPurchaseOrders({ setEditingPurchaseOrder }: ConfirmedPu
                 variant="ghost" 
                 size="sm"
                 onClick={() => handleDeletePurchaseOrder(order.id)}
+                disabled={isDeleting}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete

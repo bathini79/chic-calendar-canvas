@@ -1,7 +1,5 @@
 
 import { useState } from "react";
-import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { PurchaseOrderDialog } from "../PurchaseOrderDialog";
@@ -11,6 +9,10 @@ import { ConfirmedPurchaseOrders } from "./purchase-order/ConfirmedPurchaseOrder
 
 export function PurchaseOrdersList() {
   const [editingPurchaseOrder, setEditingPurchaseOrder] = useState<any>(null);
+
+  const handleCloseEditDialog = () => {
+    setEditingPurchaseOrder(null);
+  };
 
   return (
     <>
@@ -40,7 +42,7 @@ export function PurchaseOrdersList() {
       {editingPurchaseOrder && (
         <PurchaseOrderDialog
           purchaseOrder={editingPurchaseOrder}
-          onClose={() => setEditingPurchaseOrder(null)}
+          onClose={handleCloseEditDialog}
         />
       )}
     </>
