@@ -1,14 +1,16 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { RotateCw } from "lucide-react";
 
 export function AutoDraftGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [openDialog, setOpenDialog] = useState(false);
 
   // Fetch low stock items that need reordering
   const { data: lowStockItems, isLoading, refetch } = useQuery({
@@ -28,11 +30,11 @@ export function AutoDraftGenerator() {
           inventory_items!inner(name, unit_of_quantity),
           suppliers(id, name, email, phone, contact_name)
         `)
-        .filter('quantity', 'lte', 'minimum_quantity')
+        .lt('quantity', supabase.raw('minimum_quantity'))
         .eq("status", "active");
 
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 
@@ -63,6 +65,13 @@ export function AutoDraftGenerator() {
     return acc;
   }, {});
 
+  // Check for low stock items and show toast notification
+  useEffect(() => {
+    if (lowStockItems && lowStockItems.length > 0 && !isLoading) {
+      toast.info(`${lowStockItems.length} items are below minimum stock levels. Consider generating a purchase order.`);
+    }
+  }, [lowStockItems, isLoading]);
+
   const generateDraftOrders = async () => {
     if (!itemsBySupplier || Object.keys(itemsBySupplier).length === 0) {
       toast.error("No low stock items to order");
@@ -71,6 +80,8 @@ export function AutoDraftGenerator() {
 
     setIsGenerating(true);
     try {
+      let ordersCreated = 0;
+      
       // Create draft purchase orders for each supplier
       for (const supplierId of Object.keys(itemsBySupplier)) {
         const group = itemsBySupplier[supplierId];
@@ -115,12 +126,20 @@ export function AutoDraftGenerator() {
           .insert(poItems);
 
         if (itemsError) throw itemsError;
-
+        
+        ordersCreated++;
         toast.success(`Draft purchase order created for ${group.supplier.name}`);
+      }
+      
+      if (ordersCreated > 0) {
+        toast.success(`${ordersCreated} draft purchase order(s) created successfully`);
+      } else {
+        toast.info("No purchase orders were created");
       }
       
       // Refresh the purchase orders list
       refetch();
+      setOpenDialog(false);
     } catch (error: any) {
       console.error("Error generating draft orders:", error);
       toast.error(error.message || "Error generating draft orders");
@@ -130,13 +149,27 @@ export function AutoDraftGenerator() {
   };
 
   return (
-    <AlertDialog>
+    <AlertDialog open={openDialog} onOpenChange={setOpenDialog}>
       <AlertDialogTrigger asChild>
         <Button 
           variant="outline" 
-          disabled={isLoading || isGenerating || !lowStockItems?.length}
+          disabled={isLoading || isGenerating}
+          onClick={() => {
+            if (lowStockItems?.length === 0) {
+              toast.info("There are no low stock items that need reordering");
+            } else {
+              setOpenDialog(true);
+            }
+          }}
         >
-          {isGenerating ? "Generating..." : "Generate Draft Orders for Low Stock"}
+          {isGenerating ? (
+            <>
+              <RotateCw className="h-4 w-4 mr-2 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            "Generate Draft Orders for Low Stock"
+          )}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -155,7 +188,7 @@ export function AutoDraftGenerator() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={generateDraftOrders}>
+          <AlertDialogAction onClick={generateDraftOrders} disabled={!lowStockItems?.length}>
             Generate Draft Orders
           </AlertDialogAction>
         </AlertDialogFooter>

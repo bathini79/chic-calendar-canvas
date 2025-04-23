@@ -19,7 +19,6 @@ export function LowStockManager() {
   const { data: lowStockItems, isLoading } = useQuery({
     queryKey: ["low-stock-items"],
     queryFn: async () => {
-      // Using raw SQL for the comparison to ensure it works correctly
       const { data, error } = await supabase
         .from("inventory_location_items")
         .select(`
@@ -34,7 +33,7 @@ export function LowStockManager() {
           inventory_items!inner(id, name, unit_of_quantity),
           suppliers(id, name)
         `)
-        .filter('quantity', 'lte', 'minimum_quantity')  // Fix: Using filter syntax
+        .lt('quantity', supabase.raw('minimum_quantity'))
         .eq("status", "active");
 
       if (error) throw error;
