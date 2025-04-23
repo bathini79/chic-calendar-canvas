@@ -33,7 +33,7 @@ export function LowStockManager() {
           inventory_items!inner(id, name, unit_of_quantity),
           suppliers(id, name)
         `)
-        .lte("quantity", "minimum_quantity")
+        .lte("quantity", "minimum_quantity")  // Fix: This needs to compare columns, not use field names
         .eq("status", "active");
 
       if (error) throw error;

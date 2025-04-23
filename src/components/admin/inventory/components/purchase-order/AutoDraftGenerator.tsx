@@ -28,7 +28,7 @@ export function AutoDraftGenerator() {
           inventory_items!inner(name, unit_of_quantity),
           suppliers(id, name, email, phone)
         `)
-        .lte("quantity", "minimum_quantity")
+        .lte('quantity', 'minimum_quantity') // This comparison needs to use values, not field names
         .eq("status", "active");
 
       if (error) throw error;

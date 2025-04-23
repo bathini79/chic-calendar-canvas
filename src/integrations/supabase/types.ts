@@ -34,6 +34,7 @@ export type Database = {
           refund_notes: string | null
           refund_reason: string | null
           refunded_by: string | null
+          round_off_difference: number | null
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"] | null
           tax_amount: number | null
@@ -67,6 +68,7 @@ export type Database = {
           refund_notes?: string | null
           refund_reason?: string | null
           refunded_by?: string | null
+          round_off_difference?: number | null
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           tax_amount?: number | null
@@ -100,6 +102,7 @@ export type Database = {
           refund_notes?: string | null
           refund_reason?: string | null
           refunded_by?: string | null
+          round_off_difference?: number | null
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           tax_amount?: number | null
