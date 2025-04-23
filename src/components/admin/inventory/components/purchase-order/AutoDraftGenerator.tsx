@@ -28,7 +28,7 @@ export function AutoDraftGenerator() {
           inventory_items!inner(name, unit_of_quantity),
           suppliers(id, name, email, phone)
         `)
-        .lte('quantity', 'minimum_quantity') // This comparison needs to use values, not field names
+        .filter('quantity', 'lte', 'minimum_quantity') // Fix: Using filter syntax
         .eq("status", "active");
 
       if (error) throw error;
