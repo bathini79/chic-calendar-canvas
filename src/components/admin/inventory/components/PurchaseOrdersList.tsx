@@ -1,11 +1,11 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
 import { PurchaseOrderDialog } from "../PurchaseOrderDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DraftPurchaseOrders } from "./purchase-order/DraftPurchaseOrders";
 import { ConfirmedPurchaseOrders } from "./purchase-order/ConfirmedPurchaseOrders";
+import { AutoDraftGenerator } from "./purchase-order/AutoDraftGenerator";
 
 export function PurchaseOrdersList() {
   const [editingPurchaseOrder, setEditingPurchaseOrder] = useState<any>(null);
@@ -16,7 +16,8 @@ export function PurchaseOrdersList() {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4 gap-2">
+        <AutoDraftGenerator />
         <PurchaseOrderDialog />
       </div>
       

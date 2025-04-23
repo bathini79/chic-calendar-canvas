@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryDialog } from "@/components/admin/inventory/CategoryDialog";
@@ -38,7 +37,6 @@ export default function Inventory() {
                 <TabsTrigger value="categories">Categories</TabsTrigger>
                 <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
                 <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
-                <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
                 <TabsTrigger value="auto-consumption">Auto Consumption</TabsTrigger>
               </TabsList>
             </div>
@@ -63,14 +61,7 @@ export default function Inventory() {
               </TabsContent>
 
               <TabsContent value="purchase-orders" className="m-0">
-                <div className="flex justify-end mb-4">
-                  <AutoDraftGenerator />
-                </div>
                 <PurchaseOrdersList />
-              </TabsContent>
-              
-              <TabsContent value="low-stock" className="m-0">
-                <LowStockManager />
               </TabsContent>
               
               <TabsContent value="auto-consumption" className="m-0">

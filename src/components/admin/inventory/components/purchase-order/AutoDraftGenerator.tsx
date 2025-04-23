@@ -26,9 +26,9 @@ export function AutoDraftGenerator() {
           unit_price,
           supplier_id,
           inventory_items!inner(name, unit_of_quantity),
-          suppliers(id, name, email, phone)
+          suppliers(id, name, email, phone, contact_name)
         `)
-        .filter('quantity', 'lte', 'minimum_quantity') // Fix: Using filter syntax
+        .filter('quantity', 'lte', 'minimum_quantity')
         .eq("status", "active");
 
       if (error) throw error;
@@ -56,6 +56,7 @@ export function AutoDraftGenerator() {
         name: item.inventory_items.name,
         unit_of_quantity: item.inventory_items.unit_of_quantity,
         order_quantity: orderQuantity,
+        total_price: orderQuantity * item.unit_price
       });
     }
     
@@ -77,6 +78,11 @@ export function AutoDraftGenerator() {
         // Skip if no items to order for this supplier
         if (group.items.length === 0) continue;
         
+        // Calculate total amount
+        const totalAmount = group.items.reduce((sum: number, item: any) => 
+          sum + item.total_price, 0
+        );
+        
         // Create the purchase order
         const { data: po, error: poError } = await supabase
           .from("purchase_orders")
@@ -86,6 +92,8 @@ export function AutoDraftGenerator() {
             invoice_number: `AUTO-${format(new Date(), "yyyyMMdd-HHmmss")}`,
             order_date: new Date().toISOString(),
             notes: "Auto-generated draft for low stock items",
+            total_amount: totalAmount,
+            tax_inclusive: false,
           })
           .select()
           .single();
