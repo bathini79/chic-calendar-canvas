@@ -83,7 +83,7 @@ export function InventoryStats() {
             {lowStockItems}
           </p>
         </div>
-        <div className="al-flex bg-card p-4 rounded-lg">
+        <div className="flex bg-card p-4 rounded-lg">
           <h3 className="font-medium mb-2">Total Value</h3>
           <p className="text-2xl font-bold">
              <IndianRupee/>{totalValue.toFixed(2) || '0.00'}
