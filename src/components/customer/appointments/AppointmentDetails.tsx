@@ -36,12 +36,12 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
 }) => {
   const navigate = useNavigate();
   const { addToCart, clearCart, setSelectedLocation } = useCart();
-
+  console.log("Appointment Details:", appointment);
   const appointmentDate = parseISO(appointment.start_time);
   const formattedDate = format(appointmentDate, "EEE, dd MMM, yyyy");
   const formattedTime = format(appointmentDate, "h:mm a");
   // Get the full location information
-  const locationName = appointment.location || "Not specified";
+  const locationAddress = appointment.locationAddress || appointment.location || "Not specified";
 
   // Calculate total duration in minutes
   const totalDurationMinutes = appointment.bookings.reduce(
@@ -139,7 +139,7 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
         <div>
           <h3 className="font-medium">Location</h3>
           <p className="text-sm text-muted-foreground whitespace-pre-line">
-            {locationName}
+            {locationAddress}
           </p>
         </div>
       </div>
@@ -169,7 +169,19 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
                     {durationDisplay} with {employee?.name || "Staff"}
                   </p>
                 </div>
-                <p className="font-medium">{formatPrice(pricePaid)}</p>
+                <div className="text-right">
+                  <p className="font-medium">{formatPrice(pricePaid)}</p>
+                  {service?.selling_price && service.selling_price !== pricePaid && (
+                    <p className="text-xs text-muted-foreground line-through">
+                      {formatPrice(service.selling_price)}
+                    </p>
+                  )}
+                  {packageItem?.price && packageItem.price !== pricePaid && (
+                    <p className="text-xs text-muted-foreground line-through">
+                      {formatPrice(packageItem.price)}
+                    </p>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -178,11 +190,79 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
 
       <Separator />
 
-      <div>
-        <div className="flex justify-between font-semibold">
+      <div className="space-y-2">
+        {/* Subtotal */}
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Subtotal</span>
+          <span>{formatPrice(appointment.subtotal || appointment.total_price)}</span>
+        </div>
+
+        {/* Membership Discount - only show if present */}
+        {appointment.membership_discount > 0 && appointment.membership_name && (
+          <div className="flex justify-between text-sm text-green-600">
+            <span className="flex items-center gap-1">
+              {appointment.membership_name} Discount
+            </span>
+            <span>-{formatPrice(appointment.membership_discount)}</span>
+          </div>
+        )}
+
+        {/* Coupon - only show if present */}
+        {appointment.coupon_code && appointment.coupon_discount > 0 && (
+          <div className="flex justify-between text-sm text-green-600">
+            <span className="flex items-center gap-1">
+              Coupon: {appointment.coupon_code}
+            </span>
+            <span>-{formatPrice(appointment.coupon_discount)}</span>
+          </div>
+        )}
+
+        {/* Loyalty Points - only show if present */}
+        {appointment.points_redeemed > 0 && (
+          <div className="flex justify-between text-sm text-amber-600">
+            <span className="flex items-center gap-1">
+              Loyalty Points Redeemed ({appointment.points_redeemed} pts)
+            </span>
+            <span>-{formatPrice(appointment.points_value || 0)}</span>
+          </div>
+        )}
+
+        {/* Tax - only show if present */}
+        {appointment.tax_amount > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">
+              Tax {appointment.tax_name ? `(${appointment.tax_name})` : ''}
+            </span>
+            <span>{formatPrice(appointment.tax_amount)}</span>
+          </div>
+        )}
+
+        {/* Round off amount if applicable */}
+        {appointment.round_off_difference && (
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Round Off</span>
+            <span>{formatPrice(appointment.round_off_difference)}</span>
+          </div>
+        )}
+
+        {/* Total */}
+        <div className="flex justify-between font-semibold mt-2 pt-2 border-t">
           <span>Total</span>
           <span>{formatPrice(appointment.total_price)}</span>
         </div>
+        
+        {/* Payment Method */}
+        {appointment.payment_method && (
+          <div className="flex justify-between text-sm pt-2 mt-1">
+            <span className="text-muted-foreground">Paid with</span>
+            <span className="capitalize">
+              {appointment.payment_method === 'cash' ? 'Cash' : 
+               appointment.payment_method === 'card' ? 'Card' : 
+               appointment.payment_method === 'online' ? 'Online' : 
+               appointment.payment_method}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex space-x-4">

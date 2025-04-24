@@ -34,7 +34,6 @@ export type Database = {
           refund_notes: string | null
           refund_reason: string | null
           refunded_by: string | null
-          round_off_difference: number | null
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"] | null
           tax_amount: number | null
@@ -68,7 +67,6 @@ export type Database = {
           refund_notes?: string | null
           refund_reason?: string | null
           refunded_by?: string | null
-          round_off_difference?: number | null
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           tax_amount?: number | null
@@ -102,7 +100,6 @@ export type Database = {
           refund_notes?: string | null
           refund_reason?: string | null
           refunded_by?: string | null
-          round_off_difference?: number | null
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
           tax_amount?: number | null
@@ -1487,6 +1484,39 @@ export type Database = {
           },
           {
             foreignKeyName: "package_categories_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      package_locations: {
+        Row: {
+          created_at: string
+          location_id: string
+          package_id: string
+        }
+        Insert: {
+          created_at?: string
+          location_id: string
+          package_id: string
+        }
+        Update: {
+          created_at?: string
+          location_id?: string
+          package_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_locations_package_id_fkey"
             columns: ["package_id"]
             isOneToOne: false
             referencedRelation: "packages"

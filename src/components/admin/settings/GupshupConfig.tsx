@@ -14,8 +14,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, Info, Loader2, Save } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/lib/toast";
 
 export function GupshupConfig() {
   const [isLoading, setIsLoading] = useState(true);
@@ -24,13 +24,12 @@ export function GupshupConfig() {
   const [appId, setAppId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [sourceMobile, setSourceMobile] = useState("");
-  const [appName, setAppName] = useState(""); // New state for App Name
+  const [appName, setAppName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testPhoneNumber, setTestPhoneNumber] = useState("");
   const [testResult, setTestResult] = useState<string | null>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
     fetchGupshupConfig();
@@ -45,10 +44,9 @@ export function GupshupConfig() {
         .from("messaging_providers")
         .select("*")
         .eq("provider_name", "gupshup")
-        .maybeSingle(); // Using maybeSingle instead of single to handle the no rows case
+        .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
-        // PGRST116 is "no rows returned" error
         throw error;
       }
 
@@ -58,7 +56,7 @@ export function GupshupConfig() {
         setAppId(config.app_id || "");
         setApiKey(config.api_key || "");
         setSourceMobile(config.source_mobile || "");
-        setAppName(config.app_name || ""); // Fetch App Name
+        setAppName(config.app_name || "");
       }
     } catch (error: any) {
       console.error("Error fetching GupShup config:", error);
@@ -78,59 +76,51 @@ export function GupshupConfig() {
         app_id: appId,
         api_key: apiKey,
         source_mobile: sourceMobile,
-        app_name: appName, // Include App Name in configuration
-        channel: "whatsapp"
+        app_name: appName,
+        channel: "whatsapp",
       };
 
-      // Check if record exists
       const { data: existingData } = await supabase
         .from("messaging_providers")
         .select("id")
         .eq("provider_name", "gupshup")
-        .maybeSingle(); // Using maybeSingle to handle when no record exists
+        .maybeSingle();
 
       let result;
       if (existingData) {
-        // Update existing record
         result = await supabase
           .from("messaging_providers")
           .update({
             is_active: isActive,
-            configuration: configuration // Pass the configuration object directly
+            configuration: configuration,
           })
-          .eq("id",existingData.id);
+          .eq("id", existingData.id);
       } else {
-        // Insert new record
         result = await supabase
           .from("messaging_providers")
           .insert({
             provider_name: "gupshup",
             is_active: isActive,
-            configuration
+            configuration,
           });
       }
 
       if (result.error) throw result.error;
 
-      toast({
-        title: "Configuration saved",
+      toast.success("Configuration saved", {
         description: "GupShup settings have been updated successfully.",
       });
-      
+
       setSaveSuccess(true);
-      
-      // Reset after 3 seconds
+
       setTimeout(() => {
         setSaveSuccess(false);
       }, 3000);
-      
     } catch (error: any) {
       console.error("Error saving GupShup config:", error);
       setError(error.message || "Failed to save configuration");
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Failed to save GupShup configuration",
-        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
@@ -148,13 +138,16 @@ export function GupshupConfig() {
         headers: {
           "Cache-Control": "no-cache",
           "Content-Type": "application/x-www-form-urlencoded",
-          "apikey": apiKey,
+          apikey: apiKey,
         },
         body: new URLSearchParams({
           channel: "whatsapp",
           source: sourceMobile,
           destination: testPhoneNumber,
-          message: JSON.stringify({ type: "text", text: "Test message from GupShup" }),
+          message: JSON.stringify({
+            type: "text",
+            text: "Test message from GupShup",
+          }),
           "src.name": "TestApp",
         }),
       });
@@ -165,9 +158,10 @@ export function GupshupConfig() {
 
       const result = await response.json();
       if (result.status === "submitted") {
-        setTestResult(`Message sent successfully! Message ID: ${result.messageId}`);
-        toast({
-          title: "Success",
+        setTestResult(
+          `Message sent successfully! Message ID: ${result.messageId}`
+        );
+        toast.success("Success", {
           description: `Message sent successfully. Message ID: ${result.messageId}`,
         });
       } else {
@@ -177,10 +171,8 @@ export function GupshupConfig() {
       console.error("Error testing GupShup connection:", error);
       setTestResult("Failed to send message");
       setError(error.message || "Failed to test connection");
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Failed to send test message",
-        variant: "destructive",
       });
     } finally {
       setIsTesting(false);
@@ -237,7 +229,7 @@ export function GupshupConfig() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="app-name">App Name</Label> {/* New App Name field */}
+            <Label htmlFor="app-name">App Name</Label>
             <Input
               id="app-name"
               placeholder="GupShup App Name"
@@ -273,9 +265,9 @@ export function GupshupConfig() {
           <div className="space-y-2">
             <Label htmlFor="source-mobile" className="flex items-center">
               Source Mobile Number
-              <Info 
+              <Info
                 className="inline-block ml-1 h-4 w-4 text-muted-foreground cursor-help"
-                aria-label="Mobile number in format: 917834811114 (no + symbol)" 
+                aria-label="Mobile number in format: 917834811114 (no + symbol)"
               />
             </Label>
             <Input
@@ -286,7 +278,8 @@ export function GupshupConfig() {
               required
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Enter the phone number in format: 917834811114 (country code without + symbol)
+              Enter the phone number in format: 917834811114 (country code
+              without + symbol)
             </p>
           </div>
 
@@ -299,7 +292,8 @@ export function GupshupConfig() {
               onChange={(e) => setTestPhoneNumber(e.target.value)}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Enter the phone number in format: 919876543210 (country code without + symbol)
+              Enter the phone number in format: 919876543210 (country code
+              without + symbol)
             </p>
           </div>
         </CardContent>
@@ -335,7 +329,13 @@ export function GupshupConfig() {
           </Button>
         </CardFooter>
         {testResult && (
-          <p className={`mt-4 text-sm ${testResult.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+          <p
+            className={`mt-4 text-sm ${
+              testResult.includes("successfully")
+                ? "text-green-600"
+                : "text-red-600"
+            }`}
+          >
             {testResult}
           </p>
         )}

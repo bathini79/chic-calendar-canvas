@@ -1,4 +1,3 @@
-
 import { useCart } from "@/components/cart/CartContext";
 import { ServiceSelector } from "@/components/scheduling/ServiceSelector";
 import { UnifiedCalendar } from "@/components/scheduling/UnifiedCalendar";
@@ -88,6 +87,13 @@ export default function UnifiedScheduling() {
   };
 
   const handleTimeSlotSelect = (itemId: string, timeSlot: string) => {
+    // Special case to handle reset operation
+    if (itemId === 'reset') {
+      setSelectedTimeSlots({});
+      return;
+    }
+    
+    // Normal case - add or update a time slot
     setSelectedTimeSlots((prev) => ({
       ...prev,
       [itemId]: timeSlot,

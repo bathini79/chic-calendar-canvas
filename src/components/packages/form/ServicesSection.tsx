@@ -1,6 +1,7 @@
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { ServiceMultiSelect } from "../ServiceMultiSelect";
 import { useFormContext } from "react-hook-form";
+import { useState, useEffect } from "react";
 
 interface ServicesSectionProps {
   selectedServices: string[];
@@ -14,6 +15,23 @@ export function ServicesSection({
   onServiceRemove 
 }: ServicesSectionProps) {
   const form = useFormContext();
+  const [hasLocationError, setHasLocationError] = useState(false);
+
+  // This function will be called by the ServiceMultiSelect when location validation happens
+  const handleLocationValidationChange = (hasError: boolean) => {
+    setHasLocationError(hasError);
+    
+    // If there's a location error, set a custom form error
+    if (hasError) {
+      form.setError("services", {
+        type: "manual",
+        message: "Services must belong to the same location"
+      });
+    } else {
+      // Clear the error if it was previously set
+      form.clearErrors("services");
+    }
+  };
 
   return (
     <FormField
@@ -27,6 +45,7 @@ export function ServicesSection({
               selectedServices={selectedServices}
               onServiceSelect={onServiceSelect}
               onServiceRemove={onServiceRemove}
+              onLocationValidation={handleLocationValidationChange}
             />
           </FormControl>
           <FormMessage />

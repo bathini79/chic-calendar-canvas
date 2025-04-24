@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -10,11 +9,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { GupshupConfig } from "@/components/admin/settings/GupshupConfig";
 import { NotificationQueueProcessor } from "@/components/admin/settings/NotificationQueueProcessor";
+import { toast } from "@/lib/toast"; // Import our centralized toast utility
 
 // Optional fallback Spinner
 const Spinner = () => (
@@ -42,7 +41,6 @@ export default function ThirdParty() {
     useState<TwilioAccountDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<string>("gupshup");
-  const { toast } = useToast();
 
   useEffect(() => {
     const fetchTwilioAccountDetails = async () => {
@@ -60,10 +58,8 @@ export default function ThirdParty() {
       } catch (error: any) {
         console.error("Error fetching Twilio account details:", error);
         setError("Failed to fetch Twilio account details. Please try again later.");
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
+        toast.error("Error fetching Twilio account details", {
+          description: error.message
         });
       } finally {
         setIsLoading(false);
@@ -73,7 +69,7 @@ export default function ThirdParty() {
     if (activeSection === "twilio") {
       fetchTwilioAccountDetails();
     }
-  }, [activeSection, toast]);
+  }, [activeSection]);
 
   return (
     <div className="container py-6 max-w-6xl">
@@ -140,7 +136,6 @@ export default function ThirdParty() {
             </Card>
           )}
 
-     
           {activeSection === "other" && (
             <Card>
               <CardHeader>

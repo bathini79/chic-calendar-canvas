@@ -156,6 +156,9 @@ export default function useSaveAppointment({
             calculatedCouponDiscount +
             calculatedTaxAmount;
 
+      const roundedTotal = Math.round(totalPrice);
+      const roundOffDifference = roundedTotal - totalPrice;
+
       const usedTaxId =
         summaryParams.appliedTaxId !== undefined
           ? typeof summaryParams.appliedTaxId === "object" &&
@@ -194,7 +197,7 @@ export default function useSaveAppointment({
         summaryParams?.pointsDiscountAmount !== undefined
           ? summaryParams.pointsDiscountAmount
           : pointsDiscountAmount;
-
+      
       const appointmentData: any = {
         customer_id: selectedCustomer.id,
         start_time: startTime.toISOString(),
@@ -202,7 +205,8 @@ export default function useSaveAppointment({
         location: locationId || existingAppointmentLocation || null,
         notes: notes,
         status: appointmentStatus,
-        total_price: totalPrice,
+        total_price: summaryParams.total !== undefined ? summaryParams.total : totalPrice, // Use the passed total price
+        round_off_difference: summaryParams.roundOffDifference !== undefined ? summaryParams.roundOffDifference : 0, // Use the passed round-off difference
         discount_type: discountType as "none" | "percentage" | "fixed",
         discount_value: discountValue,
         payment_method: paymentMethod,
@@ -258,6 +262,9 @@ export default function useSaveAppointment({
         const bookingStatus: AppointmentStatus =
           currentScreen === SCREEN.CHECKOUT ? "completed" : "booked";
 
+        // For service price, only use adjustedPrices which contain membership, coupon 
+        // and regular discounts, but not loyalty points discount
+        // Loyalty points discount is applied to the total only, not individual services
         const pricePaid =
           summaryParams.adjustedPrices &&
           summaryParams.adjustedPrices[serviceId] !== undefined
@@ -301,11 +308,14 @@ export default function useSaveAppointment({
 
           const packageServiceStartTime = new Date(startTime);
 
+          // For package service price, only use adjustedPrices which contain membership, coupon 
+          // and regular discounts, but not loyalty points discount
+          // Loyalty points discount is applied to the total only, not individual services
           const pricePaid =
             summaryParams.adjustedPrices &&
             summaryParams.adjustedPrices[packageServiceId] !== undefined
               ? summaryParams.adjustedPrices[packageServiceId]
-              : 0;
+              : packageService.selling_price;
 
           const bookingData = {
             appointment_id: createdAppointmentId,
@@ -340,6 +350,9 @@ export default function useSaveAppointment({
           const isInPackage = packageServiceIds.includes(customServiceId);
           if (isInPackage) continue;
 
+          // For custom service price, only use adjustedPrices which contain membership, coupon 
+          // and regular discounts, but not loyalty points discount
+          // Loyalty points discount is applied to the total only, not individual services
           const pricePaid =
             summaryParams.adjustedPrices &&
             summaryParams.adjustedPrices[customServiceId] !== undefined

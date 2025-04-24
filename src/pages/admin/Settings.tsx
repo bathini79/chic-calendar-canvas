@@ -102,24 +102,21 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <Card className="h-full">
-          <CardContent className="pt-4 md:pt-6">
-            <div className="flex flex-col h-full">
-              <div className="mb-3 md:mb-4">
-                <Users className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+        <Link to="/admin/settings/team">
+          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="pt-4 md:pt-6">
+              <div className="flex flex-col h-full">
+                <div className="mb-3 md:mb-4">
+                  <Users className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+                </div>
+                <h3 className="text-base md:text-lg font-semibold">Team</h3>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Manage permissions, compensation and time-off.
+                </p>
               </div>
-              <h3 className="text-base md:text-lg font-semibold">Team</h3>
-              <p className="text-xs md:text-sm text-muted-foreground">
-                Manage permissions, compensation and time-off.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div>
-        <h2 className="text-lg md:text-xl font-semibold mb-4">Online presence</h2>
-        {/* Online presence section can be expanded in the future */}
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   );

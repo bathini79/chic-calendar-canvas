@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { useLoyaltyPoints } from "@/hooks/use-loyalty-points";
 
@@ -119,37 +118,11 @@ export function useLoyaltyInCheckout({
 
   // Calculate adjusted service prices with loyalty discount
   useEffect(() => {
-    if (pointsDiscountAmount > 0 && discountedSubtotal > 0) {
-      const discountRatio = pointsDiscountAmount / discountedSubtotal;
-      const newAdjustedPrices: Record<string, number> = {};
-      
-      selectedServices.forEach((serviceId) => {
-        const service = services.find((s) => s.id === serviceId);
-        if (service) {
-          const originalPrice = service.selling_price;
-          newAdjustedPrices[serviceId] = originalPrice - (originalPrice * discountRatio);
-        }
-      });
-
-      selectedPackages.forEach((packageId) => {
-        const pkg = packages.find((p) => p.id === packageId);
-        if (pkg?.package_services) {
-          const packagePrice = pkg.price;
-          const discountAmount = packagePrice * discountRatio;
-          
-          pkg.package_services.forEach((ps) => {
-            const servicePrice = ps.package_selling_price ?? ps.service.selling_price;
-            const proportion = servicePrice / packagePrice;
-            newAdjustedPrices[ps.service.id] = servicePrice - (discountAmount * proportion);
-          });
-        }
-      });
-      
-      setAdjustedServicePrices(newAdjustedPrices);
-    } else {
-      setAdjustedServicePrices({});
-    }
-  }, [pointsDiscountAmount, discountedSubtotal, subtotal, selectedServices, selectedPackages, services, packages]);
+    // For loyalty points, we don't need to calculate per-service adjustments
+    // since the discount is applied to the total only
+    // Just return an empty object as we won't be applying discounts at the service level
+    setAdjustedServicePrices({});
+  }, [pointsDiscountAmount, discountedSubtotal]);
 
   return {
     isLoyaltyEnabled: settings?.enabled || false,

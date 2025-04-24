@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,7 +45,7 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
             phone: data.phone,
             photo_url: data.photo_url,
             status: data.status,
-            employment_type: data.employment_type,
+            employment_type_id: data.employment_type_id,
           })
           .eq("id", employeeId);
           

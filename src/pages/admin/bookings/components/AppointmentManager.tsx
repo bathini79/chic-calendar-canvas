@@ -7,7 +7,7 @@ import { SummaryView } from "./SummaryView";
 import { useAppointmentState } from "../hooks/useAppointmentState";
 import { useActiveServices } from "../hooks/useActiveServices";
 import { useActivePackages } from "../hooks/useActivePackages";
-import  useSaveAppointment  from "../hooks/useSaveAppointment";
+import useSaveAppointment from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
 import {
@@ -80,10 +80,10 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
   const { cancelAppointment, markAppointmentAs, updateAppointmentStatus } =
     useAppointmentActions();
-  const [loadingPayment,setLoadingPayment] = useState(false);
+  const [loadingPayment, setLoadingPayment] = useState(false);
 
   const { data: services } = useActiveServices(locationId);
-  const { data: packages } = useActivePackages(locationId);
+  const { data: packages } = useActivePackages(); // Removed locationId parameter
   const { sendNotification } = useAppointmentNotifications();
 
   const {
@@ -269,7 +269,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     membership_id: existingAppointment?.membership_id,
     membership_name: existingAppointment?.membership_name,
     coupon_name: existingAppointment?.coupon_name,
-    coupon_amount: existingAppointment?.coupon_amount
+    coupon_amount: existingAppointment?.coupon_amount,
   });
 
   const handleProceedToCheckout = async () => {
@@ -364,7 +364,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
           .eq("appointment_id", appointmentId);
 
         if (bookings) {
-
           const bookingIds = bookings.map((booking) => booking.id);
           await updateAppointmentStatus(appointmentId, "completed", bookingIds);
           // Update local state to reflect the change
@@ -374,9 +373,10 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         console.error(
           "Error updating appointment status after payment:",
           error
-        )}finally{
-          setLoadingPayment(false)
-        }
+        );
+      } finally {
+        setLoadingPayment(false);
+      }
     }
 
     setNewAppointmentId(appointmentId || null);
@@ -390,7 +390,19 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   const onHandleSaveAppointment = async () => {
-    const appointmentId = await handleSaveAppointment();
+    const totalPrice = calculateTotalPrice(
+      services,
+      packages,
+      discountType,
+      discountValue
+    );
+    const roundedTotal = Math.round(totalPrice);
+    const roundOffDifference = roundedTotal - totalPrice;
+
+    const appointmentId = await handleSaveAppointment({
+      total: roundedTotal,
+      roundOffDifference,
+    });
     if (appointmentId) {
       if (onAppointmentSaved) {
         onAppointmentSaved();
@@ -454,11 +466,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         toast.error("Failed to update appointment status");
       }
       try {
-        if (
-          status === "canceled" ||
-          status === "noshow"
-        ) {
-          onClose()
+        if (status === "canceled" || status === "noshow") {
+          onClose();
           await sendNotification(existingAppointment.id, status);
         }
       } catch (notificationError) {
@@ -503,15 +512,18 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     >
       <div className="flex flex-col h-full">
         <div className="flex flex-1 min-h-0">
-          <div className="w-[30%] border-r">
-            <SelectCustomer
-              selectedCustomer={selectedCustomer}
-              setSelectedCustomer={setSelectedCustomer}
-              setShowCreateForm={setShowCreateForm}
-            />
-          </div>
+          {/* Only show SelectCustomer component when not in summary view */}
+          {currentScreen !== SCREEN.SUMMARY && (
+            <div className="w-[30%] border-r">
+              <SelectCustomer
+                selectedCustomer={selectedCustomer}
+                setSelectedCustomer={setSelectedCustomer}
+                setShowCreateForm={setShowCreateForm}
+              />
+            </div>
+          )}
 
-          <div className="w-[70%] flex flex-col h-full">
+          <div className={`${currentScreen === SCREEN.SUMMARY ? 'w-full' : 'w-[70%]'} flex flex-col h-full`}>
             <div className={`p-6 border-b flex-shrink-0 ${headerBgColor}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-start flex-col">
@@ -669,11 +681,13 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
               )}
 
               {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
-                <div className="p-6">
+                <div className="p-6 w-full">
                   <h3 className="text-xl font-semibold mb-6">
                     Appointment Summary
                   </h3>
-                  <SummaryView appointmentId={newAppointmentId} />
+                  <SummaryView
+                    appointmentId={newAppointmentId}
+                  />
                   <div className="mt-6 flex justify-end">
                     <Button
                       onClick={() => {

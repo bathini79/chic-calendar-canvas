@@ -40,7 +40,7 @@ const formSchema = z.object({
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   photo_url: z.string().optional(),
   status: z.enum(["active", "inactive"]).default("active"),
-  employment_type: z.enum(["stylist", "operations"]).default("stylist"),
+  employment_type_id: z.string().min(1, "Employment type is required"),
   skills: z.array(z.string()).min(1, "At least one skill is required"),
   locations: z.array(z.string()).min(1, "At least one location is required"),
 });
@@ -82,7 +82,7 @@ export function StaffForm({
       phone: "",
       photo_url: "",
       status: "active",
-      employment_type: "stylist",
+      employment_type_id: "",
       skills: [],
       locations: [],
     },
@@ -102,6 +102,20 @@ export function StaffForm({
     },
   });
 
+  // Fetch employment types from the database
+  const { data: employmentTypes } = useQuery({
+    queryKey: ["employmentTypes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employment_types")
+        .select("*")
+        .order("name");
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   useEffect(() => {
     if (initialData) {
       form.reset({
@@ -112,7 +126,7 @@ export function StaffForm({
           : "",
         photo_url: initialData.photo_url || "",
         status: initialData.status || "active",
-        employment_type: initialData.employment_type || "stylist",
+        employment_type_id: initialData.employment_type_id || "",
         skills:
           initialData.employee_skills?.map((s: any) => s.service_id) || [],
         locations:
@@ -296,7 +310,7 @@ export function StaffForm({
 
         <FormField
           control={form.control}
-          name="employment_type"
+          name="employment_type_id"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Employment Type</FormLabel>
@@ -307,8 +321,17 @@ export function StaffForm({
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="stylist">Stylist</SelectItem>
-                  <SelectItem value="operations">Operations</SelectItem>
+                  {employmentTypes?.length ? (
+                    employmentTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>
+                      No employment types available
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               <FormMessage />

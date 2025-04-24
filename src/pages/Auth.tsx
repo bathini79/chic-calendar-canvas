@@ -13,8 +13,7 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { AlertCircle, Loader2 } from "lucide-react";
@@ -43,15 +42,11 @@ const Auth = () => {
   const referralSourceParam = queryParams.get('referral');
 
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [fullName, setFullName] = useState("");
   const [needsFullName, setNeedsFullName] = useState(false);
-  const [activeTab, setActiveTab] = useState<"email" | "phone">("email");
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [canResendOtp, setCanResendOtp] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(30);
@@ -105,38 +100,6 @@ const Auth = () => {
       setReferralSource(referralSourceParam);
     }
   }, [referralSourceParam]);
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const { error } = isSignUp
-        ? await supabase.auth.signUp({
-            email,
-            password,
-          })
-        : await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-      if (error) throw error;
-
-      if (isSignUp) {
-        toast.success("Check your email for the confirmation link!");
-      } else {
-        toast.success("Logged in successfully!");
-      }
-    } catch (error: any) {
-      const errorMessage = error.message || "An unexpected error occurred. Please try again.";
-      toast.error(errorMessage);
-      setVerificationError(errorMessage);
-      console.error("Authentication error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleCountryChange = (country: {name: string, code: string, flag: string}) => {
     setSelectedCountry(country);
@@ -308,7 +271,7 @@ const Auth = () => {
     sendWhatsAppOTP();
   };
 
-  const renderPhoneContent = () => {
+  const renderContent = () => {
     if (!otpSent) {
       return (
         <>
@@ -515,78 +478,14 @@ const Auth = () => {
         <CardHeader>
           <CardTitle>Welcome to Salon App</CardTitle>
           <CardDescription>
-            Sign in to your account or create a new one
+            Sign in or register using WhatsApp
           </CardDescription>
         </CardHeader>
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "email" | "phone")}>
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="email">Email</TabsTrigger>
-            <TabsTrigger value="phone">WhatsApp</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="email">
-            <CardContent>
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm font-medium">
-                    Email
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="password" className="text-sm font-medium">
-                    Password
-                  </label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : isSignUp ? (
-                    "Create Account"
-                  ) : (
-                    "Sign In"
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="link"
-                  className="w-full"
-                  onClick={() => setIsSignUp(!isSignUp)}
-                >
-                  {isSignUp
-                    ? "Already have an account? Sign in"
-                    : "Don't have an account? Sign up"}
-                </Button>
-              </form>
-            </CardContent>
-          </TabsContent>
-          
-          <TabsContent value="phone">
-            <CardContent>
-              <div className="space-y-4">
-                {renderPhoneContent()}
-              </div>
-            </CardContent>
-          </TabsContent>
-        </Tabs>
-        
+        <CardContent>
+          <div className="space-y-4">
+            {renderContent()}
+          </div>
+        </CardContent>
         <CardFooter className="flex justify-center border-t pt-4 mt-4">
           <p className="text-sm text-muted-foreground">
             By continuing, you agree to our Terms of Service and Privacy Policy.

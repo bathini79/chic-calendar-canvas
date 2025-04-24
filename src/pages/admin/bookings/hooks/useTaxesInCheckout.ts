@@ -34,24 +34,31 @@ export const useTaxesInCheckout = ({
   }, [locationId, fetchTaxRates, fetchLocationTaxSettings]);
 
   useEffect(() => {
-    if (appliedTaxId && taxRates.length > 0) {
+    if (appliedTaxId === null || appliedTaxId === "none") {
+      setAppliedTaxRate(0);
+      setAppliedTaxName("No Tax");
+    } else if (appliedTaxId && taxRates.length > 0) {
       const tax = taxRates.find((t) => t.id === appliedTaxId);
       if (tax) {
         setAppliedTaxRate(tax.percentage);
         setAppliedTaxName(tax.name);
       }
-    } else {
-      setAppliedTaxRate(0);
-      setAppliedTaxName("");
     }
   }, [appliedTaxId, taxRates]);
 
   const handleTaxChange = (taxId: string) => {
     if (taxId === "none") {
-      setAppliedTaxId(null);
+      setAppliedTaxId(null); // Ensure backend interprets this as "No Tax"
+      setAppliedTaxRate(0);
+      setAppliedTaxName("No Tax");
       return;
     }
-    setAppliedTaxId(taxId);
+    const tax = taxRates.find((t) => t.id === taxId);
+    if (tax) {
+      setAppliedTaxId(taxId);
+      setAppliedTaxRate(tax.percentage);
+      setAppliedTaxName(tax.name);
+    }
   };
 
   const taxAmount = appliedTaxId ? discountedSubtotal * (appliedTaxRate / 100) : 0;

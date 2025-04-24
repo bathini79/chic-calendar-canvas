@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, addDays, startOfToday, isSameDay, addMinutes, parseISO, isToday, isBefore } from "date-fns";
@@ -198,9 +197,45 @@ export function UnifiedCalendar({
     let currentStartTime = new Date(`${format(selectedDate, 'yyyy-MM-dd')} ${startTimeString}`);
     const newTimeSlots: Record<string, string> = {};
     
+    // Process all top-level items first (services and packages)
     sortedItems.forEach((item) => {
-      newTimeSlots[item.id] = format(currentStartTime, 'HH:mm');
+      // First, set the time slot for the cart item id
+      const itemId = item.id;
+      newTimeSlots[itemId] = format(currentStartTime, 'HH:mm');
       
+      // For services, also store the time slot with the actual service_id as a key
+      if (item.type === 'service' && item.service_id) {
+        newTimeSlots[item.service_id] = format(currentStartTime, 'HH:mm');
+      }
+      
+      // For packages, also set time slots for all package services
+      if (item.type === 'package' && item.package) {
+        // Get services in this package
+        const packageData = item.package || {};
+        
+        if (packageData.package_services) {
+          // Handle standard package structure with package_services array
+          packageData.package_services.forEach(ps => {
+            if (ps.service && ps.service.id) {
+              newTimeSlots[ps.service.id] = format(currentStartTime, 'HH:mm');
+            }
+          });
+        } else if (packageData.services) {
+          // Package has inline services
+          packageData.services.forEach(svc => {
+            if (svc.id) {
+              newTimeSlots[svc.id] = format(currentStartTime, 'HH:mm');
+            }
+          });
+        }
+        
+        // Also store with package_id if available
+        if (item.package_id) {
+          newTimeSlots[item.package_id] = format(currentStartTime, 'HH:mm');
+        }
+      }
+      
+      // Advance the start time by the item's duration
       const itemDuration = item.service?.duration || item.duration || item.package?.duration || 0;
       currentStartTime = addMinutes(currentStartTime, itemDuration);
     });
@@ -209,9 +244,8 @@ export function UnifiedCalendar({
   };
 
   const clearSelectedTimeSlots = () => {
-    sortedItems.forEach(item => {
-      onTimeSlotSelect(item.id, '');
-    });
+    // Create a handler in the parent component to properly reset the state
+    onTimeSlotSelect('reset', '');
   };
 
   return (

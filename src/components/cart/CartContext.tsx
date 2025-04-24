@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
 interface CartItem {
@@ -95,7 +94,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           name: serviceName,
           price: servicePrice,
           duration: serviceDuration,
-          service_id: serviceId,
+          service_id: serviceId,  // Store the actual service ID for time slot reference
           service: extraData?.service || null,
           selling_price: servicePrice,
           // Add service data if available
@@ -112,7 +111,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           name: packageName,
           price: packagePrice,
           duration: packageDuration,
-          package_id: packageId,
+          package_id: packageId,  // Store the actual package ID for time slot reference
           package: extraData?.package || null,
           selling_price: packagePrice,
           // Add package data if available

@@ -55,10 +55,22 @@ export const SelectedItem: React.FC<SelectedItemProps> = ({ item, onRemove }) =>
         </div>
         <div className="flex items-center">
           {item.type === "package" && (
-            <p className="font-semibold text-lg">
-              <IndianRupee className="inline h-4 w-4" />
-              {item.price}
-            </p>
+            <div className="flex justify-end">
+              {item.price !== item.adjustedPrice && (
+                <p className="font-medium text-lg line-through text-muted-foreground mr-2">
+                  <IndianRupee className="inline h-4 w-4" />
+                  {item.price.toFixed(2)}
+                </p>
+              )}
+              <p
+                className={`font-semibold text-lg ${
+                  item.price !== item.adjustedPrice ? "text-green-600" : ""
+                }`}
+              >
+                <IndianRupee className="inline h-4 w-4" />
+                {item.adjustedPrice.toFixed(2)}
+              </p>
+            </div>
           )}
           {item.type === "service" && (
             <div className="flex justify-end">

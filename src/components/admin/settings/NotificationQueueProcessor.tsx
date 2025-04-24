@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader } from "lucide-react";
@@ -13,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast"; // Updated import
 
 // Define type for notification queue items
 interface NotificationQueueItem {
@@ -50,7 +49,7 @@ export function NotificationQueueProcessor() {
   const handleProcessQueue = async () => {
     setProcessing(true);
     try {
-      toast.info("Notification processing has been disabled");
+      toast.warning("Notification processing has been disabled");
       await fetchQueue(); // Refresh the list
     } finally {
       setProcessing(false);
