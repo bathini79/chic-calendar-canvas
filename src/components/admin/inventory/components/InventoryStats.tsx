@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { IndianRupee } from "lucide-react";
 
 export function InventoryStats() {
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
@@ -85,7 +86,7 @@ export function InventoryStats() {
         <div className="bg-card p-4 rounded-lg">
           <h3 className="font-medium mb-2">Total Value</h3>
           <p className="text-2xl font-bold">
-            ${totalValue.toFixed(2) || '0.00'}
+             <IndianRupee/>{totalValue.toFixed(2) || '0.00'}
           </p>
         </div>
       </div>
