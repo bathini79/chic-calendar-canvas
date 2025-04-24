@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { StaffDialog } from "@/components/staff/StaffDialog";
 import { StaffGrid } from "@/components/staff/StaffGrid";
@@ -18,7 +17,8 @@ export default function Staff() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<"staff" | "shifts">("staff");
-  const { data: employees, isLoading } = useSupabaseCrud<'employees'>('employees');
+  const [refreshKey, setRefreshKey] = useState(0); // Add a refresh key state
+  const { data: employees, isLoading } = useSupabaseCrud<'employees'>('employees', refreshKey);
 
   const handleOpenDialog = (employeeId?: string) => {
     setSelectedEmployeeId(employeeId);
@@ -28,6 +28,8 @@ export default function Staff() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setSelectedEmployeeId(undefined);
+    // Trigger a refresh by updating the refresh key
+    setRefreshKey((prevKey) => prevKey + 1);
   };
 
   if (isLoading) {

@@ -1,156 +1,139 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
-
-const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
-const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
-const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')
-
-// Define CORS headers
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0';
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function generateOTP() {
-  // Generate a 6-digit OTP
-  return Math.floor(100000 + Math.random() * 900000).toString()
-}
-
-async function sendWhatsAppOTP(phoneNumber: string, otp: string) {
-  // Make sure the phone number is in E.164 format
-  const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`
-  
-  
-  const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
-  
-  const formData = new URLSearchParams()
-  formData.append('From', `whatsapp:${TWILIO_PHONE_NUMBER}`)
-  formData.append('To', `whatsapp:${formattedPhone}`)
-  formData.append('Body', `Your verification code is: ${otp}`)
-
-  const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)
-  
-  try {
-    const response = await fetch(twilioUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${auth}`
-      },
-      body: formData
-    })
-    
-    const responseData = await response.json()
-    
-    if (!response.ok) {
-      console.error('Error from Twilio:', responseData)
-      throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || JSON.stringify(responseData)}`)
-    }
-    
-    return responseData
-  } catch (error) {
-    console.error('Failed to send WhatsApp message:', error)
-    throw error
-  }
-}
-
-serve(async (req) => {
-  // Handle CORS preflight requests
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
+};
+serve(async (req)=>{
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, {
+      headers: {
+        ...corsHeaders
+      }
+    });
   }
-
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({
+      error: "Method not allowed"
+    }), {
+      status: 405,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
+    });
+  }
   try {
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-      console.error('Twilio credentials missing:', {
-        ACCOUNT_SID_EXISTS: !!TWILIO_ACCOUNT_SID,
-        AUTH_TOKEN_EXISTS: !!TWILIO_AUTH_TOKEN,
-        PHONE_NUMBER_EXISTS: !!TWILIO_PHONE_NUMBER
-      })
-      throw new Error('Twilio credentials not configured')
-    }
-    
-    // Parse request body
-    const { phoneNumber } = await req.json()
-    
+    const { phoneNumber, fullName, lead_source,baseUrl } = await req.json();
     if (!phoneNumber) {
-      throw new Error('Phone number is required')
-    }
-
-    
-    // Generate OTP
-    const otp = generateOTP()
-    
-    // Store OTP in database for verification
-    const supabaseClient = Deno.env.get('SUPABASE_URL') && Deno.env.get('SUPABASE_ANON_KEY')
-      ? createClient(
-          Deno.env.get('SUPABASE_URL') as string,
-          Deno.env.get('SUPABASE_ANON_KEY') as string,
-          { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-        )
-      : null
-      
-    if (supabaseClient) {
-      try {
-        // First, delete any existing OTP for this phone number
-        await supabaseClient
-          .from('phone_auth_codes')
-          .delete()
-          .eq('phone_number', phoneNumber);
-        
-        // Then store the new OTP with expiration (10 minutes)
-        const expiresAt = new Date()
-        expiresAt.setMinutes(expiresAt.getMinutes() + 10)
-        
-        const { error } = await supabaseClient
-          .from('phone_auth_codes')
-          .insert({
-            phone_number: phoneNumber,
-            code: otp,
-            expires_at: expiresAt.toISOString(),
-            created_at: new Date().toISOString()
-          })
-          
-        if (error) {
-          console.error('Error storing OTP in database:', error)
-          throw new Error(`Failed to store OTP: ${error.message}`)
-        }
-        
-      } catch (error: any) {
-        console.error('Database operation failed:', error)
-        throw new Error(`Failed to store OTP: ${error.message}`)
-      }
-    } else {
-      console.error('Supabase client could not be initialized')
-      throw new Error('Database connection error')
-    }
-    
-    // Send OTP via WhatsApp
-    await sendWhatsAppOTP(phoneNumber, otp)
-    
-    return new Response(
-      JSON.stringify({ message: 'OTP sent successfully' }),
-      { 
-        headers: { 
+      return new Response(JSON.stringify({
+        error: "Missing phoneNumber parameter"
+      }), {
+        status: 400,
+        headers: {
           ...corsHeaders,
-          'Content-Type': 'application/json' 
-        },
-        status: 200 
-      }
-    )
-  } catch (error: any) {
-    console.error('Error sending OTP:', error)
+          "Content-Type": "application/json"
+        }
+      });
+    }
+    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    // Generate a random 6-digit OTP code
+    const generateOTP = ()=>{
+      return Math.floor(100000 + Math.random() * 900000).toString();
+    };
+    const otp = generateOTP();
+    const expiresInMinutes = 15;
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
     
-    return new Response(
-      JSON.stringify({ error: error.message || "Unknown error occurred" }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
-        status: 400 
+    // Check if user already exists
+    const { data: existingUser, error: userError } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('phone_number', phoneNumber)
+      .single();
+    
+    // Load GupShup configuration
+    // Fetch Gupshup config from message_providers table
+    const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin.from('messaging_providers').select('configuration').eq('provider_name', 'gupshup').single();
+    if (providerConfigError || !providerConfigData?.configuration) {
+      throw new Error('Gupshup config not found in message_providers');
+    }
+    
+    const { error: otpError } = await supabaseAdmin.from('phone_auth_codes').insert({
+      phone_number: phoneNumber,
+      code: otp,
+      expires_at: expiresAt.toISOString(),
+      full_name: fullName,
+      lead_source: lead_source
+    });
+    if (otpError) {
+      throw new Error(`Failed to store verification code: ${otpError.message}`);
+    }
+    const config = providerConfigData.configuration;
+    // Create verification link (must be URL-encoded)
+    const verificationParams = new URLSearchParams({
+      phone: phoneNumber,
+      code: otp
+    });
+    // Use customer verification page for the link
+    const verificationUrl = `${baseUrl}/customer-verify?${verificationParams.toString()}`;
+    // Create message with verification link
+    const MESSAGE_TEXT = `Please verify your phone number by clicking this link: ${verificationUrl}\n\nOr use code: ${otp}\n\nThis code will expire in ${expiresInMinutes} minutes.`;
+    console.log("Sending message with verification link:", verificationUrl);
+    const GUPSHUP_API_KEY = config.api_key;
+    const SOURCE_NUMBER = config.source_mobile.startsWith('+') ? config.source_mobile.slice(1) : config.source_mobile;
+    const url = "https://api.gupshup.io/wa/api/v1/msg";
+    const headers = {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "apikey": GUPSHUP_API_KEY
+    };
+    // Ensure number is formatted correctly - don't add + prefix
+    const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber;
+    const APP_NAME = config.app_name;
+    const formData = new URLSearchParams();
+    formData.append("channel", "whatsapp");
+    formData.append("source", SOURCE_NUMBER);
+    formData.append("destination", formattedPhoneNumber);
+    formData.append("message", JSON.stringify({
+      type: "text",
+      text: MESSAGE_TEXT
+    }));
+    formData.append("src.name", APP_NAME);
+    console.log("Sending to:", formattedPhoneNumber);
+    console.log("Message content:", MESSAGE_TEXT);
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: formData.toString()
+    });
+    const responseBody = await response.json();
+    if (!response.ok) {
+      console.error("Gupshup API error:", responseBody);
+      throw new Error(`Gupshup API error: ${JSON.stringify(responseBody)}`);
+    }
+    console.log("Gupshup API success:", responseBody);
+    return new Response(JSON.stringify({
+      success: true,
+      response: responseBody,
+      userData: existingUser // Include user data in the response if they exist
+    }), {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
       }
-    )
+    });
+  } catch (error) {
+    console.error("Error in send-whatsapp-otp:", error);
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
+    });
   }
-})
+});

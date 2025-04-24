@@ -54,9 +54,8 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
   );
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
   const [calculatedPrice, setCalculatedPrice] = useState(0);
-  const [discountedPrice,setDiscountedPrice] = useState({
-
-  })
+  const [discountedPrice, setDiscountedPrice] = useState(initialData?.selling_price || {});
+  const [hasLocationError, setHasLocationError] = useState(false);
 
   const form = useForm<PackageFormData>({
     resolver: zodResolver(formSchema),
@@ -97,6 +96,8 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
       setSelectedCategories(initialData?.package_categories?.map((pc: any) => pc.categories.id) || []);
       setCustomizableServices(initialData?.customizable_services || []);
       setImages(initialData?.image_urls || []);
+      setDiscountedPrice(initialData?.selling_price || {});
+      
       form.reset({
         name: initialData?.name || '',
         services: initialData?.services || [],
@@ -110,6 +111,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
         discount_value: initialData?.discount_value || 0,
         image_urls: initialData?.image_urls || [],
         customizable_services: initialData?.customizable_services || [],
+        selling_price: initialData?.selling_price || {},
       });
     }
   }, [initialData, form]);
@@ -146,6 +148,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     setSelectedCategories(updatedCategories);
     form.setValue('categories', updatedCategories);
   };
+
   const calculateDiscountedPrice = (basePrice, discountType, discountValue, totalBasePrice = basePrice) => {
     if (discountType === 'percentage') {
       return basePrice * (1 - discountValue / 100);
@@ -167,7 +170,8 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     const totalBasePrice = getTotalBasePrice();
     const finalPrice = calculateDiscountedPrice(service.selling_price, discountType, discountValue, totalBasePrice);
     setDiscountedPrice((prev) => ({ ...prev, [serviceId]: finalPrice }));
-    form.setValue(`selling_price.${serviceId}`, finalPrice);  };
+    form.setValue(`selling_price.${serviceId}`, finalPrice);
+  };
   
   useEffect(() => {
     if (!services) return;
@@ -183,6 +187,33 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
     form.setValue('price', finalPrice);
   }, [selectedServices, services, form.watch('discount_type'), form.watch('discount_value')]);
   
+  const handleLocationValidationChange = (hasError: boolean) => {
+    setHasLocationError(hasError);
+  };
+
+  const handleFormSubmit = (data: PackageFormData) => {
+    // Only allow submission if there's no location error
+    if (!hasLocationError) {
+      // Ensure duration is correctly calculated before submission
+      if (services) {
+        const totalDuration = selectedServices.reduce((total, serviceId) => {
+          const service = services.find(s => s.id === serviceId);
+          return total + (service?.duration || 0);
+        }, 0);
+        
+        // Update duration in the form data before submission
+        data.duration = totalDuration;
+      }
+      
+      onSubmit(data);
+    } else {
+      // If there's a location error, prevent submission and show an error
+      form.setError("services", {
+        type: "manual",
+        message: "Cannot create package with services from different locations"
+      });
+    }
+  };
 
   // Calculate total duration based on selected services
   useEffect(() => {
@@ -198,7 +229,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
 
   return (
     <FormProvider {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="name"
@@ -249,6 +280,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
           selectedServices={selectedServices}
           onServiceSelect={handleServiceSelect}
           onServiceRemove={handleServiceRemove}
+          onLocationValidation={handleLocationValidationChange}
         />
 
         <PriceSection 
@@ -291,7 +323,7 @@ export function PackageForm({ initialData, onSubmit, onCancel }: PackageFormProp
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit">
+          <Button type="submit" disabled={hasLocationError}>
             {initialData ? 'Update Package' : 'Create Package'}
           </Button>
         </div>

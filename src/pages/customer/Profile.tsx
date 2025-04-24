@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -18,6 +17,18 @@ interface Appointment {
   bookings: Booking[];
   location?: string;
   location_id?: string;
+  subtotal?: number;
+  tax_amount?: number;
+  tax_id?: string;
+  tax_name?: string;
+  membership_name?: string;
+  membership_discount?: number;
+  coupon_code?: string;
+  coupon_discount?: number;
+  points_redeemed?: number;
+  points_value?: number;
+  round_off_difference?: number;
+  payment_method?: string;
 }
 
 interface Booking {
@@ -31,6 +42,7 @@ interface Booking {
   service: Service | null;
   package: Package | null;
   employee: Employee | null;
+  original_price?: number;
 }
 
 interface Service {
@@ -106,8 +118,22 @@ const Profile = () => {
         .from('appointments')
         .select(`
           *,
+          subtotal,
+          tax_amount,
+          tax_id,
+          tax_name,
+          membership_name,
+          membership_discount,
+          coupon_code,
+          coupon_discount,
+          points_redeemed,
+          points_value,
+          round_off_difference,
+          payment_method,
           bookings (
             *,
+            original_price,
+            price_paid,
             service:services (*),
             package:packages (*),
             employee:employees!bookings_employee_id_fkey(*)
@@ -218,7 +244,7 @@ const Profile = () => {
     // Process the selected appointment to include full location details for the appointment details view
     const processedSelectedAppointment = {
       ...selectedAppointment,
-      location: getFormattedAddress(selectedAppointment?.location || "")
+      locationAddress: getFormattedAddress(selectedAppointment?.location || "")
     };
 
     return (

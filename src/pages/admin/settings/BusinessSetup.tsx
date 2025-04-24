@@ -19,17 +19,7 @@ export default function BusinessSetup() {
 
   return (
     <div className="container py-6 max-w-6xl">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" size="sm" asChild className="mr-2">
-          <Link to="/admin/settings">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back
-          </Link>
-        </Button>
-        <div className="text-sm text-muted-foreground">
-          Workspace settings • Business setup
-        </div>
-      </div>
+     
 
       <Routes>
         <Route path="/" element={
@@ -54,26 +44,6 @@ export default function BusinessSetup() {
                   </div>
                   <div className="px-4 py-2 cursor-pointer">
                     <span>Client sources</span>
-                  </div>
-
-                  <Separator className="my-4" />
-                  <div className="px-4 py-2 font-medium">Shortcuts</div>
-
-                  <div className="px-4 py-2 flex justify-between items-center cursor-pointer">
-                    <span>Service menu</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                  <div className="px-4 py-2 flex justify-between items-center cursor-pointer">
-                    <span>Product list</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                  <div className="px-4 py-2 flex justify-between items-center cursor-pointer">
-                    <span>Memberships</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                  <div className="px-4 py-2 flex justify-between items-center cursor-pointer">
-                    <span>Client list</span>
-                    <ArrowRight className="h-4 w-4" />
                   </div>
                 </CardContent>
               </Card>

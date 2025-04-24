@@ -45,8 +45,10 @@ interface BookingsByTimeSlot {
 
 const TimeSlots: React.FC<TimeSlotsProps> = ({
   employees,
+  hourLabels,
   formatTime,
   TOTAL_HOURS,
+  PIXELS_PER_HOUR,
   nowPosition,
   isSameDay,
   appointments,
@@ -60,11 +62,15 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
   useEffect(() => {
     setDataVersion((prev) => prev + 1);
   }, [appointments]);
+  
   const handleColumnClick = (e: React.MouseEvent, empId: string) => {
     if (e.target !== e.currentTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
-    let clickedTime = START_HOUR + offsetY / PIXELS_PER_HOUR;
+    
+    // Use the first hour from hourLabels as the start hour
+    const startHourValue = hourLabels[0] || START_HOUR;
+    let clickedTime = startHourValue + offsetY / PIXELS_PER_HOUR;
     clickedTime = Math.round(clickedTime * 4) / 4;
 
     setClickedCell({
@@ -81,6 +87,8 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     const bookingsByTimeSlot: BookingsByTimeSlot = {};
 
     appointments.forEach((appointment) => {
+      if (!appointment.bookings) return;
+      
       appointment.bookings.forEach((booking) => {
         // Check if this booking should be shown for the current employee
         // Either it's assigned to this employee OR it's unassigned and we're on the default employee
@@ -91,8 +99,8 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
 
         if (!isForThisEmployee) return;
         if (
-          appointment.status === "canceled" ||
-          appointment.status === "voided" ||
+          appointment.status === "cancelled" ||
+          appointment.status === "no-show" || // Fixed to match the actual enum value "no-show"
           !booking.id
         )
           return;
@@ -124,24 +132,27 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
           const totalBookingsInSlot = bookings.length;
 
           // Calculate booking display properties
-          const isNoShow =
-            appointment.status === "noshow"; // Fixed to match the actual enum value
-    const statusColor = isNoShow 
-      ? 'bg-red-100 border-red-300 text-red-700'
-      : getAppointmentStatusColor(appointment.status);
+          const isNoShow = appointment.status === "no-show";
+          const statusColor = isNoShow 
+            ? 'bg-red-100 border-red-300 text-red-700'
+            : getAppointmentStatusColor(appointment.status);
       
           const duration =
             booking.service?.duration || booking.package?.duration || 60;
           const startTime = new Date(
             booking.start_time || appointment.start_time
           );
-    const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+          
+          // Use the first hour from hourLabels as the start hour
+          const startHourValue = hourLabels[0] || START_HOUR;
+          const startHour = startTime.getHours() + startTime.getMinutes() / 60;
           const cellKey = `${employeeId}-${timeSlotKey}-${index}-${dataVersion}`;
+          
           // Position calculations for multiple bookings in the same slot
           // Add a small offset to ensure visibility within the cell boundaries
           const topPositionPx = Math.max(
             0,
-            (startHour - START_HOUR) * PIXELS_PER_HOUR
+            (startHour - startHourValue) * PIXELS_PER_HOUR
           );
           const heightPx = Math.max(30, (duration / 60) * PIXELS_PER_HOUR); // Ensure minimum height
 
@@ -153,39 +164,39 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
           const gapSize = 1; // 1% gap
           const adjustedWidth = widthPerBooking - gapSize;
 
-    return (
-      <div
+          return (
+            <div
               key={`${booking.id}-${index}-${dataVersion}`}
               className={`absolute rounded border ${statusColor} cursor-pointer z-10 overflow-hidden transition-colors`}
-        style={{
-          top: `${topPositionPx}px`,
-          height: `${heightPx}px`,
+              style={{
+                top: `${topPositionPx}px`,
+                height: `${heightPx}px`,
                 left: `${leftOffset + gapSize / 2}%`,
                 width: `${adjustedWidth}%`,
                 zIndex: 10 + index, // Higher index items appear in front
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          setSelectedAppointment(appointment);
-        }}
-      >
-        {isNoShow && (
-          <div className="absolute -top-2 -left-2 bg-red-100 rounded-full p-1 border border-red-300">
-            <Flag className="h-4 w-4 text-red-600" />
-          </div>
-        )}
-        <div className="p-2 text-xs">
-          <div className="font-medium truncate">
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedAppointment(appointment);
+              }}
+            >
+              {isNoShow && (
+                <div className="absolute -top-2 -left-2 bg-red-100 rounded-full p-1 border border-red-300">
+                  <Flag className="h-4 w-4 text-red-600" />
+                </div>
+              )}
+              <div className="p-2 text-xs">
+                <div className="font-medium truncate">
                   {appointment.customer?.full_name || "No name"}
-          </div>
-          <div className="truncate text-gray-600">
+                </div>
+                <div className="truncate text-gray-600">
                   {booking.service?.name ||
                     booking.package?.name ||
                     "Unnamed service"}
-          </div>
-        </div>
-      </div>
-    );
+                </div>
+              </div>
+            </div>
+          );
         });
       })
       .flat();

@@ -1,4 +1,3 @@
-
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,8 +13,7 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { AlertCircle, Loader2 } from "lucide-react";
@@ -27,7 +25,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Referral source options
 const referralSources = [
   { value: "google", label: "Google Search" },
   { value: "facebook", label: "Facebook" },
@@ -45,15 +42,11 @@ const Auth = () => {
   const referralSourceParam = queryParams.get('referral');
 
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [fullName, setFullName] = useState("");
   const [needsFullName, setNeedsFullName] = useState(false);
-  const [activeTab, setActiveTab] = useState<"email" | "phone">("email");
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [canResendOtp, setCanResendOtp] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(30);
@@ -73,12 +66,12 @@ const Auth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
         await queryClient.invalidateQueries({ queryKey: ["session"] });
-        navigate("/");
+        navigate("/services");
       }
     });
 
     if (session) {
-      navigate("/");
+      navigate("/services");
     }
 
     return () => subscription.unsubscribe();
@@ -103,41 +96,10 @@ const Auth = () => {
   }, [otpSent, resendCountdown]);
 
   useEffect(() => {
-    // Set referral source from URL parameter if available
     if (referralSourceParam && referralSources.some(source => source.value === referralSourceParam)) {
       setReferralSource(referralSourceParam);
     }
   }, [referralSourceParam]);
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const { error } = isSignUp
-        ? await supabase.auth.signUp({
-            email,
-            password,
-          })
-        : await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-      if (error) throw error;
-
-      if (isSignUp) {
-        toast.success("Check your email for the confirmation link!");
-      } else {
-        toast.success("Logged in successfully!");
-      }
-    } catch (error: any) {
-      toast.error(error.message);
-      console.error("Authentication error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleCountryChange = (country: {name: string, code: string, flag: string}) => {
     setSelectedCountry(country);
@@ -145,8 +107,9 @@ const Auth = () => {
 
   const sendWhatsAppOTP = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
-      toast.error("Please enter a valid phone number");
-      setVerificationError("Please enter a valid phone number");
+      const errorMessage = "Please enter a valid phone number";
+      toast.error(errorMessage);
+      setVerificationError(errorMessage);
       return;
     }
 
@@ -157,10 +120,19 @@ const Auth = () => {
     setResendCountdown(30);
     
     try {
-      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      const fullPhoneNumber = phoneNumber.startsWith('+') ? 
+        phoneNumber : 
+        `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;
       
-      const response = await supabase.functions.invoke('send-whatsapp-otp', {
-        body: { phoneNumber: fullPhoneNumber },
+      console.log("Sending OTP to phone number:", fullPhoneNumber);
+      
+      const response = await supabase.functions.invoke('customer-send-whatsapp-otp', {
+        body: { 
+          phoneNumber: fullPhoneNumber,
+          fullName: fullName || undefined,
+          lead_source: referralSource || undefined,
+          baseUrl: window.location.origin
+        },
       });
 
       if (response.error) {
@@ -175,7 +147,7 @@ const Auth = () => {
       setNeedsFullName(false);
       toast.success("OTP sent to your WhatsApp. Please check your messages.");
     } catch (error: any) {
-      const errorMessage = error.message || "Failed to send OTP";
+      const errorMessage = error.message || "Failed to send OTP. Please try again.";
       toast.error(errorMessage);
       setVerificationError(errorMessage);
       setEdgeFunctionError(errorMessage);
@@ -187,14 +159,16 @@ const Auth = () => {
 
   const verifyWhatsAppOTP = async () => {
     if (!otp || otp.length !== 6) {
-      toast.error("Please enter a valid 6-digit OTP");
-      setVerificationError("Please enter a valid 6-digit OTP");
+      const errorMessage = "Please enter a valid 6-digit OTP";
+      toast.error(errorMessage);
+      setVerificationError(errorMessage);
       return;
     }
 
     if (needsFullName && !fullName.trim()) {
-      toast.error("Full name is required for new registrations");
-      setVerificationError("Full name is required for new registrations");
+      const errorMessage = "Full name is required for new registrations";
+      toast.error(errorMessage);
+      setVerificationError(errorMessage);
       return;
     }
 
@@ -203,9 +177,13 @@ const Auth = () => {
     setEdgeFunctionError(null);
     
     try {
-      const fullPhoneNumber = `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+      const fullPhoneNumber = phoneNumber.startsWith('+') ? 
+        phoneNumber : 
+        `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;
       
-      const response = await supabase.functions.invoke('verify-whatsapp-otp', {
+      console.log("Verifying OTP for phone number:", fullPhoneNumber);
+      
+      const response = await supabase.functions.invoke('customer-verify-whatsapp-otp', {
         body: { 
           phoneNumber: fullPhoneNumber, 
           code: otp,
@@ -213,32 +191,71 @@ const Auth = () => {
           lead_source: referralSource || undefined
         },
       });
-
+      
       if (response.data && response.data.error) {
         if (response.data.error === "new_user_requires_name") {
           setNeedsFullName(true);
-          setVerificationError("Please enter your full name to complete registration");
-          setEdgeFunctionError("New user registration requires a full name");
           toast.info("New user detected. Please enter your full name to complete registration.");
           setIsLoading(false);
           return;
         }
-        setVerificationError(response.data.message || "Verification failed");
+        
+        if (response.data.error === "user_creation_failed") {
+          console.error("User creation failed:", response.data);
+          const errorDetails = response.data.details || "Database error";
+          setVerificationError(`User registration failed: ${errorDetails}`);
+          setEdgeFunctionError(response.data.error);
+          toast.error(`Registration failed: ${errorDetails}`);
+          setIsLoading(false);
+          return;
+        }
+        
+        const errorMessage = response.data.message || "Verification failed. Please try again.";
+        toast.error(errorMessage);
+        setVerificationError(errorMessage);
         setEdgeFunctionError(response.data.error);
-        toast.error(response.data.message || "Verification failed");
         setIsLoading(false);
         return;
       }
 
-      toast.success(response.data.isNewUser ? 
-        "Registration successful! Logging in..." : 
-        "Login successful!");
-      
-      await queryClient.invalidateQueries({ queryKey: ["session"] });
-      navigate("/");
+      if (response.data && response.data.credentials) {        
+        try {
+          const { data, error: signInError } = await supabase.auth.signInWithPassword({
+            email: response.data.credentials.email,
+            password: response.data.credentials.password,
+            options: {
+              data: {
+                phone: fullPhoneNumber,
+                full_name: fullName || response.data.fullName
+              }
+            }
+          });
+          
+          if (signInError) {
+            console.error("Error signing in with credentials:", signInError);
+            toast.error("Error signing in: " + signInError.message);
+            setIsLoading(false);
+            return;
+          }
+          
+          toast.success(response.data.isNewUser ? 
+            "Registration successful! Welcome!" : 
+            "Login successful!");
+            
+          if (data.session) {
+            navigate("/services");
+          }
+        } catch (signInError: any) {
+          console.error("Error signing in:", signInError);
+          toast.error("Error during authentication: " + signInError.message);
+        }
+      } else {
+        console.error("No credentials in response:", response.data);
+        toast.error("Authentication response missing credentials");
+      }
     } catch (error: any) {
       console.error("OTP verification error:", error);
-      const errorMessage = "Connection error. Please try again.";
+      const errorMessage = error.message || "Connection error. Please try again.";
       toast.error(errorMessage);
       setVerificationError(errorMessage);
       setEdgeFunctionError("Network or server error occurred");
@@ -254,7 +271,7 @@ const Auth = () => {
     sendWhatsAppOTP();
   };
 
-  const renderPhoneContent = () => {
+  const renderContent = () => {
     if (!otpSent) {
       return (
         <>
@@ -275,14 +292,6 @@ const Auth = () => {
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
               <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>{verificationError}</span>
-            </div>
-          )}
-          {edgeFunctionError && (
-            <div className="bg-yellow-50 text-yellow-800 p-2 rounded-md text-sm flex items-start mt-2">
-              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-              <span>
-                <strong>Server Error:</strong> {edgeFunctionError}
-              </span>
             </div>
           )}
           <Button
@@ -342,14 +351,6 @@ const Auth = () => {
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
               <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
               <span>{verificationError}</span>
-            </div>
-          )}
-          {edgeFunctionError && (
-            <div className="bg-yellow-50 text-yellow-800 p-2 rounded-md text-sm flex items-start mt-2">
-              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-              <span>
-                <strong>Server Error:</strong> {edgeFunctionError}
-              </span>
             </div>
           )}
           <div className="flex space-x-2">
@@ -417,14 +418,6 @@ const Auth = () => {
               <span>{verificationError}</span>
             </div>
           )}
-          {edgeFunctionError && (
-            <div className="bg-yellow-50 text-yellow-800 p-2 rounded-md text-sm flex items-start mt-2">
-              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-              <span>
-                <strong>Server Error:</strong> {edgeFunctionError}
-              </span>
-            </div>
-          )}
           <div className="text-center mt-2">
             {canResendOtp ? (
               <Button
@@ -451,6 +444,7 @@ const Auth = () => {
             onClick={() => {
               setOtpSent(false);
               setOtp("");
+              document.querySelectorAll("input[data-otp-slot]").forEach(input => input.value = "");
               setVerificationError(null);
               setEdgeFunctionError(null);
             }}
@@ -483,78 +477,14 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardDescription>
-            Sign in to your account or create a new one
+            Sign in or register using WhatsApp
           </CardDescription>
         </CardHeader>
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "email" | "phone")}>
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="email">Email</TabsTrigger>
-            <TabsTrigger value="phone">WhatsApp</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="email">
-            <CardContent>
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm font-medium">
-                    Email
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="password" className="text-sm font-medium">
-                    Password
-                  </label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : isSignUp ? (
-                    "Create Account"
-                  ) : (
-                    "Sign In"
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="link"
-                  className="w-full"
-                  onClick={() => setIsSignUp(!isSignUp)}
-                >
-                  {isSignUp
-                    ? "Already have an account? Sign in"
-                    : "Don't have an account? Sign up"}
-                </Button>
-              </form>
-            </CardContent>
-          </TabsContent>
-          
-          <TabsContent value="phone">
-            <CardContent>
-              <div className="space-y-4">
-                {renderPhoneContent()}
-              </div>
-            </CardContent>
-          </TabsContent>
-        </Tabs>
-        
+        <CardContent>
+          <div className="space-y-4">
+            {renderContent()}
+          </div>
+        </CardContent>
         <CardFooter className="flex justify-center border-t pt-4 mt-4">
           <p className="text-sm text-muted-foreground">
             By continuing, you agree to our Terms of Service and Privacy Policy.

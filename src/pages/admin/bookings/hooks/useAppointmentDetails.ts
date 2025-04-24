@@ -62,6 +62,10 @@ export function useAppointmentDetails(appointmentId?: string | null) {
           membership_id: data.membership_id ?? null,
           membership_name: data.membership_name ?? null,
           tax_amount: data.tax_amount ?? 0,
+          // Add loyalty points fields with default values if they don't exist
+          points_earned: data.points_earned ?? 0,
+          points_redeemed: data.points_redeemed ?? 0,
+          points_discount_amount: data.points_discount_amount ?? 0,
           // Set the mapped status
           status: mappedStatus,
           // Use correct payment method type

@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { BadgeCheck, Star } from "lucide-react";
 import { format } from "date-fns";
 import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
@@ -19,14 +18,16 @@ export function MembershipStatus({ customerId }: MembershipStatusProps) {
   const { customerMemberships, fetchCustomerMemberships } = useCustomerMemberships();
   const [loading, setLoading] = useState(true);
 
+  const stableFetchCustomerMemberships = useCallback(fetchCustomerMemberships, []);
+
   useEffect(() => {
     if (customerId) {
       setLoading(true);
-      fetchCustomerMemberships(customerId).finally(() => {
+      stableFetchCustomerMemberships(customerId).finally(() => {
         setLoading(false);
       });
     }
-  }, [customerId, fetchCustomerMemberships]);
+  }, [customerId, stableFetchCustomerMemberships]);
 
   if (loading || !customerMemberships.length) {
     return null;

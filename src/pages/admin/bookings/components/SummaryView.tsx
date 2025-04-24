@@ -15,7 +15,8 @@ import {
   Clock,
   Package,
   MapPin,
-  Percent
+  Percent,
+  Star
 } from "lucide-react";
 import { format } from 'date-fns';
 import {
@@ -37,13 +38,148 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentActions } from '../hooks/useAppointmentActions';
 import { useAppointmentDetails } from '../hooks/useAppointmentDetails';
-import type { RefundData, TransactionDetails, SummaryViewProps } from '../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRefundReason } from '../utils/formatters';
 import { formatPrice } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+
+const ReceiptDetails: React.FC<{ 
+  customer: any; 
+  items: any[]; 
+  subTotal: number | undefined; 
+  taxAmount: number | undefined; 
+  membershipName: string | undefined; 
+  membershipDiscount: number | undefined; 
+  totalPrice: number | undefined; 
+  paymentMethod: string; 
+  receiptNumber: string | undefined; 
+  onAddAnother: (() => void) | undefined; 
+}> = ({
+  customer,
+  items,
+  subTotal,
+  taxAmount,
+  membershipName,
+  membershipDiscount,
+  totalPrice,
+  paymentMethod,
+  receiptNumber,
+  onAddAnother,
+}) => {
+  return (
+    <Card className="bg-white h-full border">
+      <CardContent className="p-4 space-y-4">
+        <div className="flex items-center justify-between border-b pb-2">
+          <div className="flex-1">
+            <div className="inline-flex items-center px-2.5 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              New Sale
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 bg-gray-50 rounded-lg">
+          <h4 className="text-base font-semibold">
+            {customer.full_name || 'No name provided'}
+          </h4>
+          {customer.phone_number && (
+            <p className="text-gray-600">{customer.phone_number}</p>
+          )}
+        </div>
+
+        <div className="overflow-y-auto">
+          <h4 className="font-medium mb-4">Items</h4>
+          {items && items.map((item, idx) => (
+            <div key={idx} className="py-2 flex justify-between items-start border-b">
+              <div className="flex-1">
+                <p className="font-medium text-sm line-clamp-1">
+                  {item.type === 'package' && <Package className="h-4 w-4 inline mr-1" />}
+                  {item.name}
+                </p>
+                {item.employee && (
+                  <p className="text-xs text-gray-500">
+                    Stylist: {item.employee.name}
+                  </p>
+                )}
+                {item.duration && (
+                  <p className="text-xs text-gray-500">
+                    Duration: {item.duration} minutes
+                  </p>
+                )}
+              </div>
+              <p className="text-right text-gray-900">
+                {formatPrice(item.price)}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-1 pt-2 border-t">
+          {subTotal !== undefined && (
+            <div className="flex justify-between text-sm">
+              <span>Subtotal</span>
+              <span>{formatPrice(subTotal)}</span>
+            </div>
+          )}
+
+          {taxAmount !== undefined && taxAmount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span>Tax</span>
+              <span>{formatPrice(taxAmount)}</span>
+            </div>
+          )}
+
+          {membershipName && membershipDiscount && membershipDiscount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span className="flex items-center gap-1">
+                <Percent className="h-3 w-3" />
+                {membershipName} Discount
+              </span>
+              <span>-{formatPrice(membershipDiscount)}</span>
+            </div>
+          )}
+
+          <div className="flex justify-between text-lg font-bold pt-2">
+            <span>Total</span>
+            <span>{formatPrice(totalPrice || 0)}</span>
+          </div>
+        </div>
+
+        <div className="pt-4 border-t">
+          <div className="flex justify-between text-xs">
+            <span className="capitalize">
+              Paid with {paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'card' ? 'Card' : 'Online'}
+            </span>
+            <div className="flex items-center">
+              {paymentMethod === 'cash' ? (
+                <Banknote className="h-4 w-4 mr-1" />
+              ) : (
+                <CreditCard className="h-4 w-4 mr-1" />
+              )}
+              {formatPrice(totalPrice || 0)}
+            </div>
+          </div>
+        </div>
+
+        {receiptNumber && (
+          <div className="pt-2 text-center text-xs text-gray-500">
+            Receipt #: {receiptNumber}
+          </div>
+        )}
+
+        {onAddAnother && (
+          <div className="flex justify-center mt-4">
+            <Button onClick={onAddAnother} className="mx-auto">
+              Add Another {items && items[0]?.type === 'membership' ? 'Membership' : 'Appointment'}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   appointmentId,
@@ -56,7 +192,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   taxAmount,
   subTotal,
   membershipName,
-  membershipDiscount
+  membershipDiscount,
 }) => {
   const navigate = useNavigate();
   const [showVoidDialog, setShowVoidDialog] = React.useState(false);
@@ -77,7 +213,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [taxRates, setTaxRates] = useState<{id: string; name: string; percentage: number}[]>([]);
   const { fetchAppointmentDetails, updateAppointmentStatus, processRefund, updateBookingStylelist } = useAppointmentActions();
   const { appointment } = useAppointmentDetails(appointmentId);
-
   React.useEffect(() => {
     if (appointmentId) {
       loadAppointmentDetails();
@@ -94,11 +229,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     if (details) {
       setTransactionDetails(details);
       
-      // Initialize selected bookings if we have transaction details
       if (details.originalSale && details.originalSale.bookings) {
         setSelectedBookings(details.originalSale.bookings);
         
-        // Initialize selected stylists with current values
         const initialStylists: {[key: string]: string} = {};
         details.originalSale.bookings.forEach(booking => {
           if (booking.employee_id) {
@@ -167,14 +300,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     if (!appointmentId) return;
     
     try {
-      // Update each booking's stylist
       const updatePromises = Object.entries(selectedEmployees).map(([bookingId, employeeId]) => {
         return updateBookingStylelist(bookingId, employeeId);
       });
       
       await Promise.all(updatePromises);
-      await loadAppointmentDetails(); // Reload the details to show updated information
-      
+      await loadAppointmentDetails();
       setShowEditSaleDialog(false);
       toast.success('Sale details updated successfully');
     } catch (error) {
@@ -189,140 +320,18 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     }
 
     return (
-      <Card className="bg-white h-full border">
-        <CardContent className="p-4 space-y-4">
-          <div className="flex items-center justify-between border-b pb-2">
-            <div className="flex-1">
-              <div className="inline-flex items-center px-2.5 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                New Sale
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="text-base font-semibold">
-              {customer.full_name || 'No name provided'}
-            </h4>
-            <p className="text-gray-600">{customer.email || 'No email provided'}</p>
-            {customer.phone_number && (
-              <p className="text-gray-600">{customer.phone_number}</p>
-            )}
-          </div>
-
-          <div className="overflow-y-auto">
-            <h4 className="font-medium mb-4">Items</h4>
-            
-            {items && items.map((item, idx) => (
-              <div key={idx} className="py-2 flex justify-between items-start border-b">
-                <div className="flex-1">
-                  <p className="font-medium text-sm line-clamp-1">
-                    {item.type === 'package' && <Package className="h-4 w-4 inline mr-1" />}
-                    {item.name}
-                  </p>
-                  {item.employee && (
-                    <p className="text-xs text-gray-500">
-                      Stylist: {item.employee.name}
-                    </p>
-                  )}
-                  {item.duration && (
-                    <p className="text-xs text-gray-500">
-                      Duration: {item.duration} minutes
-                    </p>
-                  )}
-                </div>
-                <p className="text-right text-gray-900">
-                  {formatPrice(item.price)}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="space-y-1 pt-2 border-t">
-            {/* Original Amount (Subtotal) */}
-            {subTotal !== undefined && (
-              <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
-                <span>{formatPrice(subTotal)}</span>
-              </div>
-            )}
-            
-            {/* Tax Name & Amount */}
-            {taxAmount !== undefined && taxAmount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span>Tax</span>
-                <span>{formatPrice(taxAmount)}</span>
-              </div>
-            )}
-            
-            {/* Membership Discount */}
-            {membershipName && membershipDiscount && membershipDiscount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span className="flex items-center gap-1">
-                  <Percent className="h-3 w-3" />
-                  {membershipName} Discount
-                </span>
-                <span>-{formatPrice(membershipDiscount)}</span>
-              </div>
-            )}
-            
-            {/* Other Discount */}
-            {appointment && appointment.discount_type !== 'none' && appointment.discount_value > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>
-                  Discount ({appointment.discount_type === 'percentage' ? 
-                    `${appointment.discount_value}%` : 
-                    formatPrice(appointment.discount_value)
-                  })
-                </span>
-                <span>
-                  -{formatPrice(
-                    appointment.discount_type === 'percentage' 
-                      ? (subTotal || 0) * (appointment.discount_value / 100)
-                      : appointment.discount_value
-                  )}
-                </span>
-              </div>
-            )}
-            
-            {/* Total Amount */}
-            <div className="flex justify-between text-lg font-bold pt-2">
-              <span>Total</span>
-              <span>{formatPrice(totalPrice || 0)}</span>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <div className="flex justify-between text-xs">
-              <span className="capitalize">
-                Paid with {paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'card' ? 'Card' : 'Online'}
-              </span>
-              <div className="flex items-center">
-                {paymentMethod === 'cash' ? (
-                  <Banknote className="h-4 w-4 mr-1" />
-                ) : (
-                  <CreditCard className="h-4 w-4 mr-1" />
-                )}
-                {formatPrice(totalPrice || 0)}
-              </div>
-            </div>
-          </div>
-          
-          {receiptNumber && (
-            <div className="pt-2 text-center text-xs text-gray-500">
-              Receipt #: {receiptNumber}
-            </div>
-          )}
-          
-          {onAddAnother && (
-            <div className="flex justify-center mt-4">
-              <Button onClick={onAddAnother} className="mx-auto">
-                Add Another {items && items[0]?.type === 'membership' ? 'Membership' : 'Appointment'}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <ReceiptDetails
+        customer={customer}
+        items={items}
+        subTotal={subTotal}
+        taxAmount={taxAmount}
+        membershipName={membershipName}
+        membershipDiscount={membershipDiscount}
+        totalPrice={totalPrice}
+        paymentMethod={paymentMethod}
+        receiptNumber={receiptNumber}
+        onAddAnother={onAddAnother}
+      />
     );
   };
 
@@ -459,7 +468,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       ...refunds,
       originalSale
     ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  
+  console.log("allTransactions",allTransactions)
     return (
       <>
         <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto px-1">
@@ -468,7 +477,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             const groupedBookings = getGroupedBookings(transaction);
             const locationName = getLocationNameById(transaction.location);
             const taxName = getTaxNameById(transaction.tax_id);
-            // Calculate subtotal (without taxes, discounts, etc.)
             const subtotal = transaction.bookings.reduce((sum, booking) => sum + (booking.price_paid || 0), 0);
             
             return (
@@ -541,7 +549,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                     <h4 className="text-base font-semibold">
                       {transaction.customer?.full_name || 'No name provided'}
                     </h4>
-                    <p className="text-gray-600">{transaction.customer?.email || 'No email provided'}</p>
+                    <p className="text-gray-600">{transaction.customer?.phone_number}</p>
                   </div>
   
                   <div className="overflow-y-auto">
@@ -609,49 +617,45 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                   </div>
   
                   <div className="space-y-1 pt-2 border-t">
-                    {/* Original Amount (Subtotal) */}
                     <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
                       <span>₹{subtotal.toFixed(2)}</span>
                     </div>
                     
-                    {/* Tax Name & Amount */}
-                    {transaction.tax_amount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span>{taxName ? `Tax (${taxName})` : 'Tax'}</span>
-                        <span>₹{transaction.tax_amount.toFixed(2)}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between text-sm">
+                      <span>{taxName ? `Tax (${taxName})` : 'Tax'}</span>
+                      <span>₹{transaction.tax_amount.toFixed(2)}</span>
+                    </div>
                     
-                    {/* Membership Discount */}
-                    {transaction.membership_discount > 0 && transaction.membership_name && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span className="flex items-center gap-1">
-                          <Percent className="h-3 w-3" />
-                          {transaction.membership_name} Discount
-                        </span>
-                        <span>-₹{transaction.membership_discount.toFixed(2)}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span className="flex items-center gap-1">
+                        <Percent className="h-3 w-3" />
+                        {transaction.membership_name} Discount
+                      </span>
+                      <span>-₹{transaction.membership_discount.toFixed(2)}</span>
+                    </div>
                     
-                    {/* Other Discount */}
-                    {transaction.discount_type !== 'none' && transaction.discount_value > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>
-                          Discount ({transaction.discount_type === 'percentage' ? 
-                            `${transaction.discount_value}%` : 
-                            '₹' + transaction.discount_value
-                          })
-                        </span>
-                        <span>
-                          -{transaction.discount_type === 'percentage' 
-                            ? '₹' + (subtotal * (transaction.discount_value / 100)).toFixed(2)
-                            : '₹' + transaction.discount_value.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>
+                        {transaction.discount_value ?`Discount (${transaction.discount_type === 'percentage' ? 
+                          `${transaction.discount_value}%` : 
+                          '₹' + transaction.discount_value
+                        })` : null}
+                      </span>
+                      <span>
+                      {transaction.discount_value > 0 ? 
+                        (transaction.discount_type === 'percentage' 
+                          ? `-₹${(subtotal * (transaction.discount_value / 100)).toFixed(2)}`
+                          : `-₹${transaction.discount_value.toFixed(2)}`) 
+                        : null}
+                      </span>
+                    </div>
+                    {transaction?.round_off_difference ? <div className="flex justify-between text-sm">
+                      <span>Round off</span>
+                      <span>₹{formatPrice(transaction?.round_off_difference)}</span>
+                    </div>: ""}
                     
-                    {/* Total Amount */}
+                    
                     <div className="flex justify-between text-lg font-bold pt-2">
                       <span>Total</span>
                       <span className={isRefund ? 'text-red-600' : ''}>
@@ -665,16 +669,31 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                       <span className="capitalize">
                         Paid with {transaction.payment_method === 'cash' ? 'Cash' : transaction.payment_method === 'card' ? 'Card' : 'Online'}
                       </span>
-                      <div className="flex items-center">
-                        {transaction.payment_method === 'cash' ? (
-                          <Banknote className="h-4 w-4 mr-1" />
-                        ) : (
-                          <CreditCard className="h-4 w-4 mr-1" />
-                        )}
-                        ₹{Math.abs(transaction.total_price).toFixed(2)}
-                      </div>
                     </div>
                   </div>
+  
+                  {(transaction.points_earned > 0 || transaction.points_redeemed > 0) && (
+                    <div className="pt-2 border-t text-xs text-gray-600">
+                      {transaction.points_earned > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="flex items-center gap-1">
+                            <Star className="h-3 w-3 text-amber-500" />
+                            Points Earned
+                          </span>
+                          <span className="text-green-600">+{transaction.points_earned}</span>
+                        </div>
+                      )}
+                      {transaction.points_redeemed > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="flex items-center gap-1">
+                            <Star className="h-3 w-3 text-amber-500" />
+                            Points Redeemed
+                          </span>
+                          <span className="text-amber-600">-{transaction.points_redeemed}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
   
                   {isRefund && transaction.refund_reason && (
                     <div className="space-y-2 pt-4 border-t">

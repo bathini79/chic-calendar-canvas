@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +11,7 @@ export const useActivePackages = (locationId?: string) => {
     queryFn: async () => {
       setIsLoading(true);
       try {
-        let query = supabase
+        const { data, error } = await supabase
           .from("packages")
           .select(
             `
@@ -25,21 +24,6 @@ export const useActivePackages = (locationId?: string) => {
           )
           .eq("status", "active");
 
-        if (locationId) {
-          const { data: packageIds, error: locationError } = await supabase
-            .from("package_locations")
-            .select("package_id")
-            .eq("location_id", locationId);
-
-          if (locationError) throw locationError;
-
-          if (packageIds && packageIds.length > 0) {
-            const ids = packageIds.map((item) => item.package_id);
-            query = query.in("id", ids);
-          }
-        }
-
-        const { data, error } = await query;
         if (error) throw error;
 
         // Map the data to the Package type

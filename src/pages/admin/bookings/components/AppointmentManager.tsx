@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -11,14 +10,27 @@ import { useActivePackages } from "../hooks/useActivePackages";
 import useSaveAppointment from "../hooks/useSaveAppointment";
 import { toast } from "sonner";
 import { getTotalPrice, getTotalDuration } from "../utils/bookingUtils";
-import { Appointment, SCREEN, Service, Package, PaymentMethod, AppointmentStatus } from "../types";
+import {
+  Appointment,
+  SCREEN,
+  Service,
+  Package,
+  PaymentMethod,
+  AppointmentStatus,
+} from "../types";
 import { SelectCustomer } from "@/components/admin/bookings/components/SelectCustomer";
 import { formatTime, formatTimeString } from "../utils/timeUtils";
 import { useAppointmentActions } from "../hooks/useAppointmentActions";
 import { useAppointmentDetails } from "../hooks/useAppointmentDetails";
 import { StatusBadge, getStatusBackgroundColor } from "./StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 
 interface AppointmentManagerProps {
   isOpen: boolean;
@@ -53,18 +66,25 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 }) => {
   const [currentScreen, setCurrentScreen] = useState(SCREEN.SERVICE_SELECTION);
   const [newAppointmentId, setNewAppointmentId] = useState<string | null>(null);
-  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>("booked");
+  const [appointmentStatus, setAppointmentStatus] =
+    useState<AppointmentStatus>("booked");
   const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
-  
+  const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(
+    null
+  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const { appointment, refetch: refetchAppointment } = useAppointmentDetails(
     existingAppointment?.id
   );
-  
-  const { cancelAppointment, markAppointmentAs, updateAppointmentStatus } = useAppointmentActions();
+
+  const { cancelAppointment, markAppointmentAs, updateAppointmentStatus } =
+    useAppointmentActions();
+  const [loadingPayment, setLoadingPayment] = useState(false);
 
   const { data: services } = useActiveServices(locationId);
-  const { data: packages } = useActivePackages(locationId);
+  const { data: packages } = useActivePackages(); // Removed locationId parameter
+  const { sendNotification } = useAppointmentNotifications();
 
   const {
     selectedCustomer,
@@ -107,12 +127,16 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     if (existingAppointment) {
       processExistingAppointment(existingAppointment);
       setAppointmentStatus(existingAppointment.status || "booked");
-      
-      if (existingAppointment.status === "completed" || existingAppointment.status === "refunded" || existingAppointment.status === "partially_refunded") {
+
+      if (
+        existingAppointment.status === "completed" ||
+        existingAppointment.status === "refunded" ||
+        existingAppointment.status === "partially_refunded"
+      ) {
         setCurrentScreen(SCREEN.SUMMARY);
         setNewAppointmentId(existingAppointment.id);
       } else {
-        setCurrentScreen(SCREEN.CHECKOUT);
+        setCurrentScreen(SCREEN.SERVICE_SELECTION);
       }
     }
   }, [selectedDate, selectedTime, existingAppointment]);
@@ -180,9 +204,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     setSelectedPackages(packages);
     setSelectedStylists(stylists);
     setCustomizedServices(customizedServicesMap);
-    setPaymentMethod(
-      (appointment.payment_method as PaymentMethod) || "cash"
-    );
+    setPaymentMethod((appointment.payment_method as PaymentMethod) || "cash");
     setDiscountType(
       (appointment.discount_type as "none" | "percentage" | "fixed") || "none"
     );
@@ -220,7 +242,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     );
   };
 
-  const { handleSaveAppointment, isLoading } = useSaveAppointment({
+  const { handleSaveAppointment } = useSaveAppointment({
     selectedDate: stateSelectedDate,
     selectedTime: stateSelectedTime,
     selectedCustomer,
@@ -247,18 +269,31 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     membership_id: existingAppointment?.membership_id,
     membership_name: existingAppointment?.membership_name,
     coupon_name: existingAppointment?.coupon_name,
-    coupon_amount: existingAppointment?.coupon_amount
+    coupon_amount: existingAppointment?.coupon_amount,
   });
 
   const handleProceedToCheckout = async () => {
+    setErrorMessage(null); // Clear any previous error messages
+
     if (!selectedCustomer) {
-      toast.error("Please select a customer");
+      setErrorMessage("Please select a customer.");
       return;
     }
     if (selectedServices.length === 0 && selectedPackages.length === 0) {
-      toast.error("Please select at least one service or package");
+      setErrorMessage("Please select at least one service or package.");
       return;
     }
+
+    // Check if all selected services have a stylist assigned
+    const unassignedServices = selectedServices.filter(
+      (serviceId) => !selectedStylists[serviceId]
+    );
+
+    if (unassignedServices.length > 0) {
+      setErrorMessage("Please assign a stylist to all selected services.");
+      return;
+    }
+
     setCurrentScreen(SCREEN.CHECKOUT);
   };
 
@@ -322,22 +357,28 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     if (appointmentId) {
       // Update status to completed when payment is done
       try {
+        setLoadingPayment(true);
         const { data: bookings } = await supabase
-          .from('bookings')
-          .select('id')
-          .eq('appointment_id', appointmentId);
-          
+          .from("bookings")
+          .select("id")
+          .eq("appointment_id", appointmentId);
+
         if (bookings) {
-          const bookingIds = bookings.map(booking => booking.id);
-          await updateAppointmentStatus(appointmentId, 'completed', bookingIds);
+          const bookingIds = bookings.map((booking) => booking.id);
+          await updateAppointmentStatus(appointmentId, "completed", bookingIds);
           // Update local state to reflect the change
-          setAppointmentStatus('completed');
+          setAppointmentStatus("completed");
         }
       } catch (error) {
-        console.error("Error updating appointment status after payment:", error);
+        console.error(
+          "Error updating appointment status after payment:",
+          error
+        );
+      } finally {
+        setLoadingPayment(false);
       }
     }
-    
+
     setNewAppointmentId(appointmentId || null);
     setCurrentScreen(SCREEN.SUMMARY);
 
@@ -349,7 +390,19 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   };
 
   const onHandleSaveAppointment = async () => {
-    const appointmentId = await handleSaveAppointment();
+    const totalPrice = calculateTotalPrice(
+      services,
+      packages,
+      discountType,
+      discountValue
+    );
+    const roundedTotal = Math.round(totalPrice);
+    const roundOffDifference = roundedTotal - totalPrice;
+
+    const appointmentId = await handleSaveAppointment({
+      total: roundedTotal,
+      roundOffDifference,
+    });
     if (appointmentId) {
       if (onAppointmentSaved) {
         onAppointmentSaved();
@@ -359,28 +412,11 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
-  const handleCancelAppointment = async () => {
-    if (existingAppointment?.id) {
-      try {
-        await cancelAppointment(existingAppointment.id);
-        toast.success("Appointment canceled successfully");
-        setAppointmentStatus('canceled');
-        onClose();
-        if (onAppointmentSaved) {
-          onAppointmentSaved();
-        }
-      } catch (error) {
-        console.error("Error canceling appointment:", error);
-        toast.error("Failed to cancel appointment");
-      }
-    }
-  };
-
   const handleMarkAs = async (status: "noshow" | "completed") => {
     if (existingAppointment?.id) {
       try {
         await markAppointmentAs(existingAppointment.id, status);
-        toast.success(`Appointment marked as ${status}`);
+        toast.success(`Appointmentz marked as ${status}`);
         setAppointmentStatus(status);
         if (status === "completed") {
           // If marked as completed, show the summary screen
@@ -409,22 +445,17 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
   const applyStatusChange = async (status: AppointmentStatus) => {
     if (existingAppointment?.id) {
       try {
-        const bookingIds = existingAppointment.bookings?.map(booking => booking.id) || [];
-        
+        const bookingIds =
+          existingAppointment.bookings?.map((booking) => booking.id) || [];
+
         const success = await updateAppointmentStatus(
           existingAppointment.id,
           status,
           bookingIds
         );
-        
+
         if (success) {
           toast.success(`Appointment status updated to ${status}`);
-          
-          if (status === "completed") {
-            setNewAppointmentId(existingAppointment.id);
-            setCurrentScreen(SCREEN.SUMMARY);
-          }
-          
           // Refetch to ensure UI reflects changes
           if (refetchAppointment) {
             refetchAppointment();
@@ -433,6 +464,15 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
       } catch (error) {
         console.error("Error updating appointment status:", error);
         toast.error("Failed to update appointment status");
+      }
+      try {
+        if (status === "canceled" || status === "noshow") {
+          onClose();
+          await sendNotification(existingAppointment.id, status);
+        }
+      } catch (notificationError) {
+        console.error("Error sending confirmation:", notificationError);
+        // Don't fail the booking if notification fails
       }
     }
   };
@@ -446,15 +486,23 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     }
   };
 
-  const isCompleted = appointmentStatus === "completed" || 
-                      appointmentStatus === "refunded" || 
-                      appointmentStatus === "partially_refunded";
-  
-  const shouldShowStatusDropdown = existingAppointment !== null && existingAppointment !== undefined;
+  const isCompleted =
+    appointmentStatus === "completed" ||
+    appointmentStatus === "refunded" ||
+    appointmentStatus === "partially_refunded";
 
-  const displayTime = stateSelectedTime ? formatTimeString(stateSelectedTime) : "";
-  
-  const headerBgColor = appointmentStatus && getStatusBackgroundColor(appointmentStatus);
+  const shouldShowStatusDropdown =
+    currentScreen === SCREEN.SERVICE_SELECTION &&
+    newAppointmentId &&
+    existingAppointment !== null &&
+    existingAppointment !== undefined;
+
+  const displayTime = stateSelectedTime
+    ? formatTimeString(stateSelectedTime)
+    : "";
+
+  const headerBgColor =
+    appointmentStatus && getStatusBackgroundColor(appointmentStatus);
 
   return (
     <div
@@ -464,15 +512,18 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
     >
       <div className="flex flex-col h-full">
         <div className="flex flex-1 min-h-0">
-          <div className="w-[30%] border-r">
-            <SelectCustomer
-              selectedCustomer={selectedCustomer}
-              setSelectedCustomer={setSelectedCustomer}
-              setShowCreateForm={setShowCreateForm}
-            />
-          </div>
+          {/* Only show SelectCustomer component when not in summary view */}
+          {currentScreen !== SCREEN.SUMMARY && (
+            <div className="w-[30%] border-r">
+              <SelectCustomer
+                selectedCustomer={selectedCustomer}
+                setSelectedCustomer={setSelectedCustomer}
+                setShowCreateForm={setShowCreateForm}
+              />
+            </div>
+          )}
 
-          <div className="w-[70%] flex flex-col h-full">
+          <div className={`${currentScreen === SCREEN.SUMMARY ? 'w-full' : 'w-[70%]'} flex flex-col h-full`}>
             <div className={`p-6 border-b flex-shrink-0 ${headerBgColor}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-start flex-col">
@@ -485,12 +536,14 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                     <p className="text-sm text-muted-foreground">
                       {displayTime}
                     </p>
-                    
+
                     {shouldShowStatusDropdown && (
                       <div className="flex items-center gap-2">
                         <Select
                           value={appointmentStatus}
-                          onValueChange={(value) => handleStatusChange(value as AppointmentStatus)}
+                          onValueChange={(value) =>
+                            handleStatusChange(value as AppointmentStatus)
+                          }
                           disabled={isCompleted}
                         >
                           <SelectTrigger className="w-[180px] h-8">
@@ -514,9 +567,12 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                             <SelectItem value="canceled">
                               <StatusBadge status="canceled" />
                             </SelectItem>
-                            <SelectItem value="completed">
-                              <StatusBadge status="completed" />
-                            </SelectItem>
+                            {currentScreen === SCREEN.SUMMARY as typeof currentScreen &&
+                            newAppointmentId ? (
+                              <SelectItem value="completed">
+                                <StatusBadge status="completed" />
+                              </SelectItem>
+                            ) : null}
                           </SelectContent>
                         </Select>
                       </div>
@@ -554,23 +610,35 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                     />
                   </div>
 
-                  <div className="p-6 border-t flex-shrink-0 flex justify-end gap-4 bg-white">
-                    <Button variant="outline" onClick={onHandleSaveAppointment}>
-                      Save Appointment
-                    </Button>
-                    <Button
-                      className="bg-black text-white"
-                      onClick={handleProceedToCheckout}
-                    >
-                      Checkout
-                    </Button>
+                  <div className="p-6 border-t flex-shrink-0 flex flex-col gap-4 bg-white">
+                    {errorMessage && (
+                      <div className="text-red-500 text-sm text-left">
+                        {errorMessage}
+                      </div>
+                    )}
+                    <div className="flex justify-end gap-4">
+                      <Button
+                        variant="outline"
+                        onClick={onHandleSaveAppointment}
+                      >
+                        Save Appointment
+                      </Button>
+                      <Button
+                        className="bg-black text-white"
+                        onClick={handleProceedToCheckout}
+                      >
+                        Checkout
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}
 
               {currentScreen === SCREEN.CHECKOUT && (
                 <CheckoutSection
-                  appointmentId={newAppointmentId || existingAppointment?.id || ""}
+                  appointmentId={
+                    newAppointmentId || existingAppointment?.id || ""
+                  }
                   selectedCustomer={selectedCustomer}
                   selectedServices={selectedServices}
                   selectedPackages={selectedPackages}
@@ -587,7 +655,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   onPaymentComplete={handlePaymentComplete}
                   selectedStylists={selectedStylists}
                   selectedTimeSlots={{
-                    [newAppointmentId || existingAppointment?.id || ""]: stateSelectedTime,
+                    [newAppointmentId || existingAppointment?.id || ""]:
+                      stateSelectedTime,
                   }}
                   onSaveAppointment={handleSaveAppointment}
                   onRemoveService={handleRemoveService}
@@ -596,19 +665,29 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   customizedServices={customizedServices}
                   isExistingAppointment={!!existingAppointment}
                   locationId={locationId}
-                  onCancelAppointment={existingAppointment ? handleCancelAppointment : undefined}
-                  onMarkAsNoShow={existingAppointment ? () => handleMarkAs("noshow") : undefined}
-                  onMarkAsCompleted={existingAppointment ? () => handleMarkAs("completed") : undefined}
+                  onMarkAsNoShow={
+                    existingAppointment
+                      ? () => handleMarkAs("noshow")
+                      : undefined
+                  }
+                  onMarkAsCompleted={
+                    existingAppointment
+                      ? () => handleMarkAs("completed")
+                      : undefined
+                  }
                   appointmentStatus={appointmentStatus}
+                  loadingPayment={loadingPayment}
                 />
               )}
 
               {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
-                <div className="p-6">
+                <div className="p-6 w-full">
                   <h3 className="text-xl font-semibold mb-6">
                     Appointment Summary
                   </h3>
-                  <SummaryView appointmentId={newAppointmentId} />
+                  <SummaryView
+                    appointmentId={newAppointmentId}
+                  />
                   <div className="mt-6 flex justify-end">
                     <Button
                       onClick={() => {
@@ -626,32 +705,35 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
         </div>
       </div>
 
-      <AlertDialog open={showStatusConfirmation} onOpenChange={setShowStatusConfirmation}>
+      <AlertDialog
+        open={showStatusConfirmation}
+        onOpenChange={setShowStatusConfirmation}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pendingStatus === "canceled" 
-                ? "Cancel Appointment" 
-                : pendingStatus === "noshow" 
-                  ? "Mark as No Show" 
-                  : "Change Status"}
+              {pendingStatus === "canceled"
+                ? "Cancel Appointment"
+                : pendingStatus === "noshow"
+                ? "Mark as No Show"
+                : "Change Status"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingStatus === "canceled" 
+              {pendingStatus === "canceled"
                 ? "Are you sure you want to cancel this appointment? This will notify the customer and free up the time slot."
-                : pendingStatus === "noshow" 
-                  ? "Are you sure you want to mark this appointment as a no-show? This will be recorded in the customer's history."
-                  : "Are you sure you want to change the status?"}
+                : pendingStatus === "noshow"
+                ? "Are you sure you want to mark this appointment as a no-show? This will be recorded in the customer's history."
+                : "Are you sure you want to change the status?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmStatusChange}>
-              {pendingStatus === "canceled" 
-                ? "Yes, Cancel Appointment" 
-                : pendingStatus === "noshow" 
-                  ? "Yes, Mark as No Show" 
-                  : "Confirm"}
+              {pendingStatus === "canceled"
+                ? "Yes, Cancel Appointment"
+                : pendingStatus === "noshow"
+                ? "Yes, Mark as No Show"
+                : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

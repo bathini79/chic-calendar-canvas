@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,19 +35,17 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
 
   const handleFormSubmit = async (data: any) => {
     try {
-      let id = employeeId;
-      
-      // If editing, update employee record
+      // If editing existing employee
       if (employeeId) {
         const { error } = await supabase
           .from("employees")
           .update({
             name: data.name,
-            email: data.email,
+            email: data.email || `${data.phone.replace(/\D/g, '')}@staff.internal`, // Ensure email is never null
             phone: data.phone,
             photo_url: data.photo_url,
             status: data.status,
-            employment_type: data.employment_type,
+            employment_type_id: data.employment_type_id,
           })
           .eq("id", employeeId);
           
@@ -69,55 +66,73 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
           .eq("employee_id", employeeId);
           
         if (locationsDeleteError) throw locationsDeleteError;
+          
+        // Insert skills
+        if (data.skills.length > 0) {
+          const skillsToInsert = data.skills.map((skillId: string) => ({
+            employee_id: employeeId,
+            service_id: skillId,
+          }));
+          
+          const { error: skillsInsertError } = await supabase
+            .from("employee_skills")
+            .insert(skillsToInsert);
+            
+          if (skillsInsertError) throw skillsInsertError;
+        }
+        
+        // Insert location assignments
+        if (data.locations.length > 0) {
+          const locationsToInsert = data.locations.map((locationId: string) => ({
+            employee_id: employeeId,
+            location_id: locationId,
+          }));
+          
+          const { error: locationsInsertError } = await supabase
+            .from("employee_locations")
+            .insert(locationsToInsert);
+            
+          if (locationsInsertError) throw locationsInsertError;
+        }
+        
+        toast.success("Staff member updated successfully");
       } 
-      // If creating new, insert employee record
+      // Creating new employee - use the onboarding edge function
       else {
-        const { data: newEmployee, error } = await supabase
-          .from("employees")
-          .insert({
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            photo_url: data.photo_url,
-            status: data.status,
-            employment_type: data.employment_type,
-          })
-          .select()
-          .single();
-          
+        // Get the current window location to create the verification link
+        const baseUrl = window.location.origin;
+        
+        // Call the employee-onboarding edge function with updated parameters
+        const { data: responseData, error } = await supabase.functions.invoke('employee-onboarding', {
+          body: { 
+            employeeData: {
+              ...data,
+              status: 'inactive', // Always set to inactive for new employees
+              baseUrl
+            },
+            sendWelcomeMessage: true,
+            createAuthAccount: true,
+            sendVerificationLink: true
+          }
+        });
+        
         if (error) throw error;
-        id = newEmployee.id;
-      }
-      
-      // Insert skills
-      if (data.skills.length > 0) {
-        const skillsToInsert = data.skills.map((skillId: string) => ({
-          employee_id: id,
-          service_id: skillId,
-        }));
         
-        const { error: skillsInsertError } = await supabase
-          .from("employee_skills")
-          .insert(skillsToInsert);
-          
-        if (skillsInsertError) throw skillsInsertError;
-      }
-      
-      // Insert location assignments
-      if (data.locations.length > 0) {
-        const locationsToInsert = data.locations.map((locationId: string) => ({
-          employee_id: id,
-          location_id: locationId,
-        }));
+        if (!responseData.success) {
+          throw new Error(responseData.message || "Failed to onboard employee");
+        }
         
-        const { error: locationsInsertError } = await supabase
-          .from("employee_locations")
-          .insert(locationsToInsert);
-          
-        if (locationsInsertError) throw locationsInsertError;
+        // Show appropriate toast messages based on the response
+        if (responseData.verificationSent) {
+          toast.success("Staff member created! Verification link sent to their phone");
+        } else if (responseData.welcomeMessageSent) {
+          toast.success("Staff member created! Welcome message sent to their phone");
+        } else {
+          toast.success("Staff member created successfully");
+          toast.warning("Could not send notifications to the staff member");
+        }
       }
       
-      toast.success(employeeId ? "Staff member updated successfully" : "Staff member created successfully");
       onOpenChange(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to save staff member");

@@ -113,7 +113,7 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
                     )}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {customer.email}
+                    {customer.phone_number}
                   </div>
                 </div>
               </div>

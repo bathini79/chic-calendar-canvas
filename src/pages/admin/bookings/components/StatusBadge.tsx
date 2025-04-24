@@ -20,12 +20,12 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
   const getStatusConfig = () => {
     switch (status) {
       // Completed statuses - green
-      case 'completed':
-        return {
-          label: 'Completed',
-          icon: <CheckCircle className="h-3 w-3 mr-1" />,
-          variant: 'success' as const
-        };
+      // case 'completed':
+      //   return {
+      //     label: 'Completed',
+      //     icon: <CheckCircle className="h-3 w-3 mr-1" />,
+      //     variant: 'success' as const
+      //   };
       
       // Active/Positive statuses - primary color (blue/purple)
       case 'confirmed':
@@ -113,8 +113,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) =
 // Helper function to get background color based on status
 export const getStatusBackgroundColor = (status: AppointmentStatus): string => {
   switch (status) {
-    case 'completed':
-      return 'bg-green-50';
+    // case 'completed':
+    //   return 'bg-green-50';
     case 'confirmed':
     case 'booked':
       return 'bg-blue-50';

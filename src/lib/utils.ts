@@ -95,14 +95,17 @@ export const getMembershipDiscount = (
     
     if (mem.discount_type === 'percentage') {
       discountAmount = amount * (mem.discount_value / 100);
-      
-      // Apply max discount cap if exists
-      if (mem.max_discount_value) {
-        discountAmount = Math.min(discountAmount, mem.max_discount_value);
-      }
     } else {
-      discountAmount = Math.min(mem.discount_value, amount);
+      discountAmount = mem.discount_value;
     }
+    
+    // Apply max discount cap for both percentage and fixed discounts
+    if (mem.max_discount_value) {
+      discountAmount = Math.min(discountAmount, mem.max_discount_value);
+    }
+    
+    // Ensure we never discount more than the actual amount
+    discountAmount = Math.min(discountAmount, amount);
     
     if (discountAmount > bestDiscount) {
       bestDiscount = discountAmount;

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCart } from "@/components/cart/CartContext";
@@ -11,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useCoupons, Coupon } from "@/hooks/use-coupons";
-import { CouponDebugger } from "@/components/debug/CouponDebugger";
 
 type TaxRate = {
   id: string;
@@ -257,9 +255,6 @@ export default function Cart() {
           </Card>
         </div>
       </div>
-      
-      {/* Debugging section */}
-      {process.env.NODE_ENV !== 'production' && <CouponDebugger />}
     </div>
   );
 }

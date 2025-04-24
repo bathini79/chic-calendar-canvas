@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -7,7 +6,6 @@ import { Pencil, Plus, Linkedin, Twitter, Instagram, Facebook } from "lucide-rea
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { ProfileSidebar } from "./ProfileSidebar";
 import { ProfileEditDialog } from "./ProfileEditDialog";
 import { AddressCard } from "./AddressCard";
@@ -47,13 +45,10 @@ export const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addAddressDialogOpen, setAddAddressDialogOpen] = useState(false);
+  const [addresses, setAddresses] = useState<Address[]>([]);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -64,7 +59,6 @@ export const ProfilePage = () => {
         return;
       }
 
-      // Fetch profile data
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -77,7 +71,6 @@ export const ProfilePage = () => {
         return;
       }
 
-      // Fetch addresses
       const { data: addressesData, error: addressesError } = await supabase
         .from('user_addresses')
         .select('*')
@@ -90,24 +83,29 @@ export const ProfilePage = () => {
 
       setProfile({
         ...profileData,
-        addresses: addressesData || []
+        addresses: []
       });
+      
+      setAddresses(addressesData || []);
     } catch (error: any) {
       console.error("Error in fetchUserProfile:", error);
       toast.error("Failed to load profile data");
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [fetchUserProfile]);
 
   const handleProfileUpdate = async (updatedProfile: Partial<ProfileData>) => {
     try {
       const userId = profile?.id;
       if (!userId) return;
 
-      // Format birth_date as string if it's a Date object
       let birthDate = updatedProfile.birth_date;
-      if (birthDate instanceof Date) {
+      if (birthDate && typeof birthDate !== 'string') {
         birthDate = birthDate.toISOString().split('T')[0];
       }
 
@@ -141,7 +139,6 @@ export const ProfilePage = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Add the new address
       const { error } = await supabase
         .from('user_addresses')
         .insert({
@@ -235,15 +232,12 @@ export const ProfilePage = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-background">
-      {/* Sidebar for desktop */}
       <div className="hidden md:block">
         <ProfileSidebar />
       </div>
 
-      {/* Main content */}
       <div className="flex-1 p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
-          {/* Profile header */}
           <div className="mb-8 text-center">
             <div className="relative inline-block mb-4">
               <Avatar className="h-24 w-24 border-4 border-background">
@@ -278,7 +272,6 @@ export const ProfilePage = () => {
             </Button>
           </div>
 
-          {/* Personal Info */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Personal Information</CardTitle>
@@ -309,7 +302,6 @@ export const ProfilePage = () => {
             </CardContent>
           </Card>
 
-          {/* Addresses */}
           <Card className="mb-6">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>My Addresses</CardTitle>
@@ -323,9 +315,9 @@ export const ProfilePage = () => {
               </Button>
             </CardHeader>
             <CardContent>
-              {profile?.addresses && profile.addresses.length > 0 ? (
+              {addresses && addresses.length > 0 ? (
                 <div className="grid gap-4">
-                  {profile.addresses.map((address) => (
+                  {addresses.map((address) => (
                     <AddressCard 
                       key={address.id} 
                       address={address} 
@@ -350,7 +342,6 @@ export const ProfilePage = () => {
             </CardContent>
           </Card>
 
-          {/* Social Media */}
           <Card>
             <CardHeader>
               <CardTitle>Social Media</CardTitle>
@@ -411,7 +402,6 @@ export const ProfilePage = () => {
         </div>
       </div>
 
-      {/* Edit Profile Dialog */}
       {profile && (
         <ProfileEditDialog 
           open={editDialogOpen} 
@@ -422,7 +412,6 @@ export const ProfilePage = () => {
         />
       )}
 
-      {/* Add Address Dialog */}
       <AddAddressDialog
         open={addAddressDialogOpen}
         onOpenChange={setAddAddressDialogOpen}

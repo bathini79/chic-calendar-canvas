@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryDialog } from "@/components/admin/inventory/CategoryDialog";
@@ -11,6 +10,8 @@ import { PurchaseOrdersList } from "@/components/admin/inventory/components/Purc
 import { HeaderActions } from "@/components/admin/inventory/components/HeaderActions";
 import { AutoConsumption } from "@/components/admin/inventory/components/AutoConsumption";
 import { ItemDialog } from "@/components/admin/inventory/ItemDialog";
+import { LowStockManager } from "@/components/admin/inventory/LowStockManager";
+import { AutoDraftGenerator } from "@/components/admin/inventory/components/purchase-order/AutoDraftGenerator";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");

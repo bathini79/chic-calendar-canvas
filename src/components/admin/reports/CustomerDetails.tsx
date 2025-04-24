@@ -222,15 +222,7 @@ export function CustomerDetails({ customerId, onBack }: CustomerDetailsProps) {
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">{customer.phone_number || 'No phone number'}</span>
-                </div>
-                
-                {customer.whatsapp_number && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">{customer.whatsapp_number} (WhatsApp)</span>
-                  </div>
-                )}
-                
+                </div>                
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">{customer.email || 'No email'}</span>

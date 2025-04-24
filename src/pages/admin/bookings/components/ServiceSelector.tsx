@@ -117,23 +117,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           )
         `)
         .eq('status', 'active');
-      
-      if (locationId) {
-        // Get packages associated with this location
-        const { data: packageLocations, error: packageLocationsError } = await supabase
-          .from('package_locations')
-          .select('package_id')
-          .eq('location_id', locationId);
-        
-        if (packageLocationsError) throw packageLocationsError;
-        
-        // If we have package locations, filter by them
-        if (packageLocations && packageLocations.length > 0) {
-          const packageIds = packageLocations.map(pl => pl.package_id);
-          query = query.in('id', packageIds);
-        }
-      }
-      
+
       const { data, error } = await query;
       
       if (error) throw error;

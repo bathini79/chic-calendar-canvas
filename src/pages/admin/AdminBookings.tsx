@@ -7,7 +7,7 @@ import { CalendarHeader } from "./bookings/components/CalendarHeader";
 import { StatsPanel } from "./bookings/components/StatsPanel";
 import { MapPin, Calendar as CalendarIcon, Plus, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
-import { formatTime, formatTimeString, hourLabels as timeUtilsHourLabels, isSameDay, TOTAL_HOURS } from "./bookings/utils/timeUtils";
+import { formatTime, formatTimeString, isSameDay } from "./bookings/utils/timeUtils";
 import { useCalendarState } from "./bookings/hooks/useCalendarState";
 import TimeSlots from "@/components/admin/bookings/components/TimeSlots";
 import { useAppointmentsByDate } from "./bookings/hooks/useAppointmentsByDate";
@@ -20,7 +20,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Appointment, Employee } from "./bookings/types";
+import { Appointment, Employee, LocationHours } from "./bookings/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,11 @@ const initialStats = [
   { label: "Today's Bookings", value: 5 },
   { label: "Today's Revenue", value: 1950 },
 ];
+
+// Default business hours constants
+const DEFAULT_START_HOUR = 8;
+const DEFAULT_TOTAL_HOURS = 12;
+const DEFAULT_PIXELS_PER_HOUR = 60;
 
 export default function AdminBookings() {
   const queryClient = useQueryClient();
@@ -54,6 +59,13 @@ export default function AdminBookings() {
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [locationHours, setLocationHours] = useState<LocationHours[]>([]);
+  const [businessHours, setBusinessHours] = useState({
+    startHour: DEFAULT_START_HOUR,
+    endHour: DEFAULT_START_HOUR + DEFAULT_TOTAL_HOURS,
+    totalHours: DEFAULT_TOTAL_HOURS,
+    pixelsPerHour: DEFAULT_PIXELS_PER_HOUR
+  });
 
   const { currentDate, nowPosition, goToday, goPrev, goNext } =
     useCalendarState();
@@ -89,6 +101,61 @@ export default function AdminBookings() {
       return data;
     },
   });
+
+  // Fetch location hours when the location changes
+  useEffect(() => {
+    const fetchLocationHours = async () => {
+      if (!selectedLocationId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('location_hours')
+          .select('*')
+          .eq('location_id', selectedLocationId);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setLocationHours(data as LocationHours[]);
+          
+          // Get today's business hours
+          const today = currentDate;
+          const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+          const todayHours = data.find(hours => hours.day_of_week === dayOfWeek);
+          
+          if (todayHours && !todayHours.is_closed) {
+            // Parse the time strings into hours
+            const startTimeParts = todayHours.start_time.split(':');
+            const endTimeParts = todayHours.end_time.split(':');
+            
+            const startHourFromLocation = parseInt(startTimeParts[0], 10);
+            const endHourFromLocation = parseInt(endTimeParts[0], 10) + (parseInt(endTimeParts[1], 10) > 0 ? 1 : 0);
+            const totalHours = endHourFromLocation - startHourFromLocation;
+            
+            // Update the business hours state
+            setBusinessHours({
+              startHour: startHourFromLocation,
+              endHour: endHourFromLocation,
+              totalHours: totalHours,
+              pixelsPerHour: DEFAULT_PIXELS_PER_HOUR
+            });
+          } else {
+            // If the location is closed or no hours found, set to default
+            setBusinessHours({
+              startHour: DEFAULT_START_HOUR,
+              endHour: DEFAULT_START_HOUR + DEFAULT_TOTAL_HOURS,
+              totalHours: DEFAULT_TOTAL_HOURS,
+              pixelsPerHour: DEFAULT_PIXELS_PER_HOUR
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching location hours:", error);
+      }
+    };
+    
+    fetchLocationHours();
+  }, [selectedLocationId, currentDate]);
 
   useEffect(() => {
     if (!selectedLocationId && locations.length > 0) {
@@ -223,6 +290,12 @@ export default function AdminBookings() {
     setIsAddAppointmentOpen(true);
   };
 
+  // Generate the hour labels for the time slots
+  const hourLabels = Array.from(
+    { length: businessHours.totalHours }, 
+    (_, i) => i + businessHours.startHour
+  );
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -277,15 +350,15 @@ export default function AdminBookings() {
         <TimeSlots
           employees={employees}
           formatTime={formatTime}
-          TOTAL_HOURS={TOTAL_HOURS}
+          TOTAL_HOURS={businessHours.totalHours}
           currentDate={currentDate}
           nowPosition={nowPosition}
           isSameDay={isSameDay}
           appointments={appointments}
           setSelectedAppointment={handleAppointmentClick}
           setClickedCell={handleCellClick}
-          hourLabels={timeUtilsHourLabels}
-          PIXELS_PER_HOUR={60}
+          hourLabels={hourLabels}
+          PIXELS_PER_HOUR={businessHours.pixelsPerHour}
           handleColumnClick={() => {}}
           renderAppointmentBlock={() => null}
         />

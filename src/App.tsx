@@ -1,6 +1,5 @@
-
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AdminLayout } from "@/layouts/AdminLayout";
+import  AdminLayout  from "@/layouts/AdminLayout";
 import { AdminRoute } from "@/components/auth/AdminRoute";
 import CustomerLayout from "@/layouts/CustomerLayout";
 import Home from "@/pages/customer/Home";
@@ -22,12 +21,16 @@ import Settings from "./pages/admin/Settings";
 import BusinessSetup from "./pages/admin/settings/BusinessSetup";
 import Sales from "./pages/admin/settings/Sales";
 import ThirdParty from "./pages/admin/settings/ThirdParty";
+import Team from "./pages/admin/settings/Team";
 import Reports from "./pages/admin/Reports";
+import VerifyEmployeePage from "./pages/verify";
+import { Toaster } from "@/components/ui/sonner"; // Import the Sonner Toaster
 
-// Import DnD
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { UserStatus } from "./components/auth/UserStatus";
+import VerificationPage from "./pages/verify";
+import CustomerVerification from "./components/verification/CustomerVerification";
 
 export default function App() {
   return (
@@ -35,9 +38,15 @@ export default function App() {
       {/* Add UserStatus component for persistent auth state */}
       <UserStatus />
       
+      {/* Add Sonner Toaster for consistent toast notifications */}
+      <Toaster position="top-right" />
+      
       {/* Wrap all routes with DndProvider */}
       <DndProvider backend={HTML5Backend}>
         <Routes>
+        <Route path="/" element={<Auth />} />
+          <Route path="/verify" element={<VerificationPage />} />
+          <Route path="/customer-verify" element={<CustomerVerification />} />
           {/* Customer Routes */}
           <Route path="/" element={<Navigate to="/services" replace />} />
           <Route path="/" element={<CustomerLayout />}>
@@ -56,6 +65,10 @@ export default function App() {
           </Route>
 
           <Route path="/auth" element={<Auth />} />
+          
+          {/* Verification Routes */}
+          <Route path="/verify" element={<CustomerVerification />} />
+          <Route path="/verify-employee" element={<VerifyEmployeePage />} />
 
           {/* Admin Routes */}
           <Route
@@ -79,6 +92,8 @@ export default function App() {
             <Route path="settings/sales/*" element={<Sales />} />
             <Route path="settings/third-party" element={<ThirdParty />} />
             <Route path="settings/third-party/*" element={<ThirdParty />} />
+            <Route path="settings/team" element={<Team />} />
+            <Route path="settings/team/*" element={<Team />} />
           </Route>
         </Routes>
       </DndProvider>

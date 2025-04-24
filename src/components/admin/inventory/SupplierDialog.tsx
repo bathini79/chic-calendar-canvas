@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { SupplierForm } from "./components/SupplierForm";
 import { useSupplierForm } from "./hooks/use-supplier-form";
 import type { SupplierFormValues } from "./schemas/supplier-schema";
@@ -27,38 +26,12 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
     email: supplier?.email || "",
     phone: supplier?.phone || "",
     address: supplier?.address || "",
-    items: [],
   });
 
   const { handleSubmit } = useSupplierForm(supplier, () => {
     setOpen(false);
     if (onClose) onClose();
   });
-
-  useEffect(() => {
-    const fetchSupplierItems = async () => {
-      if (supplier) {
-        try {
-          const { data: supplierItems, error } = await supabase
-            .from('supplier_items')
-            .select('item_id')
-            .eq('supplier_id', supplier.id);
-            
-          if (error) throw error;
-          setDefaultValues(prev => ({
-            ...prev,
-            items: (supplierItems || []).map(si => si.item_id)
-          }));
-        } catch (error: any) {
-          console.error('Error fetching supplier items:', error);
-        }
-      }
-    };
-
-    if (open && supplier) {
-      fetchSupplierItems();
-    }
-  }, [supplier, open]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

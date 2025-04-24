@@ -75,7 +75,6 @@ export function StaffList({ searchQuery, onEdit }: StaffListProps) {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
             <TableHead>Phone</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Status</TableHead>
@@ -103,7 +102,6 @@ export function StaffList({ searchQuery, onEdit }: StaffListProps) {
                   <div className="font-medium">{employee.name}</div>
                 </div>
               </TableCell>
-              <TableCell>{employee.email}</TableCell>
               <TableCell>{employee.phone}</TableCell>
               <TableCell>
                 <span className="capitalize">{employee.employment_type}</span>
@@ -142,7 +140,7 @@ export function StaffList({ searchQuery, onEdit }: StaffListProps) {
                     variant="ghost"
                     size="sm"
                     className="text-destructive"
-                    onClick={() => setEmployeeToDelete(employee.id)}
+                    onClick={() => handleDeleteEmployee(employee.id)}
                   >
                     <Trash className="h-4 w-4 mr-1" />
                     Delete
