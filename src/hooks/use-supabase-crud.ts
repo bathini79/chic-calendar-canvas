@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -9,9 +8,9 @@ type Row<T extends TableName> = Database['public']['Tables'][T]['Row']
 type Insert<T extends TableName> = Database['public']['Tables'][T]['Insert']
 type Update<T extends TableName> = Database['public']['Tables'][T]['Update']
 
-export function useSupabaseCrud<T extends TableName>(tableName: T) {
+export function useSupabaseCrud<T extends TableName>(tableName: T, refreshKey?: number) {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: [tableName],
+    queryKey: [tableName, refreshKey],
     queryFn: async () => {
       const { data: result, error } = await supabase
         .from(tableName)

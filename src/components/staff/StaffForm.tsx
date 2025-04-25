@@ -52,6 +52,7 @@ interface StaffFormProps {
   onSubmit: (data: StaffFormData) => void;
   onCancel: () => void;
   employeeId?: string;
+  isSubmitting?: boolean;
 }
 
 export function StaffForm({
@@ -59,6 +60,7 @@ export function StaffForm({
   onSubmit,
   onCancel,
   employeeId,
+  isSubmitting = false,
 }: StaffFormProps) {
   const [images, setImages] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
@@ -106,13 +108,19 @@ export function StaffForm({
   const { data: employmentTypes } = useQuery({
     queryKey: ["employmentTypes"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employment_types")
-        .select("*")
-        .order("name");
+      try {
+        // Use any type since employment_types may not be properly typed in Database types
+        const { data, error } = await supabase
+          .from('employment_types' as any)
+          .select("*")
+          .order("name");
 
-      if (error) throw error;
-      return data || [];
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching employment types:", error);
+        return [];
+      }
     },
   });
 
@@ -322,13 +330,16 @@ export function StaffForm({
                 </FormControl>
                 <SelectContent>
                   {employmentTypes?.length ? (
-                    employmentTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.name}
+                    employmentTypes.map((type: any) => (
+                      <SelectItem 
+                        key={type.id} 
+                        value={type.id || 'invalid-id'} // Ensure value is never empty
+                      >
+                        {type.name || 'Unknown'}
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>
+                    <SelectItem value="no-employment-types" disabled>
                       No employment types available
                     </SelectItem>
                   )}
@@ -405,11 +416,11 @@ export function StaffForm({
         />
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isPhoneCheckLoading}>
-            {isPhoneCheckLoading ? (
+          <Button type="submit" disabled={isPhoneCheckLoading || isSubmitting}>
+            {(isPhoneCheckLoading || isSubmitting) ? (
               <LoaderCircle
                 className="animate-spin mr-2"
                 size={16}

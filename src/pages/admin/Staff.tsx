@@ -20,9 +20,15 @@ export default function Staff() {
   const [refreshKey, setRefreshKey] = useState(0); // Add a refresh key state
   const { data: employees, isLoading } = useSupabaseCrud<'employees'>('employees', refreshKey);
 
+  // Make sure to handle the case where employeeId is undefined
   const handleOpenDialog = (employeeId?: string) => {
-    setSelectedEmployeeId(employeeId);
-    setIsDialogOpen(true);
+    try {
+      setSelectedEmployeeId(employeeId || undefined);
+      setIsDialogOpen(true);
+    } catch (error) {
+      console.error("Error opening staff dialog:", error);
+      // Prevent crashing by handling errors
+    }
   };
 
   const handleCloseDialog = () => {

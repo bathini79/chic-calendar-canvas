@@ -9,6 +9,16 @@ interface HeaderActionsProps {
 }
 
 export function HeaderActions({ onAdd, view, onViewChange }: HeaderActionsProps) {
+  // Add error handling for the Add Staff button click
+  const handleAddClick = () => {
+    try {
+      onAdd();
+    } catch (error) {
+      console.error("Error adding staff:", error);
+      // You could add a toast notification here if desired
+    }
+  };
+
   return (
     <div className="flex items-center justify-between">
       <div className="space-y-1">
@@ -36,7 +46,7 @@ export function HeaderActions({ onAdd, view, onViewChange }: HeaderActionsProps)
           </Button>
         </div>
 
-        <Button onClick={onAdd} className="flex items-center gap-2">
+        <Button onClick={handleAddClick} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Add Staff
         </Button>

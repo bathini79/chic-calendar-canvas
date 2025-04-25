@@ -1,8 +1,9 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 interface StaffDialogProps {
   open: boolean;
@@ -11,30 +12,48 @@ interface StaffDialogProps {
 }
 
 export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  
+  // Reset error state when dialog opens/closes
+  useEffect(() => {
+    if (open) {
+      setError(null);
+    }
+  }, [open]);
+  
   // Fetch employee data if editing
   const { data: employeeData } = useQuery({
     queryKey: ['employee', employeeId],
     queryFn: async () => {
-      if (!employeeId) return null;
-      
-      const { data, error } = await supabase
-        .from('employees')
-        .select(`
-          *,
-          employee_skills(service_id),
-          employee_locations(location_id)
-        `)
-        .eq('id', employeeId)
-        .single();
-      
-      if (error) throw error;
-      return data;
+      try {
+        if (!employeeId) return null;
+        
+        const { data, error } = await supabase
+          .from('employees')
+          .select(`
+            *,
+            employee_skills(service_id),
+            employee_locations(location_id)
+          `)
+          .eq('id', employeeId)
+          .single();
+        
+        if (error) throw error;
+        return data;
+      } catch (err: any) {
+        console.error("Error fetching employee data:", err);
+        setError(err);
+        return null;
+      }
     },
-    enabled: !!employeeId
+    enabled: !!employeeId && open
   });
 
   const handleFormSubmit = async (data: any) => {
     try {
+      setIsLoading(true);
+      
       // If editing existing employee
       if (employeeId) {
         const { error } = await supabase
@@ -118,8 +137,8 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
         
         if (error) throw error;
         
-        if (!responseData.success) {
-          throw new Error(responseData.message || "Failed to onboard employee");
+        if (!responseData?.success) {
+          throw new Error(responseData?.message || "Failed to onboard employee");
         }
         
         // Show appropriate toast messages based on the response
@@ -137,21 +156,47 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
     } catch (error: any) {
       toast.error(error.message || "Failed to save staff member");
       console.error("Error saving staff member:", error);
+      setError(error);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  // Handle error display
+  if (error && open) {
+    toast.error(`There was an error: ${error.message}`);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{employeeId ? "Edit Staff Member" : "Add Staff Member"}</DialogTitle>
+          <DialogDescription>
+            {employeeId 
+              ? "Update the information for this staff member." 
+              : "Fill in the details to add a new staff member to your team."}
+          </DialogDescription>
         </DialogHeader>
-        <StaffForm 
-          onSubmit={handleFormSubmit} 
-          onCancel={() => onOpenChange(false)} 
-          employeeId={employeeId}
-          initialData={employeeData}
-        />
+        {error ? (
+          <div className="py-4 text-center">
+            <p className="text-destructive">Error loading staff data</p>
+            <button 
+              className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-md" 
+              onClick={() => onOpenChange(false)}
+            >
+              Close
+            </button>
+          </div>
+        ) : (
+          <StaffForm 
+            onSubmit={handleFormSubmit} 
+            onCancel={() => onOpenChange(false)} 
+            employeeId={employeeId}
+            initialData={employeeData}
+            isSubmitting={isLoading}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
