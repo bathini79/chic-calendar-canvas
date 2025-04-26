@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { GupshupConfig } from "@/components/admin/settings/GupshupConfig";
+import { MetaWhatsAppConfig } from "@/components/admin/settings/MetaWhatsAppConfig";
 import { NotificationQueueProcessor } from "@/components/admin/settings/NotificationQueueProcessor";
 import { toast } from "@/lib/toast"; // Import our centralized toast utility
 
@@ -103,6 +104,14 @@ export default function ThirdParty() {
               </div>
               <div
                 className={`px-4 py-2 cursor-pointer ${
+                  activeSection === "meta_whatsapp" ? "bg-accent" : ""
+                }`}
+                onClick={() => setActiveSection("meta_whatsapp")}
+              >
+                <span>Meta WhatsApp Cloud API</span>
+              </div>
+              <div
+                className={`px-4 py-2 cursor-pointer ${
                   activeSection === "notifications" ? "bg-accent" : ""
                 }`}
                 onClick={() => setActiveSection("notifications")}
@@ -124,6 +133,8 @@ export default function ThirdParty() {
         {/* Main Content */}
         <div className="md:col-span-3">
           {activeSection === "gupshup" && <GupshupConfig />}
+          
+          {activeSection === "meta_whatsapp" && <MetaWhatsAppConfig />}
           
           {activeSection === "notifications" && (
             <Card>

@@ -1,50 +1,44 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
+// Define CORS headers
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: corsHeaders
-    });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Get origin from request headers or use Supabase URL
-    const origin = req.headers.get('origin') || Deno.env.get('SUPABASE_URL') || 'https://oygmfedzibzxojqirgxo.supabase.co';
+    // Get the base URL from the request
+    const url = new URL(req.url)
+    const baseUrl = `${url.protocol}//${url.host}`
     
     return new Response(
-      JSON.stringify({
-        success: true,
-        origin: origin
+      JSON.stringify({ 
+        success: true, 
+        baseUrl,
       }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        },
-        status: 200
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
       }
-    );
+    )
   } catch (error) {
-    console.error('Error in get-app-url:', error);
+    console.error('Error:', error)
     
     return new Response(
-      JSON.stringify({
-        error: error.message || 'An error occurred'
+      JSON.stringify({ 
+        success: false, 
+        error: error.message || "Unknown error occurred" 
       }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        },
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }
-    );
+    )
   }
-});
+})

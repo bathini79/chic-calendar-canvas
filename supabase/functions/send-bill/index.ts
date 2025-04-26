@@ -15,7 +15,12 @@ serve(async (req) => {
   }
 
   try {
-    const { appointmentId, message, notificationType = 'bill_receipt' } = await req.json();
+    const { 
+      appointmentId, 
+      message, 
+      notificationType = 'bill_receipt',
+      preferredProvider // Optional parameter to specify which provider to use
+    } = await req.json();
 
     if (!appointmentId) throw new Error("Appointment ID is required");
     if (!message) throw new Error("Message is required");
@@ -43,83 +48,35 @@ serve(async (req) => {
       throw new Error("Invalid appointment or missing phone number");
     }
 
-    // Fetch Gupshup config from message_providers table
-    const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin
-      .from('messaging_providers')
-      .select('configuration')
-      .eq('provider_name', 'gupshup')
-      .single();
-      
-    if (providerConfigError || !providerConfigData?.configuration) {
-      throw new Error('Gupshup config not found in message_providers');
-    }
-    
-    const gupshupConfig = providerConfigData.configuration;
-    const GUPSHUP_API_KEY = gupshupConfig.api_key;
-    const SOURCE_NUMBER = gupshupConfig.source_mobile.startsWith("+") ? 
-      gupshupConfig.source_mobile.slice(1) : gupshupConfig.source_mobile;
-    const SRC_NAME = gupshupConfig.app_name;
-
-    // Format phone number for Gupshup
-    const formattedPhone = appointment.profiles.phone_number.startsWith("+") ? 
-      appointment.profiles.phone_number.slice(1) : appointment.profiles.phone_number;
-
-    // Create notification record in the database
-    const { data: notification, error: notificationError } = await supabaseAdmin
-      .from('appointment_notifications')
-      .insert({
-        appointment_id: appointmentId,
-        notification_type: notificationType,
-        status: 'pending',
-        recipient: formattedPhone,
-      })
-      .select()
-      .single();
-
-    if (notificationError) throw notificationError;
-
-    // Send message via Gupshup WhatsApp API
-    const gupshupPayload = new URLSearchParams({
-      channel: "whatsapp",
-      source: SOURCE_NUMBER,
-      destination: formattedPhone,
-      message: JSON.stringify({
-        type: "text",
-        text: message
-      }),
-      "src.name": SRC_NAME
-    });
-
-    const gupshupResponse = await fetch("https://api.gupshup.io/wa/api/v1/msg", {
-      method: "POST",
+    // Send the message using the unified send-whatsapp-message function
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        apikey: GUPSHUP_API_KEY
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
       },
-      body: gupshupPayload.toString()
+      body: JSON.stringify({
+        phoneNumber: appointment.profiles.phone_number,
+        message,
+        appointmentId,
+        notificationType,
+        preferredProvider
+      })
     });
 
-    const result = await gupshupResponse.json();
-
-    if (!gupshupResponse.ok) {
-      throw new Error(`Gupshup API error: ${JSON.stringify(result)}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Failed to send WhatsApp message: ${errorData.error || response.statusText}`);
     }
 
-    // Update notification status
-    await supabaseAdmin
-      .from('appointment_notifications')
-      .update({ 
-        status: 'sent',
-        processed_at: new Date().toISOString(),
-        message_id: result.messageId
-      })
-      .eq("id", notification.id);
+    const result = await response.json();
 
     return new Response(
       JSON.stringify({
         success: true,
         message: "Bill notification sent successfully",
-        messageId: result.messageId
+        messageId: result.messageId,
+        provider: result.provider
       }),
       {
         status: 200,

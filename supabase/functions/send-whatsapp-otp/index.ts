@@ -1,11 +1,12 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0';
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
-serve(async (req)=>{
+
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: {
@@ -13,6 +14,7 @@ serve(async (req)=>{
       }
     });
   }
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({
       error: "Method not allowed"
@@ -24,8 +26,16 @@ serve(async (req)=>{
       }
     });
   }
+
   try {
-    const { phoneNumber, fullName, lead_source,baseUrl } = await req.json();
+    const { 
+      phoneNumber, 
+      fullName, 
+      lead_source, 
+      baseUrl,
+      preferredProvider // Optional parameter to specify which provider to use
+    } = await req.json();
+
     if (!phoneNumber) {
       return new Response(JSON.stringify({
         error: "Missing phoneNumber parameter"
@@ -37,29 +47,29 @@ serve(async (req)=>{
         }
       });
     }
-    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL'), 
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    );
+
     // Generate a random 6-digit OTP code
-    const generateOTP = ()=>{
+    const generateOTP = () => {
       return Math.floor(100000 + Math.random() * 900000).toString();
     };
+    
     const otp = generateOTP();
     const expiresInMinutes = 15;
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
     
     // Check if user already exists
-    const { data: existingUser, error: userError } = await supabaseAdmin
+    const { data: existingUser } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('phone_number', phoneNumber)
       .single();
     
-    // Load GupShup configuration
-    // Fetch Gupshup config from message_providers table
-    const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin.from('messaging_providers').select('configuration').eq('provider_name', 'gupshup').single();
-    if (providerConfigError || !providerConfigData?.configuration) {
-      throw new Error('Gupshup config not found in message_providers');
-    }
-    
+    // Store the OTP code in the database
     const { error: otpError } = await supabaseAdmin.from('phone_auth_codes').insert({
       phone_number: phoneNumber,
       code: otp,
@@ -67,56 +77,51 @@ serve(async (req)=>{
       full_name: fullName,
       lead_source: lead_source
     });
+    
     if (otpError) {
       throw new Error(`Failed to store verification code: ${otpError.message}`);
     }
-    const config = providerConfigData.configuration;
+    
     // Create verification link (must be URL-encoded)
     const verificationParams = new URLSearchParams({
       phone: phoneNumber,
       code: otp
     });
+    
     // Use customer verification page for the link
     const verificationUrl = `${baseUrl}/customer-verify?${verificationParams.toString()}`;
+    
     // Create message with verification link
-    const MESSAGE_TEXT = `Please verify your phone number by clicking this link: ${verificationUrl}\n\nOr use code: ${otp}\n\nThis code will expire in ${expiresInMinutes} minutes.`;
+    const message = `Please verify your phone number by clicking this link: ${verificationUrl}\n\nOr use code: ${otp}\n\nThis code will expire in ${expiresInMinutes} minutes.`;
+    
     console.log("Sending message with verification link:", verificationUrl);
-    const GUPSHUP_API_KEY = config.api_key;
-    const SOURCE_NUMBER = config.source_mobile.startsWith('+') ? config.source_mobile.slice(1) : config.source_mobile;
-    const url = "https://api.gupshup.io/wa/api/v1/msg";
-    const headers = {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "apikey": GUPSHUP_API_KEY
-    };
-    // Ensure number is formatted correctly - don't add + prefix
-    const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber;
-    const APP_NAME = config.app_name;
-    const formData = new URLSearchParams();
-    formData.append("channel", "whatsapp");
-    formData.append("source", SOURCE_NUMBER);
-    formData.append("destination", formattedPhoneNumber);
-    formData.append("message", JSON.stringify({
-      type: "text",
-      text: MESSAGE_TEXT
-    }));
-    formData.append("src.name", APP_NAME);
-    console.log("Sending to:", formattedPhoneNumber);
-    console.log("Message content:", MESSAGE_TEXT);
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: formData.toString()
+
+    // Send the message using the unified send-whatsapp-message function
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+      },
+      body: JSON.stringify({
+        phoneNumber,
+        message,
+        preferredProvider
+      })
     });
-    const responseBody = await response.json();
+
     if (!response.ok) {
-      console.error("Gupshup API error:", responseBody);
-      throw new Error(`Gupshup API error: ${JSON.stringify(responseBody)}`);
+      const errorData = await response.json();
+      throw new Error(`Failed to send WhatsApp message: ${errorData.error || response.statusText}`);
     }
-    console.log("Gupshup API success:", responseBody);
+
+    const result = await response.json();
+    
     return new Response(JSON.stringify({
       success: true,
-      response: responseBody,
-      userData: existingUser // Include user data in the response if they exist
+      response: result,
+      userData: existingUser, // Include user data in the response if they exist
+      provider: result.provider
     }), {
       status: 200,
       headers: {
@@ -124,8 +129,10 @@ serve(async (req)=>{
         "Content-Type": "application/json"
       }
     });
+    
   } catch (error) {
     console.error("Error in send-whatsapp-otp:", error);
+    
     return new Response(JSON.stringify({
       error: error.message
     }), {
