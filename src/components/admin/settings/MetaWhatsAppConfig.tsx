@@ -283,7 +283,7 @@ export function MetaWhatsAppConfig() {
               required
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Found in Meta Developer Dashboard under WhatsApp > API Setup
+              Found in Meta Developer Dashboard under WhatsApp &gt; API Setup
             </p>
           </div>
 
@@ -372,7 +372,7 @@ export function MetaWhatsAppConfig() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Add this URL to your Meta Developer Dashboard under WhatsApp > Configuration > Webhooks
+              Add this URL to your Meta Developer Dashboard under WhatsApp &gt; Configuration &gt; Webhooks
             </p>
             <Button 
               type="button"
