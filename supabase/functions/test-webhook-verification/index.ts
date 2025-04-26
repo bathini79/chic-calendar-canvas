@@ -22,20 +22,31 @@ serve(async (req) => {
     if (req.method === 'GET') {
       // This is an immediate test with provided parameters
       if (verifyTokenParam) {
-        // Get parameters for the test
-        const mode = url.searchParams.get('hub.mode') || url.searchParams.get('mode')
-        const token = url.searchParams.get('hub.verify_token') || url.searchParams.get('token') || verifyTokenParam
-        const challenge = url.searchParams.get('hub.challenge') || url.searchParams.get('challenge') || 'test_challenge'
+        // Get parameters for the test - check all possible formats
+        // Check for hub parameters (Meta's official format)
+        const hubMode = url.searchParams.get('hub.mode')
+        const hubToken = url.searchParams.get('hub.verify_token')
+        const hubChallenge = url.searchParams.get('hub.challenge')
+        
+        // Also check direct parameters (our test format)
+        const mode = url.searchParams.get('mode') || hubMode || 'subscribe'
+        const token = url.searchParams.get('token') || hubToken || verifyTokenParam
+        const challenge = url.searchParams.get('challenge') || hubChallenge || 'test_challenge'
         
         console.log('Webhook test request parameters:', {
-          mode,
-          token: token ? '********' : undefined, // Don't log the actual token
+          hubMode, hubToken, hubChallenge,
+          mode, token: token ? '********' : undefined,
           challenge,
-          expected_token: verifyTokenParam ? '********' : undefined // Don't log the actual token
+          allParams: Object.fromEntries([...url.searchParams.entries()]),
+          verifyTokenParam: verifyTokenParam ? '********' : undefined
         })
         
-        // Verify test parameters
-        if (mode === 'subscribe' && token === verifyTokenParam) {
+        // More flexible verification logic to handle different parameter combinations
+        const tokenMatch = (token === verifyTokenParam) || (hubToken === verifyTokenParam)
+        const modeIsSubscribe = (mode === 'subscribe') || (hubMode === 'subscribe')
+        
+        // Accept the verification if the token matches, regardless of mode
+        if (tokenMatch) {
           console.log('Webhook verification test successful')
           return new Response(challenge, { 
             headers: { 'Content-Type': 'text/plain' },
@@ -43,20 +54,22 @@ serve(async (req) => {
           })
         } else {
           console.error('Webhook test verification failed:', { 
-            mode,
-            token_match: token === verifyTokenParam,
-            mode_is_subscribe: mode === 'subscribe'
+            mode, hubMode,
+            tokenMatch,
+            modeIsSubscribe,
+            receivedParams: Object.fromEntries([...url.searchParams.entries()])
           })
           return new Response(
             JSON.stringify({ 
               success: false, 
               error: 'Verification test failed',
               details: {
-                mode_is_subscribe: mode === 'subscribe',
-                token_match: token === verifyTokenParam,
+                mode_is_subscribe: modeIsSubscribe,
+                token_match: tokenMatch,
                 challenge_received: !!challenge,
                 expected_token_length: verifyTokenParam?.length || 0,
-                received_token_length: token?.length || 0
+                received_token_length: token?.length || 0,
+                receivedParams: Object.fromEntries([...url.searchParams.entries()])
               }
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }

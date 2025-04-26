@@ -356,9 +356,6 @@ export function MetaWhatsAppConfig() {
                 Generate
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Used to verify webhook endpoints from Meta
-            </p>
           </div>
 
           <div className="space-y-2 pt-4">
@@ -383,46 +380,10 @@ export function MetaWhatsAppConfig() {
             <p className="text-xs text-muted-foreground mt-1">
               Add this URL to your Meta Developer Dashboard under WhatsApp &gt; Configuration &gt; Webhooks
             </p>
-            <Button 
-              type="button"
-              variant="outline"
-              className="mt-2"
-              onClick={async () => {
-                try {
-                  setIsTesting(true);
-                  setTestResult(null);
-                  setError(null);
-
-                  // Use the dedicated test webhook verification endpoint instead
-                  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || webhookUrl.split('/functions/')[0];
-                  const testUrl = `${supabaseUrl}/functions/v1/test-webhook-verification?verify_token=${encodeURIComponent(verifyToken)}&mode=subscribe&challenge=test_challenge&token=${encodeURIComponent(verifyToken)}`;
-                  
-                  const response = await fetch(testUrl, {
-                    method: 'GET'
-                  });
-
-                  const text = await response.text();
-                  
-                  if (response.ok && text === 'test_challenge') {
-                    setTestResult('Webhook verification test passed! Your webhook endpoint is correctly configured.');
-                    toast.success('Webhook verification successful');
-                  } else {
-                    throw new Error(`Verification test failed. Status: ${response.status}, Response: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
-                  }
-                } catch (error: any) {
-                  console.error('Webhook verification test failed:', error);
-                  setTestResult(`Webhook verification test failed: ${error.message}`);
-                  setError('Webhook verification failed');
-                  toast.error('Webhook verification failed', {
-                    description: error.message
-                  });
-                } finally {
-                  setIsTesting(false);
-                }
-              }}
-            >
-              Test Webhook Verification
-            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              <strong>Note:</strong> You'll need to manually verify this webhook in the Meta Developer Dashboard 
+              using the verify token shown above.
+            </p>
           </div>
 
           <div className="space-y-2 mt-6 pt-4 border-t">
