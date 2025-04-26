@@ -506,7 +506,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
   return (
     <div
-      className={`fixed top-0 right-0 w-full max-w-6xl h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
+      className={`fixed top-0 right-0 w-full  h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${currentScreen == SCREEN.SUMMARY ? `max-w-3xl`: `max-w-6xl`} ${
         isOpen ? "translate-x-0" : "translate-x-full"
       }`}
     >

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.26.0";
 // Define CORS headers
@@ -6,6 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
+
 serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -146,21 +146,9 @@ serve(async (req)=>{
         if (tokenError) throw tokenError;
         // Create the verification link
         verificationLink = `${baseUrl}/verify?token=${verificationToken}&phone=${encodeURIComponent(employeeData.phone)}`;
-        // Send the verification link via Gupshup
-        try {
-          // Check if Gupshup is configured
-          const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin.from('messaging_providers').select('configuration').eq('provider_name', 'gupshup').single();
-          if (providerConfigError || !providerConfigData?.configuration) {
-            throw new Error('Gupshup config not found');
-          }
-          const gupshupConfig = providerConfigData.configuration;
-          const GUPSHUP_API_KEY = gupshupConfig.api_key;
-          const SOURCE_NUMBER = gupshupConfig.source_mobile.startsWith("+") ? gupshupConfig.source_mobile.slice(1) : gupshupConfig.source_mobile;
-          const APP_NAME = gupshupConfig.app_name;
-          // Format phone number for WhatsApp
-          const formattedPhone = employeeData.phone.startsWith('+') ? employeeData.phone.slice(1) : employeeData.phone;
-          // Create verification message
-          const message = `
+        
+        // Create verification message
+        const message = `
 Hello ${employeeData.name},
 
 Welcome to our team! Please click the link below to verify your account:
@@ -171,55 +159,73 @@ This link will expire in 24 hours. If you have any questions, please contact you
 
 Best regards,
 The Management Team
-          `.trim();
-          // Send message via Gupshup
-          const gupshupPayload = new URLSearchParams({
-            channel: "whatsapp",
-            source: SOURCE_NUMBER,
-            destination: formattedPhone,
-            message: JSON.stringify({
-              type: "text",
-              text: message
-            }),
-            "src.name": APP_NAME
-          });
-          const gupshupResponse = await fetch("https://api.gupshup.io/wa/api/v1/msg", {
-            method: "POST",
+`.trim();
+
+        // Fetch the system preference for WhatsApp provider
+        const { data: systemSettings } = await supabaseAdmin
+          .from("system_settings")
+          .select("value")
+          .eq("key", "preferred_whatsapp_provider")
+          .single();
+        
+        const preferredProvider = systemSettings?.value || null;
+        
+        // Send message using the centralized WhatsApp message function
+        try {
+          console.log(`Sending verification message to ${employeeData.phone}`);
+          
+          const whatsappPayload = {
+            phoneNumber: employeeData.phone,
+            message,
+            preferredProvider,
+            // These parameters need to match what send-whatsapp-message expects
+            notificationType: 'verification_link'
+            // Don't use parameters the API doesn't expect
+          };
+          
+          console.log(`WhatsApp payload: ${JSON.stringify(whatsappPayload)}`);
+          
+          const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
+            method: 'POST',
             headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              apikey: GUPSHUP_API_KEY
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
             },
-            body: gupshupPayload.toString()
+            body: JSON.stringify(whatsappPayload)
           });
-          const gupshupResult = await gupshupResponse.json();
-          if (!gupshupResponse.ok) {
-            throw new Error(`Gupshup error: ${JSON.stringify(gupshupResult)}`);
+          
+          const responseText = await response.text();
+          let result;
+          
+          try {
+            result = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error(`Error parsing response: ${responseText}`);
+            throw new Error(`Invalid response format: ${responseText}`);
           }
-          verificationSent = true;
+          
+          if (!response.ok) {
+            console.error(`WhatsApp API error - Status: ${response.status}, Response: ${JSON.stringify(result)}`);
+            throw new Error(`Failed to send WhatsApp message: ${result.error || response.statusText}`);
+          }
+          
+          console.log(`WhatsApp verification message result: ${JSON.stringify(result)}`);
+          verificationSent = result.success;
+          
         } catch (error) {
           console.error(`Error sending verification message: ${error.message}`);
-        // Continue with the process even if sending the verification message fails
+          // Continue with the process even if sending the verification message fails
         }
       } catch (error) {
         console.error(`Error creating verification link: ${error.message}`);
       // Continue with the process even if verification link creation fails
       }
     }
+    
     // 6. Send welcome message if requested and verification link wasn't sent
     let welcomeMessageSent = false;
     if (sendWelcomeMessage && !verificationSent) {
       try {
-        // Check if Gupshup is configured
-        const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin.from('messaging_providers').select('configuration').eq('provider_name', 'gupshup').single();
-        if (providerConfigError || !providerConfigData?.configuration) {
-          throw new Error('Gupshup config not found');
-        }
-        const gupshupConfig = providerConfigData.configuration;
-        const GUPSHUP_API_KEY = gupshupConfig.api_key;
-        const SOURCE_NUMBER = gupshupConfig.source_mobile.startsWith("+") ? gupshupConfig.source_mobile.slice(1) : gupshupConfig.source_mobile;
-        const APP_NAME = gupshupConfig.app_name;
-        // Format phone number for WhatsApp
-        const formattedPhone = employeeData.phone.startsWith('+') ? employeeData.phone.slice(1) : employeeData.phone;
         // Create welcome message
         const message = `
 Hello ${employeeData.name},
@@ -232,31 +238,63 @@ If you have any questions, please contact your manager.
 
 Best regards,
 The Management Team
-        `.trim();
-        // Send message via Gupshup
-        const gupshupPayload = new URLSearchParams({
-          channel: "whatsapp",
-          source: SOURCE_NUMBER,
-          destination: formattedPhone,
-          message: JSON.stringify({
-            type: "text",
-            text: message
-          }),
-          "src.name": APP_NAME
-        });
-        const gupshupResponse = await fetch("https://api.gupshup.io/wa/api/v1/msg", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            apikey: GUPSHUP_API_KEY
-          },
-          body: gupshupPayload.toString()
-        });
-        const gupshupResult = await gupshupResponse.json();
-        if (!gupshupResponse.ok) {
-          throw new Error(`Gupshup error: ${JSON.stringify(gupshupResult)}`);
+`.trim();
+
+        // Fetch the system preference for WhatsApp provider
+        const { data: systemSettings } = await supabaseAdmin
+          .from("system_settings")
+          .select("value")
+          .eq("key", "preferred_whatsapp_provider")
+          .single();
+        
+        const preferredProvider = systemSettings?.value || null;
+        
+        // Send message using the centralized WhatsApp message function
+        try {
+          console.log(`Sending welcome message to ${employeeData.phone}`);
+          
+          const whatsappPayload = {
+            phoneNumber: employeeData.phone,
+            message,
+            preferredProvider,
+            // These parameters need to match what send-whatsapp-message expects
+            notificationType: 'welcome_message'
+            // Don't use parameters the API doesn't expect
+          };
+          
+          console.log(`WhatsApp payload: ${JSON.stringify(whatsappPayload)}`);
+          
+          const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+            },
+            body: JSON.stringify(whatsappPayload)
+          });
+          
+          const responseText = await response.text();
+          let result;
+          
+          try {
+            result = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error(`Error parsing response: ${responseText}`);
+            throw new Error(`Invalid response format: ${responseText}`);
+          }
+          
+          if (!response.ok) {
+            console.error(`WhatsApp API error - Status: ${response.status}, Response: ${JSON.stringify(result)}`);
+            throw new Error(`Failed to send WhatsApp message: ${result.error || response.statusText}`);
+          }
+          
+          console.log(`WhatsApp welcome message result: ${JSON.stringify(result)}`);
+          welcomeMessageSent = result.success;
+          
+        } catch (error) {
+          console.error(`Error sending welcome message: ${error.message}`);
+          // Continue with the process even if sending the welcome message fails
         }
-        welcomeMessageSent = true;
       } catch (error) {
         console.error(`Error sending welcome message: ${error.message}`);
       // Continue with the process even if welcome message fails
@@ -293,6 +331,7 @@ The Management Team
     });
   }
 });
+
 // Helper function to handle auth user deletion
 async function handleDeleteAuthUser(authUserId) {
   try {

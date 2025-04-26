@@ -1,10 +1,5 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
-
-const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
-const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
-const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')
 
 // Define CORS headers
 const corsHeaders = {
@@ -27,40 +22,35 @@ async function sendWhatsAppOTP(phoneNumber: string, otp: string, name: string, v
   // Make sure the phone number is in E.164 format
   const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber.replace(/\s/g, '')}`
   
-  const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
-  
   // Create the verification link
   const verificationLink = `${baseUrl}/verify?token=${verificationToken}&code=${otp}`;
-  
-  const formData = new URLSearchParams()
-  formData.append('From', `whatsapp:${TWILIO_PHONE_NUMBER}`)
-  formData.append('To', `whatsapp:${formattedPhone}`)
-  formData.append('Body', `Hello ${name}, your verification code to activate your staff account is: ${otp}. Click on this link to verify: ${verificationLink}`)
 
-  const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)
+  // Create the message content
+  const messageContent = `Hello ${name}, your verification code to activate your staff account is: ${otp}. Click on this link to verify: ${verificationLink}`;
   
-  try {
-    const response = await fetch(twilioUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${auth}`
-      },
-      body: formData
+  // Use our centralized WhatsApp messaging function
+  const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+    },
+    body: JSON.stringify({
+      phoneNumber: formattedPhone,
+      message: messageContent,
+      notificationType: 'employee_verification',
+      // We can optionally specify a preferred provider, though it's not required
+      // as the send-whatsapp-message function will handle fallbacks
     })
-    
-    const responseData = await response.json()
-    
-    if (!response.ok) {
-      console.error('Error from Twilio:', responseData)
-      throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || JSON.stringify(responseData)}`)
-    }
-    
-    return responseData
-  } catch (error) {
-    console.error('Failed to send WhatsApp message:', error)
-    throw error
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Error sending WhatsApp message:', errorData);
+    throw new Error(`Failed to send WhatsApp message: ${JSON.stringify(errorData)}`);
   }
+  
+  return await response.json();
 }
 
 serve(async (req) => {
@@ -70,16 +60,6 @@ serve(async (req) => {
   }
 
   try {
-    // Check if Twilio credentials are available
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-      console.error('Twilio credentials missing:', {
-        ACCOUNT_SID_EXISTS: !!TWILIO_ACCOUNT_SID,
-        AUTH_TOKEN_EXISTS: !!TWILIO_AUTH_TOKEN,
-        PHONE_NUMBER_EXISTS: !!TWILIO_PHONE_NUMBER
-      })
-      throw new Error('Twilio credentials not configured')
-    }
-    
     // Parse request body
     const { phoneNumber, employeeId, name, baseUrl } = await req.json()
     

@@ -125,12 +125,17 @@ serve(async (req) => {
 
     // Send the message using the appropriate provider
     let result;
-    if (providerName === 'meta_whatsapp') {
-      result = await sendMetaWhatsAppMessage(phoneNumber, message, selectedProvider.configuration, supabaseAdmin);
-    } else if (providerName === 'gupshup') {
-      result = await sendGupshupMessage(phoneNumber, message, selectedProvider.configuration, supabaseAdmin);
-    } else {
-      throw new Error(`Unsupported provider: ${providerName}`);
+    try {
+      if (providerName === 'meta_whatsapp') {
+        result = await sendMetaWhatsAppMessage(phoneNumber, message, selectedProvider.configuration, supabaseAdmin);
+      } else if (providerName === 'gupshup') {
+        result = await sendGupshupMessage(phoneNumber, message, selectedProvider.configuration, supabaseAdmin);
+      } else {
+        throw new Error(`Unsupported provider: ${providerName}`);
+      }
+    } catch (sendError) {
+      console.error(`Error sending message via ${providerName}:`, sendError);
+      throw new Error(`Failed to send message: ${sendError.message}`);
     }
 
     // Update notification status if applicable
@@ -155,6 +160,25 @@ serve(async (req) => {
           message_id: result.messageId,
           provider: providerName
         });
+    }
+    
+    // Record employee-related notifications (verification or welcome messages)
+    if (notificationType === 'verification_link' || notificationType === 'welcome_message') {
+      try {
+        await supabaseAdmin.from('whatsapp_messages').insert({
+          provider: providerName,
+          direction: 'outbound',
+          to_number: phoneNumber,
+          message_content: message,
+          message_type: 'text',
+          message_id: result.messageId,
+          notification_type: notificationType,
+          status: 'sent'
+        });
+      } catch (recordError) {
+        console.error(`Error recording ${notificationType} in database:`, recordError);
+        // Don't throw here, still consider the message as sent even if recording fails
+      }
     }
 
     return new Response(JSON.stringify({
@@ -231,17 +255,22 @@ async function sendMetaWhatsAppMessage(phoneNumber, message, config, supabaseAdm
     }
     
     // Store the sent message in the database
-    await supabaseAdmin.from('whatsapp_messages').insert({
-      provider: 'meta_whatsapp',
-      direction: 'outbound',
-      from_number: config.phone_number_id,
-      to_number: phoneNumber,
-      message_content: message,
-      message_type: 'text',
-      message_id: messageId,
-      raw_payload: result,
-      status: 'sent'
-    });
+    try {
+      await supabaseAdmin.from('whatsapp_messages').insert({
+        provider: 'meta_whatsapp',
+        direction: 'outbound',
+        from_number: config.phone_number_id,
+        to_number: phoneNumber,
+        message_content: message,
+        message_type: 'text',
+        message_id: messageId,
+        raw_payload: result,
+        status: 'sent'
+      });
+    } catch (dbError) {
+      console.error('Error storing WhatsApp message in database:', dbError);
+      // Continue despite database error
+    }
     
     return { 
       success: true, 
@@ -296,17 +325,22 @@ async function sendGupshupMessage(phoneNumber, message, config, supabaseAdmin) {
     }
     
     // Store the sent message in the database
-    await supabaseAdmin.from('whatsapp_messages').insert({
-      provider: 'gupshup',
-      direction: 'outbound',
-      from_number: SOURCE_NUMBER,
-      to_number: formattedPhone,
-      message_content: message,
-      message_type: 'text',
-      message_id: result.messageId,
-      raw_payload: result,
-      status: 'sent'
-    });
+    try {
+      await supabaseAdmin.from('whatsapp_messages').insert({
+        provider: 'gupshup',
+        direction: 'outbound',
+        from_number: SOURCE_NUMBER,
+        to_number: formattedPhone,
+        message_content: message,
+        message_type: 'text',
+        message_id: result.messageId,
+        raw_payload: result,
+        status: 'sent'
+      });
+    } catch (dbError) {
+      console.error('Error storing WhatsApp message in database:', dbError);
+      // Continue despite database error
+    }
     
     return { 
       success: true, 

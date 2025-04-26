@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 interface StaffDialogProps {
@@ -14,6 +14,7 @@ interface StaffDialogProps {
 export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const queryClient = useQueryClient();
   
   // Reset error state when dialog opens/closes
   useEffect(() => {
@@ -151,6 +152,9 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
           toast.warning("Could not send notifications to the staff member");
         }
       }
+      
+      // Invalidate the employees query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["employees-with-locations"] });
       
       onOpenChange(false);
     } catch (error: any) {
