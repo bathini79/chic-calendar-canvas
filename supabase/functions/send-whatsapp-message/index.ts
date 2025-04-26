@@ -59,56 +59,68 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
     );
 
-    // Determine which messaging provider to use
-    let providerName = preferredProvider || 'meta_whatsapp'; // Default to Meta if not specified
-    
     // Get active messaging providers
     const { data: providers, error: providersError } = await supabaseAdmin
       .from('messaging_providers')
-      .select('provider_name, is_active, configuration')
-      .eq('is_active', true);
+      .select('provider_name, is_active, configuration');
     
     if (providersError) {
       throw new Error(`Failed to fetch messaging providers: ${providersError.message}`);
     }
     
-    // Check if Meta WhatsApp is the preferred or active provider
-    const metaProvider = providers.find(p => p.provider_name === 'meta_whatsapp' && p.is_active);
+    console.log("Available providers:", JSON.stringify(providers));
     
-    // Check if Gupshup is the preferred or active provider
-    const gupshupProvider = providers.find(p => p.provider_name === 'gupshup' && p.is_active);
+    // Filter to only get active providers - IMPORTANT: Only use providers that are marked as active
+    const activeProviders = providers.filter(p => p.is_active === true);
     
-    // Determine which provider to use based on preference and availability
+    console.log("Active providers:", JSON.stringify(activeProviders));
+    
+    if (activeProviders.length === 0) {
+      throw new Error('No active WhatsApp messaging providers available');
+    }
+    
+    // Find the active providers we support
+    const metaProvider = activeProviders.find(p => p.provider_name === 'meta_whatsapp');
+    const gupshupProvider = activeProviders.find(p => p.provider_name === 'gupshup');
+    
+    // Determine which provider to use
+    let providerName;
+    let selectedProvider;
+    
     if (preferredProvider) {
-      // Use the specified provider if it exists and is active
-      const preferredProviderConfig = providers.find(p => p.provider_name === preferredProvider && p.is_active);
-      if (!preferredProviderConfig) {
+      // If a preferred provider is specified, try to use it if it's active
+      selectedProvider = activeProviders.find(p => p.provider_name === preferredProvider);
+      
+      if (selectedProvider) {
+        // Use the preferred provider if it's active
+        providerName = preferredProvider;
+      } else {
+        // If preferred provider isn't active, use any available provider as fallback
         if (preferredProvider === 'meta_whatsapp' && gupshupProvider) {
-          // Fallback to Gupshup if Meta is preferred but not available
           providerName = 'gupshup';
+          selectedProvider = gupshupProvider;
         } else if (preferredProvider === 'gupshup' && metaProvider) {
-          // Fallback to Meta if Gupshup is preferred but not available
           providerName = 'meta_whatsapp';
+          selectedProvider = metaProvider;
         } else {
-          throw new Error(`Preferred provider ${preferredProvider} is not available and no fallback exists`);
+          throw new Error(`Preferred provider ${preferredProvider} is not active and no fallback is available`);
         }
       }
     } else {
-      // Auto-select based on availability
+      // Auto-select based on availability, prioritizing Meta WhatsApp
       if (metaProvider) {
         providerName = 'meta_whatsapp';
+        selectedProvider = metaProvider;
       } else if (gupshupProvider) {
         providerName = 'gupshup';
+        selectedProvider = gupshupProvider;
       } else {
-        throw new Error('No active WhatsApp messaging provider available');
+        throw new Error('No supported WhatsApp messaging provider is active');
       }
     }
     
-    // Get the selected provider configuration
-    const selectedProvider = providers.find(p => p.provider_name === providerName);
-    
     if (!selectedProvider) {
-      throw new Error(`Selected provider ${providerName} configuration not found`);
+      throw new Error(`No active provider found for ${providerName}`);
     }
 
     // Send the message using the appropriate provider

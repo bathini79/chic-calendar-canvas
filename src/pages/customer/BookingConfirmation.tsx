@@ -365,10 +365,10 @@ export default function BookingConfirmation() {
         // Send confirmation WhatsApp message
         await sendConfirmation(appointmentId, bookingsData);
         
-        // Send bill to customer via WhatsApp
-        await sendBill(appointmentId);
+        // No longer automatically send bill from booking confirmation
+        // Bill generation should happen elsewhere in the workflow
         
-        toast.success("Booking confirmed and bill sent successfully!");
+        toast.success("Booking confirmed successfully!");
       } catch (notificationError) {
         console.error("Error sending notifications:", notificationError);
         toast.error("Booking confirmed but there was an issue sending notifications");

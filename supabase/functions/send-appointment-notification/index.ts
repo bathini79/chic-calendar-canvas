@@ -64,7 +64,7 @@ serve(async (req) => {
       .single();
 
     if (appointmentError || !appointment?.profiles?.phone_number) {
-      throw new Error("Invalid appointment or missing phone number");
+      throw new Error(`Invalid appointment or missing phone number,${appointmentId}`);
     }
 
     // Format message details
@@ -125,6 +125,21 @@ serve(async (req) => {
         message += `Reminder for your upcoming appointment at ${locationName} on ${formattedDate} at ${formattedTime}.`;
     }
 
+    // Fetch the system preference for WhatsApp provider, if any
+    const { data: systemSettings, error: settingsError } = await supabaseAdmin
+      .from("system_settings")
+      .select("value")
+      .eq("key", "preferred_whatsapp_provider")
+      .single();
+
+    console.log("System settings for provider:", JSON.stringify(systemSettings));
+    
+    // Use preferred provider from parameters, fallback to system setting if available
+    const systemPreferredProvider = systemSettings?.value || null;
+    const effectivePreferredProvider = preferredProvider || systemPreferredProvider;
+    
+    console.log("Using preferred provider:", effectivePreferredProvider);
+
     // Send the message using the unified send-whatsapp-message function
     const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
       method: 'POST',
@@ -138,7 +153,7 @@ serve(async (req) => {
         notificationId,
         appointmentId,
         notificationType,
-        preferredProvider
+        preferredProvider: effectivePreferredProvider
       })
     });
 
