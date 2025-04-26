@@ -118,24 +118,11 @@ const Profile = () => {
         .from('appointments')
         .select(`
           *,
-          subtotal,
-          tax_amount,
-          tax_id,
-          tax_name,
-          membership_name,
-          membership_discount,
-          coupon_code,
-          coupon_discount,
-          points_redeemed,
-          points_value,
-          round_off_difference,
-          payment_method,
+          customer:profiles(*),
           bookings (
             *,
-            original_price,
-            price_paid,
-            service:services (*),
-            package:packages (*),
+            service:services(*),
+            package:packages(*),
             employee:employees!bookings_employee_id_fkey(*)
           )
         `)
