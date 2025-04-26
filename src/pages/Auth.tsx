@@ -62,16 +62,48 @@ const Auth = () => {
     },
   });
 
+  // Handle routing based on user role
+  const handleRouteBasedOnRole = async (userId: string) => {
+    try {
+      // Fetch user profile to get role
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+        
+      if (error) {
+        console.error("Error fetching user role:", error);
+        navigate("/services"); // Default route if role check fails
+        return;
+      }
+      
+      // Route based on role
+      if (profileData?.role === 'admin') {
+        navigate("/admin");
+      } else {
+        navigate("/services");
+      }
+    } catch (err) {
+      console.error("Error checking user role:", err);
+      navigate("/services"); // Default route if there's an error
+    }
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
         await queryClient.invalidateQueries({ queryKey: ["session"] });
-        navigate("/services");
+        if (session?.user?.id) {
+          handleRouteBasedOnRole(session.user.id);
+        } else {
+          navigate("/services");
+        }
       }
     });
 
-    if (session) {
-      navigate("/services");
+    if (session?.user?.id) {
+      handleRouteBasedOnRole(session.user.id);
     }
 
     return () => subscription.unsubscribe();
@@ -242,8 +274,8 @@ const Auth = () => {
             "Registration successful! Welcome!" : 
             "Login successful!");
             
-          if (data.session) {
-            navigate("/services");
+          if (data.session?.user?.id) {
+            handleRouteBasedOnRole(data.session.user.id);
           }
         } catch (signInError: any) {
           console.error("Error signing in:", signInError);
