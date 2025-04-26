@@ -389,15 +389,13 @@ export const BillGenerator: React.FC<BillGeneratorProps> = ({ appointmentId, onB
   }
   
   return (
-    <Button 
+    <div 
       onClick={handleDownload} 
-      disabled={loading}
-      variant="outline"
-      className="flex items-center gap-2"
+      className="flex items-center gap-2 cursor-pointer"
     >
       {loading ? 'Generating...' : 'Download Invoice'}
       <Download className="h-4 w-4" />
-    </Button>
+    </div>
   );
 };
 
