@@ -374,6 +374,45 @@ export function MetaWhatsAppConfig() {
             <p className="text-xs text-muted-foreground mt-1">
               Add this URL to your Meta Developer Dashboard under WhatsApp > Configuration > Webhooks
             </p>
+            <Button 
+              type="button"
+              variant="outline"
+              className="mt-2"
+              onClick={async () => {
+                try {
+                  setIsTesting(true);
+                  setTestResult(null);
+                  setError(null);
+
+                  // Manually test the webhook verification
+                  const testUrl = `${webhookUrl}?hub.mode=subscribe&hub.challenge=test_challenge&hub.verify_token=${encodeURIComponent(verifyToken)}`;
+                  
+                  const response = await fetch(testUrl, {
+                    method: 'GET'
+                  });
+
+                  const text = await response.text();
+                  
+                  if (response.ok && text === 'test_challenge') {
+                    setTestResult('Webhook verification test passed! Your webhook endpoint is correctly configured.');
+                    toast.success('Webhook verification successful');
+                  } else {
+                    throw new Error(`Verification test failed. Status: ${response.status}, Response: ${text}`);
+                  }
+                } catch (error: any) {
+                  console.error('Webhook verification test failed:', error);
+                  setTestResult(`Webhook verification test failed: ${error.message}`);
+                  setError('Webhook verification failed');
+                  toast.error('Webhook verification failed', {
+                    description: error.message
+                  });
+                } finally {
+                  setIsTesting(false);
+                }
+              }}
+            >
+              Test Webhook Verification
+            </Button>
           </div>
 
           <div className="space-y-2 mt-6 pt-4 border-t">
