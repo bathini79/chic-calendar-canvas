@@ -28,6 +28,8 @@ serve(async (req) => {
       const token = url.searchParams.get('hub.verify_token')
       const challenge = url.searchParams.get('hub.challenge')
       
+      console.log('Received webhook verification request:', { mode, token, challenge })
+      
       // Fetch the verify token from the database
       const { data: providerConfig, error: configError } = await supabaseAdmin
         .from('messaging_providers')
@@ -44,18 +46,34 @@ serve(async (req) => {
       }
       
       const verifyToken = providerConfig.configuration.verify_token
+      console.log('Stored verify token:', verifyToken)
       
       // Verify the webhook
-      if (mode === 'subscribe' && token === verifyToken) {
-        console.log('Meta WhatsApp webhook verified')
+      if (mode === 'subscribe' && token === verifyToken && challenge) {
+        console.log('Meta WhatsApp webhook verification successful, returning challenge')
         return new Response(challenge, { 
           headers: { 'Content-Type': 'text/plain' },
           status: 200 
         })
       } else {
-        console.error('Failed to verify webhook:', { mode, token })
+        console.error('Failed to verify webhook:', { 
+          mode,
+          token,
+          verifyToken, 
+          challengeReceived: !!challenge,
+          modeIsSubscribe: mode === 'subscribe',
+          tokenMatches: token === verifyToken
+        })
         return new Response(
-          JSON.stringify({ success: false, error: 'Verification failed' }),
+          JSON.stringify({ 
+            success: false, 
+            error: 'Verification failed',
+            details: {
+              modeIsSubscribe: mode === 'subscribe',
+              tokenMatches: token === verifyToken,
+              challengeReceived: !!challenge
+            }
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
         )
       }
