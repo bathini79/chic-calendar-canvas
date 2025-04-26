@@ -161,60 +161,36 @@ Best regards,
 The Management Team
 `.trim();
 
-        // Fetch the system preference for WhatsApp provider
-        const { data: systemSettings } = await supabaseAdmin
-          .from("system_settings")
-          .select("value")
-          .eq("key", "preferred_whatsapp_provider")
-          .single();
-        
-        const preferredProvider = systemSettings?.value || null;
-        
-        // Send message using the centralized WhatsApp message function
-        try {
-          console.log(`Sending verification message to ${employeeData.phone}`);
-          
-          const whatsappPayload = {
-            phoneNumber: employeeData.phone,
-            message,
-            preferredProvider,
-            // These parameters need to match what send-whatsapp-message expects
-            notificationType: 'verification_link'
-            // Don't use parameters the API doesn't expect
-          };
-          
-          console.log(`WhatsApp payload: ${JSON.stringify(whatsappPayload)}`);
-          
-          const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-            },
-            body: JSON.stringify(whatsappPayload)
-          });
-          
-          const responseText = await response.text();
-          let result;
-          
+        // Send the verification message via WhatsApp
+        if (sendWelcomeMessage) {
           try {
-            result = JSON.parse(responseText);
-          } catch (parseError) {
-            console.error(`Error parsing response: ${responseText}`);
-            throw new Error(`Invalid response format: ${responseText}`);
+            const whatsappResponse = await fetch(
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                },
+                body: JSON.stringify({
+                  phoneNumber: employeeData.phone,
+                  message: message,
+                  notificationType: 'verification_link'
+                })
+              }
+            );
+            
+            const whatsappResult = await whatsappResponse.json();
+            if (!whatsappResponse.ok) {
+              throw new Error(`WhatsApp API error: ${JSON.stringify(whatsappResult)}`);
+            }
+            
+            verificationSent = true;
+            console.log('Verification message sent successfully', whatsappResult);
+          } catch (whatsappError) {
+            console.error(`Error sending verification message: ${whatsappError.message}`);
+            // Continue with the process even if sending the message fails
           }
-          
-          if (!response.ok) {
-            console.error(`WhatsApp API error - Status: ${response.status}, Response: ${JSON.stringify(result)}`);
-            throw new Error(`Failed to send WhatsApp message: ${result.error || response.statusText}`);
-          }
-          
-          console.log(`WhatsApp verification message result: ${JSON.stringify(result)}`);
-          verificationSent = result.success;
-          
-        } catch (error) {
-          console.error(`Error sending verification message: ${error.message}`);
-          // Continue with the process even if sending the verification message fails
         }
       } catch (error) {
         console.error(`Error creating verification link: ${error.message}`);
