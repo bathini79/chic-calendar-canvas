@@ -44,14 +44,23 @@ export function MetaWhatsAppConfig() {
       
       if (error) throw error;
       
-      if (data?.origin) {
-        setWebhookUrl(`${data.origin}/functions/v1/meta-whatsapp-webhook`);
+      // Make sure we're using the Supabase URL, not the app URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || data?.baseUrl;
+      if (supabaseUrl) {
+        // Construct the proper Supabase function URL
+        setWebhookUrl(`${supabaseUrl}/functions/v1/meta-whatsapp-webhook`);
       } else {
         setWebhookUrl("https://[your-supabase-project].supabase.co/functions/v1/meta-whatsapp-webhook");
       }
     } catch (error) {
       console.error("Error generating webhook URL:", error);
-      setWebhookUrl("https://[your-supabase-project].supabase.co/functions/v1/meta-whatsapp-webhook");
+      // Fallback to environment variable if available
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (supabaseUrl) {
+        setWebhookUrl(`${supabaseUrl}/functions/v1/meta-whatsapp-webhook`);
+      } else {
+        setWebhookUrl("https://[your-supabase-project].supabase.co/functions/v1/meta-whatsapp-webhook");
+      }
     }
   };
 
@@ -384,8 +393,9 @@ export function MetaWhatsAppConfig() {
                   setTestResult(null);
                   setError(null);
 
-                  // Manually test the webhook verification
-                  const testUrl = `${webhookUrl}?hub.mode=subscribe&hub.challenge=test_challenge&hub.verify_token=${encodeURIComponent(verifyToken)}`;
+                  // Use the dedicated test webhook verification endpoint instead
+                  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || webhookUrl.split('/functions/')[0];
+                  const testUrl = `${supabaseUrl}/functions/v1/test-webhook-verification?verify_token=${encodeURIComponent(verifyToken)}&mode=subscribe&challenge=test_challenge&token=${encodeURIComponent(verifyToken)}`;
                   
                   const response = await fetch(testUrl, {
                     method: 'GET'
@@ -397,7 +407,7 @@ export function MetaWhatsAppConfig() {
                     setTestResult('Webhook verification test passed! Your webhook endpoint is correctly configured.');
                     toast.success('Webhook verification successful');
                   } else {
-                    throw new Error(`Verification test failed. Status: ${response.status}, Response: ${text}`);
+                    throw new Error(`Verification test failed. Status: ${response.status}, Response: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
                   }
                 } catch (error: any) {
                   console.error('Webhook verification test failed:', error);
