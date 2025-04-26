@@ -44,6 +44,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatRefundReason } from '../utils/formatters';
 import { formatPrice } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { BillGenerator } from '@/components/billing/BillGenerator';
+import { BillSummary } from '@/components/billing/BillSummary';
 
 const ReceiptDetails: React.FC<{ 
   customer: any; 
@@ -528,8 +530,13 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                               Edit sale details
                             </DropdownMenuItem>
                             <DropdownMenuItem>
-                              <Download className="mr-2 h-4 w-4" />
-                              Download PDF
+                              <div className="flex items-center w-full">
+                                <FileText className="mr-2 h-4 w-4" />
+                                <BillGenerator 
+                                  appointmentId={appointmentId} 
+                                  onBillGenerated={() => {}} 
+                                />
+                              </div>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem

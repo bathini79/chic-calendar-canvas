@@ -198,6 +198,54 @@ export default function useSaveAppointment({
           ? summaryParams.pointsDiscountAmount
           : pointsDiscountAmount;
       
+      // Calculate the subtotal (sum of all service prices before tax and discounts)
+      const subtotal = selectedServices.reduce((total, serviceId) => {
+        const service = services.find(s => s.id === serviceId);
+        if (!service) return total;
+        
+        const servicePricePaid = summaryParams.adjustedPrices && 
+          summaryParams.adjustedPrices[serviceId] !== undefined
+            ? summaryParams.adjustedPrices[serviceId]
+            : service.selling_price;
+            
+        return total + servicePricePaid;
+      }, 0) + selectedPackages.reduce((total, packageId) => {
+        const pkg = packages.find(p => p.id === packageId);
+        if (!pkg) return total;
+        
+        // Include all package services in the subtotal
+        const packageServiceIds = pkg.package_services?.map((ps: any) => ps.service.id) || [];
+        const packageSubtotal = packageServiceIds.reduce((pkgTotal, serviceId) => {
+          const packageService = services.find(s => s.id === serviceId);
+          if (!packageService) return pkgTotal;
+          
+          const pricePaid = summaryParams.adjustedPrices && 
+            summaryParams.adjustedPrices[serviceId] !== undefined
+              ? summaryParams.adjustedPrices[serviceId]
+              : packageService.selling_price;
+              
+          return pkgTotal + pricePaid;
+        }, 0);
+        
+        // Add any custom services for this package
+        const customServiceIds = customizedServices[packageId] || [];
+        const customSubtotal = customServiceIds.reduce((customTotal, serviceId) => {
+          if (packageServiceIds.includes(serviceId)) return customTotal; // Skip if already in package
+          
+          const customService = services.find(s => s.id === serviceId);
+          if (!customService) return customTotal;
+          
+          const pricePaid = summaryParams.adjustedPrices && 
+            summaryParams.adjustedPrices[serviceId] !== undefined
+              ? summaryParams.adjustedPrices[serviceId]
+              : customService.selling_price;
+              
+          return customTotal + pricePaid;
+        }, 0);
+        
+        return total + packageSubtotal + customSubtotal;
+      }, 0);
+      
       const appointmentData: any = {
         customer_id: selectedCustomer.id,
         start_time: startTime.toISOString(),
@@ -206,6 +254,7 @@ export default function useSaveAppointment({
         notes: notes,
         status: appointmentStatus,
         total_price: summaryParams.total !== undefined ? summaryParams.total : totalPrice, // Use the passed total price
+        subtotal: summaryParams.subtotal !== undefined ? summaryParams.subtotal : subtotal, // Store the subtotal
         round_off_difference: summaryParams.roundOffDifference !== undefined ? summaryParams.roundOffDifference : 0, // Use the passed round-off difference
         discount_type: discountType as "none" | "percentage" | "fixed",
         discount_value: discountValue,

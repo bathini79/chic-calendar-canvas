@@ -50,6 +50,7 @@ import {
   Settings2,
   User,
   XCircle,
+  FileInvoice,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
@@ -92,6 +93,8 @@ import { addDays } from "date-fns";
 import { InputCurrency } from "@/components/ui/input-currency";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppointmentNotifications, NOTIFICATION_TYPES } from "@/hooks/use-appointment-notifications";
+import { BillSummary } from "@/components/billing/BillSummary";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface AppointmentDetailsDialogProps {
   appointmentId: string;
@@ -104,7 +107,7 @@ export function AppointmentDetailsDialog({
   open,
   onOpenChange,
 }: AppointmentDetailsDialogProps) {
-  const [activeTab, setActiveTab] = useState<"details" | "actions" | "notifications">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "actions" | "bill">("details");
   const [isRefunding, setIsRefunding] = useState(false);
   const [refundReason, setRefundReason] = useState<string>("");
   const [refundNotes, setRefundNotes] = useState<string>("");
@@ -194,6 +197,14 @@ export function AppointmentDetailsDialog({
     const success = await markAppointmentAs(appointmentId, 'completed');
     if (success) {
       setIsCompleting(false);
+      
+      // Switch to the bill tab after marking as completed
+      setActiveTab("bill");
+      
+      toast({
+        title: "Success",
+        description: "Appointment marked as completed. You can now generate and send the bill.",
+      });
     }
   };
 
@@ -224,24 +235,6 @@ export function AppointmentDetailsDialog({
     }
   };
 
-  const tabs = [
-    {
-      id: "details",
-      label: "Details",
-      icon: FileText
-    },
-    {
-      id: "actions",
-      label: "Actions",
-      icon: Settings2
-    },
-    {
-      id: "notifications",
-      label: "Notifications",
-      icon: MessageSquare
-    }
-  ];
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>
@@ -259,40 +252,27 @@ export function AppointmentDetailsDialog({
         </SheetHeader>
 
         <div className="mt-4">
-          <div className="flex items-center space-x-4 pb-4">
-            {tabs.map((tab) => (
-              <Button
-                key={tab.id}
-                variant="ghost"
-                className={cn(
-                  "gap-2",
-                  activeTab === tab.id && "bg-secondary text-secondary-foreground"
-                )}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                <tab.icon className="h-4 w-4" />
-                {tab.label}
-              </Button>
-            ))}
-          </div>
-          <Separator />
-        </div>
-
-        <ScrollArea className="h-[calc(100vh-12rem)]">
-          {isAppointmentLoading ? (
-            <div className="grid gap-4 p-4">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-40 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-40 w-full" />
-            </div>
-          ) : appointmentError ? (
-            <div className="p-4">
-              <p className="text-red-500">Error: {appointmentError.message}</p>
-            </div>
-          ) : (
-            <>
-              {activeTab === "details" && (
+          <Tabs defaultValue="details" onValueChange={(value) => setActiveTab(value as "details" | "actions" | "bill")}>
+            <TabsList className="grid grid-cols-3">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="actions">Actions</TabsTrigger>
+              <TabsTrigger value="bill">Bill</TabsTrigger>
+            </TabsList>
+            <Separator className="my-4" />
+            
+            <TabsContent value="details" className="space-y-4">
+              {isAppointmentLoading ? (
+                <div className="grid gap-4 p-4">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-40 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-40 w-full" />
+                </div>
+              ) : appointmentError ? (
+                <div className="p-4">
+                  <p className="text-red-500">Error: {appointmentError.message}</p>
+                </div>
+              ) : (
                 <div className="space-y-4 p-4">
                   <Card>
                     <CardHeader>
@@ -435,8 +415,19 @@ export function AppointmentDetailsDialog({
                   </Card>
                 </div>
               )}
-
-              {activeTab === "actions" && (
+            </TabsContent>
+            
+            <TabsContent value="actions" className="space-y-4">
+              {isAppointmentLoading ? (
+                <div className="grid gap-4 p-4">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-40 w-full" />
+                </div>
+              ) : appointmentError ? (
+                <div className="p-4">
+                  <p className="text-red-500">Error: {appointmentError.message}</p>
+                </div>
+              ) : (
                 <div className="space-y-4 p-4">
                   <h3 className="text-lg font-medium">Actions</h3>
                   <p className="text-sm text-muted-foreground mb-4">
@@ -522,10 +513,66 @@ export function AppointmentDetailsDialog({
                   </div>
                 </div>
               )}
-
-            </>
-          )}
-        </ScrollArea>
+            </TabsContent>
+            
+            <TabsContent value="bill" className="space-y-4">
+              {isAppointmentLoading ? (
+                <div className="grid gap-4 p-4">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-40 w-full" />
+                </div>
+              ) : appointmentError ? (
+                <div className="p-4">
+                  <p className="text-red-500">Error: {appointmentError.message}</p>
+                </div>
+              ) : (
+                <div className="p-4">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-medium">Bill & Invoice</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Generate and send bill to customer
+                    </p>
+                  </div>
+                  
+                  {isCompleted ? (
+                    <BillSummary 
+                      appointmentId={appointmentId}
+                      showGenerateButton={true}
+                    />
+                  ) : (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Invoice</CardTitle>
+                        <CardDescription>Appointment not completed yet</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+                        <FileInvoice className="h-12 w-12 text-muted-foreground mb-3" />
+                        <p className="text-muted-foreground">
+                          You need to mark this appointment as completed before generating a bill.
+                        </p>
+                        {canComplete && (
+                          <Button
+                            className="mt-4"
+                            variant="outline"
+                            onClick={() => setIsCompleting(true)}
+                            disabled={isLoading}
+                          >
+                            {isLoading ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                            )}
+                            Mark as Completed
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
 
         {/* Refund Dialog */}
         <AlertDialog open={isRefunding} onOpenChange={setIsRefunding}>

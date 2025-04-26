@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { formatPrice } from "@/lib/utils";
-import { MapPin, ArrowLeft, ShoppingCart, Clock } from "lucide-react";
+import { MapPin, ArrowLeft, ShoppingCart, Clock, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/pages/admin/bookings/components/StatusBadge";
 import type { AppointmentStatus } from "@/types/appointment";
@@ -20,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import { BillGenerator } from "@/components/billing/BillGenerator";
 
 interface AppointmentDetailsProps {
   appointment: any;
@@ -317,6 +318,26 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
       <div className="text-xs text-muted-foreground">
         Booking ref: {appointment.id.substring(0, 8).toUpperCase()}
       </div>
+
+      {/* Receipt Download - only visible for completed appointments */}
+      {appointment.status === "completed" && (
+        <div className="mt-6 pt-6 border-t">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">Receipt</h3>
+              <p className="text-sm text-muted-foreground">
+                Download a copy of your receipt
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              <BillGenerator 
+                appointmentId={appointment.id} 
+                onBillGenerated={() => {}} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

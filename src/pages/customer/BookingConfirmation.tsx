@@ -50,6 +50,7 @@ import { usePaymentHandler } from '@/pages/admin/bookings/hooks/usePaymentHandle
 import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 import { getAdjustedServicePrices } from "@/pages/admin/bookings/utils/bookingUtils";
 import { PackageServiceItem } from "./PackageServiceItem";
+import { useBillService } from "@/hooks/use-bill-service";
 import {
   Accordion,
   AccordionItem,
@@ -67,6 +68,75 @@ const sendConfirmation = async (appointmentId: string, bookings?: any[]) => {
   } catch (error) {
     console.error("Error sending confirmation:", error);
     // Don't throw the error so the process can continue
+    return null;
+  }
+};
+
+// Add a function to send the bill as well
+const sendBill = async (appointmentId: string) => {
+  try {
+    // Get appointment details to create the bill message
+    const { data: appointment, error: appointmentError } = await supabase
+      .from("appointments")
+      .select(`
+        id,
+        total_price,
+        start_time,
+        created_at,
+        customer:profiles(*),
+        location
+      `)
+      .eq("id", appointmentId)
+      .single();
+    
+    if (appointmentError) {
+      console.error("Error fetching appointment details:", appointmentError);
+      return null;
+    }
+    
+    // Get business details for the message
+    const { data: businessDetails } = await supabase
+      .from("business_details")
+      .select("name")
+      .single();
+    
+    // Get location details if available
+    let locationName = "our salon";
+    if (appointment.location) {
+      const { data: locationData } = await supabase
+        .from("locations")
+        .select("name")
+        .eq("id", appointment.location)
+        .single();
+      
+      if (locationData) {
+        locationName = locationData.name;
+      }
+    }
+    
+    const businessName = businessDetails?.name || "Chic Calendar Canvas";
+    const billNumber = appointment.id.slice(0, 8).toUpperCase();
+    const formattedDate = new Date(appointment.created_at || appointment.start_time).toLocaleDateString();
+    
+    // Generate a message with bill information
+    const message = `Thank you for your visit to ${locationName}! Here is your bill receipt:\n\n` +
+                   `Receipt #: ${billNumber}\n` +
+                   `Date: ${formattedDate}\n` +
+                   `Amount: ₹${appointment.total_price.toFixed(2)}\n\n` +
+                   `You can view your full invoice at any time in your customer portal. Thank you for choosing ${businessName}!`;
+    
+    // Call the Supabase Edge Function to send the WhatsApp message
+    const { data: billResult } = await supabase.functions.invoke('send-bill', {
+      body: { 
+        appointmentId, 
+        message,
+        notificationType: 'bill_receipt'
+      }
+    });
+    
+    return billResult;
+  } catch (error) {
+    console.error("Error sending bill:", error);
     return null;
   }
 };
@@ -292,14 +362,18 @@ export default function BookingConfirmation() {
         .eq("appointment_id", appointmentId);
 
       try {
-        // Pass the bookings data to sendConfirmation
+        // Send confirmation WhatsApp message
         await sendConfirmation(appointmentId, bookingsData);
+        
+        // Send bill to customer via WhatsApp
+        await sendBill(appointmentId);
+        
+        toast.success("Booking confirmed and bill sent successfully!");
       } catch (notificationError) {
-        console.error("Error sending confirmation:", notificationError);
-        // Error handling is already in sendConfirmation, but this is an extra safety
+        console.error("Error sending notifications:", notificationError);
+        toast.error("Booking confirmed but there was an issue sending notifications");
       }
 
-      toast.success("Booking confirmed successfully!");
       setBookingSuccess(true);
       setTimeout(() => clearCartItems(items, removeFromCart), 5000);
     },
@@ -1020,7 +1094,7 @@ export default function BookingConfirmation() {
                       <Award className="h-4 w-4" />
                       Loyalty Points Discount
                     </span>
-                    <span>-₹{loyalty.pointsDiscountAmount.toFixed(2)}</span>
+                    <span className="text-green-600">-₹{loyalty.pointsDiscountAmount.toFixed(2)}</span>
                   </div>
                 )}
 
