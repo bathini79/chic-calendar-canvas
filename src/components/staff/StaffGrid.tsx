@@ -154,17 +154,17 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
         {staff?.map((member) => (
           <Card key={member.id} className="relative">
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center space-y-4">
-                <Avatar className="h-20 w-20">
+            <CardContent className="pt-4">
+              <div className="flex flex-col items-center space-y-3">
+                <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
                   <AvatarImage src={member.photo_url} alt={member.name} />
                   <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="text-center">
-                  <h3 className="font-semibold text-lg">{member.name}</h3>
+                  <h3 className="font-semibold text-base sm:text-lg">{member.name}</h3>
                   <p className="text-xs text-muted-foreground mt-1">
                     {member.phone}
                   </p>
@@ -186,23 +186,23 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-wrap justify-center gap-2">
+            <CardFooter className="flex flex-wrap justify-center gap-2 p-2 sm:p-4">
               <Button
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-xs sm:text-sm"
                 onClick={() => promptDeleteEmployee({ id: member.id, name: member.name })}
               >
-                <Trash className="h-4 w-4" />
+                <Trash className="h-3 w-3 sm:h-4 sm:w-4" />
                 Delete
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-xs sm:text-sm"
                 onClick={() => onEdit(member.id)}
               >
-                <Edit className="h-4 w-4" />
+                <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                 Edit
               </Button>
             </CardFooter>

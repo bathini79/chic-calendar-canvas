@@ -1,6 +1,8 @@
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Grid, List } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface HeaderActionsProps {
   onAdd: () => void;
@@ -9,18 +11,10 @@ interface HeaderActionsProps {
 }
 
 export function HeaderActions({ onAdd, view, onViewChange }: HeaderActionsProps) {
-  // Add error handling for the Add Staff button click
-  const handleAddClick = () => {
-    try {
-      onAdd();
-    } catch (error) {
-      console.error("Error adding staff:", error);
-      // You could add a toast notification here if desired
-    }
-  };
+  const isMobile = useIsMobile();
 
   return (
-    <div className="flex items-center justify-between">
+    <div className={`${isMobile ? 'space-y-4' : 'flex items-center justify-between'}`}>
       <div className="space-y-1">
         <h2 className="text-2xl font-semibold tracking-tight">Staff</h2>
         <p className="text-sm text-muted-foreground">
@@ -28,7 +22,7 @@ export function HeaderActions({ onAdd, view, onViewChange }: HeaderActionsProps)
         </p>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className={`flex items-center gap-4 ${isMobile ? 'justify-between' : ''}`}>
         <div className="flex items-center gap-2">
           <Button
             variant={view === "grid" ? "default" : "outline"}
@@ -46,9 +40,9 @@ export function HeaderActions({ onAdd, view, onViewChange }: HeaderActionsProps)
           </Button>
         </div>
 
-        <Button onClick={handleAddClick} className="flex items-center gap-2">
+        <Button onClick={onAdd} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
-          Add Staff
+          {!isMobile && "Add Staff"}
         </Button>
       </div>
     </div>

@@ -43,7 +43,7 @@ export default function Staff() {
   }
 
   return (
-    <div className="container py-6 space-y-4">
+    <div className="container py-4 sm:py-6 space-y-4 px-2 sm:px-4">
       <Tabs 
         defaultValue="staff" 
         value={activeTab} 
@@ -51,7 +51,7 @@ export default function Staff() {
         className="w-full"
       >
         <div className="flex justify-between items-center mb-4">
-          <TabsList>
+          <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="staff">Staff</TabsTrigger>
             <TabsTrigger value="shifts">Shifts</TabsTrigger>
           </TabsList>

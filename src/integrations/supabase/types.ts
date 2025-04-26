@@ -34,8 +34,10 @@ export type Database = {
           refund_notes: string | null
           refund_reason: string | null
           refunded_by: string | null
+          round_off_difference: number | null
           start_time: string
           status: Database["public"]["Enums"]["appointment_status"] | null
+          subtotal: number | null
           tax_amount: number | null
           tax_id: string | null
           total_duration: number | null
@@ -67,8 +69,10 @@ export type Database = {
           refund_notes?: string | null
           refund_reason?: string | null
           refunded_by?: string | null
+          round_off_difference?: number | null
           start_time: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
+          subtotal?: number | null
           tax_amount?: number | null
           tax_id?: string | null
           total_duration?: number | null
@@ -100,8 +104,10 @@ export type Database = {
           refund_notes?: string | null
           refund_reason?: string | null
           refunded_by?: string | null
+          round_off_difference?: number | null
           start_time?: string
           status?: Database["public"]["Enums"]["appointment_status"] | null
+          subtotal?: number | null
           tax_amount?: number | null
           tax_id?: string | null
           total_duration?: number | null
@@ -750,6 +756,7 @@ export type Database = {
           created_at: string
           email: string
           employment_type: Database["public"]["Enums"]["employee_type"]
+          employment_type_id: string | null
           id: string
           name: string
           phone: string | null
@@ -762,6 +769,7 @@ export type Database = {
           created_at?: string
           email: string
           employment_type?: Database["public"]["Enums"]["employee_type"]
+          employment_type_id?: string | null
           id?: string
           name: string
           phone?: string | null
@@ -774,12 +782,51 @@ export type Database = {
           created_at?: string
           email?: string
           employment_type?: Database["public"]["Enums"]["employee_type"]
+          employment_type_id?: string | null
           id?: string
           name?: string
           phone?: string | null
           photo_url?: string | null
           status?: Database["public"]["Enums"]["employee_status"] | null
           updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_employees_employment_type"
+            columns: ["employment_type_id"]
+            isOneToOne: false
+            referencedRelation: "employment_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employment_types: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_configurable: boolean | null
+          name: string
+          permissions: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_configurable?: boolean | null
+          name: string
+          permissions?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_configurable?: boolean | null
+          name?: string
+          permissions?: Json | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1484,39 +1531,6 @@ export type Database = {
           },
           {
             foreignKeyName: "package_categories_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "packages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      package_locations: {
-        Row: {
-          created_at: string
-          location_id: string
-          package_id: string
-        }
-        Insert: {
-          created_at?: string
-          location_id: string
-          package_id: string
-        }
-        Update: {
-          created_at?: string
-          location_id?: string
-          package_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "package_locations_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "package_locations_package_id_fkey"
             columns: ["package_id"]
             isOneToOne: false
             referencedRelation: "packages"
