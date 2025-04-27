@@ -257,7 +257,8 @@ serve(async (req) => {
             lead_source: userLeadSource,
             role: 'customer',
             wallet_balance: 0,
-            last_used: new Date().toISOString()
+            last_used: new Date().toISOString(),
+            user_id: userId,
           });
           
         if (profileError) {

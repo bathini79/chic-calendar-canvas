@@ -4,6 +4,7 @@
 -- Create an improved version of the function that handles both metadata formats
 CREATE OR REPLACE FUNCTION "public"."create_profile"() RETURNS "trigger"
     LANGUAGE "plpgsql"
+    SECURITY DEFINER  -- Add this line to make it run with the permissions of the function owner
     AS $$
 DECLARE
     full_name_val text;
@@ -34,6 +35,7 @@ $$;
 -- Similarly, fix the ensure_email_or_phone_on_user_creation function
 CREATE OR REPLACE FUNCTION "public"."ensure_email_or_phone_on_user_creation"() RETURNS "trigger"
     LANGUAGE "plpgsql"
+    SECURITY DEFINER  -- Add this line to make it run with the permissions of the function owner
     AS $$
 DECLARE
     phone_val text;
