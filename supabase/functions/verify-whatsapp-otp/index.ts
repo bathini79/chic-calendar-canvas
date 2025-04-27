@@ -158,7 +158,7 @@ serve(async (req) => {
           password: password,
           phone_confirm: true,
           email_confirm: true,
-          raw_user_meta_data: { 
+          user_metadata: { 
             full_name: fullName,
             phone_verified: true,
             phone: `${normalizedPhone}`, // Add + for metadata
@@ -192,7 +192,7 @@ serve(async (req) => {
               // Update password to allow login
               await supabaseAdmin.auth.admin.updateUserById(userId, { 
                 password: tempPassword,
-                raw_user_meta_data: {
+                user_metadata: {
                   ...authUser.user.raw_user_metadata,
                   phone: `${normalizedPhone}`, // Add + for metadata
                   lead_source: lead_source
@@ -349,7 +349,7 @@ serve(async (req) => {
         userId,
         { 
           password: tempPassword,
-          raw_user_meta_data: updatedMetadata
+          user_metadata: updatedMetadata
         }
       )
       
