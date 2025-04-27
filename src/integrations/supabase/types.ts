@@ -12,6 +12,9 @@ export type Database = {
       appointments: {
         Row: {
           coupon_amount: number | null
+          coupon_code: string | null
+          coupon_discount_type: string | null
+          coupon_discount_value: number | null
           coupon_id: string | null
           coupon_name: string | null
           created_at: string | null
@@ -40,6 +43,7 @@ export type Database = {
           subtotal: number | null
           tax_amount: number | null
           tax_id: string | null
+          tax_name: string | null
           total_duration: number | null
           total_price: number
           transaction_type: string | null
@@ -47,6 +51,9 @@ export type Database = {
         }
         Insert: {
           coupon_amount?: number | null
+          coupon_code?: string | null
+          coupon_discount_type?: string | null
+          coupon_discount_value?: number | null
           coupon_id?: string | null
           coupon_name?: string | null
           created_at?: string | null
@@ -75,6 +82,7 @@ export type Database = {
           subtotal?: number | null
           tax_amount?: number | null
           tax_id?: string | null
+          tax_name?: string | null
           total_duration?: number | null
           total_price: number
           transaction_type?: string | null
@@ -82,6 +90,9 @@ export type Database = {
         }
         Update: {
           coupon_amount?: number | null
+          coupon_code?: string | null
+          coupon_discount_type?: string | null
+          coupon_discount_value?: number | null
           coupon_id?: string | null
           coupon_name?: string | null
           created_at?: string | null
@@ -110,6 +121,7 @@ export type Database = {
           subtotal?: number | null
           tax_amount?: number | null
           tax_id?: string | null
+          tax_name?: string | null
           total_duration?: number | null
           total_price?: number
           transaction_type?: string | null
