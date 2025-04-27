@@ -122,8 +122,12 @@ serve(async (req) => {
       console.error("Error checking for existing profile:", profilesError);
     }
     
-    // If this is a new user and no full name provided, request it
-    if (!existingProfiles && !fullName) {
+    // Fix for the issue: Only require full name if it's a new user AND no name is provided
+    // We need to check both fullName parameter and stored fullName in verification
+    const storedFullName = verificationData.full_name || '';
+    
+    // If this is a new user and no full name provided (either in request or stored), request it
+    if (!existingProfiles && !fullName && !storedFullName) {
       console.log("New user requires a name");
       return new Response(JSON.stringify({
         error: "new_user_requires_name",
@@ -137,8 +141,7 @@ serve(async (req) => {
       });
     }
     
-    // Get stored full name from verification if available
-    const storedFullName = verificationData.full_name || '';
+    // Determine the final full name to use - priority: parameter, stored value, generated
     const finalFullName = fullName || storedFullName || `User_${searchPhone.substring(searchPhone.length - 4)}`;
     const userLead = lead_source || verificationData.lead_source || 'direct';
     
