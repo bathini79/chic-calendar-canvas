@@ -145,18 +145,6 @@ serve(async (req) => {
     // Create unique email from phone number
     const emailFromPhone = `${searchPhone}@phone-auth.user`;
     
-    // Generate random password (user will authenticate via OTP)
-    const generatePassword = () => {
-      const length = 16;
-      const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
-      let password = '';
-      for (let i = 0; i < length; i++) {
-        const randomIndex = Math.floor(Math.random() * charset.length);
-        password += charset[randomIndex];
-      }
-      return password;
-    };
-    
     let userId = null;
     let userEmail = null;
     
@@ -164,10 +152,21 @@ serve(async (req) => {
     if (!existingProfiles) {
       console.log("Creating new user");
       try {
-        // First create the auth user
-        const password = generatePassword();
+        // Generate random password (user will authenticate via OTP)
+        const generatePassword = () => {
+          const length = 16;
+          const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
+          let password = '';
+          for (let i = 0; i < length; i++) {
+            const randomIndex = Math.floor(Math.random() * charset.length);
+            password += charset[randomIndex];
+          }
+          return password;
+        };
         
         // Create user record in auth.users
+        const password = generatePassword();
+        
         try {
           const { data: newUser, error: userError } = await supabaseAdmin.auth.admin.createUser({
             email: emailFromPhone,
@@ -188,25 +187,54 @@ serve(async (req) => {
           userId = newUser.user.id;
           userEmail = newUser.user.email;
           
-          // The profile should be created by the database trigger
-          // But we'll update it with additional info
-          
           console.log("Created auth user:", userId);
           
-          // Ensure profile exists with proper data
-          const { error: profileUpdateError } = await supabaseAdmin
+          // Make sure profile exists
+          // Since handle_new_user trigger should create the profile,
+          // we'll check if it exists and then update it
+          const { data: profile, error: profileCheckError } = await supabaseAdmin
             .from('profiles')
-            .update({
-              full_name: finalFullName,
-              phone_number: searchPhone,
-              lead_source: userLead,
-              phone_verified: true
-            })
-            .eq('id', userId);
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
+            
+          if (profileCheckError) {
+            console.error("Error checking for created profile:", profileCheckError);
+          }
           
-          if (profileUpdateError) {
-            console.error("Error updating profile:", profileUpdateError);
-            throw new Error(`Profile update error: ${profileUpdateError.message}`);
+          if (!profile) {
+            // Profile wasn't created by trigger, create it manually
+            const { error: createProfileError } = await supabaseAdmin
+              .from('profiles')
+              .insert({
+                id: userId,
+                full_name: finalFullName,
+                phone_number: searchPhone,
+                lead_source: userLead,
+                phone_verified: true,
+                email: emailFromPhone
+              });
+              
+            if (createProfileError) {
+              console.error("Error creating profile manually:", createProfileError);
+              throw new Error(`Profile creation error: ${createProfileError.message}`);
+            }
+          } else {
+            // Profile exists, just update it
+            const { error: updateError } = await supabaseAdmin
+              .from('profiles')
+              .update({
+                full_name: finalFullName,
+                phone_number: searchPhone,
+                lead_source: userLead,
+                phone_verified: true
+              })
+              .eq('id', userId);
+              
+            if (updateError) {
+              console.error("Error updating profile:", updateError);
+              throw new Error(`Profile update error: ${updateError.message}`);
+            }
           }
           
         } catch (createError) {
@@ -249,6 +277,14 @@ serve(async (req) => {
           .update({ full_name: fullName })
           .eq('id', userId);
       }
+      
+      // Update lead_source if provided
+      if (lead_source && lead_source !== existingProfiles.lead_source) {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ lead_source: lead_source })
+          .eq('id', userId);
+      }
     }
     
     console.log("Verification successful for user:", userId);
@@ -259,6 +295,18 @@ serve(async (req) => {
       .delete()
       .eq('phone_number', normalizedPhone);
     
+    // Generate a temporary password for this session login
+    const generateTempPassword = () => {
+      const length = 16;
+      const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
+      let password = '';
+      for (let i = 0; i < length; i++) {
+        const randomIndex = Math.floor(Math.random() * charset.length);
+        password += charset[randomIndex];
+      }
+      return password;
+    };
+    
     // Prepare login credentials to return
     return new Response(JSON.stringify({
       success: true,
@@ -267,7 +315,7 @@ serve(async (req) => {
       userId: userId,
       credentials: {
         email: userEmail,
-        password: generatePassword() // Generate a temporary password for this session login
+        password: generateTempPassword() // Generate a temporary password for this session login
       }
     }), {
       status: 200,
