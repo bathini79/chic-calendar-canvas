@@ -65,7 +65,6 @@ const Auth = () => {
   // Handle routing based on user role
   const handleRouteBasedOnRole = async (userId: string) => {
     try {
-      // Fetch user profile to get role
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('role')
@@ -78,7 +77,6 @@ const Auth = () => {
         return;
       }
       
-      // Route based on role
       if (profileData?.role === 'admin') {
         navigate("/admin");
       } else {
@@ -154,7 +152,7 @@ const Auth = () => {
     try {
       const fullPhoneNumber = phoneNumber.startsWith('+') ? 
         phoneNumber : 
-        `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;
+        `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
       
       console.log("Sending OTP to phone number:", fullPhoneNumber);
       
@@ -211,18 +209,24 @@ const Auth = () => {
     try {
       const fullPhoneNumber = phoneNumber.startsWith('+') ? 
         phoneNumber : 
-        `${selectedCountry.code.slice(1)}${phoneNumber.replace(/\s/g, '')}`;
+        `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
       
       console.log("Verifying OTP for phone number:", fullPhoneNumber);
       
+      const payload = { 
+        phoneNumber: fullPhoneNumber, 
+        code: otp,
+        fullName: fullName || undefined,
+        lead_source: referralSource || undefined
+      };
+      
+      console.log("Verification payload:", payload);
+      
       const response = await supabase.functions.invoke('customer-verify-whatsapp-otp', {
-        body: { 
-          phoneNumber: fullPhoneNumber, 
-          code: otp,
-          fullName: needsFullName ? fullName : undefined,
-          lead_source: referralSource || undefined
-        },
+        body: payload,
       });
+      
+      console.log("Verification response:", response);
       
       if (response.data && response.data.error) {
         if (response.data.error === "new_user_requires_name") {
@@ -475,7 +479,7 @@ const Auth = () => {
             onClick={() => {
               setOtpSent(false);
               setOtp("");
-              document.querySelectorAll("input[data-otp-slot]").forEach(input => input.value = "");
+              document.querySelectorAll("input[data-otp-slot]").forEach(input => (input as HTMLInputElement).value = "");
               setVerificationError(null);
               setEdgeFunctionError(null);
             }}
@@ -507,6 +511,7 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
+          <CardTitle>Welcome</CardTitle>
           <CardDescription>
             Sign in or register using WhatsApp
           </CardDescription>

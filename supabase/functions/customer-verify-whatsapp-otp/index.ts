@@ -122,13 +122,23 @@ serve(async (req) => {
       console.error("Error checking for existing profile:", profilesError);
     }
     
-    // Fix for the issue: Only require full name if it's a new user AND no name is provided
-    // We need to check both fullName parameter and stored fullName in verification
+    // Extract any stored name from the verification data
     const storedFullName = verificationData.full_name || '';
     
-    // If this is a new user and no full name provided (either in request or stored), request it
-    if (!existingProfiles && !fullName && !storedFullName) {
-      console.log("New user requires a name");
+    // Debug logs to help troubleshoot
+    console.log("Existing profile:", existingProfiles ? "Yes" : "No");
+    console.log("Full name from request:", fullName || "Not provided");
+    console.log("Stored full name:", storedFullName || "Not stored");
+    
+    // For new users, we need a name from somewhere - either the request, stored in verification, or we'll generate one
+    const isNewUser = !existingProfiles;
+    const hasProvidedName = Boolean(fullName && fullName.trim());
+    const hasStoredName = Boolean(storedFullName && storedFullName.trim());
+    const hasName = hasProvidedName || hasStoredName;
+    
+    // Only request a name if this is a new user AND we don't have a name from any source
+    if (isNewUser && !hasName) {
+      console.log("New user requires a name - no name found");
       return new Response(JSON.stringify({
         error: "new_user_requires_name",
         message: "Please provide your full name to complete registration"
@@ -298,19 +308,35 @@ serve(async (req) => {
       .delete()
       .eq('phone_number', normalizedPhone);
     
-    // Generate a temporary password for this session login
-    const generateTempPassword = () => {
-      const length = 16;
-      const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
-      let password = '';
-      for (let i = 0; i < length; i++) {
-        const randomIndex = Math.floor(Math.random() * charset.length);
-        password += charset[randomIndex];
-      }
-      return password;
-    };
+    // Generate session credentials
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: userEmail,
+    });
+
+    if (sessionError) {
+      console.error("Error generating session:", sessionError);
+      // Fall back to password-based credentials
+      return new Response(JSON.stringify({
+        success: true,
+        isNewUser: !existingProfiles,
+        fullName: finalFullName,
+        userId: userId,
+        credentials: {
+          email: userEmail,
+          // Use a temporary token as password
+          password: `tmp_${Math.random().toString(36).substring(2, 15)}`
+        }
+      }), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      });
+    }
     
-    // Prepare login credentials to return
+    // Return success with auth credentials
     return new Response(JSON.stringify({
       success: true,
       isNewUser: !existingProfiles,
@@ -318,7 +344,7 @@ serve(async (req) => {
       userId: userId,
       credentials: {
         email: userEmail,
-        password: generateTempPassword() // Generate a temporary password for this session login
+        password: sessionData.properties.hashed_token || `tmp_${Math.random().toString(36).substring(2, 15)}`
       }
     }), {
       status: 200,
