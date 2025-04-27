@@ -163,7 +163,7 @@ serve(async (req) => {
     }
     
     // Record employee-related notifications (verification or welcome messages)
-    if (notificationType === 'verification_link' || notificationType === 'welcome_message') {
+    if (notificationType === 'verification_link' || notificationType === 'welcome_message' || notificationType === 'otp_verification') {
       try {
         await supabaseAdmin.from('whatsapp_messages').insert({
           provider: providerName,

@@ -30,7 +30,6 @@ export function useAppointmentNotifications() {
       if (fetchError) throw fetchError;
       
       if (!pendingNotifications || pendingNotifications.length === 0) {
-        toast.info("No pending notifications found");
         return { processed: 0 };
       }
 

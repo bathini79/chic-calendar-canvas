@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0';
 
@@ -69,17 +68,6 @@ serve(async (req) => {
       .eq('phone_number', normalizedPhone)
       .single();
     
-    // Load GupShup configuration
-    const { data: providerConfigData, error: providerConfigError } = await supabaseAdmin
-      .from('messaging_providers')
-      .select('configuration')
-      .eq('provider_name', 'gupshup')
-      .single();
-    
-    if (providerConfigError || !providerConfigData?.configuration) {
-      throw new Error('Gupshup config not found in message_providers');
-    }
-    
     // Store the OTP in the database
     const { error: otpError } = await supabaseAdmin.from('phone_auth_codes').insert({
       phone_number: normalizedPhone,
@@ -93,54 +81,38 @@ serve(async (req) => {
       throw new Error(`Failed to store verification code: ${otpError.message}`);
     }
     
-    const config = providerConfigData.configuration;
-    
     // Create message with OTP
     const MESSAGE_TEXT = `Your verification code for login is: ${otp}\n\nThis code will expire in ${expiresInMinutes} minutes.`;
     console.log("Sending login OTP message to:", normalizedPhone);
     
-    const GUPSHUP_API_KEY = config.api_key;
-    const SOURCE_NUMBER = config.source_mobile.startsWith('+') ? config.source_mobile.slice(1) : config.source_mobile;
-    const url = "https://api.gupshup.io/wa/api/v1/msg";
-    const headers = {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "apikey": GUPSHUP_API_KEY
-    };
-    
-    // Ensure number is formatted correctly - don't add + prefix
-    const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber;
-    const APP_NAME = config.app_name;
-    
-    const formData = new URLSearchParams();
-    formData.append("channel", "whatsapp");
-    formData.append("source", SOURCE_NUMBER);
-    formData.append("destination", formattedPhoneNumber);
-    formData.append("message", JSON.stringify({
-      type: "text",
-      text: MESSAGE_TEXT
-    }));
-    formData.append("src.name", APP_NAME);
-    
-    console.log("Sending login OTP to:", formattedPhoneNumber);
-    
-    const response = await fetch(url, {
+    // Use the centralized send-whatsapp-message function to send the OTP
+    // This supports both Meta WhatsApp and Gupshup providers
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
       method: "POST",
-      headers,
-      body: formData.toString()
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+      },
+      body: JSON.stringify({
+        phoneNumber: phoneNumber,
+        message: MESSAGE_TEXT,
+        notificationType: "otp_verification"
+      })
     });
     
     const responseBody = await response.json();
     
-    if (!response.ok) {
-      console.error("Gupshup API error for customer login:", responseBody);
-      throw new Error(`Gupshup API error: ${JSON.stringify(responseBody)}`);
+    if (!response.ok || !responseBody.success) {
+      console.error("WhatsApp API error for customer login:", responseBody);
+      throw new Error(`WhatsApp API error: ${JSON.stringify(responseBody)}`);
     }
     
-    console.log("Gupshup API success for customer login OTP:", responseBody);
+    console.log("WhatsApp message sent successfully for customer login OTP via", responseBody.provider);
     
     return new Response(JSON.stringify({
       success: true,
-      response: responseBody,
+      provider: responseBody.provider,
+      messageId: responseBody.messageId,
       userData: existingUser // Include user data in the response if they exist
     }), {
       status: 200,
