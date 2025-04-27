@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0';
 
@@ -40,10 +39,15 @@ serve(async (req) => {
       }
     });    
     
-    // Ensure the phone number format is consistent (without + prefix)
+    // Ensure the phone number format is consistent (without + prefix for database queries)
     const normalizedPhone = phoneNumber.startsWith('+') 
       ? phoneNumber.substring(1) 
       : phoneNumber;
+    
+    // Format with + for auth API
+    const formattedPhone = phoneNumber.startsWith('+') 
+      ? phoneNumber 
+      : `+${phoneNumber}`;
     
     console.log("Normalized phone for OTP verification:", normalizedPhone);
     
@@ -127,22 +131,27 @@ serve(async (req) => {
       try {
         console.log("Creating new user with phone:", normalizedPhone);
         
-        // Create a unique email based on phone number
-        const email = `${normalizedPhone.replace(/[^0-9]/g, '')}@phone.user`;
+        // Previous approach was causing database errors, so trying a simplified approach
+        // Create a unique email based on phone number and random ID
+        const randomId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        const email = `phone_${normalizedPhone.replace(/[^0-9]/g, '')}_${randomId}@example.com`;
+        
         // Generate a random password
         const password = crypto.randomUUID();
         
-        // Create new user with phone as unique identifier
+        // Log details before creating user
+        console.log(`Creating user with email ${email}`);
+        
+        // Simplified createUser call with minimal required fields
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          phone: `+${normalizedPhone}`, // Add + for auth storage
           email: email,
           password: password,
-          phone_confirm: true,
           email_confirm: true,
-          user_metadata: { 
+          raw_user_meta_data: { 
             full_name: userName,
-            phone_verified: true,
-            phone: `${normalizedPhone}`, // Store in metadata
+            phone: normalizedPhone,
             lead_source: userLeadSource
           }
         });
@@ -173,9 +182,9 @@ serve(async (req) => {
               // Update password to allow login
               await supabaseAdmin.auth.admin.updateUserById(userId, { 
                 password: tempPassword,
-                user_metadata: {
-                  ...authUser.user.user_metadata,
-                  phone: `${normalizedPhone}`,
+                raw_user_meta_data: {
+                  ...authUser.user.raw_user_meta_data,
+                  phone: normalizedPhone,
                   lead_source: userLeadSource
                 }
               });
@@ -233,7 +242,11 @@ serve(async (req) => {
         
         console.log("User created during customer login with ID:", userId);
         
-        // Explicitly create profile in case the trigger doesn't work
+        // Create profile for the new user
+        // Wait a short time for auth triggers to run
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Try to create the profile
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
@@ -242,11 +255,13 @@ serve(async (req) => {
             phone_verified: true,
             full_name: userName,
             lead_source: userLeadSource,
-            role: 'customer'
+            role: 'customer',
+            wallet_balance: 0,
+            last_used: new Date().toISOString()
           });
           
         if (profileError) {
-          console.error('Error creating profile during customer login:', profileError);
+          console.log('Profile insert error (may be normal if trigger created it):', profileError);
           
           // Try to update if insert failed due to existing record
           const { error: updateError } = await supabaseAdmin
@@ -255,7 +270,8 @@ serve(async (req) => {
               phone_number: normalizedPhone,
               phone_verified: true,
               full_name: userName,
-              lead_source: userLeadSource
+              lead_source: userLeadSource,
+              role: 'customer'
             })
             .eq('id', userId);
             
@@ -316,12 +332,12 @@ serve(async (req) => {
       
       // Update the user's metadata with lead_source if provided
       const updatedMetadata = {
-        ...userData.user.user_metadata,
-        phone: `${normalizedPhone}`,
+        ...userData.user.raw_user_meta_data,
+        phone: normalizedPhone,
       };
       
       // Only add lead_source if it exists and is not already set
-      if (userLeadSource && !userData.user.user_metadata.lead_source) {
+      if (userLeadSource && !userData.user.raw_user_meta_data.lead_source) {
         updatedMetadata.lead_source = userLeadSource;
       }
       
@@ -330,7 +346,7 @@ serve(async (req) => {
         userId,
         { 
           password: tempPassword,
-          user_metadata: updatedMetadata
+          raw_user_meta_data: updatedMetadata
         }
       );
       

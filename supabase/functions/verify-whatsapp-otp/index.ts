@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
@@ -154,12 +153,12 @@ serve(async (req) => {
         const password = crypto.randomUUID()
         // Create new user with phone as unique identifier
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          phone: `+${normalizedPhone}`, // Add + for auth storage
+          phone: `${normalizedPhone}`, // Add + for auth storage
           email: email,
           password: password,
           phone_confirm: true,
           email_confirm: true,
-          user_metadata: { 
+          raw_user_meta_data: { 
             full_name: fullName,
             phone_verified: true,
             phone: `${normalizedPhone}`, // Add + for metadata
@@ -193,8 +192,8 @@ serve(async (req) => {
               // Update password to allow login
               await supabaseAdmin.auth.admin.updateUserById(userId, { 
                 password: tempPassword,
-                user_metadata: {
-                  ...authUser.user.user_metadata,
+                raw_user_meta_data: {
+                  ...authUser.user.raw_user_metadata,
                   phone: `${normalizedPhone}`, // Add + for metadata
                   lead_source: lead_source
                 }
@@ -336,12 +335,12 @@ serve(async (req) => {
       
       // Update the user's metadata with lead_source if provided
       const updatedMetadata = {
-        ...userData.user.user_metadata,
+        ...userData.user.raw_user_metadata,
         phone: `${normalizedPhone}`, // Add + for metadata
       };
       
       // Only add lead_source if it exists and is not already set
-      if (lead_source && !userData.user.user_metadata.lead_source) {
+      if (lead_source && !userData.user.raw_user_metadata.lead_source) {
         updatedMetadata.lead_source = lead_source;
       }
       
@@ -350,7 +349,7 @@ serve(async (req) => {
         userId,
         { 
           password: tempPassword,
-          user_metadata: updatedMetadata
+          raw_user_meta_data: updatedMetadata
         }
       )
       

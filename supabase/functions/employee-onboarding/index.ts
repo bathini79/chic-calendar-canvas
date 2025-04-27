@@ -358,7 +358,7 @@ serve(async (req) => {
             password,
             phone: employeeData.phone,
             email_confirm: true,
-            user_metadata: {
+            raw_user_meta_data: {
               full_name: employeeData.name,
               employee_id: employeeId,
               employment_type: employeeData.employment_type || "stylist",

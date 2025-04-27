@@ -79,9 +79,9 @@ export function UserDetailsForm() {
         } else {
           // If no profile exists, just set the email
           form.reset({
-            fullName: session.user.user_metadata?.full_name || "",
+            fullName: session.user.raw_user_metadata?.full_name || "",
             email: email,
-            phone: session.user.phone || "",
+            phone: session.user.raw_user_metadata?.phone || "",
           });
         }
       } catch (error) {
