@@ -250,24 +250,24 @@ serve(async (req) => {
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
-            id: userId,
+            user_id: userId,  // Changed - Only pass user_id, not id
             phone_number: normalizedPhone,
             phone_verified: true,
             full_name: userName,
             lead_source: userLeadSource,
             role: 'customer',
             wallet_balance: 0,
-            last_used: new Date().toISOString(),
-            user_id: userId,
+            last_used: new Date().toISOString()
           });
           
         if (profileError) {
-          console.log('Profile insert error (may be normal if trigger created it):', profileError);
+          console.log('Profile insert error:', profileError);
           
           // Try to update if insert failed due to existing record
           const { error: updateError } = await supabaseAdmin
             .from('profiles')
             .update({
+              user_id: userId,  // Ensure user_id is set correctly
               phone_number: normalizedPhone,
               phone_verified: true,
               full_name: userName,

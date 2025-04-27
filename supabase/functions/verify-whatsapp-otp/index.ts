@@ -256,21 +256,22 @@ serve(async (req) => {
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
-            id: userId,
+            user_id: userId,  // Changed - only use user_id, not id
             phone_number: normalizedPhone,
             phone_verified: true,
             full_name: fullName,
             lead_source: lead_source,
             role: 'customer'
-          })
+          });
           
         if (profileError) {
-          console.error('Error creating profile:', profileError)
+          console.error('Error creating profile:', profileError);
           
           // Try to update if insert failed due to existing record
           const { error: updateError } = await supabaseAdmin
             .from('profiles')
             .update({
+              user_id: userId,  // Ensure user_id is set correctly
               phone_number: normalizedPhone,
               phone_verified: true,
               full_name: fullName,
@@ -279,7 +280,7 @@ serve(async (req) => {
             .eq('id', userId);
             
           if (updateError) {
-            console.error('Error updating profile:', updateError)
+            console.error('Error updating profile:', updateError);
           }
         }
         
