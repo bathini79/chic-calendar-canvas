@@ -1,49 +1,28 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0';
 
 // Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    let data;
-    
-    // Check if this is a GET request from a verification link
-    const url = new URL(req.url);
-    const isUrlVerification = req.method === 'GET' && (
-      url.pathname === '/verify-whatsapp-otp' || 
-      url.pathname === '/customer-verify'
-    );
-    
-    if (isUrlVerification) {
-      // Extract parameters from URL for link verification
-      const token = url.searchParams.get('token');
-      const code = url.searchParams.get('code');
-      const phone = url.searchParams.get('phone');
-      
-      if (!phone || (!token && !code)) {
-        throw new Error('Phone number and verification token or code are required');
-      }
-      
-      data = { phoneNumber: phone, code, token };
-    } else {
-      // Regular POST verification
-      data = await req.json();
+    // Parse the request body
+    const data = await req.json();
+    const { phoneNumber, code } = data;
+    const fullName = null, lead_source = null;
+    if (!phoneNumber || !code) {
+      throw new Error('Phone number and verification code are required');
     }
     
-    const { phoneNumber, code, token } = data;
-    
-    if (!phoneNumber || (!code && !token)) {
-      throw new Error('Phone number and verification code or token are required');
-    }
+    console.log("Verifying customer login OTP for phone:", phoneNumber);
       
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -60,12 +39,17 @@ serve(async (req) => {
       }
     });    
     
-    console.log("Verifying code for phone:", phoneNumber);
-    
-    // Ensure the phone number format is consistent (without + prefix)
+    // Ensure the phone number format is consistent (without + prefix for database queries)
     const normalizedPhone = phoneNumber.startsWith('+') 
       ? phoneNumber.substring(1) 
       : phoneNumber;
+    
+    // Format with + for auth API
+    const formattedPhone = phoneNumber.startsWith('+') 
+      ? phoneNumber 
+      : `+${phoneNumber}`;
+    
+    console.log("Normalized phone for OTP verification:", normalizedPhone);
     
     // Step 1: Verify OTP from database
     const { data: otpData, error: otpError } = await supabaseAdmin
@@ -76,7 +60,8 @@ serve(async (req) => {
       .single();
       
     if (otpError || !otpData) {
-      console.error('OTP verification error:', otpError || "No matching OTP found");
+      console.error('Customer OTP verification error:', otpError || "No matching OTP found");
+      console.log("Checking database for phone:", normalizedPhone, "code:", code);
       return new Response(
         JSON.stringify({ 
           error: 'invalid_code',
@@ -86,7 +71,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 // Using 200 to avoid non-2xx handling issues
         }
-      )
+      );
     }
     
     // Check if OTP has expired
@@ -94,7 +79,7 @@ serve(async (req) => {
     const currentTime = new Date();
     
     if (currentTime > expiresAt) {
-      console.error('OTP expired');
+      console.error('Customer OTP expired');
       return new Response(
         JSON.stringify({ 
           error: 'code_expired',
@@ -104,34 +89,33 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200
         }
-      )
+      );
     }
     
-    // Extract fullName and lead_source from OTP data
-    const fullName = otpData.full_name || '';
-    const lead_source = otpData.lead_source || null;
+    // Extract fullName and lead_source from OTP data or use provided values
+    const userName = fullName || otpData.full_name || '';
+    const userLeadSource = lead_source || otpData.lead_source || null;
     
-    console.log("OTP validated for user:", fullName, "lead source:", lead_source);
+    console.log("OTP validated for customer login user:", userName, "lead source:", userLeadSource);
     
     // Step 2: Check if user exists by phone number
-    let existingUserQuery = supabaseAdmin
+    const { data: existingUser, error: userError } = await supabaseAdmin
       .from('profiles')
       .select('id')
-      .eq('phone_number', normalizedPhone);
+      .eq('phone_number', normalizedPhone)
+      .maybeSingle();
     
-    const { data: existingUser, error: userError } = await existingUserQuery.maybeSingle();
-    
-    let userId = null
-    let isNewUser = false
-    let credentials = null
+    let userId = null;
+    let isNewUser = false;
+    let credentials = null;
     
     // Step 3: Handle authentication based on whether user exists
     if (userError || !existingUser) {
       // New user registration
-      isNewUser = true
+      isNewUser = true;
       
       // New user requires fullName
-      if (!fullName) {
+      if (!userName) {
         return new Response(
           JSON.stringify({ 
             error: "new_user_requires_name",
@@ -141,33 +125,39 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
           }
-        )
+        );
       }
       
       try {
         console.log("Creating new user with phone:", normalizedPhone);
         
-        // Create a unique email based on phone number
-        const email = `${normalizedPhone.replace(/[^0-9]/g, '')}@phone.user`
+        // Previous approach was causing database errors, so trying a simplified approach
+        // Create a unique email based on phone number and random ID
+        const randomId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        const email = `phone_${normalizedPhone.replace(/[^0-9]/g, '')}_${randomId}@example.com`;
+        
         // Generate a random password
-        const password = crypto.randomUUID()
-        // Create new user with phone as unique identifier
+        const password = crypto.randomUUID();
+        
+        // Log details before creating user
+        console.log(`Creating user with email ${email}`);
+        
+        // Simplified createUser call with minimal required fields
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          phone: `${normalizedPhone}`, // Add + for auth storage
           email: email,
           password: password,
-          phone_confirm: true,
           email_confirm: true,
-          user_metadata: { 
-            full_name: fullName,
-            phone_verified: true,
-            phone: `${normalizedPhone}`, // Add + for metadata
-            lead_source: lead_source
+          raw_user_meta_data: { 
+            full_name: userName,
+            phone: normalizedPhone,
+            lead_source: userLeadSource
           }
-        })
+        });
         
         if (createError) {
-          console.error('Error creating user:', createError)
+          console.error('Error creating user during customer login:', createError);
           
           // Check if profile entry exists despite auth error
           const { data: existingProfile } = await supabaseAdmin
@@ -192,10 +182,10 @@ serve(async (req) => {
               // Update password to allow login
               await supabaseAdmin.auth.admin.updateUserById(userId, { 
                 password: tempPassword,
-                user_metadata: {
-                  ...authUser.user.raw_user_metadata,
-                  phone: `${normalizedPhone}`, // Add + for metadata
-                  lead_source: lead_source
+                raw_user_meta_data: {
+                  ...authUser.user.raw_user_meta_data,
+                  phone: normalizedPhone,
+                  lead_source: userLeadSource
                 }
               });
               
@@ -220,8 +210,8 @@ serve(async (req) => {
                   userId: userId,
                   phoneNumber: normalizedPhone,
                   credentials: credentials,
-                  fullName: fullName,
-                  lead_source: lead_source
+                  fullName: userName,
+                  lead_source: userLeadSource
                 }),
                 { 
                   headers: { 
@@ -245,27 +235,33 @@ serve(async (req) => {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200
             }
-          )
+          );
         }
         
-        userId = newUser.user.id
+        userId = newUser.user.id;
         
-        console.log("User created with ID:", userId);
+        console.log("User created during customer login with ID:", userId);
         
-        // Explicitly create profile in case the trigger doesn't work
+        // Create profile for the new user
+        // Wait a short time for auth triggers to run
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Try to create the profile
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
-            user_id: userId,  // Changed - only use user_id, not id
+            user_id: userId,  // Changed - Only pass user_id, not id
             phone_number: normalizedPhone,
             phone_verified: true,
-            full_name: fullName,
-            lead_source: lead_source,
-            role: 'customer'
+            full_name: userName,
+            lead_source: userLeadSource,
+            role: 'employee',
+            wallet_balance: 0,
+            last_used: new Date().toISOString()
           });
           
         if (profileError) {
-          console.error('Error creating profile:', profileError);
+          console.log('Profile insert error:', profileError);
           
           // Try to update if insert failed due to existing record
           const { error: updateError } = await supabaseAdmin
@@ -274,8 +270,9 @@ serve(async (req) => {
               user_id: userId,  // Ensure user_id is set correctly
               phone_number: normalizedPhone,
               phone_verified: true,
-              full_name: fullName,
-              lead_source: lead_source
+              full_name: userName,
+              lead_source: userLeadSource,
+              role: 'customer'
             })
             .eq('id', userId);
             
@@ -288,11 +285,11 @@ serve(async (req) => {
         credentials = {
           email: email,
           password: password
-        }
+        };
         
-        console.log("User registered successfully with credentials");
+        console.log("User registered successfully with credentials during customer login");
       } catch (error) {
-        console.error('Unexpected error in user creation:', error);
+        console.error('Unexpected error in user creation during customer login:', error);
         return new Response(
           JSON.stringify({ 
             error: "user_creation_failed",
@@ -303,19 +300,19 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
           }
-        )
+        );
       }
     } else {
       // Existing user - direct sign in
-      userId = existingUser.id
+      userId = existingUser.id;
       
-      console.log("Existing user found with ID:", userId);
+      console.log("Existing user found during customer login with ID:", userId);
       
       // Get user from auth
-      const { data: userData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId)
+      const { data: userData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
       
       if (authUserError) {
-        console.error('Error fetching user:', authUserError)
+        console.error('Error fetching user during customer login:', authUserError);
         return new Response(
           JSON.stringify({ 
             error: "user_not_found",
@@ -325,24 +322,24 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
           }
-        )
+        );
       }
       
       // Extract email from user data
-      const email = userData.user.email
+      const email = userData.user.email;
       
       // Generate a one-time password for this login
-      const tempPassword = crypto.randomUUID()
+      const tempPassword = crypto.randomUUID();
       
       // Update the user's metadata with lead_source if provided
       const updatedMetadata = {
-        ...userData.user.raw_user_metadata,
-        phone: `${normalizedPhone}`, // Add + for metadata
+        ...userData.user.raw_user_meta_data,
+        phone: normalizedPhone,
       };
       
       // Only add lead_source if it exists and is not already set
-      if (lead_source && !userData.user.raw_user_metadata.lead_source) {
-        updatedMetadata.lead_source = lead_source;
+      if (userLeadSource && !userData.user.raw_user_meta_data.lead_source) {
+        updatedMetadata.lead_source = userLeadSource;
       }
       
       // Update the user's password and metadata
@@ -350,12 +347,12 @@ serve(async (req) => {
         userId,
         { 
           password: tempPassword,
-          user_metadata: updatedMetadata
+          raw_user_meta_data: updatedMetadata
         }
-      )
+      );
       
       if (passwordUpdateError) {
-        console.error('Error updating user password:', passwordUpdateError)
+        console.error('Error updating user password during customer login:', passwordUpdateError);
         return new Response(
           JSON.stringify({ 
             error: "password_update_failed",
@@ -365,13 +362,13 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
           }
-        )
+        );
       }
       
       // Also update profile phone number and lead_source if provided
       const updateData: any = { phone_number: normalizedPhone };
-      if (lead_source) {
-        updateData.lead_source = lead_source;
+      if (userLeadSource) {
+        updateData.lead_source = userLeadSource;
       }
       
       const { error: profileUpdateError } = await supabaseAdmin
@@ -380,23 +377,23 @@ serve(async (req) => {
         .eq('id', userId);
         
       if (profileUpdateError) {
-        console.error('Error updating profile:', profileUpdateError);
+        console.error('Error updating profile during customer login:', profileUpdateError);
       }
       
       // Return credentials for frontend to create session
       credentials = {
         email: email,
         password: tempPassword
-      }
+      };
       
-      console.log("Existing user login credentials generated");
+      console.log("Existing user login credentials generated during customer login");
     }
     
     // Delete used OTP
     await supabaseAdmin
       .from('phone_auth_codes')
       .delete()
-      .eq('phone_number', normalizedPhone)
+      .eq('phone_number', normalizedPhone);
     
     // Return user data and credentials
     return new Response(
@@ -407,8 +404,8 @@ serve(async (req) => {
         userId: userId,
         phoneNumber: normalizedPhone,
         credentials: credentials,
-        fullName: fullName,
-        lead_source: lead_source
+        fullName: userName,
+        lead_source: userLeadSource
       }),
       { 
         headers: { 
@@ -417,9 +414,9 @@ serve(async (req) => {
         },
         status: 200 
       }
-    )
+    );
   } catch (error) {
-    console.error('Error verifying OTP:', error)
+    console.error('Error verifying customer login OTP:', error);
     
     return new Response(
       JSON.stringify({ 
@@ -433,6 +430,6 @@ serve(async (req) => {
         },
         status: 200
       }
-    )
+    );
   }
-})
+});

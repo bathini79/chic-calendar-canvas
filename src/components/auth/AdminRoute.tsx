@@ -27,9 +27,9 @@ export function AdminRoute({ children }: AdminRouteProps) {
     return <div>Loading...</div>;
   }
 
-  if (!profile || profile.role !== "admin") {
+  if (!profile || (profile.role !== "admin" && profile.role !== "employee")) {
     return <Navigate to="/" />;
   }
-
+  
   return <>{children}</>;
 }

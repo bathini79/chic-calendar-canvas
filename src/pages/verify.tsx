@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,17 +67,34 @@ export default function VerificationPage() {
     setError("");
 
     try {
-      // Format the full phone number with country code
-      const formattedPhone = phoneNumber.startsWith('+') ? 
-        phoneNumber : 
-        `${countryCode.code}${phoneNumber.replace(/\s+/g, '')}`;
+      // For directly entered phone numbers, format with country code
+      // For URL-provided phone numbers that were already parsed, avoid adding country code again
+      let formattedPhone;
       
-      console.log("Sending verification request for phone:", formattedPhone, "code:", verificationCode);
+      // If we got the phone from URL and already parsed the country code
+      if (phone && phone.startsWith(countryCode.code) && !phoneNumber.includes(countryCode.code)) {
+        // Just use the original phone from URL which already has the country code
+        formattedPhone = phone;
+        console.log("Using original phone from URL (already has country code):", formattedPhone);
+      } else {
+        // This is a manually entered phone, so format it with country code
+        formattedPhone = phoneNumber.startsWith('+') ? 
+          phoneNumber : 
+          `${countryCode.code}${phoneNumber.replace(/\s+/g, '')}`;
+        console.log("Formatted manually entered phone with country code:", formattedPhone);
+      }
+      
+      // For the payload, ensure the phone number is without + prefix
+      const normalizedPhone = formattedPhone.startsWith('+') ? 
+        formattedPhone.substring(1) : 
+        formattedPhone;
+      
+      console.log("Normalized phone for backend:", normalizedPhone);
       
       const { data, error } = await supabase.functions.invoke("verify-whatsapp-otp", {
         body: {
           code: verificationCode,
-          phoneNumber: formattedPhone,
+          phoneNumber: normalizedPhone, // Send without + prefix
           token
         }
       });
