@@ -74,28 +74,60 @@ export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsMa
     // Initialize permissions from employmentTypes
     const permissionsMap: Record<string, string[]> = {};
     
+    console.log("Initializing permissions from employment types:", employmentTypes);
+    
     employmentTypes.forEach(type => {
-      permissionsMap[type.id] = type.permissions || [];
+      // Ensure permissions is always an array, even if it comes as null or undefined
+      let typePermissions = [];
+      
+      // Handle different formats that might come from Supabase
+      if (type.permissions) {
+        if (typeof type.permissions === 'string') {
+          try {
+            // Try to parse if it's a string
+            typePermissions = JSON.parse(type.permissions);
+          } catch (e) {
+            console.error(`Failed to parse permissions string for type ${type.id}:`, e);
+            typePermissions = [];
+          }
+        } else if (Array.isArray(type.permissions)) {
+          // Already an array
+          typePermissions = [...type.permissions];
+        } else if (typeof type.permissions === 'object') {
+          // Handle potential PostgreSQL JSONB object format
+          typePermissions = Object.values(type.permissions);
+        }
+      }
+      
+      console.log(`Parsed permissions for ${type.name} (${type.id}):`, typePermissions);
+      permissionsMap[type.id] = typePermissions;
     });
     
+    console.log("Initialized permissions map:", permissionsMap);
     setPermissions(permissionsMap);
     setIsLoading(false);
   }, [employmentTypes]);
 
   const handlePermissionChange = (typeId: string, permissionId: string, checked: boolean) => {
+    console.log(`Permission change: typeId=${typeId}, permissionId=${permissionId}, checked=${checked}`);
+    
     setPermissions(prev => {
       const currentPermissions = [...(prev[typeId] || [])];
       
       if (checked) {
         if (!currentPermissions.includes(permissionId)) {
           currentPermissions.push(permissionId);
+          console.log(`Added permission ${permissionId} to type ${typeId}`);
         }
       } else {
         const index = currentPermissions.indexOf(permissionId);
         if (index !== -1) {
           currentPermissions.splice(index, 1);
+          console.log(`Removed permission ${permissionId} from type ${typeId}`);
         }
       }
+      
+      console.log(`Updated permissions for type ${typeId}:`, currentPermissions);
       
       return {
         ...prev,
@@ -107,25 +139,60 @@ export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsMa
   const savePermissions = async () => {
     try {
       setIsSaving(true);
+      let successCount = 0;
       
-      // Save all permissions in parallel
-      const updatePromises = Object.entries(permissions).map(([typeId, perms]) => {
-        return supabase
-          .from("employment_types")
-          .update({ permissions: perms })
-          .eq("id", typeId);
-      });
-      
-      const results = await Promise.all(updatePromises);
-      
-      // Check for errors
-      const errors = results.filter(result => result.error);
-      if (errors.length > 0) {
-        throw new Error(`Failed to save some permissions: ${errors[0].error?.message}`);
+      // Process each permission update sequentially
+      for (const [typeId, perms] of Object.entries(permissions)) {
+        try {
+          // Use a simple array approach with explicit conversion
+          console.log(`Saving permissions for type ${typeId}:`, perms);
+          
+          // Try direct approach with permissions as an array
+          const { error } = await supabase
+            .from("employment_types")
+            .update({ 
+              permissions: perms,
+              updated_at: new Date().toISOString() // Force update with current timestamp
+            })
+            .eq("id", typeId);
+          
+          if (error) {
+            console.error(`Error with direct array approach for type ${typeId}:`, error);
+            
+            // If direct approach fails, try with RPC function
+            const { error: rpcError } = await supabase.rpc('update_employment_type_permissions', {
+              type_id: typeId,
+              perms_json: JSON.stringify(perms)
+            });
+            
+            if (rpcError) {
+              throw new Error(`Both update methods failed: ${rpcError.message}`);
+            } else {
+              console.log(`Successfully updated permissions via RPC for type ${typeId}`);
+              successCount++;
+            }
+          } else {
+            console.log(`Successfully updated permissions for type ${typeId}`);
+            successCount++;
+          }
+        } catch (typeError) {
+          console.error(`Failed to save permissions for type ${typeId}:`, typeError);
+        }
       }
       
-      toast.success("Permissions saved successfully");
-      onRefresh();
+      // Report success based on how many types were successfully updated
+      if (successCount === Object.keys(permissions).length) {
+        toast.success("All permissions saved successfully");
+      } else if (successCount > 0) {
+        toast.success(`Saved permissions for ${successCount} out of ${Object.keys(permissions).length} employment types`);
+      } else {
+        toast.error("Failed to save any permissions");
+      }
+      
+      // Force a fresh reload with a small delay
+      setTimeout(() => {
+        onRefresh();
+      }, 500);
     } catch (error: any) {
       toast.error("Error saving permissions: " + error.message);
       console.error(error);

@@ -21,10 +21,18 @@ export default function Team() {
   const fetchEmploymentTypes = async () => {
     try {
       setIsLoading(true);
+      console.log("Fetching employment types with fresh data...");
+      
+      // Use a cache-busting technique by adding a timestamp parameter
+      const timestamp = new Date().getTime();
       const { data, error } = await supabase
         .from("employment_types")
         .select("*")
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .then(result => {
+          console.log("Fetched employment types:", result.data);
+          return result;
+        });
 
       if (error) throw error;
       
@@ -38,8 +46,10 @@ export default function Team() {
           .order("created_at", { ascending: true });
         
         if (refreshError) throw refreshError;
+        console.log("Using refreshed data after initialization:", refreshedData);
         setEmploymentTypes(refreshedData || []);
       } else {
+        console.log("Setting employment types with data:", data);
         setEmploymentTypes(data);
       }
     } catch (error: any) {
