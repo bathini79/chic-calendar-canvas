@@ -1,4 +1,3 @@
-
 import { getAppointmentStatusColor } from "@/pages/admin/bookings/utils/bookingUtils";
 import {
   START_HOUR,
@@ -8,6 +7,8 @@ import {
 import { Flag } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { Appointment, Booking, Employee } from "@/pages/admin/bookings/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface TimeSlotsProps {
   employees: Employee[];
@@ -32,6 +33,7 @@ interface TimeSlotsProps {
     y: number;
     date: Date;
   }) => void;
+  isLoading?: boolean; // New prop for loading state
 }
 
 interface BookingsByTimeSlot {
@@ -55,6 +57,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
   setSelectedAppointment,
   setClickedCell,
   currentDate,
+  isLoading = false, // Default to false if not provided
 }) => {
   const [dataVersion, setDataVersion] = useState(0);
 
@@ -206,21 +209,36 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     <div className="flex-1 overflow-auto">
       <div className="flex">
         <div className="w-16 border-r" />
-        {employees.map((emp: Employee) => (
-          <div
-            key={emp.id}
-            className="flex-1 border-r flex items-center justify-center p-2"
-          >
-            <div className="flex flex-col items-center space-y-1">
-              <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
-                {emp.avatar || emp.photo_url?.charAt(0) || emp.name?.charAt(0) || "?"}
-              </div>
-              <div className="text-xs font-medium text-gray-700">
-                {emp.name}
+        {isLoading ? (
+          // Skeleton loaders for employee headers
+          Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={`skeleton-header-${index}`}
+              className="flex-1 border-r flex items-center justify-center p-2"
+            >
+              <div className="flex flex-col items-center space-y-1">
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <Skeleton className="h-4 w-20" />
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          employees.map((emp: Employee) => (
+            <div
+              key={emp.id}
+              className="flex-1 border-r flex items-center justify-center p-2"
+            >
+              <div className="flex flex-col items-center space-y-1">
+                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
+                  {emp.avatar || emp.photo_url?.charAt(0) || emp.name?.charAt(0) || "?"}
+                </div>
+                <div className="text-xs font-medium text-gray-700">
+                  {emp.name}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="flex">
@@ -235,34 +253,59 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
           ))}
         </div>
 
-        {employees.map((emp: Employee) => (
-          <div
-            key={emp.id}
-            className="flex-1 border-r relative"
-            style={{
-              minWidth: "150px",
-              height: TOTAL_HOURS * PIXELS_PER_HOUR,
-            }}
-            onClick={(e) => handleColumnClick(e, emp.id)}
-          >
-            {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="absolute left-0 right-0 border-b"
-                style={{ top: idx * 15 }}
-              />
-            ))}
+        {isLoading ? (
+          // Skeleton loaders for employee columns
+          Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={`skeleton-column-${index}`}
+              className="flex-1 border-r relative"
+              style={{
+                minWidth: "150px",
+                height: TOTAL_HOURS * PIXELS_PER_HOUR,
+              }}
+            >
+              {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="absolute left-0 right-0 border-b"
+                  style={{ top: idx * 15 }}
+                />
+              ))}
+              <Skeleton className="absolute left-[5%] top-[10%] h-20 w-[90%] rounded-md" />
+              <Skeleton className="absolute left-[5%] top-[40%] h-16 w-[90%] rounded-md" />
+              <Skeleton className="absolute left-[5%] top-[70%] h-24 w-[90%] rounded-md" />
+            </div>
+          ))
+        ) : (
+          employees.map((emp: Employee) => (
+            <div
+              key={emp.id}
+              className="flex-1 border-r relative"
+              style={{
+                minWidth: "150px",
+                height: TOTAL_HOURS * PIXELS_PER_HOUR,
+              }}
+              onClick={(e) => handleColumnClick(e, emp.id)}
+            >
+              {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="absolute left-0 right-0 border-b"
+                  style={{ top: idx * 15 }}
+                />
+              ))}
 
-            {nowPosition !== null && isSameDay(currentDate, new Date()) && (
-              <div
-                className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
-                style={{ top: nowPosition }}
-              />
-            )}
+              {nowPosition !== null && isSameDay(currentDate, new Date()) && (
+                <div
+                  className="absolute left-0 right-0 h-[2px] bg-red-500 z-20"
+                  style={{ top: nowPosition }}
+                />
+              )}
 
-            {renderAppointmentBlocks(emp.id)}
-          </div>
-        ))}
+              {renderAppointmentBlocks(emp.id)}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

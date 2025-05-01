@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -29,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { MembershipSale } from "@/components/admin/sales/MembershipSale";
+import { useStaffSchedule } from "@/hooks/use-staff-schedule";
 
 const initialStats = [
   { label: "Pending Confirmation", value: 0 },
@@ -296,6 +296,16 @@ export default function AdminBookings() {
     (_, i) => i + businessHours.startHour
   );
 
+  const { scheduledStaffIds, isLoading: isLoadingSchedule } = useStaffSchedule({
+    selectedDate: currentDate,
+    locationId: selectedLocationId
+  });
+  
+  // Filter employees to only show those scheduled for the selected date
+  const scheduledEmployees = employees.filter(employee => 
+    scheduledStaffIds.includes(employee.id)
+  );
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-50 relative">
@@ -348,7 +358,7 @@ export default function AdminBookings() {
           onNext={goNext}
         />
         <TimeSlots
-          employees={employees}
+          employees={scheduledEmployees}
           formatTime={formatTime}
           TOTAL_HOURS={businessHours.totalHours}
           currentDate={currentDate}
@@ -361,6 +371,7 @@ export default function AdminBookings() {
           PIXELS_PER_HOUR={businessHours.pixelsPerHour}
           handleColumnClick={() => {}}
           renderAppointmentBlock={() => null}
+          isLoading={isLoadingSchedule} // Pass loading state to TimeSlots
         />
         
         {clickedCell && (
@@ -390,7 +401,7 @@ export default function AdminBookings() {
             onClose={closeAddAppointment}
             selectedDate={appointmentDate}
             selectedTime={appointmentTime}
-            employees={employees.filter(emp => emp.id != "unassigned")}
+            employees={scheduledEmployees.filter(emp => emp.id != "unassigned")}
             existingAppointment={selectedAppointment}
             locationId={selectedLocationId}
             onAppointmentSaved={() => {
