@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useEffect } from "react";
-import { Package as PackageIcon, Plus, Minus, AlertCircle } from "lucide-react";
+import { Package as PackageIcon, Plus, Minus, AlertCircle, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,6 +20,8 @@ import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useStaffAvailability } from "../hooks/useStaffAvailability";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 type Stylist = {
   id: string;
@@ -41,6 +43,8 @@ export interface ServiceSelectorProps {
   locationId?: string;
   selectedDate?: Date;
   selectedTime?: string;
+  existingAppointment?: boolean;
+  appointmentId?: string; // Add this parameter to identify the current appointment being edited
 }
 
 export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
@@ -55,16 +59,20 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   customizedServices = {},
   locationId,
   selectedDate,
-  selectedTime
+  selectedTime,
+  existingAppointment = false,
+  appointmentId
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
-
+  const [bookedStylistWarnings, setBookedStylistWarnings] = useState<Record<string, {message: string, status: string}>>({});
+  
   // Get staff availability when appointment time is selected
-  const { availableStylists, isLoading: isLoadingAvailability } = useStaffAvailability({
+  const { availableStylistsInfo, availableStylists, isLoading: isLoadingAvailability } = useStaffAvailability({
     selectedDate,
     selectedTime,
     locationId,
+    appointmentId, // Pass the appointmentId to useStaffAvailability
   });
 
   const { data: categories } = useQuery({
@@ -176,8 +184,92 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
   // Function to determine if a stylist is available
   const isStylistAvailable = (stylistId: string) => {
-    if (!selectedDate || !selectedTime) return true; // If no date/time selected, all stylists are available
-    return availableStylists.includes(stylistId);
+    if (!selectedDate || !selectedTime) return true;
+    if (!availableStylistsInfo) return availableStylists.includes(stylistId);
+    
+    const stylistInfo = availableStylistsInfo.find(s => s.id === stylistId);
+
+    // If stylist is unavailable due to a booking conflict, check its status
+    if (!stylistInfo?.isAvailable && stylistInfo?.bookingInfo) {
+      const status = stylistInfo.bookingInfo.status;
+      // Only consider "booked" or "inprogress" as conflicts
+      if (status !== "booked" && status !== "inprogress" && status !== "confirmed") {
+        return true; // Treat as available if not booked or in progress
+      }
+    }
+    
+    return stylistInfo?.isAvailable ?? true;
+  };
+
+  // Get the booking info for a stylist if they're unavailable
+  const getStylistBookingInfo = (stylistId: string) => {
+    if (!availableStylistsInfo) return null;
+    const stylistInfo = availableStylistsInfo.find(s => s.id === stylistId);
+    
+    // Only return booking info if status is "booked" or "inprogress"
+    if (stylistInfo?.bookingInfo) {
+      const status = stylistInfo.bookingInfo.status;
+      if (status === "booked" || status === "inprogress" || status === "confirmed") {
+        return stylistInfo.bookingInfo;
+      }
+    }
+    
+    return null;
+  };
+
+  // Check if this stylist is only booked for this current appointment
+  const isBookedForCurrentAppointmentOnly = (stylistId: string, bookingInfo: any) => {
+    if (!existingAppointment || !bookingInfo) return false;
+    
+    // If the appointment ID matches the current appointment's ID, this is not a conflict
+    // This would need to be implemented based on your actual appointment ID structure
+    return false; // Placeholder - implement the actual logic
+  };
+
+  // Handle stylist selection
+  const handleStylistSelection = (itemId: string, stylistId: string) => {
+    // If stylist is "any" or available, no warnings needed
+    if (stylistId === 'any' || isStylistAvailable(stylistId)) {
+      // Clear any existing warning for this item
+      if (bookedStylistWarnings[itemId]) {
+        const newWarnings = { ...bookedStylistWarnings };
+        delete newWarnings[itemId];
+        setBookedStylistWarnings(newWarnings);
+      }
+      onStylistSelect(itemId, stylistId);
+      return;
+    }
+
+    // Get booking info for unavailable stylist
+    const bookingInfo = getStylistBookingInfo(stylistId);
+    
+    // If this is the stylist's own booking for this appointment, don't warn
+    if (isBookedForCurrentAppointmentOnly(stylistId, bookingInfo)) {
+      onStylistSelect(itemId, stylistId);
+      return;
+    }
+
+    // Get stylist name
+    const stylistName = stylists.find(s => s.id === stylistId)?.name || 'Stylist';
+    
+    // Format times for the warning message
+    const startTime = bookingInfo?.startTime ? 
+      new Date(bookingInfo.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+    const endTime = bookingInfo?.endTime ? 
+      new Date(bookingInfo.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+    
+    // Create warning message with booking details
+    setBookedStylistWarnings(prev => ({
+      ...prev,
+      [itemId]: {
+        message: `${stylistName} is already booked from ${startTime} to ${endTime}. They may have overlapping appointments.`,
+        status: bookingInfo?.status || 'booked'
+      }
+    }));
+
+    // Still allow selection but show a toast warning
+    toast.warning(`${stylistName} already has a booking during this time slot.`);
+    onStylistSelect(itemId, stylistId);
   };
 
   const handlePackageSelect = (pkg: any) => {
@@ -221,18 +313,54 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     return service?.duration || 60; // Default to 60 minutes if not found
   };
 
-  // Update staff availability when a service is selected
-  useEffect(() => {
-    if (!selectedServices.length && !Object.keys(selectedStylists).length) return;
-    
-    // When services change, update the service duration in useStaffAvailability if needed
-    const totalDuration = selectedServices.reduce((total, serviceId) => {
-      return total + getServiceDuration(serviceId);
-    }, 0);
-    
-    // Here you would refresh availability with the new duration if needed
-    // This would require updating the useStaffAvailability hook with the service duration
-  }, [selectedServices, selectedDate, selectedTime]);
+  // Function to render the stylist selection dropdown
+  const renderStylistDropdown = (itemId: string, value: string, colorIndicator = false) => {
+    return (
+      <TooltipProvider delayDuration={300}>
+        <Select 
+          value={value || ''} 
+          onValueChange={(value) => handleStylistSelection(itemId, value)}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select stylist" />
+          </SelectTrigger>
+          <SelectContent align="center" side="bottom">
+            <SelectItem value="any">Any Available Stylist</SelectItem>
+            {stylists.map((stylist) => {
+              const available = isStylistAvailable(stylist.id);
+              
+              return (
+                <Tooltip key={stylist.id}>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <SelectItem 
+                        value={stylist.id}
+                        // Allow selection even when not available
+                        disabled={false}
+                        className={cn(!available && "opacity-70")}
+                      >
+                        <span className="flex items-center gap-2">
+                          {stylist.name}
+                          {!available && colorIndicator && (
+                            <AlertCircle className="h-4 w-4 text-yellow-500" />
+                          )}
+                        </span>
+                      </SelectItem>
+                    </div>
+                  </TooltipTrigger>
+                  {!available && (
+                    <TooltipContent side="right" align="start" className="z-50">
+                      <p>This stylist is not available at the selected time</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </TooltipProvider>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -291,44 +419,8 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                       ₹{isService ? item.selling_price : calculatePackagePrice(item)}
                     </TableCell>
                     <TableCell>
-                      {isService && isSelected && (
-                        <TooltipProvider>
-                          <Select 
-                            value={selectedStylists[item.id] || ''} 
-                            onValueChange={(value) => onStylistSelect(item.id, value)}
-                          >
-                            <SelectTrigger className="w-[180px]">
-                              <SelectValue placeholder="Select stylist" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {stylists.map((stylist) => {
-                                const available = isStylistAvailable(stylist.id);
-                                return (
-                                  <Tooltip key={stylist.id}>
-                                    <TooltipTrigger asChild>
-                                      <div className={cn("relative", !available && "opacity-50")}>
-                                        <SelectItem value={stylist.id} disabled={!available}>
-                                          <span className="flex items-center gap-2">
-                                            {stylist.name}
-                                            {!available && (
-                                              <AlertCircle className="h-4 w-4 text-red-500" />
-                                            )}
-                                          </span>
-                                        </SelectItem>
-                                      </div>
-                                    </TooltipTrigger>
-                                    {!available && (
-                                      <TooltipContent>
-                                        <p>This stylist is not available at the selected time</p>
-                                      </TooltipContent>
-                                    )}
-                                  </Tooltip>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                        </TooltipProvider>
-                      )}
+                      {isService && isSelected && 
+                        renderStylistDropdown(item.id, selectedStylists[item.id] || '', true)}
                     </TableCell>
                     <TableCell>
                       <Button
@@ -371,42 +463,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                                     ? ps.package_selling_price
                                     : ps.service.selling_price}
                                 </span>
-                                <TooltipProvider>
-                                  <Select 
-                                    value={selectedStylists[ps.service.id] || ''} 
-                                    onValueChange={(value) => onStylistSelect(ps.service.id, value)}
-                                  >
-                                    <SelectTrigger className="w-[180px]">
-                                      <SelectValue placeholder="Select stylist" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {stylists.map((stylist) => {
-                                        const available = isStylistAvailable(stylist.id);
-                                        return (
-                                          <Tooltip key={stylist.id}>
-                                            <TooltipTrigger asChild>
-                                              <div className={cn("relative", !available && "opacity-50")}>
-                                                <SelectItem value={stylist.id} disabled={!available}>
-                                                  <span className="flex items-center gap-2">
-                                                    {stylist.name}
-                                                    {!available && (
-                                                      <AlertCircle className="h-4 w-4 text-red-500" />
-                                                    )}
-                                                  </span>
-                                                </SelectItem>
-                                              </div>
-                                            </TooltipTrigger>
-                                            {!available && (
-                                              <TooltipContent>
-                                                <p>This stylist is not available at the selected time</p>
-                                              </TooltipContent>
-                                            )}
-                                          </Tooltip>
-                                        );
-                                      })}
-                                    </SelectContent>
-                                  </Select>
-                                </TooltipProvider>
+                                {renderStylistDropdown(ps.service.id, selectedStylists[ps.service.id] || '')}
                               </div>
                             </div>
                           ))}
@@ -414,7 +471,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                             <div className="pt-4 space-y-4">
                               <h4 className="font-medium text-sm">Additional Services</h4>
                               {services?.filter(service => 
-                                item.customizable_services.includes(service.id)
+                                item.customizable_services?.includes(service.id)
                               ).map(service => (
                                 <div
                                   key={service.id}
@@ -423,7 +480,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                                   <div className="flex items-center gap-4">
                                     <Checkbox
                                       checked={customizedServices[item.id]?.includes(service.id)}
-                                      onCheckedChange={() => onCustomPackage(item.id, service.id)}
+                                      onCheckedChange={() => onCustomPackage && onCustomPackage(item.id, service.id)}
                                     />
                                     <span className="text-sm font-medium">{service.name}</span>
                                     <span className="text-sm text-muted-foreground">
@@ -434,44 +491,8 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                                     <span className="text-sm font-medium">
                                       +₹{service.selling_price}
                                     </span>
-                                    {customizedServices[item.id]?.includes(service.id) && (
-                                      <TooltipProvider>
-                                        <Select 
-                                          value={selectedStylists[service.id] || ''} 
-                                          onValueChange={(value) => onStylistSelect(service.id, value)}
-                                        >
-                                          <SelectTrigger className="w-[180px]">
-                                            <SelectValue placeholder="Select stylist" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {stylists.map((stylist) => {
-                                              const available = isStylistAvailable(stylist.id);
-                                              return (
-                                                <Tooltip key={stylist.id}>
-                                                  <TooltipTrigger asChild>
-                                                    <div className={cn("relative", !available && "opacity-50")}>
-                                                      <SelectItem value={stylist.id} disabled={!available}>
-                                                        <span className="flex items-center gap-2">
-                                                          {stylist.name}
-                                                          {!available && (
-                                                            <AlertCircle className="h-4 w-4 text-red-500" />
-                                                          )}
-                                                        </span>
-                                                      </SelectItem>
-                                                    </div>
-                                                  </TooltipTrigger>
-                                                  {!available && (
-                                                    <TooltipContent>
-                                                      <p>This stylist is not available at the selected time</p>
-                                                    </TooltipContent>
-                                                  )}
-                                                </Tooltip>
-                                              );
-                                            })}
-                                          </SelectContent>
-                                        </Select>
-                                      </TooltipProvider>
-                                    )}
+                                    {customizedServices[item.id]?.includes(service.id) && 
+                                      renderStylistDropdown(service.id, selectedStylists[service.id] || '')}
                                   </div>
                                 </div>
                               ))}
@@ -487,9 +508,23 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           </TableBody>
         </Table>
       </ScrollArea>
+      
       {isLoadingAvailability && (
         <div className="flex items-center justify-center py-2 text-sm text-muted-foreground">
           Loading stylist availability...
+        </div>
+      )}
+      
+      {Object.keys(bookedStylistWarnings).length > 0 && (
+        <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+          <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+          <div className="text-sm text-yellow-600">
+            {Object.values(bookedStylistWarnings).length === 1 ? (
+              <span>{Object.values(bookedStylistWarnings)[0].message}</span>
+            ) : (
+              <span>{Object.values(bookedStylistWarnings).length} stylists have booking conflicts</span>
+            )}
+          </div>
         </div>
       )}
     </div>

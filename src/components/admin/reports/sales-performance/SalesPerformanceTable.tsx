@@ -163,7 +163,6 @@ export function SalesPerformanceTable({ employeeId, dateRange }: SalesPerformanc
     
     // For CSV and Excel, we could use libraries like csv-stringify or xlsx
     // For PDF, we could use libraries like jspdf or react-pdf
-    console.log(`Exporting sales performance data as ${format}`);
   };
   
   return (

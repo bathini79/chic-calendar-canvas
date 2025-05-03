@@ -205,7 +205,6 @@ export function PaymentBySource({ onBack }: PaymentBySourceProps) {
     // For PDF, we could use libraries like jspdf or react-pdf
     // For chart export, we could generate a PNG of the chart
     
-    console.log(`Exporting payment data as ${format}`);
   };
 
   return (

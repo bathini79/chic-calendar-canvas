@@ -274,7 +274,6 @@ export const CustomerSalesReport = ({ employeeId, dateRange }: CustomerSalesRepo
   // Handle export
   const handleExport = (format: 'xlsx' | 'csv' | 'pdf') => {
     // Implementation for exporting would go here
-    console.log(`Exporting in ${format} format`);
     alert(`Export to ${format} initiated. This functionality would be implemented with appropriate libraries.`);
   };
 

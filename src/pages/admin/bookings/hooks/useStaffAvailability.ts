@@ -7,15 +7,32 @@ interface StaffAvailabilityProps {
   selectedTime?: string;
   locationId?: string;
   serviceDuration?: number;
+  appointmentId?: string; // Changed from currentAppointmentId to appointmentId to match ServiceSelector component
+}
+
+interface StylistAvailabilityInfo {
+  id: string;
+  name: string; 
+  isAvailable: boolean;
+  bookingInfo?: {
+    id?: string;
+    status?: string;
+    startTime?: string;
+    endTime?: string;
+    customer?: string;
+    appointmentId?: string;
+  };
 }
 
 export function useStaffAvailability({
   selectedDate,
   selectedTime,
   locationId,
-  serviceDuration = 60, // Default to 60 mins if not specified
+  serviceDuration = 60,
+  appointmentId
 }: StaffAvailabilityProps) {
   const [availableStylists, setAvailableStylists] = useState<string[]>([]);
+  const [availableStylistsInfo, setAvailableStylistsInfo] = useState<StylistAvailabilityInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,6 +40,7 @@ export function useStaffAvailability({
     const fetchStaffAvailability = async () => {
       if (!selectedDate || !selectedTime || !locationId) {
         setAvailableStylists([]);
+        setAvailableStylistsInfo([]);
         return;
       }
 
@@ -45,6 +63,7 @@ export function useStaffAvailability({
         
         if (!employees || employees.length === 0) {
           setAvailableStylists([]);
+          setAvailableStylistsInfo([]);
           setIsLoading(false);
           return;
         }
@@ -96,31 +115,45 @@ export function useStaffAvailability({
         
         if (timeOffError) throw timeOffError;
 
-        // 5. Get existing bookings for this date
+        // 5. Get existing bookings for this date with more detail
+        // IMPORTANT: We get all bookings, including those for the current appointment
         const { data: bookings, error: bookingsError } = await supabase
           .from('bookings')
-          .select('*')
+          .select(`
+            *,
+            appointment:appointments(id, status)
+          `)
           .in('employee_id', employees.map(e => e.id))
           .gte('start_time', todayStart.toISOString())
           .lte('end_time', todayEnd.toISOString());
         
         if (bookingsError) throw bookingsError;
 
-        // Find available stylists
-        const available = employees.filter(employee => {
+        // Process each stylist's availability
+        const stylistInfoArray = employees.map(employee => {
           // Check if employee has time off
           const hasTimeOff = timeOff?.some(t => t.employee_id === employee.id);
-          if (hasTimeOff) return false;
-
-          // Check if there's a specific shift for today
-          const employeeSpecificShifts = specificShifts?.filter(s => s.employee_id === employee.id) || [];
           
-          // Check if there's a recurring shift
+          // If employee has time off, they're not available
+          if (hasTimeOff) {
+            return {
+              id: employee.id,
+              name: employee.name,
+              isAvailable: false
+            };
+          }
+          
+          // Check for shifts
+          const employeeSpecificShifts = specificShifts?.filter(s => s.employee_id === employee.id) || [];
           const employeeRecurringShifts = recurringShifts?.filter(s => s.employee_id === employee.id) || [];
           
           // If no shifts found at all, employee is not working
           if (employeeSpecificShifts.length === 0 && employeeRecurringShifts.length === 0) {
-            return false;
+            return {
+              id: employee.id,
+              name: employee.name,
+              isAvailable: false
+            };
           }
 
           // If specific shifts exist, they override recurring shifts
@@ -148,31 +181,60 @@ export function useStaffAvailability({
               shiftEnd.setHours(endHour, endMinute, 0, 0);
             }
             
-            // Fix: The appointment is within the shift if:
-            // 1. The appointment start time is >= shift start time AND
-            // 2. The appointment end time <= shift end time
             return (appointmentStart >= shiftStart && appointmentEnd <= shiftEnd);
           });
 
-          if (!isWorkingDuringAppointment) return false;
+          if (!isWorkingDuringAppointment) {
+            return {
+              id: employee.id,
+              name: employee.name,
+              isAvailable: false
+            };
+          }
 
-          // Check for conflicting bookings
-          const hasConflictingBooking = bookings?.some(booking => {
+          // Check for conflicting bookings, excluding bookings that are part of the current appointment
+          const conflictingBooking = bookings?.find(booking => {
+            // Only check bookings for this employee
             if (booking.employee_id !== employee.id) return false;
             
+            // KEY FIX: Skip this booking if it belongs to the current appointment
+            if (appointmentId && booking.appointment?.id === appointmentId) {
+              console.log(`Excluding booking for appointment ${appointmentId}`);
+              return false;
+            }
+            
+            // Check for time overlap
             const bookingStart = new Date(booking.start_time);
             const bookingEnd = new Date(booking.end_time);
             
-            // Check for overlap
-            return (
-              (appointmentStart < bookingEnd && appointmentEnd > bookingStart)
-            );
+            return (appointmentStart < bookingEnd && appointmentEnd > bookingStart);
           });
 
-          return !hasConflictingBooking;
+          if (conflictingBooking) {
+            return {
+              id: employee.id,
+              name: employee.name,
+              isAvailable: false,
+              bookingInfo: {
+                id: conflictingBooking.id,
+                status: conflictingBooking.appointment?.status || 'booked',
+                startTime: conflictingBooking.start_time,
+                endTime: conflictingBooking.end_time,
+                appointmentId: conflictingBooking.appointment?.id
+              }
+            };
+          }
+
+          // If we got here, the stylist is available
+          return {
+            id: employee.id,
+            name: employee.name,
+            isAvailable: true
+          };
         });
 
-        setAvailableStylists(available.map(e => e.id));
+        setAvailableStylistsInfo(stylistInfoArray);
+        setAvailableStylists(stylistInfoArray.filter(s => s.isAvailable).map(s => s.id));
       } catch (err) {
         console.error('Error fetching staff availability:', err);
         setError('Failed to check staff availability');
@@ -182,10 +244,11 @@ export function useStaffAvailability({
     };
 
     fetchStaffAvailability();
-  }, [selectedDate, selectedTime, locationId, serviceDuration]);
+  }, [selectedDate, selectedTime, locationId, serviceDuration, appointmentId]);
 
   return {
     availableStylists,
+    availableStylistsInfo,
     isLoading,
     error
   };

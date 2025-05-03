@@ -217,7 +217,6 @@ export function SalesByEmployee({ onBack, employeeId, dateRange: initialDateRang
     
     // For CSV and Excel, we could use libraries like csv-stringify or xlsx
     // For PDF, we could use libraries like jspdf or react-pdf
-    console.log(`Exporting sales by employee data as ${format}`);
   };
   
   // Define COLORS for the pie chart

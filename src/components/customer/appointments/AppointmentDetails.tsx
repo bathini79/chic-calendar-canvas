@@ -37,7 +37,6 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({
 }) => {
   const navigate = useNavigate();
   const { addToCart, clearCart, setSelectedLocation } = useCart();
-  console.log("Appointment Details:", appointment);
   const appointmentDate = parseISO(appointment.start_time);
   const formattedDate = format(appointmentDate, "EEE, dd MMM, yyyy");
   const formattedTime = format(appointmentDate, "h:mm a");

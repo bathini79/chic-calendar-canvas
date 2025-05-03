@@ -609,6 +609,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                       locationId={locationId}
                       selectedDate={stateSelectedDate}
                       selectedTime={stateSelectedTime}
+                      existingAppointment={!!existingAppointment}
+                      appointmentId={existingAppointment?.id}
                     />
                   </div>
 

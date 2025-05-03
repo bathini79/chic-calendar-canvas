@@ -60,8 +60,6 @@ export default function CustomerVerification() {
     setError("");
 
     try {
-      console.log("Sending verification request for phone:", phoneNumber, "code:", verificationCode);
-
       const { data, error } = await supabase.functions.invoke("verify-whatsapp-otp", {
         body: {
           code: verificationCode,
@@ -72,9 +70,6 @@ export default function CustomerVerification() {
       if (error) {
         throw error;
       }
-
-      console.log("Verification response:", data);
-
       if (data.success) {
         setVerified(true);
         toast.success("Your account has been verified successfully!");

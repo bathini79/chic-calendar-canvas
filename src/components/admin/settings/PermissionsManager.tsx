@@ -73,9 +73,7 @@ export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsMa
   useEffect(() => {
     // Initialize permissions from employmentTypes
     const permissionsMap: Record<string, string[]> = {};
-    
-    console.log("Initializing permissions from employment types:", employmentTypes);
-    
+      
     employmentTypes.forEach(type => {
       // Ensure permissions is always an array, even if it comes as null or undefined
       let typePermissions = [];
@@ -99,17 +97,14 @@ export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsMa
         }
       }
       
-      console.log(`Parsed permissions for ${type.name} (${type.id}):`, typePermissions);
       permissionsMap[type.id] = typePermissions;
     });
     
-    console.log("Initialized permissions map:", permissionsMap);
     setPermissions(permissionsMap);
     setIsLoading(false);
   }, [employmentTypes]);
 
   const handlePermissionChange = (typeId: string, permissionId: string, checked: boolean) => {
-    console.log(`Permission change: typeId=${typeId}, permissionId=${permissionId}, checked=${checked}`);
     
     setPermissions(prev => {
       const currentPermissions = [...(prev[typeId] || [])];
@@ -117,18 +112,14 @@ export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsMa
       if (checked) {
         if (!currentPermissions.includes(permissionId)) {
           currentPermissions.push(permissionId);
-          console.log(`Added permission ${permissionId} to type ${typeId}`);
         }
       } else {
         const index = currentPermissions.indexOf(permissionId);
         if (index !== -1) {
           currentPermissions.splice(index, 1);
-          console.log(`Removed permission ${permissionId} from type ${typeId}`);
         }
       }
-      
-      console.log(`Updated permissions for type ${typeId}:`, currentPermissions);
-      
+            
       return {
         ...prev,
         [typeId]: currentPermissions
@@ -144,9 +135,7 @@ export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsMa
       // Process each permission update sequentially
       for (const [typeId, perms] of Object.entries(permissions)) {
         try {
-          // Use a simple array approach with explicit conversion
-          console.log(`Saving permissions for type ${typeId}:`, perms);
-          
+          // Use a simple array approach with explicit conversion          
           // Try direct approach with permissions as an array
           const { error } = await supabase
             .from("employment_types")
@@ -168,11 +157,9 @@ export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsMa
             if (rpcError) {
               throw new Error(`Both update methods failed: ${rpcError.message}`);
             } else {
-              console.log(`Successfully updated permissions via RPC for type ${typeId}`);
               successCount++;
             }
           } else {
-            console.log(`Successfully updated permissions for type ${typeId}`);
             successCount++;
           }
         } catch (typeError) {

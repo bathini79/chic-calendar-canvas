@@ -274,7 +274,6 @@ export function SalesPerformanceAnalytics({ employeeId, dateRange }: SalesPerfor
     // For CSV and Excel, we could use libraries like csv-stringify or xlsx
     // For PDF, we could use libraries like jspdf or react-pdf
     // For images, we could use html-to-image or similar libraries
-    console.log(`Exporting analytics as ${format}`);
   };
   
   return (
