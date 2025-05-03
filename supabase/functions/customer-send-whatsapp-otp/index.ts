@@ -49,6 +49,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
     
+    // Get preferred messaging provider for OTP delivery
+    const { data: otpProvider } = await supabaseAdmin
+      .from('messaging_providers')
+      .select('provider_name')
+      .eq('is_otp_provider', true)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    // Determine preferred provider based on admin settings
+    const preferredOtpProvider = otpProvider?.provider_name || 'meta_whatsapp';
+    const useSMS = preferredOtpProvider === 'twofactor';
+    
+    console.log("Using OTP provider:", preferredOtpProvider, "SMS mode:", useSMS);
+    
     // Generate a random 6-digit OTP code
     const generateOTP = () => {
       return Math.floor(100000 + Math.random() * 900000).toString();
@@ -85,34 +99,58 @@ serve(async (req) => {
     const MESSAGE_TEXT = `Your verification code for login is: ${otp}\n\nThis code will expire in ${expiresInMinutes} minutes.`;
     console.log("Sending login OTP message to:", normalizedPhone);
     
-    // Use the centralized send-whatsapp-message function to send the OTP
-    // This supports both Meta WhatsApp and Gupshup providers
-    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-      },
-      body: JSON.stringify({
-        phoneNumber: phoneNumber,
-        message: MESSAGE_TEXT,
-        notificationType: "otp_verification"
-      })
-    });
+    let response;
+    let responseBody;
     
-    const responseBody = await response.json();
-    
-    if (!response.ok || !responseBody.success) {
-      console.error("WhatsApp API error for customer login:", responseBody);
-      throw new Error(`WhatsApp API error: ${JSON.stringify(responseBody)}`);
+    // Route to the appropriate sending method based on provider preference
+    if (useSMS) {
+      // For 2Factor.in, use the dedicated SMS endpoint
+      response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-twofactor-sms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify({
+          phoneNumber,
+          message: MESSAGE_TEXT,
+          otpCode: otp,
+          notificationType: 'otp_verification'
+        })
+      });
+    } else {
+      // For WhatsApp providers, use the centralized send-whatsapp-message function
+      response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify({
+          phoneNumber: phoneNumber,
+          message: MESSAGE_TEXT,
+          preferredProvider: preferredOtpProvider,
+          fallbackToSMS: true,
+          isOTP: true,
+          notificationType: "otp_verification"
+        })
+      });
     }
     
-    console.log("WhatsApp message sent successfully for customer login OTP via", responseBody.provider);
+    responseBody = await response.json();
+    
+    if (!response.ok || (responseBody.error && !responseBody.success)) {
+      console.error("OTP sending error for customer login:", responseBody);
+      throw new Error(`OTP sending error: ${responseBody.error || JSON.stringify(responseBody)}`);
+    }
+    
+    console.log("OTP message sent successfully for customer login via", responseBody.provider || preferredOtpProvider);
     
     return new Response(JSON.stringify({
       success: true,
-      provider: responseBody.provider,
+      provider: responseBody.provider || preferredOtpProvider,
       messageId: responseBody.messageId,
+      isSMS: useSMS || responseBody.isSMS,
       userData: existingUser // Include user data in the response if they exist
     }), {
       status: 200,

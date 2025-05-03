@@ -81,6 +81,7 @@ export default function Staff() {
               open={isDialogOpen} 
               onOpenChange={handleCloseDialog}
               employeeId={selectedEmployeeId}
+              use2FactorVerification={true} // Enable 2Factor verification for new staff
             />
           </div>
         )}

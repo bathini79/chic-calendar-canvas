@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { GupshupConfig } from "@/components/admin/settings/GupshupConfig";
 import { MetaWhatsAppConfig } from "@/components/admin/settings/MetaWhatsAppConfig";
+import { TwoFactorConfig } from "@/components/admin/settings/TwoFactorConfig";
 import { NotificationQueueProcessor } from "@/components/admin/settings/NotificationQueueProcessor";
 import { toast } from "@/lib/toast"; // Import our centralized toast utility
 
@@ -41,7 +42,7 @@ export default function ThirdParty() {
   const [accountDetails, setAccountDetails] =
     useState<TwilioAccountDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<string>("gupshup");
+  const [activeSection, setActiveSection] = useState<string>("twofactor");
 
   useEffect(() => {
     const fetchTwilioAccountDetails = async () => {
@@ -96,6 +97,14 @@ export default function ThirdParty() {
             <CardContent className="p-0">
               <div
                 className={`px-4 py-2 cursor-pointer ${
+                  activeSection === "twofactor" ? "bg-accent" : ""
+                }`}
+                onClick={() => setActiveSection("twofactor")}
+              >
+                <span>2Factor.in SMS</span>
+              </div>
+              <div
+                className={`px-4 py-2 cursor-pointer ${
                   activeSection === "gupshup" ? "bg-accent" : ""
                 }`}
                 onClick={() => setActiveSection("gupshup")}
@@ -132,6 +141,8 @@ export default function ThirdParty() {
 
         {/* Main Content */}
         <div className="md:col-span-3">
+          {activeSection === "twofactor" && <TwoFactorConfig />}
+
           {activeSection === "gupshup" && <GupshupConfig />}
           
           {activeSection === "meta_whatsapp" && <MetaWhatsAppConfig />}

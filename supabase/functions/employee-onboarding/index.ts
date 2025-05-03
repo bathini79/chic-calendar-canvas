@@ -30,6 +30,7 @@ serve(async (req) => {
       sendWelcomeMessage = true,
       createAuthAccount = true,
       sendVerificationLink = true,
+      sendOtp = false,  // New parameter for 2Factor OTP verification
     } = requestBody;
     
     if (!employeeData || !employeeData.name || !employeeData.phone) {
@@ -45,25 +46,52 @@ serve(async (req) => {
     // Ensure email is never null
     const safeEmail = employeeData.email || `${employeeData.phone.replace(/\D/g, "")}@staff.internal`;
 
-    // 1. Create the employee record with inactive status
-    const { data: newEmployee, error: employeeError } = await supabaseAdmin
-      .from("employees")
-      .insert({
-        name: employeeData.name,
-        email: safeEmail,
-        phone: employeeData.phone,
-        photo_url: employeeData.photo_url || null,
-        status: "inactive",
-        employment_type: employeeData.employment_type || "stylist",
-      })
-      .select()
-      .single();
+    // Check if we're updating an existing employee or creating a new one
+    let employeeId, newEmployee;
+    if (employeeData.id) {
+      // Update existing employee
+      const { data: updatedEmployee, error: updateError } = await supabaseAdmin
+        .from("employees")
+        .update({
+          name: employeeData.name,
+          email: safeEmail,
+          phone: employeeData.phone,
+          photo_url: employeeData.photo_url || null,
+          status: employeeData.status || "inactive",
+          employment_type_id: employeeData.employment_type_id
+        })
+        .eq("id", employeeData.id)
+        .select()
+        .single();
 
-    if (employeeError) {
-      throw new Error(`Failed to create employee: ${employeeError.message}`);
+      if (updateError) {
+        throw new Error(`Failed to update employee: ${updateError.message}`);
+      }
+
+      employeeId = employeeData.id;
+      newEmployee = updatedEmployee;
+    } else {
+      // Create new employee
+      const { data: createdEmployee, error: employeeError } = await supabaseAdmin
+        .from("employees")
+        .insert({
+          name: employeeData.name,
+          email: safeEmail,
+          phone: employeeData.phone,
+          photo_url: employeeData.photo_url || null,
+          status: employeeData.status || "inactive",
+          employment_type_id: employeeData.employment_type_id
+        })
+        .select()
+        .single();
+
+      if (employeeError) {
+        throw new Error(`Failed to create employee: ${employeeError.message}`);
+      }
+
+      employeeId = createdEmployee.id;
+      newEmployee = createdEmployee;
     }
-
-    const employeeId = newEmployee.id;
 
     // 2. Associate skills if provided
     if (employeeData.skills && employeeData.skills.length > 0) {
@@ -139,7 +167,7 @@ serve(async (req) => {
               user_metadata: {
                 full_name: employeeData.name,
                 employee_id: employeeId,
-                employment_type: employeeData.employment_type || "stylist",
+                employment_type_id: employeeData.employment_type_id,
               },
             }
           );
@@ -164,7 +192,7 @@ serve(async (req) => {
             user_metadata: {
               full_name: employeeData.name,
               employee_id: employeeId,
-              employment_type: employeeData.employment_type || "stylist",
+              employment_type_id: employeeData.employment_type_id,
             },
           });
           
@@ -188,6 +216,47 @@ serve(async (req) => {
     // 5. Send verification or welcome message
     let messageSent = false;
     let verificationLink = "";
+    let verificationCodeGenerated = false;
+    
+    // Generate a code for verification (6-digit number)
+    const generateCode = () => {
+      return Math.floor(100000 + Math.random() * 900000).toString();
+    };
+    
+    // Generate a verification code regardless if we're sending it via link or OTP
+    const verificationCode = generateCode();
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+    
+    // Always create a verification code in the database for the employee
+    try {
+      // Make sure to strip the + sign from the phone number
+      const normalizedPhone = employeeData.phone.startsWith('+') ? employeeData.phone.substring(1) : employeeData.phone;
+      
+      // Store the verification code in employee_verification_codes
+      await supabaseAdmin
+        .from("employee_verification_codes")
+        .insert({
+          employee_id: employeeId,
+          code: verificationCode,
+          expires_at: expiresAt.toISOString(),
+        });
+      
+      // Also store the code in phone_auth_codes for compatibility with verification endpoints  
+      await supabaseAdmin
+        .from("phone_auth_codes")
+        .insert({
+          phone_number: normalizedPhone, // Store without + prefix
+          code: verificationCode,
+          expires_at: expiresAt.toISOString(),
+          full_name: employeeData.name,
+          lead_source: "employee_onboarding"
+        });
+      
+      verificationCodeGenerated = true;
+    } catch (error) {
+      console.error(`Error storing verification code: ${error.message}`);
+    }
     
     if (sendVerificationLink || sendWelcomeMessage) {
       try {
@@ -207,15 +276,7 @@ serve(async (req) => {
             return token;
           };
           
-          // Generate a code (6-digit number)
-          const generateCode = () => {
-            return Math.floor(100000 + Math.random() * 900000).toString();
-          };
-          
           const verificationToken = generateToken();
-          const verificationCode = generateCode();
-          const expiresAt = new Date();
-          expiresAt.setHours(expiresAt.getHours() + 24);
           
           // Store the verification token in employee_verification_links
           await supabaseAdmin
@@ -226,20 +287,6 @@ serve(async (req) => {
               verification_code: verificationCode,
               expires_at: expiresAt.toISOString(),
               used: false,
-            });
-          
-          // Also store the code in phone_auth_codes for compatibility with verify-whatsapp-otp
-          // Make sure to strip the + sign from the phone number as that's what verify-whatsapp-otp expects
-          const normalizedPhone = employeeData.phone.startsWith('+') ? employeeData.phone.substring(1) : employeeData.phone;
-          
-          await supabaseAdmin
-            .from("phone_auth_codes")
-            .insert({
-              phone_number: normalizedPhone, // Store without + prefix
-              code: verificationCode,
-              expires_at: expiresAt.toISOString(),
-              full_name: employeeData.name,
-              lead_source: "employee_onboarding"
             });
             
           // Include code, token and phone in the verification link
@@ -370,6 +417,8 @@ The Management Team`;
         authUserId,
         messageSent,
         verificationLink,
+        verificationCode: sendOtp ? verificationCode : undefined, // Only include if explicitly requested
+        verificationCodeGenerated,
         message: "Employee onboarding process completed",
       }),
       {

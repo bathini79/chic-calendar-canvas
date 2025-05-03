@@ -53,6 +53,7 @@ interface StaffFormProps {
   onCancel: () => void;
   employeeId?: string;
   isSubmitting?: boolean;
+  use2FactorVerification?: boolean; // New prop to enable 2Factor verification
 }
 
 export function StaffForm({
@@ -61,6 +62,7 @@ export function StaffForm({
   onCancel,
   employeeId,
   isSubmitting = false,
+  use2FactorVerification = false, // Default to false for backwards compatibility
 }: StaffFormProps) {
   const [images, setImages] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
@@ -210,7 +212,7 @@ export function StaffForm({
     const updatedData = {
       ...data,
       photo_url: images[0] || null,
-      phone: `${selectedCountry.code.slice(1)}${data.phone}`,
+      phone: `${selectedCountry.code}${data.phone}`, // Include full country code with +
     };
 
     onSubmit(updatedData);
@@ -428,9 +430,16 @@ export function StaffForm({
                 aria-hidden="true"
               />
             ) : null}
-            {employeeId ? "Update Staff Member" : "Create Staff Member"}
+            {employeeId ? "Update Staff Member" : 
+             use2FactorVerification ? "Next: Verify Phone" : "Create Staff Member"}
           </Button>
         </div>
+
+        {use2FactorVerification && !employeeId && (
+          <div className="text-sm text-muted-foreground px-2 py-1 bg-muted/50 rounded-md">
+            A verification code will be sent to the staff member's phone number after submission.
+          </div>
+        )}
       </form>
     </Form>
   );

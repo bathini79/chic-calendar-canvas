@@ -53,6 +53,7 @@ const Auth = () => {
   const [edgeFunctionError, setEdgeFunctionError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState({ name: "India", code: "+91", flag: "🇮🇳" });
   const [referralSource, setReferralSource] = useState(referralSourceParam || "");
+  const [messagingChannel, setMessagingChannel] = useState<"SMS" | "WhatsApp">("SMS");
 
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -135,7 +136,8 @@ const Auth = () => {
     setSelectedCountry(country);
   };
 
-  const sendWhatsAppOTP = async () => {
+  // Renamed from sendWhatsAppOTP to sendOTP for more generic naming
+  const sendOTP = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
       const errorMessage = "Please enter a valid phone number";
       toast.error(errorMessage);
@@ -154,7 +156,7 @@ const Auth = () => {
         phoneNumber : 
         `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
       
-      console.log("Sending OTP to phone number:", fullPhoneNumber);
+      console.log(`Sending OTP via ${messagingChannel} to phone number:`, fullPhoneNumber);
       
       const response = await supabase.functions.invoke('customer-send-whatsapp-otp', {
         body: { 
@@ -173,9 +175,17 @@ const Auth = () => {
         throw new Error(response.data.error || "Failed to send OTP");
       }
 
+      // Set messaging channel based on response if available
+      if (response.data && response.data.channel) {
+        setMessagingChannel(response.data.channel === "whatsapp" ? "WhatsApp" : "SMS");
+      } else {
+        // Default to WhatsApp if not specified in response
+        setMessagingChannel("WhatsApp");
+      }
+
       setOtpSent(true);
       setNeedsFullName(false);
-      toast.success("OTP sent to your WhatsApp. Please check your messages.");
+      toast.success(`OTP sent to your ${messagingChannel}. Please check your messages.`);
     } catch (error: any) {
       const errorMessage = error.message || "Failed to send OTP. Please try again.";
       toast.error(errorMessage);
@@ -187,7 +197,8 @@ const Auth = () => {
     }
   };
 
-  const verifyWhatsAppOTP = async () => {
+  // Renamed from verifyWhatsAppOTP to verifyOTP for more generic naming
+  const verifyOTP = async () => {
     if (!otp || otp.length !== 6) {
       const errorMessage = "Please enter a valid 6-digit OTP";
       toast.error(errorMessage);
@@ -211,7 +222,7 @@ const Auth = () => {
         phoneNumber : 
         `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
       
-      console.log("Verifying OTP for phone number:", fullPhoneNumber);
+      console.log(`Verifying OTP via ${messagingChannel} for phone number:`, fullPhoneNumber);
       
       const payload = { 
         phoneNumber: fullPhoneNumber, 
@@ -303,7 +314,7 @@ const Auth = () => {
     setOtp("");
     setCanResendOtp(false);
     setResendCountdown(30);
-    sendWhatsAppOTP();
+    sendOTP();
   };
 
   const renderContent = () => {
@@ -332,7 +343,7 @@ const Auth = () => {
           <Button
             type="button"
             className="w-full"
-            onClick={sendWhatsAppOTP}
+            onClick={sendOTP}
             disabled={isLoading}
           >
             {isLoading ? (
@@ -341,7 +352,7 @@ const Auth = () => {
                 Sending...
               </>
             ) : (
-              "Send OTP via WhatsApp"
+              `Send OTP via ${messagingChannel}`
             )}
           </Button>
         </>
@@ -406,7 +417,7 @@ const Auth = () => {
             <Button
               type="button"
               className="w-1/2"
-              onClick={verifyWhatsAppOTP}
+              onClick={verifyOTP}
               disabled={isLoading || !fullName.trim()}
             >
               {isLoading ? (
@@ -445,7 +456,7 @@ const Auth = () => {
         </InputOTP>
           </div>
           <p className="text-xs text-muted-foreground text-center">
-            Check your WhatsApp for the 6-digit verification code
+            Check your {messagingChannel} for the 6-digit verification code
           </p>
           {verificationError && (
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
@@ -490,7 +501,7 @@ const Auth = () => {
           <Button
             type="button"
             className="w-1/2"
-            onClick={verifyWhatsAppOTP}
+            onClick={verifyOTP}
             disabled={isLoading || otp.length !== 6}
           >
             {isLoading ? (
@@ -513,7 +524,7 @@ const Auth = () => {
         <CardHeader>
           <CardTitle>Welcome</CardTitle>
           <CardDescription>
-            Sign in or register using WhatsApp
+            Sign in or register using {messagingChannel}
           </CardDescription>
         </CardHeader>
         <CardContent>

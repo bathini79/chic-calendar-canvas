@@ -32,8 +32,7 @@ serve(async (req) => {
       phoneNumber, 
       fullName, 
       lead_source, 
-      baseUrl,
-      preferredProvider // Optional parameter to specify which provider to use
+      baseUrl
     } = await req.json();
 
     if (!phoneNumber) {
@@ -52,6 +51,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL'), 
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     );
+
+    // Get preferred messaging provider for OTP delivery
+    const { data: otpProvider } = await supabaseAdmin
+      .from('messaging_providers')
+      .select('provider_name')
+      .eq('is_otp_provider', true)
+      .maybeSingle();
+
+    // Determine preferred provider based on admin settings (default to WhatsApp if not set)
+    const preferredOtpProvider = otpProvider?.provider_name || 'meta_whatsapp';
+    const forceSMS = preferredOtpProvider === 'twofactor';
 
     // Generate a random 6-digit OTP code
     const generateOTP = () => {
@@ -91,37 +101,71 @@ serve(async (req) => {
     // Use customer verification page for the link
     const verificationUrl = `${baseUrl}/customer-verify?${verificationParams.toString()}`;
     
-    // Create message with verification link
-    const message = `Please verify your phone number by clicking this link: ${verificationUrl}\n\nOr use code: ${otp}\n\nThis code will expire in ${expiresInMinutes} minutes.`;
+    let response;
+    let result;
     
-    console.log("Sending message with verification link:", verificationUrl);
+    // Check if we should use SMS directly based on admin preference
+    if (forceSMS) {
+      // For SMS, send just the OTP code with a simple message (no link)
+      const smsMessage = `${fullName ? `Hello ${fullName}, ` : ''}Your verification code is: ${otp}. This code will expire in ${expiresInMinutes} minutes.`;
+      
+      // Use the dedicated 2Factor.in SMS endpoint
+      response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-twofactor-sms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify({
+          phoneNumber,
+          message: smsMessage,
+          otpCode: otp,
+          notificationType: 'otp_verification'
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to send SMS: ${errorData.error || response.statusText}`);
+      }
+      
+      result = await response.json();
+    } else {
+      // Create WhatsApp message with verification link
+      const whatsappMessage = `Please verify your phone number by clicking this link: ${verificationUrl}\n\nOr use code: ${otp}\n\nThis code will expire in ${expiresInMinutes} minutes.`;
+      
+      console.log("Sending message with verification link:", verificationUrl);
 
-    // Send the message using the unified send-whatsapp-message function
-    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-      },
-      body: JSON.stringify({
-        phoneNumber,
-        message,
-        preferredProvider
-      })
-    });
+      // Send the message using the unified send-whatsapp-message function
+      response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-whatsapp-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify({
+          phoneNumber,
+          message: whatsappMessage,
+          fallbackToSMS: true, // Always attempt SMS fallback for OTP codes
+          isOTP: true, // Indicate this contains an OTP code
+          notificationType: 'otp_verification'
+        })
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Failed to send WhatsApp message: ${errorData.error || response.statusText}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to send verification message: ${errorData.error || response.statusText}`);
+      }
+      
+      result = await response.json();
     }
-
-    const result = await response.json();
     
     return new Response(JSON.stringify({
       success: true,
       response: result,
       userData: existingUser, // Include user data in the response if they exist
-      provider: result.provider
+      provider: result.provider,
+      isSMS: result.isSMS || forceSMS
     }), {
       status: 200,
       headers: {

@@ -16,7 +16,7 @@ serve(async (req) => {
   try {
     // Parse the request body
     const data = await req.json();
-    const { phoneNumber, code, fullName, lead_source } = data;
+    const { phoneNumber, code, fullName, lead_source, provider = 'whatsapp' } = data;
     
     if (!phoneNumber || !code) {
       throw new Error('Phone number and verification code are required');
@@ -96,7 +96,10 @@ serve(async (req) => {
     const userName = fullName || otpData.full_name || '';
     const userLeadSource = lead_source || otpData.lead_source || null;
     
-    console.log("OTP validated for customer login user:", userName, "lead source:", userLeadSource);
+    // Determine communication channel preference
+    const communicationChannel = provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp';
+    
+    console.log("OTP validated for customer login user:", userName, "lead source:", userLeadSource, "communication channel:", communicationChannel);
     
     // Step 2: Check if user exists by phone number
     const { data: existingUser, error: userError } = await supabaseAdmin
@@ -152,7 +155,9 @@ serve(async (req) => {
           raw_user_meta_data: { 
             full_name: userName,
             phone: normalizedPhone,
-            lead_source: userLeadSource
+            lead_source: userLeadSource,
+            communication_consent: true,
+            communication_channel: communicationChannel
           }
         });
         
@@ -185,7 +190,9 @@ serve(async (req) => {
                 raw_user_meta_data: {
                   ...authUser.user.raw_user_meta_data,
                   phone: normalizedPhone,
-                  lead_source: userLeadSource
+                  lead_source: userLeadSource,
+                  communication_consent: true,
+                  communication_channel: communicationChannel
                 }
               });
               
@@ -194,6 +201,15 @@ serve(async (req) => {
                 email: email,
                 password: tempPassword
               };
+              
+              // Update the profile with communication preferences
+              await supabaseAdmin
+                .from('profiles')
+                .update({
+                  communication_consent: true,
+                  communication_channel: communicationChannel
+                })
+                .eq('id', userId);
               
               // Delete used OTP
               await supabaseAdmin
@@ -211,7 +227,8 @@ serve(async (req) => {
                   phoneNumber: normalizedPhone,
                   credentials: credentials,
                   fullName: userName,
-                  lead_source: userLeadSource
+                  lead_source: userLeadSource,
+                  communicationChannel: communicationChannel
                 }),
                 { 
                   headers: { 
@@ -257,6 +274,8 @@ serve(async (req) => {
             lead_source: userLeadSource,
             role: 'customer',
             wallet_balance: 0,
+            communication_consent: true,
+            communication_channel: communicationChannel,
             last_used: new Date().toISOString()
           });
           
@@ -272,7 +291,9 @@ serve(async (req) => {
               phone_verified: true,
               full_name: userName,
               lead_source: userLeadSource,
-              role: 'customer'
+              role: 'customer',
+              communication_consent: true,
+              communication_channel: communicationChannel
             })
             .eq('id', userId);
             
@@ -335,6 +356,8 @@ serve(async (req) => {
       const updatedMetadata = {
         ...userData.user.raw_user_meta_data,
         phone: normalizedPhone,
+        communication_consent: true,
+        communication_channel: communicationChannel
       };
       
       // Only add lead_source if it exists and is not already set
@@ -366,7 +389,12 @@ serve(async (req) => {
       }
       
       // Also update profile phone number and lead_source if provided
-      const updateData: any = { phone_number: normalizedPhone };
+      const updateData: any = { 
+        phone_number: normalizedPhone,
+        communication_consent: true,
+        communication_channel: communicationChannel
+      };
+      
       if (userLeadSource) {
         updateData.lead_source = userLeadSource;
       }
@@ -405,7 +433,8 @@ serve(async (req) => {
         phoneNumber: normalizedPhone,
         credentials: credentials,
         fullName: userName,
-        lead_source: userLeadSource
+        lead_source: userLeadSource,
+        communicationChannel: communicationChannel
       }),
       { 
         headers: { 

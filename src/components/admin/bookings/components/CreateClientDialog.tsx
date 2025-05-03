@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,7 +6,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { adminSupabase, supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { Customer } from "@/pages/admin/bookings/types";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,11 +14,13 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { LoaderCircle } from "lucide-react";
 import { CountryCode } from "@/lib/country-codes";
 
+// Define the form schema with validation
 const createClientSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
   phone_number: z.string().min(10, "Valid phone number is required"),
   lead_source: z.string().min(1, "How did you hear about us is required"),
+  otp: z.string().optional(),
 });
 
 type CreateClientFormData = z.infer<typeof createClientSchema>;
@@ -50,72 +51,140 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       email: "",
       phone_number: "",
       lead_source: "",
+      otp: "",
     },
   });
 
-  const sendWhatsAppVerification = async (phoneNumber: string) => {
+  // Function to send verification OTP
+  const sendVerificationOTP = async () => {
     try {
+      // Validate form data before sending OTP
+      const formData = form.getValues();
+      if (!formData.full_name) {
+        toast.error("Full name is required");
+        return;
+      }
+      if (!formData.phone_number) {
+        toast.error("Phone number is required");
+        return;
+      }
+      if (!formData.lead_source) {
+        toast.error("Lead source is required");
+        return;
+      }
+
       setIsSubmitting(true);
       
-      // Format the phone number correctly for the API
-      // Removing the + from the country code
+      // Format phone number for API
       const countryCodeWithoutPlus = selectedCountry.code.replace("+", "");
-      const formattedPhoneNumber = phoneNumber.replace(/\s/g, ""); // Remove spaces
+      const formattedPhoneNumber = formData.phone_number.replace(/\s/g, "");
       const fullPhoneNumber = `${countryCodeWithoutPlus}${formattedPhoneNumber}`;
       const baseUrl = `${window.location.protocol}//${window.location.host}`;
       
+      // Call Supabase edge function to send OTP
       const { data, error } = await supabase.functions.invoke('send-whatsapp-otp', {
         body: { 
           phoneNumber: fullPhoneNumber,
-          fullName: form.getValues("full_name"),
-          lead_source: form.getValues("lead_source"),
+          fullName: formData.full_name,
+          lead_source: formData.lead_source,
           baseUrl
         }
       });
 
       if (error) {
-        toast.error("Failed to send verification: " + error.message);
-        setIsSubmitting(false);
-        return false;
-      }
-
-      if (data?.success) {
-        toast.success("Verification code sent to WhatsApp");
-        setOtpSent(true);
-        setIsSubmitting(false);
-        return true;
-      } else {
-        toast.error("Failed to send verification: " + (data?.error || "Unknown error"));
-        setIsSubmitting(false);
-        return false;
-      }
-    } catch (error: any) {
-      toast.error("Failed to send verification: " + error.message);
-      setIsSubmitting(false);
-      return false;
-    }
-  };
-
-  const onSubmit = async (data: CreateClientFormData) => {
-    try {
-      setIsSubmitting(true);
-
-      // Send WhatsApp verification with full name and lead source
-      const verificationSent = await sendWhatsAppVerification(data?.phone_number);
-      
-      if (!verificationSent) {
-        setIsSubmitting(false);
+        toast.error("Failed to send verification code: " + error.message);
         return;
       }
 
-      toast.success("Verification sent to client's WhatsApp. User will be created after verification.");
-      form.reset();
-      onClose();
+      if (data?.success) {
+        toast.success("Verification code sent successfully");
+        setOtpSent(true);
+      } else {
+        toast.error("Failed to send verification code: " + (data?.error || "Unknown error"));
+      }
     } catch (error: any) {
-      toast.error("Failed to create client: " + error.message);
+      toast.error("Error sending verification code: " + error.message);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Function to verify OTP and create customer
+  const verifyOTPAndCreateCustomer = async () => {
+    try {
+      const formData = form.getValues();
+      if (!formData.otp) {
+        toast.error("Please enter the verification code");
+        return;
+      }
+
+      setIsSubmitting(true);
+      
+      // Format phone number for API
+      const countryCodeWithoutPlus = selectedCountry.code.replace("+", "");
+      const formattedPhoneNumber = formData.phone_number.replace(/\s/g, "");
+      const fullPhoneNumber = `${countryCodeWithoutPlus}${formattedPhoneNumber}`;
+      
+      // Call Supabase edge function to verify OTP
+      const { data, error } = await supabase.functions.invoke('verify-whatsapp-otp', {
+        body: { 
+          phoneNumber: fullPhoneNumber,
+          code: formData.otp,
+          fullName: formData.full_name,
+          lead_source: formData.lead_source,
+          provider: "twofactor"
+        }
+      });
+
+      if (error) {
+        toast.error("Verification failed: " + error.message);
+        return;
+      }
+
+      if (data?.success) {
+        toast.success("Client verified and created successfully");
+        
+        // Create customer object from response data
+        const newCustomer: Customer = {
+          id: data.userId,
+          full_name: data.fullName,
+          phone_number: data.phoneNumber,
+          email: formData.email || undefined,
+        };
+        
+        form.reset();
+        setOtpSent(false);
+        onSuccess(newCustomer);
+        onClose();
+      } else {
+        toast.error("Verification failed: " + (data?.message || "Unknown error"));
+      }
+    } catch (error: any) {
+      toast.error("Error verifying code: " + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    form.trigger();
+    
+    if (!form.formState.isValid) {
+      return;
+    }
+    
+    if (!otpSent) {
+      sendVerificationOTP();
+    } else {
+      verifyOTPAndCreateCustomer();
+    }
+  };
+
+  const handleCancel = () => {
+    form.reset();
+    setOtpSent(false);
+    onClose();
   };
 
   const leadSourceOptions = [
@@ -135,7 +204,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         </DialogHeader>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <FormField
               control={form.control}
               name="full_name"
@@ -143,7 +212,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
                 <FormItem>
                   <FormLabel>Full Name *</FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe" {...field} />
+                    <Input placeholder="John Doe" {...field} disabled={otpSent} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -162,6 +231,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
                       selectedCountry={selectedCountry}
                       onCountryChange={setSelectedCountry}
                       {...field}
+                      disabled={otpSent}
                     />
                   </FormControl>
                   <FormMessage />
@@ -176,7 +246,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="john@example.com" {...field} />
+                    <Input type="email" placeholder="john@example.com" {...field} disabled={otpSent} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -192,6 +262,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
+                    disabled={otpSent}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -211,18 +282,39 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
               )}
             />
 
+            {otpSent && (
+              <FormField
+                control={form.control}
+                name="otp"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Verification Code *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter 6-digit code" 
+                        {...field}
+                        maxLength={6}
+                        inputMode="numeric" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <div className="flex justify-end gap-4 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
+                    {otpSent ? "Verifying..." : "Sending..."}
                   </>
                 ) : (
-                  "Create Client"
+                  otpSent ? "Verify & Create Client" : "Send Verification"
                 )}
               </Button>
             </div>

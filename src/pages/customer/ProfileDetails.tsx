@@ -3,13 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Bell, Loader2, MessageSquare, Phone } from "lucide-react";
 import { format } from "date-fns";
 import { useCustomerMemberships } from "@/hooks/use-customer-memberships";
 import { MembershipDetailsCard } from "@/components/customer/profile/MembershipDetailsCard";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 interface ProfileData {
   id: string;
@@ -24,6 +28,8 @@ interface ProfileData {
   facebook_url: string;
   avatar_url: string;
   lead_source?: string;
+  communication_consent: boolean;
+  communication_channel: string;
 }
 
 const genderOptions = [
@@ -54,6 +60,8 @@ const ProfileDetails = () => {
     instagram_url: "",
     facebook_url: "",
     lead_source: "",
+    communication_consent: true,
+    communication_channel: "whatsapp",
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -102,6 +110,8 @@ const ProfileDetails = () => {
             facebook_url: data.facebook_url || "",
             avatar_url: data.avatar_url || "",
             lead_source: data.lead_source || "",
+            communication_consent: data.communication_consent !== false, // Default to true if not set
+            communication_channel: data.communication_channel || "whatsapp", // Default to WhatsApp if not set
           });
           setProfileFetched(true);
         }
@@ -151,6 +161,20 @@ const ProfileDetails = () => {
     }));
   };
 
+  const handleCommunicationConsentChange = (checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      communication_consent: checked,
+    }));
+  };
+
+  const handleCommunicationChannelChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      communication_channel: value,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session?.user?.id) return;
@@ -169,6 +193,8 @@ const ProfileDetails = () => {
           instagram_url: formData.instagram_url,
           facebook_url: formData.facebook_url,
           lead_source: formData.lead_source,
+          communication_consent: formData.communication_consent,
+          communication_channel: formData.communication_channel,
         })
         .eq("id", session.user.id);
       
@@ -261,6 +287,65 @@ const ProfileDetails = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Communication Preferences Section */}
+            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-medium mb-4 flex items-center">
+                <Bell className="mr-2 h-5 w-5" />
+                Communication Preferences
+              </h3>
+              
+              <div className="flex items-center space-x-2 mb-6">
+                <Switch
+                  id="communication-consent"
+                  checked={formData.communication_consent}
+                  onCheckedChange={handleCommunicationConsentChange}
+                />
+                <Label htmlFor="communication-consent">
+                  I agree to receive notifications about appointments and offers
+                </Label>
+              </div>
+
+              {formData.communication_consent && (
+                <div className="mb-6">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    How would you like to receive appointment notifications and updates?
+                  </p>
+                  
+                  <RadioGroup 
+                    value={formData.communication_channel} 
+                    onValueChange={handleCommunicationChannelChange}
+                    className="flex flex-col space-y-3"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="whatsapp" id="whatsapp" />
+                      <Label htmlFor="whatsapp" className="flex items-center">
+                        <MessageSquare className="mr-2 h-4 w-4" /> 
+                        WhatsApp (recommended)
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="sms" id="sms" />
+                      <Label htmlFor="sms" className="flex items-center">
+                        <Phone className="mr-2 h-4 w-4" /> 
+                        SMS Text Message
+                      </Label>
+                    </div>
+                  </RadioGroup>
+
+                  <Alert className="mt-4" variant="outline">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Important</AlertTitle>
+                    <AlertDescription>
+                      We use these notifications to send information about your upcoming appointments, 
+                      confirmations, reminders, and changes. Security verification codes may be sent via a 
+                      different method as determined by system administrators. Standard messaging rates may apply.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end">

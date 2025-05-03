@@ -36,7 +36,9 @@ serve(async (req) => {
       notificationId, 
       appointmentId,
       notificationType,
-      preferredProvider // Optional parameter to specify which provider to use
+      preferredProvider, // Optional parameter to specify which provider to use
+      fallbackToSMS = true, // New parameter to control SMS fallback behavior
+      isOTP = false // Whether this message contains an OTP code
     } = await req.json();
 
     // Validate required parameters
@@ -76,32 +78,49 @@ serve(async (req) => {
     console.log("Active providers:", JSON.stringify(activeProviders));
     
     if (activeProviders.length === 0) {
-      throw new Error('No active WhatsApp messaging providers available');
+      throw new Error('No active messaging providers available');
     }
     
     // Find the active providers we support
     const metaProvider = activeProviders.find(p => p.provider_name === 'meta_whatsapp');
     const gupshupProvider = activeProviders.find(p => p.provider_name === 'gupshup');
+    const twofactorProvider = activeProviders.find(p => p.provider_name === 'twofactor');
     
     // Determine which provider to use
     let providerName;
     let selectedProvider;
+    let isSMSProvider = false;
     
-    if (preferredProvider) {
-      // If a preferred provider is specified, try to use it if it's active
+    // If SMS is explicitly requested
+    if (preferredProvider === 'twofactor' || preferredProvider === 'sms') {
+      if (twofactorProvider) {
+        providerName = 'twofactor';
+        selectedProvider = twofactorProvider;
+        isSMSProvider = true;
+      } else {
+        throw new Error('SMS provider (2Factor.in) is not active');
+      }
+    } 
+    else if (preferredProvider) {
+      // If a specific WhatsApp provider is specified, try to use it
       selectedProvider = activeProviders.find(p => p.provider_name === preferredProvider);
       
       if (selectedProvider) {
         // Use the preferred provider if it's active
         providerName = preferredProvider;
       } else {
-        // If preferred provider isn't active, use any available provider as fallback
+        // If preferred provider isn't active, use any available WhatsApp provider as fallback
         if (preferredProvider === 'meta_whatsapp' && gupshupProvider) {
           providerName = 'gupshup';
           selectedProvider = gupshupProvider;
         } else if (preferredProvider === 'gupshup' && metaProvider) {
           providerName = 'meta_whatsapp';
           selectedProvider = metaProvider;
+        } else if (fallbackToSMS && twofactorProvider) {
+          // Fallback to SMS if WhatsApp providers are not available
+          providerName = 'twofactor';
+          selectedProvider = twofactorProvider;
+          isSMSProvider = true;
         } else {
           throw new Error(`Preferred provider ${preferredProvider} is not active and no fallback is available`);
         }
@@ -114,8 +133,13 @@ serve(async (req) => {
       } else if (gupshupProvider) {
         providerName = 'gupshup';
         selectedProvider = gupshupProvider;
+      } else if (fallbackToSMS && twofactorProvider) {
+        // Fallback to SMS if no WhatsApp providers are available
+        providerName = 'twofactor';
+        selectedProvider = twofactorProvider;
+        isSMSProvider = true;
       } else {
-        throw new Error('No supported WhatsApp messaging provider is active');
+        throw new Error('No supported messaging provider is active');
       }
     }
     
@@ -130,12 +154,47 @@ serve(async (req) => {
         result = await sendMetaWhatsAppMessage(phoneNumber, message, selectedProvider.configuration, supabaseAdmin);
       } else if (providerName === 'gupshup') {
         result = await sendGupshupMessage(phoneNumber, message, selectedProvider.configuration, supabaseAdmin);
+      } else if (providerName === 'twofactor') {
+        // For OTP messages, extract the OTP code from the message
+        let otpCode = null;
+        if (isOTP) {
+          // Try to extract OTP from the message - looking for a 6-digit code
+          const otpMatch = message.match(/\b\d{6}\b/);
+          if (otpMatch) {
+            otpCode = otpMatch[0];
+          }
+        }
+        
+        result = await sendTwoFactorSMS(phoneNumber, message, otpCode, selectedProvider.configuration, supabaseAdmin);
       } else {
         throw new Error(`Unsupported provider: ${providerName}`);
       }
     } catch (sendError) {
-      console.error(`Error sending message via ${providerName}:`, sendError);
-      throw new Error(`Failed to send message: ${sendError.message}`);
+      // If WhatsApp sending fails and SMS fallback is enabled, try SMS
+      if (!isSMSProvider && fallbackToSMS && twofactorProvider) {
+        console.log(`Falling back to SMS after ${providerName} failure:`, sendError.message);
+        try {
+          // For OTP messages, extract the OTP code from the message
+          let otpCode = null;
+          if (isOTP) {
+            // Try to extract OTP from the message - looking for a 6-digit code
+            const otpMatch = message.match(/\b\d{6}\b/);
+            if (otpMatch) {
+              otpCode = otpMatch[0];
+            }
+          }
+          
+          result = await sendTwoFactorSMS(phoneNumber, message, otpCode, twofactorProvider.configuration, supabaseAdmin);
+          providerName = 'twofactor';
+          isSMSProvider = true;
+        } catch (smsError) {
+          console.error('SMS fallback also failed:', smsError);
+          throw new Error(`All message delivery attempts failed. Last error: ${smsError.message}`);
+        }
+      } else {
+        console.error(`Error sending message via ${providerName}:`, sendError);
+        throw new Error(`Failed to send message: ${sendError.message}`);
+      }
     }
 
     // Update notification status if applicable
@@ -184,7 +243,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       messageId: result.messageId,
-      provider: providerName
+      provider: providerName,
+      isSMS: isSMSProvider
     }), {
       status: 200,
       headers: {
@@ -194,7 +254,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Error sending WhatsApp message:", error);
+    console.error("Error sending message:", error);
     
     return new Response(JSON.stringify({
       success: false,
@@ -350,6 +410,96 @@ async function sendGupshupMessage(phoneNumber, message, config, supabaseAdmin) {
     
   } catch (error) {
     console.error('Error sending WhatsApp message via Gupshup:', error);
+    throw error;
+  }
+}
+
+/**
+ * Send a message using 2Factor.in SMS API
+ */
+async function sendTwoFactorSMS(phoneNumber, message, otpCode, config, supabaseAdmin) {
+  try {
+    // Format the phone number for 2Factor (without + prefix)
+    const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber;
+    
+    let apiUrl = '';
+    let result = null;
+    
+    // If an OTP code is provided, use it for verification
+    if (otpCode) {
+      // Use template if provided, otherwise use default OTP template
+      if (config.template_name) {
+        apiUrl = `https://2factor.in/API/V1/${config.api_key}/SMS/${formattedPhone}/${otpCode}/${config.template_name}`;
+      } else {
+        apiUrl = `https://2factor.in/API/V1/${config.api_key}/SMS/${formattedPhone}/${otpCode}`;
+      }
+    } else {
+      // For regular text messages, use sendSMS endpoint
+      apiUrl = `https://2factor.in/API/V1/${config.api_key}/ADDON_SERVICES/SEND/TSMS`;
+      
+      // Create payload for non-OTP messages
+      const smsPayload = {
+        From: config.sender_id,
+        To: formattedPhone,
+        Msg: message
+      };
+      
+      // Send using POST method for custom messages
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(smsPayload)
+      });
+      
+      result = await response.json();
+      
+      if (!response.ok || result.Status !== 'Success') {
+        throw new Error(result.Details || 'Failed to send SMS');
+      }
+    }
+    
+    // For OTP messages, use the GET endpoint
+    if (otpCode && !result) {
+      const response = await fetch(apiUrl);
+      result = await response.json();
+      
+      if (!response.ok || result.Status !== 'Success') {
+        throw new Error(result.Details || 'Failed to send SMS');
+      }
+    }
+    
+    // Use the session ID as the message ID
+    const messageId = result.Details || (`sms_${Date.now()}`);
+    
+    // Store the sent message in the database
+    try {
+      await supabaseAdmin.from('whatsapp_messages').insert({
+        provider: 'twofactor_sms',
+        direction: 'outbound',
+        from_number: config.sender_id,
+        to_number: formattedPhone,
+        message_content: otpCode ? `OTP: ${otpCode}` : message,
+        message_type: 'text',
+        message_id: messageId,
+        raw_payload: result,
+        status: 'sent',
+        status_timestamp: new Date().toISOString()
+      });
+    } catch (dbError) {
+      console.error('Error storing SMS message in database:', dbError);
+      // Continue despite database error
+    }
+    
+    return { 
+      success: true, 
+      messageId,
+      rawResponse: result
+    };
+    
+  } catch (error) {
+    console.error('Error sending SMS via 2Factor:', error);
     throw error;
   }
 }

@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { LoaderCircle, ArrowLeft } from "lucide-react";
 
 interface StaffDialogProps {
   open: boolean;
@@ -14,12 +17,18 @@ interface StaffDialogProps {
 export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [verificationStep, setVerificationStep] = useState<'form' | 'otp' | 'done'>('form');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [tempEmployeeData, setTempEmployeeData] = useState<any>(null);
   const queryClient = useQueryClient();
   
-  // Reset error state when dialog opens/closes
+  // Reset error state and verification step when dialog opens/closes
   useEffect(() => {
     if (open) {
       setError(null);
+      setVerificationStep('form');
+      setVerificationCode('');
+      setTempEmployeeData(null);
     }
   }, [open]);
   
@@ -116,13 +125,19 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
         }
         
         toast.success("Staff member updated successfully");
+        // Invalidate the employees query to refresh the list
+        queryClient.invalidateQueries({ queryKey: ["employees-with-locations"] });
+        onOpenChange(false);
       } 
-      // Creating new employee - use the onboarding edge function
+      // Creating new employee - first create temporary record and send OTP
       else {
         // Get the current window location to create the verification link
         const baseUrl = window.location.origin;
         
-        // Call the employee-onboarding edge function with updated parameters
+        // Store form data for later use
+        setTempEmployeeData(data);
+        
+        // Call the employee-onboarding edge function to create temporary employee record
         const { data: responseData, error } = await supabase.functions.invoke('employee-onboarding', {
           body: { 
             employeeData: {
@@ -130,40 +145,125 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
               status: 'inactive', // Always set to inactive for new employees
               baseUrl
             },
-            sendWelcomeMessage: true,
-            createAuthAccount: true,
-            sendVerificationLink: true
+            sendWelcomeMessage: false,
+            createAuthAccount: false,
+            sendVerificationLink: false,
+            sendOtp: true // Request an OTP generation
           }
         });
         
         if (error) throw error;
         
         if (!responseData?.success) {
-          throw new Error(responseData?.message || "Failed to onboard employee");
+          throw new Error(responseData?.message || "Failed to create temporary employee record");
         }
         
-        // Show appropriate toast messages based on the response
-        if (responseData.verificationSent) {
-          toast.success("Staff member created! Verification link sent to their phone");
-        } else if (responseData.welcomeMessageSent) {
-          toast.success("Staff member created! Welcome message sent to their phone");
-        } else {
-          toast.success("Staff member created successfully");
-          toast.warning("Could not send notifications to the staff member");
+        // Now send the OTP via 2Factor
+        const { data: otpData, error: otpError } = await supabase.functions.invoke('send-whatsapp-message', {
+          body: { 
+            phoneNumber: data.phone,
+            message: `Your verification code for staff account creation is: ${responseData.verificationCode}. This code will expire in 15 minutes.`,
+            preferredProvider: 'twofactor',
+            isOTP: true,
+            notificationType: 'staff_verification'
+          }
+        });
+        
+        if (otpError) {
+          throw otpError;
         }
+        
+        if (!otpData?.success) {
+          throw new Error(otpData?.error || "Failed to send verification code");
+        }
+        
+        // Move to OTP verification step
+        setVerificationStep('otp');
+        toast.success("Verification code sent to " + data.phone);
       }
-      
-      // Invalidate the employees query to refresh the list
-      queryClient.invalidateQueries({ queryKey: ["employees-with-locations"] });
-      
-      onOpenChange(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to save staff member");
-      console.error("Error saving staff member:", error);
+      console.error("Error in staff flow:", error);
       setError(error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Handle OTP verification and complete staff creation
+  const handleVerifyOTP = async () => {
+    if (!verificationCode || !tempEmployeeData) {
+      toast.error("Verification code is required");
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      // Verify the OTP
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-employee-code', {
+        body: { 
+          phoneNumber: tempEmployeeData.phone,
+          code: verificationCode,
+        }
+      });
+
+      if (verifyError) {
+        throw verifyError;
+      }
+
+      if (!verifyData?.success) {
+        throw new Error(verifyData?.message || "Invalid verification code");
+      }
+      
+      // OTP verified, complete employee creation
+      const baseUrl = window.location.origin;
+      
+      const { data: completeData, error: completeError } = await supabase.functions.invoke('employee-onboarding', {
+        body: { 
+          employeeData: {
+            ...tempEmployeeData,
+            id: verifyData.employeeId,
+            status: 'active', // Set to active since it's verified
+            baseUrl
+          },
+          sendWelcomeMessage: true,
+          createAuthAccount: true,
+          sendVerificationLink: false
+        }
+      });
+      
+      if (completeError) {
+        throw completeError;
+      }
+      
+      if (!completeData?.success) {
+        throw new Error(completeData?.message || "Failed to complete staff creation");
+      }
+      
+      toast.success("Staff member verified and created successfully!");
+      // Invalidate the employees query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["employees-with-locations"] });
+      setVerificationStep('done');
+      
+      // Close dialog after a short delay to show success state
+      setTimeout(() => {
+        onOpenChange(false);
+      }, 1500);
+      
+    } catch (error: any) {
+      toast.error(error.message || "Verification failed");
+      console.error("Error verifying staff:", error);
+      setError(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Reset to form step
+  const handleBackToForm = () => {
+    setVerificationStep('form');
+    setVerificationCode('');
   };
 
   // Handle error display
@@ -175,22 +275,84 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{employeeId ? "Edit Staff Member" : "Add Staff Member"}</DialogTitle>
+          <DialogTitle>
+            {employeeId ? "Edit Staff Member" : 
+             verificationStep === 'otp' ? "Verify Staff Member" :
+             verificationStep === 'done' ? "Staff Member Created" :
+             "Add Staff Member"}
+          </DialogTitle>
           <DialogDescription>
-            {employeeId 
-              ? "Update the information for this staff member." 
-              : "Fill in the details to add a new staff member to your team."}
+            {employeeId ? "Update the information for this staff member." : 
+             verificationStep === 'otp' ? "Enter the verification code sent to the staff member's phone." :
+             verificationStep === 'done' ? "Staff member has been successfully created and verified!" :
+             "Fill in the details to add a new staff member to your team."}
           </DialogDescription>
         </DialogHeader>
+        
         {error ? (
           <div className="py-4 text-center">
-            <p className="text-destructive">Error loading staff data</p>
+            <p className="text-destructive">Error: {error.message}</p>
             <button 
               className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-md" 
               onClick={() => onOpenChange(false)}
             >
               Close
             </button>
+          </div>
+        ) : verificationStep === 'otp' ? (
+          <div className="space-y-4 py-4">
+            <div className="text-sm text-muted-foreground mb-4">
+              A verification code has been sent to {tempEmployeeData?.phone}. 
+              Please enter the 6-digit code below to verify and create the staff account.
+            </div>
+            
+            <div className="flex flex-col items-center justify-center gap-4">
+              <Input
+                className="text-center text-lg w-full max-w-[200px]"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                placeholder="000000"
+                disabled={isLoading}
+                maxLength={6}
+                inputMode="numeric"
+              />
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleBackToForm} 
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </Button>
+                
+                <Button 
+                  onClick={handleVerifyOTP} 
+                  disabled={isLoading || verificationCode.length !== 6}
+                >
+                  {isLoading ? (
+                    <>
+                      <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : "Verify & Create"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : verificationStep === 'done' ? (
+          <div className="py-8 flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 bg-green-100 text-green-700 rounded-full flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium">Staff Member Created Successfully!</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              The staff account has been verified and is now active.
+            </p>
           </div>
         ) : (
           <StaffForm 
@@ -199,6 +361,7 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
             employeeId={employeeId}
             initialData={employeeData}
             isSubmitting={isLoading}
+            use2FactorVerification={!employeeId} // Use 2Factor verification for new staff only
           />
         )}
       </DialogContent>

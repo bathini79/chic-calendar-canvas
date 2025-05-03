@@ -16,13 +16,15 @@ serve(async (req) => {
   try {
     // Parse the request body
     const data = await req.json();
-    const { phoneNumber, code } = data;
-    const fullName = null, lead_source = null;
+    const { phoneNumber, code, provider = 'any' } = data;
+    const fullName = data.fullName || null;
+    const lead_source = data.lead_source || null;
+    
     if (!phoneNumber || !code) {
       throw new Error('Phone number and verification code are required');
     }
     
-    console.log("Verifying customer login OTP for phone:", phoneNumber);
+    console.log("Verifying customer login OTP for phone:", phoneNumber, "with provider:", provider);
       
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -117,9 +119,9 @@ serve(async (req) => {
       // New user requires fullName
       if (!userName) {
         return new Response(
-          JSON.stringify({ 
-            error: "new_user_requires_name",
-            message: "New user registration requires a full name"
+          JSON.stringify({
+            error: 'missing_name',
+            message: 'Full name is required for registration'
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -129,172 +131,53 @@ serve(async (req) => {
       }
       
       try {
-        console.log("Creating new user with phone:", normalizedPhone);
+        // Generate a random email/password for the new user
+        // This is needed because Supabase Auth requires an email
+        const tempEmail = `${crypto.randomUUID()}@placeholder.com`;
+        const tempPassword = crypto.randomUUID();
         
-        // Previous approach was causing database errors, so trying a simplified approach
-        // Create a unique email based on phone number and random ID
-        const randomId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-        const email = `phone_${normalizedPhone.replace(/[^0-9]/g, '')}_${randomId}@example.com`;
-        
-        // Generate a random password
-        const password = crypto.randomUUID();
-        
-        // Log details before creating user
-        console.log(`Creating user with email ${email}`);
-        
-        // Simplified createUser call with minimal required fields
-        const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          email: email,
-          password: password,
+        // Create the user in Supabase Auth
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: tempEmail,
+          password: tempPassword,
           email_confirm: true,
-          raw_user_meta_data: { 
+          phone: formattedPhone,
+          phone_confirm: true,
+          user_metadata: {
             full_name: userName,
             phone: normalizedPhone,
-            lead_source: userLeadSource
+            lead_source: userLeadSource,
+            communication_consent: true, // By completing verification, they consent to receive communication
+            communication_channel: provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp'
           }
         });
         
-        if (createError) {
-          console.error('Error creating user during customer login:', createError);
-          
-          // Check if profile entry exists despite auth error
-          const { data: existingProfile } = await supabaseAdmin
-            .from('profiles')
-            .select('id')
-            .eq('phone_number', normalizedPhone)
-            .maybeSingle();
-            
-          if (existingProfile) {
-            userId = existingProfile.id;
-            
-            // Try to get auth user by ID to proceed with login
-            const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
-            
-            if (authUser && authUser.user) {              
-              // Get email from existing auth user
-              const email = authUser.user.email;
-              
-              // Generate a temporary password for this login
-              const tempPassword = crypto.randomUUID();
-              
-              // Update password to allow login
-              await supabaseAdmin.auth.admin.updateUserById(userId, { 
-                password: tempPassword,
-                raw_user_meta_data: {
-                  ...authUser.user.raw_user_meta_data,
-                  phone: normalizedPhone,
-                  lead_source: userLeadSource
-                }
-              });
-              
-              // Set credentials for frontend login
-              credentials = {
-                email: email,
-                password: tempPassword
-              };
-              
-              // Delete used OTP
-              await supabaseAdmin
-                .from('phone_auth_codes')
-                .delete()
-                .eq('phone_number', normalizedPhone);
-                
-              // Return success with existing user info
-              return new Response(
-                JSON.stringify({
-                  success: true,
-                  message: 'Login successful',
-                  isNewUser: false,
-                  userId: userId,
-                  phoneNumber: normalizedPhone,
-                  credentials: credentials,
-                  fullName: userName,
-                  lead_source: userLeadSource
-                }),
-                { 
-                  headers: { 
-                    ...corsHeaders,
-                    'Content-Type': 'application/json' 
-                  },
-                  status: 200 
-                }
-              );
-            }
-          }
-          
-          // If we reach here, the error is real and we should return it
-          return new Response(
-            JSON.stringify({ 
-              error: "user_creation_failed",
-              message: "User creation failed",
-              details: createError.message
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200
-            }
-          );
-        }
+        if (authError) throw authError;
         
-        userId = newUser.user.id;
+        userId = authData.user.id;
+        credentials = { email: tempEmail, password: tempPassword };
         
-        console.log("User created during customer login with ID:", userId);
-        
-        // Create profile for the new user
-        // Wait a short time for auth triggers to run
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Try to create the profile
-        const { error: profileError } = await supabaseAdmin
+        // Update the profiles table with the user data
+        // The RLS triggers should handle this, but we'll do it explicitly to be sure
+        await supabaseAdmin
           .from('profiles')
-          .insert({
-            user_id: userId,  // Changed - Only pass user_id, not id
-            phone_number: normalizedPhone,
-            phone_verified: true,
+          .update({
             full_name: userName,
+            role: 'customer',
             lead_source: userLeadSource,
-            role: 'employee',
-            wallet_balance: 0,
-            last_used: new Date().toISOString()
-          });
+            communication_consent: true,
+            communication_channel: provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp'
+          })
+          .eq('id', userId);
           
-        if (profileError) {
-          console.log('Profile insert error:', profileError);
-          
-          // Try to update if insert failed due to existing record
-          const { error: updateError } = await supabaseAdmin
-            .from('profiles')
-            .update({
-              user_id: userId,  // Ensure user_id is set correctly
-              phone_number: normalizedPhone,
-              phone_verified: true,
-              full_name: userName,
-              lead_source: userLeadSource,
-              role: 'customer'
-            })
-            .eq('id', userId);
-            
-          if (updateError) {
-            console.error('Error updating profile:', updateError);
-          }
-        }
+        console.log("New customer registered with ID:", userId, "via provider:", provider);
         
-        // Return credentials for frontend to create session
-        credentials = {
-          email: email,
-          password: password
-        };
-        
-        console.log("User registered successfully with credentials during customer login");
       } catch (error) {
-        console.error('Unexpected error in user creation during customer login:', error);
+        console.error('Error creating new user during OTP verification:', error);
         return new Response(
-          JSON.stringify({ 
-            error: "user_creation_failed",
-            message: "User creation failed",
-            details: error.message || "Unexpected error"
+          JSON.stringify({
+            error: 'registration_failed',
+            message: error.message || 'Failed to register new user'
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -312,11 +195,11 @@ serve(async (req) => {
       const { data: userData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
       
       if (authUserError) {
-        console.error('Error fetching user during customer login:', authUserError);
+        console.error('Error fetching auth user during OTP verification:', authUserError);
         return new Response(
-          JSON.stringify({ 
-            error: "user_not_found",
-            message: "User exists in profiles but not in auth"
+          JSON.stringify({
+            error: 'auth_error',
+            message: authUserError.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -342,21 +225,26 @@ serve(async (req) => {
         updatedMetadata.lead_source = userLeadSource;
       }
       
+      // Update communication preferences if specified
+      if (provider && provider !== 'any') {
+        updatedMetadata.communication_channel = provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp';
+      }
+      
       // Update the user's password and metadata
-      const { error: passwordUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
         userId,
-        { 
+        {
           password: tempPassword,
-          raw_user_meta_data: updatedMetadata
+          user_metadata: updatedMetadata
         }
       );
       
-      if (passwordUpdateError) {
-        console.error('Error updating user password during customer login:', passwordUpdateError);
+      if (updateError) {
+        console.error('Error updating user during OTP verification:', updateError);
         return new Response(
-          JSON.stringify({ 
-            error: "password_update_failed",
-            message: "Failed to update user credentials"
+          JSON.stringify({
+            error: 'update_error',
+            message: updateError.message
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -365,28 +253,18 @@ serve(async (req) => {
         );
       }
       
-      // Also update profile phone number and lead_source if provided
-      const updateData: any = { phone_number: normalizedPhone };
-      if (userLeadSource) {
-        updateData.lead_source = userLeadSource;
+      // Update profile table with latest communication preferences
+      if (provider && provider !== 'any') {
+        await supabaseAdmin
+          .from('profiles')
+          .update({
+            communication_consent: true,
+            communication_channel: provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp'
+          })
+          .eq('id', userId);
       }
       
-      const { error: profileUpdateError } = await supabaseAdmin
-        .from('profiles')
-        .update(updateData)
-        .eq('id', userId);
-        
-      if (profileUpdateError) {
-        console.error('Error updating profile during customer login:', profileUpdateError);
-      }
-      
-      // Return credentials for frontend to create session
-      credentials = {
-        email: email,
-        password: tempPassword
-      };
-      
-      console.log("Existing user login credentials generated during customer login");
+      credentials = { email, password: tempPassword };
     }
     
     // Delete used OTP
@@ -405,7 +283,8 @@ serve(async (req) => {
         phoneNumber: normalizedPhone,
         credentials: credentials,
         fullName: userName,
-        lead_source: userLeadSource
+        lead_source: userLeadSource,
+        communicationChannel: provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp'
       }),
       { 
         headers: { 
