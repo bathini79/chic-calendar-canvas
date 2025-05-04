@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -20,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { usePermissions, SectionPermission } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -28,36 +28,43 @@ const sidebarNavItems = [
     title: "Dashboard",
     href: "/admin",
     icon: <Home className="mr-2 h-4 w-4" />,
+    permission: null, // Visible to all users who can access admin area
   },
   {
     title: "Bookings",
     href: "/admin/bookings",
     icon: <Calendar className="mr-2 h-4 w-4" />,
+    permission: "appointments" as SectionPermission, // Requires appointment booking permissions
   },
   {
     title: "Services",
     href: "/admin/services",
     icon: <Scissors className="mr-2 h-4 w-4" />,
+    permission: "services" as SectionPermission,
   },
   {
     title: "Staff",
     href: "/admin/staff",
     icon: <Users className="mr-2 h-4 w-4" />,
+    permission: "staff" as SectionPermission,
   },
   {
     title: "Inventory",
     href: "/admin/inventory",
     icon: <Package className="mr-2 h-4 w-4" />,
+    permission: "inventory" as SectionPermission,
   },
   {
     title: "Reports",
     href: "/admin/reports",
     icon: <FileBarChart className="mr-2 h-4 w-4" />,
+    permission: "reports" as SectionPermission,
   },
   {
     title: "Settings",
     href: "/admin/settings",
     icon: <Settings className="mr-2 h-4 w-4" />,
+    permission: "settings" as SectionPermission, // Typically restricted to admins
   },
 ];
 
@@ -65,6 +72,7 @@ export function AppSidebar() {
   const { pathname } = useLocation();
   const { setOpen, open, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
+  const { hasAccess, loading: permissionsLoading, isAdmin } = usePermissions();
   const [businessDetails, setBusinessDetails] = useState({
     name: "",
     logo_url: null
@@ -110,6 +118,16 @@ export function AppSidebar() {
     fetchBusinessDetails();
   }, []);
 
+  // Filter navigation items based on user permissions
+  const filteredNavItems = sidebarNavItems.filter(item => {
+    // If no permission required or user is admin, show the item
+    if (!item.permission || isAdmin) {
+      return true;
+    }
+    // Otherwise check if user has required permission
+    return hasAccess(item.permission);
+  });
+
   return (
     <div 
       className={cn(
@@ -148,25 +166,35 @@ export function AppSidebar() {
       </div>
       <ScrollArea className="flex-1">
         <nav className="grid items-start px-2 py-4 gap-1">
-          {sidebarNavItems.map((item, index) => (
-            <Link to={item.href} key={index}>
-              <Button
-                variant={pathname === item.href ? "secondary" : "ghost"}
-                className={cn("w-full justify-start", {
-                  "bg-muted": pathname === item.href,
-                })}
-                title={!open ? item.title : undefined}
-              >
-                {React.cloneElement(item.icon, { 
-                  className: cn(
-                    item.icon.props.className, 
-                    !open && "mr-0 mx-auto"
-                  ) 
-                })}
-                {open && <span className="transition-opacity">{item.title}</span>}
-              </Button>
-            </Link>
-          ))}
+          {permissionsLoading ? (
+            // Show skeletons while loading permissions
+            Array(5).fill(0).map((_, index) => (
+              <div key={index} className="px-1 py-2">
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ))
+          ) : (
+            // Render navigation items based on permissions
+            filteredNavItems.map((item, index) => (
+              <Link to={item.href} key={index}>
+                <Button
+                  variant={pathname === item.href ? "secondary" : "ghost"}
+                  className={cn("w-full justify-start", {
+                    "bg-muted": pathname === item.href,
+                  })}
+                  title={!open ? item.title : undefined}
+                >
+                  {React.cloneElement(item.icon, { 
+                    className: cn(
+                      item.icon.props.className, 
+                      !open && "mr-0 mx-auto"
+                    ) 
+                  })}
+                  {open && <span className="transition-opacity">{item.title}</span>}
+                </Button>
+              </Link>
+            ))
+          )}
         </nav>
       </ScrollArea>
     </div>

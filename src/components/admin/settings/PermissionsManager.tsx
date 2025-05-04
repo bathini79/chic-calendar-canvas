@@ -5,100 +5,97 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { SectionPermission } from "@/hooks/usePermissions";
 
 interface PermissionsManagerProps {
   employmentTypes: any[];
   onRefresh: () => void;
 }
 
-// Define all available permissions
+// Define all available permissions - updated to match section permissions in usePermissions hook
 const AVAILABLE_PERMISSIONS = [
+  
   {
-    id: "perform_services",
+    id: "perform_services" as SectionPermission,
     name: "Perform Services",
     description: "Perform haircuts, treatments, and other salon services on customers"
   },
   {
-    id: "book_appointments",
-    name: "Book Appointments",
-    description: "Create and manage appointments"
+    id: "appointments" as SectionPermission,
+    name: "Appointments & Bookings",
+    description: "Create and manage appointments, view schedules"
   },
   {
-    id: "view_own_schedule",
-    name: "View Own Schedule",
-    description: "View personal schedule only"
+    id: "services" as SectionPermission,
+    name: "Services",
+    description: "Manage salon services and treatments"
   },
   {
-    id: "view_all_schedules",
-    name: "View All Schedules",
-    description: "View schedules of all staff members"
-  },
-  {
-    id: "manage_inventory",
-    name: "Manage Inventory",
-    description: "Add, update, and remove inventory items"
-  },
-  {
-    id: "view_reports",
-    name: "View Reports",
-    description: "Access financial and business reports"
-  },
-  {
-    id: "manage_staff",
-    name: "Manage Staff",
+    id: "staff" as SectionPermission,
+    name: "Staff Management",
     description: "Add, update, and remove staff members"
   },
   {
-    id: "manage_services",
-    name: "Manage Services",
-    description: "Add, update, and remove services"
+    id: "inventory" as SectionPermission,
+    name: "Inventory",
+    description: "Add, update, and remove inventory items"
   },
   {
-    id: "manage_customers",
-    name: "Manage Customers",
-    description: "Add, update, and remove customer information"
+    id: "reports" as SectionPermission,
+    name: "Reports",
+    description: "Access financial and business reports"
   },
   {
-    id: "process_payments",
-    name: "Process Payments",
-    description: "Handle customer payments"
+    id: "sales" as SectionPermission,
+    name: "Sales",
+    description: "Process sales, payments, and view sales history"
   },
   {
-    id: "apply_discounts",
-    name: "Apply Discounts",
-    description: "Apply discounts to services and products"
+    id: "packages" as SectionPermission,
+    name: "Packages",
+    description: "Manage service packages and bundles"
+  },
+  {
+    id: "locations" as SectionPermission,
+    name: "Locations",
+    description: "Manage business locations and settings"
+  },
+  {
+    id: "settings" as SectionPermission,
+    name: "Settings",
+    description: "Access and modify business settings"
   }
 ];
 
 export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsManagerProps) {
-  const [permissions, setPermissions] = useState<Record<string, string[]>>({});
+  const [permissions, setPermissions] = useState<Record<string, SectionPermission[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     // Initialize permissions from employmentTypes
-    const permissionsMap: Record<string, string[]> = {};
+    const permissionsMap: Record<string, SectionPermission[]> = {};
       
     employmentTypes.forEach(type => {
       // Ensure permissions is always an array, even if it comes as null or undefined
-      let typePermissions = [];
+      let typePermissions: SectionPermission[] = [];
       
       // Handle different formats that might come from Supabase
       if (type.permissions) {
         if (typeof type.permissions === 'string') {
           try {
             // Try to parse if it's a string
-            typePermissions = JSON.parse(type.permissions);
+            typePermissions = JSON.parse(type.permissions) as SectionPermission[];
           } catch (e) {
             console.error(`Failed to parse permissions string for type ${type.id}:`, e);
             typePermissions = [];
           }
         } else if (Array.isArray(type.permissions)) {
           // Already an array
-          typePermissions = [...type.permissions];
+          typePermissions = [...type.permissions] as SectionPermission[];
         } else if (typeof type.permissions === 'object') {
           // Handle potential PostgreSQL JSONB object format
-          typePermissions = Object.values(type.permissions);
+          typePermissions = Object.values(type.permissions) as SectionPermission[];
         }
       }
       
@@ -109,7 +106,7 @@ export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsMa
     setIsLoading(false);
   }, [employmentTypes]);
 
-  const handlePermissionChange = (typeId: string, permissionId: string, checked: boolean) => {
+  const handlePermissionChange = (typeId: string, permissionId: SectionPermission, checked: boolean) => {
     
     setPermissions(prev => {
       const currentPermissions = [...(prev[typeId] || [])];
@@ -193,7 +190,7 @@ export function PermissionsManager({ employmentTypes, onRefresh }: PermissionsMa
     }
   };
 
-  const isPermissionSelected = (typeId: string, permissionId: string) => {
+  const isPermissionSelected = (typeId: string, permissionId: SectionPermission) => {
     return permissions[typeId]?.includes(permissionId) || false;
   };
 
