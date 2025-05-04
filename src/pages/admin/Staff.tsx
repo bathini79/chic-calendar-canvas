@@ -38,6 +38,10 @@ export default function Staff() {
     setRefreshKey((prevKey) => prevKey + 1);
   };
 
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+  };
+
   if (isLoading) {
     return <div className="flex justify-center items-center h-32">Loading...</div>;
   }
@@ -63,6 +67,8 @@ export default function Staff() {
               onAdd={() => handleOpenDialog()} 
               view={view} 
               onViewChange={setView}
+              searchQuery={searchQuery}
+              onSearchChange={handleSearchChange}
             />
 
             {view === "grid" ? (

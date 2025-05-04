@@ -185,7 +185,7 @@ const Auth = () => {
 
       setOtpSent(true);
       setNeedsFullName(false);
-      toast.success(`OTP sent to your ${messagingChannel}. Please check your messages.`);
+      toast.success(`OTP sent to your phone. Please check your messages.`);
     } catch (error: any) {
       const errorMessage = error.message || "Failed to send OTP. Please try again.";
       toast.error(errorMessage);
@@ -352,7 +352,7 @@ const Auth = () => {
                 Sending...
               </>
             ) : (
-              `Send OTP via ${messagingChannel}`
+              `Send OTP`
             )}
           </Button>
         </>
@@ -456,7 +456,7 @@ const Auth = () => {
         </InputOTP>
           </div>
           <p className="text-xs text-muted-foreground text-center">
-            Check your {messagingChannel} for the 6-digit verification code
+            Check your messages for the 6-digit verification code
           </p>
           {verificationError && (
             <div className="bg-red-50 text-red-700 p-2 rounded-md text-sm flex items-start mt-2">
@@ -524,7 +524,7 @@ const Auth = () => {
         <CardHeader>
           <CardTitle>Welcome</CardTitle>
           <CardDescription>
-            Sign in or register using {messagingChannel}
+            Sign in or register
           </CardDescription>
         </CardHeader>
         <CardContent>

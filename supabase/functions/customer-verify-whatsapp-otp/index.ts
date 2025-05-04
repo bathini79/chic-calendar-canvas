@@ -261,44 +261,77 @@ serve(async (req) => {
         
         // Create profile for the new user
         // Wait a short time for auth triggers to run
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Increased wait time
         
-        // Try to create the profile
-        const { error: profileError } = await supabaseAdmin
+        // Check if profile already exists (created by database trigger)
+        const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
           .from('profiles')
-          .insert({
-            user_id: userId,  // Changed - Only pass user_id, not id
-            phone_number: normalizedPhone,
-            phone_verified: true,
-            full_name: userName,
-            lead_source: userLeadSource,
-            role: 'customer',
-            wallet_balance: 0,
-            communication_consent: true,
-            communication_channel: communicationChannel,
-            last_used: new Date().toISOString()
-          });
+          .select('*')
+          .eq('id', userId)
+          .single();
+        
+        if (existingProfile) {
+          console.log('Profile already exists, updating with complete information:', userId);
           
-        if (profileError) {
-          console.log('Profile insert error:', profileError);
-          
-          // Try to update if insert failed due to existing record
+          // Update the existing profile with all necessary fields
           const { error: updateError } = await supabaseAdmin
             .from('profiles')
             .update({
-              user_id: userId,  // Ensure user_id is set correctly
+              phone_number: normalizedPhone,
+              phone_verified: true,
+              full_name: userName,
+              lead_source: userLeadSource,
+              role: 'customer', // Keep the role consistent
+              communication_consent: true,
+              communication_channel: communicationChannel,
+              last_used: new Date().toISOString()
+            })
+            .eq('id', userId);
+            
+          if (updateError) {
+            console.error('Error updating complete profile information:', updateError);
+          } else {
+            console.log('Successfully updated profile with complete information');
+          }
+        } else {
+          // Try to create a new profile if none exists
+          const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .insert({
+              id: userId, // Use userId for both id and user_id
+              user_id: userId,
               phone_number: normalizedPhone,
               phone_verified: true,
               full_name: userName,
               lead_source: userLeadSource,
               role: 'customer',
+              wallet_balance: 0,
               communication_consent: true,
-              communication_channel: communicationChannel
-            })
-            .eq('id', userId);
+              communication_channel: communicationChannel,
+              last_used: new Date().toISOString()
+            });
             
-          if (updateError) {
-            console.error('Error updating profile:', updateError);
+          if (profileError) {
+            console.log('Profile insert error, trying again with update:', profileError);
+            
+            // If insert fails, try updating as a last resort
+            const { error: updateError } = await supabaseAdmin
+              .from('profiles')
+              .update({
+                phone_number: normalizedPhone,
+                phone_verified: true,
+                full_name: userName,
+                lead_source: userLeadSource,
+                role: 'customer',
+                communication_consent: true,
+                communication_channel: communicationChannel,
+                last_used: new Date().toISOString()
+              })
+              .eq('id', userId);
+              
+            if (updateError) {
+              console.error('All profile creation/update attempts failed:', updateError);
+            }
           }
         }
         
@@ -391,8 +424,11 @@ serve(async (req) => {
       // Also update profile phone number and lead_source if provided
       const updateData: any = { 
         phone_number: normalizedPhone,
+        phone_verified: true, // Added phone_verified
+        full_name: userName || existingUser.full_name, // Add full_name from metadata if available
         communication_consent: true,
-        communication_channel: communicationChannel
+        communication_channel: communicationChannel,
+        last_used: new Date().toISOString() // Add last_used timestamp
       };
       
       if (userLeadSource) {

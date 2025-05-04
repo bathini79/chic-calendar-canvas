@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.26.0'
 
@@ -32,16 +31,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
     )
     
+    // Always normalize phone number by removing + prefix
+    const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber
+    
+    console.log(`Looking for employee with phone: ${normalizedPhone} (normalized)`)
+    
     // Get the employee ID from phone number
     const { data: employeeData, error: employeeError } = await supabaseAdmin
       .from('employees')
-      .select('id')
-      .eq('phone', phoneNumber)
+      .select('id, phone')
+      .eq('phone', normalizedPhone)
       .single()
     
     if (employeeError || !employeeData) {
+      console.error('Employee not found error:', employeeError)
       throw new Error('Employee not found with this phone number')
     }
+    
+    console.log(`Found employee with id: ${employeeData.id}, phone: ${employeeData.phone}`)
     
     const employeeId = employeeData.id
     let isVerified = false
@@ -116,17 +123,22 @@ serve(async (req) => {
       throw new Error(`Failed to activate employee: ${updateError.message}`)
     }
     
-    // Mark as phone_verified in profile
+    // Mark as phone_verified in profile - use normalized phone number
     const { data: profileData, error: profileFetchError } = await supabaseAdmin
       .from('profiles')
-      .select('id')
-      .eq('phone_number', phoneNumber)
+      .select('id, phone_number')
+      .eq('phone_number', normalizedPhone)
     
     if (!profileFetchError && profileData?.length > 0) {
-      await supabaseAdmin
-        .from('profiles')
-        .update({ phone_verified: true })
-        .eq('phone_number', phoneNumber)
+      for (const profile of profileData) {
+        console.log(`Updating profile ${profile.id} with phone ${profile.phone_number} to verified`)
+        await supabaseAdmin
+          .from('profiles')
+          .update({ phone_verified: true })
+          .eq('id', profile.id)
+      }
+    } else {
+      console.log('No matching profile found for phone verification')
     }
     
     // Delete the used verification code
