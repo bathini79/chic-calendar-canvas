@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Building2, AtSign, Phone, Clock, Calendar, Check, AlertCircle, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { TimeInput } from "@/components/ui/time-input";
 
 interface LocationDialogProps {
@@ -40,6 +43,13 @@ interface LocationHours {
   location_id?: string;
 }
 
+interface ValidationErrors {
+  name?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+}
+
 export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = "full" }: LocationDialogProps) {
   const [formData, setFormData] = useState<LocationFormData>({
     name: "",
@@ -54,32 +64,28 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
+  const [activeTab, setActiveTab] = useState("general");
   const [locationHours, setLocationHours] = useState<LocationHours[]>([]);
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 3;
 
-  // Initialize location hours with default values for all days of the week
   const initializeLocationHours = () => {
-    const daysOfWeek = [0, 1, 2, 3, 4, 5, 6]; // Sunday = 0, Monday = 1, ..., Saturday = 6
-    
-    // If we already have hours with values, use them
+    const daysOfWeek = [0, 1, 2, 3, 4, 5, 6];
     if (locationHours.length > 0) return;
-    
-    // Create default hours for each day
     const defaultHours: LocationHours[] = daysOfWeek.map(day => ({
       day_of_week: day,
-      start_time: day === 0 ? '10:00' : '09:00', // Sunday starts later
-      end_time: day === 0 ? '16:00' : '18:00',   // Sunday ends earlier
-      is_closed: day === 0, // Sunday is closed by default
+      start_time: day === 0 ? '10:00' : '09:00',
+      end_time: day === 0 ? '16:00' : '18:00',
+      is_closed: day === 0,
     }));
-    
     setLocationHours(defaultHours);
   };
 
-  // Fetch location data if editing
   useEffect(() => {
     if (locationId && isOpen) {
       setIsFetching(true);
-      
       const fetchLocationData = async () => {
         try {
           const { data, error } = await supabase
@@ -87,7 +93,6 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
             .select("*")
             .eq("id", locationId)
             .single();
-            
           if (error) {
             toast.error("Failed to fetch location data");
             console.error(error);
@@ -103,13 +108,10 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
               phone: data.phone || "",
               is_active: data.is_active !== false,
             });
-
-            // Fetch location hours
             const { data: hoursData, error: hoursError } = await supabase
               .from("location_hours")
               .select("*")
               .eq("location_id", locationId);
-                
             if (hoursError) {
               console.error("Error fetching location hours:", hoursError);
             } else if (hoursData && hoursData.length > 0) {
@@ -124,15 +126,12 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
           setIsFetching(false);
         }
       };
-      
       fetchLocationData();
     } else if (isOpen) {
-      // Initialize hours for new location
       initializeLocationHours();
     }
   }, [locationId, isOpen]);
 
-  // Reset form when dialog opens/closes
   useEffect(() => {
     if (!isOpen) {
       if (!locationId) {
@@ -148,7 +147,9 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
           is_active: true,
         });
       }
-      setCurrentStep(1);
+      setActiveTab("general");
+      setErrors({});
+      setTouched({});
     }
   }, [isOpen, locationId]);
 
@@ -157,9 +158,77 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
       ...prev,
       [field]: value
     }));
+    setTouched(prev => ({
+      ...prev,
+      [field]: true
+    }));
+    validateField(field, value);
   };
 
-  // Update a specific day's hours
+  const validateField = (field: string, value: any) => {
+    let newErrors = { ...errors };
+    switch(field) {
+      case 'name':
+        if (!value.trim()) {
+          newErrors.name = "Location name is required";
+        } else {
+          delete newErrors.name;
+        }
+        break;
+      case 'address':
+        if (!value.trim() && activeTab !== "general") {
+          newErrors.address = "Address is required";
+        } else {
+          delete newErrors.address;
+        }
+        break;
+      case 'email':
+        if (value && !/^\S+@\S+\.\S+$/.test(value)) {
+          newErrors.email = "Invalid email format";
+        } else {
+          delete newErrors.email;
+        }
+        break;
+      case 'phone':
+        if (value && !/^[0-9+\-\s()]*$/.test(value)) {
+          newErrors.phone = "Invalid phone number";
+        } else {
+          delete newErrors.phone;
+        }
+        break;
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateForm = () => {
+    const newErrors: ValidationErrors = {};
+    let isValid = true;
+    if (!formData.name.trim()) {
+      newErrors.name = "Location name is required";
+      isValid = false;
+    }
+    if (activeTab !== "general" && !formData.address.trim()) {
+      newErrors.address = "Address is required";
+      isValid = false;
+    }
+    if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
+      newErrors.email = "Invalid email format";
+      isValid = false;
+    }
+    if (formData.phone && !/^[0-9+\-\s()]*$/.test(formData.phone)) {
+      newErrors.phone = "Invalid phone number";
+      isValid = false;
+    }
+    setErrors(newErrors);
+    const allTouched: Record<string, boolean> = {};
+    Object.keys(formData).forEach(key => {
+      allTouched[key] = true;
+    });
+    setTouched(allTouched);
+    return isValid;
+  };
+
   const updateDayHours = (dayIndex: number, field: keyof LocationHours, value: any) => {
     setLocationHours(prev => 
       prev.map((day, index) => 
@@ -168,40 +237,50 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
     );
   };
 
-  const validateCurrentStep = () => {
-    if (currentStep === 1) {
-      return formData.name && (formData.email || formData.phone);
-    } else if (currentStep === 2) {
-      return formData.address;
+  const handleNextStep = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(prev => prev + 1);
+      if (currentStep === 1) setActiveTab("address");
+      if (currentStep === 2) setActiveTab("hours");
     }
-    return true;
+  };
+
+  const handlePrevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+      if (currentStep === 2) setActiveTab("general");
+      if (currentStep === 3) setActiveTab("address");
+    }
   };
 
   const handleSubmit = async () => {
+    if (!validateForm()) {
+      toast.error("Please fix the validation errors before submitting");
+      return;
+    }
     setIsLoading(true);
-
     try {
-      let locationId;
-      
+      let updatedLocationId = locationId;
       if (mode === "contact") {
-        // Handle contact edit mode
+        if (!updatedLocationId) {
+          throw new Error("Location ID is required for editing contact details");
+        }
         const { error } = await supabase
           .from("locations")
           .update({
             email: formData.email,
             phone: formData.phone
           })
-          .eq("id", locationId);
-
+          .eq("id", updatedLocationId);
         if (error) throw error;
       } else if (mode === "billing" || mode === "location") {
-        // Handle billing or location edit mode
+        if (!updatedLocationId) {
+          throw new Error(`Location ID is required for editing ${mode} details`);
+        }
         const updateData: Partial<LocationFormData> = {};
-        
         if (mode === "billing") {
           updateData.name = formData.name;
         }
-        
         if (mode === "location") {
           updateData.address = formData.address;
           updateData.city = formData.city;
@@ -209,70 +288,53 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
           updateData.zip_code = formData.zip_code;
           updateData.country = formData.country;
         }
-        
         const { error } = await supabase
           .from("locations")
           .update(updateData)
-          .eq("id", locationId);
-
+          .eq("id", updatedLocationId);
         if (error) throw error;
       } else {
-        // Handle full form submission
         if (!formData.name) {
           toast.error("Location name is required");
           setIsLoading(false);
           return;
         }
-
         let response;
-        if (locationId) {
-          // Update existing location
+        if (updatedLocationId) {
           response = await supabase
             .from("locations")
             .update(formData)
-            .eq("id", locationId);
-          
+            .eq("id", updatedLocationId);
           if (response.error) throw response.error;
-          locationId = locationId;
         } else {
-          // Create new location
           response = await supabase
             .from("locations")
             .insert([formData])
             .select();
-
           if (response.error) throw response.error;
           if (response.data && response.data.length > 0) {
-            locationId = response.data[0].id;
+            updatedLocationId = response.data[0].id;
+          } else {
+            throw new Error("Failed to get ID of newly created location");
           }
         }
-
-        // Save location hours
-        if (locationId) {
-          // First, delete any existing hours
+        if (updatedLocationId) {
           const { error: deleteError } = await supabase
             .from("location_hours")
             .delete()
-            .eq("location_id", locationId);
-
+            .eq("location_id", updatedLocationId);
           if (deleteError) throw deleteError;
-
-          // Then insert the new hours
           const hoursToInsert = locationHours.map(hour => ({
             ...hour,
-            location_id: locationId
+            location_id: updatedLocationId
           }));
-
           const { error: insertError } = await supabase
             .from("location_hours")
             .insert(hoursToInsert);
-
           if (insertError) throw insertError;
         }
-
-        toast.success(locationId ? "Location updated successfully" : "Location created successfully");
+        toast.success(updatedLocationId === locationId ? "Location updated successfully" : "Location created successfully");
       }
-
       if (onSuccess) onSuccess();
       onClose();
     } catch (error: any) {
@@ -291,353 +353,479 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
     return locationId ? "Edit Location" : "Add Location";
   };
 
-  const renderStepContent = () => {
-    if (isFetching) {
-      return <div className="py-4 text-center">Loading location data...</div>;
-    }
-
-    if (mode === "contact") {
-      return (
-        <div className="space-y-4 py-4">
+  const renderContactSection = () => {
+    return (
+      <div className="space-y-6 px-4 md:px-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="name" className="text-base font-medium flex items-center">
+              <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+              Location Name <span className="text-destructive ml-1">*</span>
+            </Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => handleChange("name", e.target.value)}
+              placeholder="e.g. Main Salon"
+              className={cn("h-12 text-base", errors.name && touched.name ? "border-destructive" : "")}
+            />
+            {errors.name && touched.name && (
+              <div className="text-sm text-destructive flex items-center mt-1">
+                <AlertCircle className="h-3 w-3 mr-1" /> {errors.name}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="is_active" className="text-base font-medium">Status</Label>
+            <div className="flex items-center gap-4 h-12">
+              <div 
+                className={cn(
+                  "px-4 py-2 rounded-md border flex items-center gap-2 cursor-pointer flex-1 justify-center",
+                  formData.is_active ? "bg-primary/10 border-primary" : "bg-muted/20"
+                )}
+                onClick={() => handleChange("is_active", true)}
+              >
+                {formData.is_active && <Check className="h-4 w-4 text-primary" />}
+                Active
+              </div>
+              <div 
+                className={cn(
+                  "px-4 py-2 rounded-md border flex items-center gap-2 cursor-pointer flex-1 justify-center",
+                  !formData.is_active ? "bg-muted/30 border-muted-foreground" : "bg-muted/10"
+                )}
+                onClick={() => handleChange("is_active", false)}
+              >
+                {!formData.is_active && <Check className="h-4 w-4" />}
+                Inactive
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-base font-medium flex items-center">
+              <AtSign className="h-4 w-4 mr-2 text-muted-foreground" />
+              Email
+            </Label>
             <Input
               id="email"
               type="email"
               value={formData.email}
               onChange={(e) => handleChange("email", e.target.value)}
               placeholder="Location email address"
+              className={cn("h-12 text-base", errors.email && touched.email ? "border-destructive" : "")}
             />
+            {errors.email && touched.email && (
+              <div className="text-sm text-destructive flex items-center mt-1">
+                <AlertCircle className="h-3 w-3 mr-1" /> {errors.email}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone</Label>
+            <Label htmlFor="phone" className="text-base font-medium flex items-center">
+              <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+              Phone
+            </Label>
             <Input
               id="phone"
               value={formData.phone}
               onChange={(e) => handleChange("phone", e.target.value)}
               placeholder="Contact number"
+              className={cn("h-12 text-base", errors.phone && touched.phone ? "border-destructive" : "")}
             />
+            {errors.phone && touched.phone && (
+              <div className="text-sm text-destructive flex items-center mt-1">
+                <AlertCircle className="h-3 w-3 mr-1" /> {errors.phone}
+              </div>
+            )}
           </div>
         </div>
-      );
-    }
+      </div>
+    );
+  };
 
-    if (mode === "billing") {
-      return (
-        <div className="space-y-4 py-4">
+  const renderAddressSection = () => {
+    return (
+      <div className="space-y-6 px-4 md:px-0">
+        <div className="space-y-2">
+          <Label htmlFor="address" className="text-base font-medium flex items-center">
+            <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+            Address <span className="text-destructive ml-1">*</span>
+          </Label>
+          <Input
+            id="address"
+            value={formData.address}
+            onChange={(e) => handleChange("address", e.target.value)}
+            placeholder="Street address"
+            className={cn("h-12 text-base", errors.address && touched.address ? "border-destructive" : "")}
+          />
+          {errors.address && touched.address && (
+            <div className="text-sm text-destructive flex items-center mt-1">
+              <AlertCircle className="h-3 w-3 mr-1" /> {errors.address}
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <Label htmlFor="name">Company Name</Label>
+            <Label htmlFor="city" className="text-base font-medium">City</Label>
             <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => handleChange("name", e.target.value)}
-              placeholder="Company name"
+              id="city"
+              value={formData.city}
+              onChange={(e) => handleChange("city", e.target.value)}
+              placeholder="City"
+              className="h-12 text-base"
             />
           </div>
-        </div>
-      );
-    }
 
-    if (mode === "location") {
-      return (
-        <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="address">Address*</Label>
+            <Label htmlFor="state" className="text-base font-medium">State/Province</Label>
             <Input
-              id="address"
-              value={formData.address}
-              onChange={(e) => handleChange("address", e.target.value)}
-              placeholder="Street address"
-              required
+              id="state"
+              value={formData.state}
+              onChange={(e) => handleChange("state", e.target.value)}
+              placeholder="State/Province"
+              className="h-12 text-base"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="zip_code" className="text-base font-medium">Postal Code</Label>
+            <Input
+              id="zip_code"
+              value={formData.zip_code}
+              onChange={(e) => handleChange("zip_code", e.target.value)}
+              placeholder="Postal/Zip code"
+              className="h-12 text-base"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                value={formData.city}
-                onChange={(e) => handleChange("city", e.target.value)}
-                placeholder="City"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="state">State</Label>
-              <Input
-                id="state"
-                value={formData.state}
-                onChange={(e) => handleChange("state", e.target.value)}
-                placeholder="State/Province"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="zip_code">Postal Code</Label>
-              <Input
-                id="zip_code"
-                value={formData.zip_code}
-                onChange={(e) => handleChange("zip_code", e.target.value)}
-                placeholder="Postal/Zip code"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
-              <Select
-                value={formData.country}
-                onValueChange={(value) => handleChange("country", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select country" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="India">India</SelectItem>
-                  <SelectItem value="United States">United States</SelectItem>
-                  <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                  <SelectItem value="Canada">Canada</SelectItem>
-                  <SelectItem value="Australia">Australia</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="country" className="text-base font-medium">Country</Label>
+            <Select
+              value={formData.country}
+              onValueChange={(value) => handleChange("country", value)}
+            >
+              <SelectTrigger className="h-12 text-base">
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="India">India</SelectItem>
+                <SelectItem value="United States">United States</SelectItem>
+                <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                <SelectItem value="Canada">Canada</SelectItem>
+                <SelectItem value="Australia">Australia</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
-      );
-    }
+      </div>
+    );
+  };
 
-    if (mode === "full") {
-      // Multi-step form
-      switch (currentStep) {
-        case 1: // Contact Information
-          return (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Location Name*</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleChange("name", e.target.value)}
-                  placeholder="e.g. Main Salon"
-                  required
-                />
-              </div>
+  const renderHoursSection = () => {
+    return (
+      <div className="space-y-6 px-4 md:px-0">
+        <div className="flex items-center">
+          <Clock className="h-5 w-5 mr-2 text-primary" />
+          <h3 className="text-lg font-medium">Business Hours</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Set operating hours for this location. These will be the default working hours for your team and visible to clients.
+        </p>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                  placeholder="Location email address"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
-                  placeholder="Contact number"
-                />
-              </div>
-
-              <div className="flex items-center space-x-2 mt-6">
-                <Checkbox
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => handleChange("is_active", checked)}
-                />
-                <Label htmlFor="is_active">Location is active</Label>
-              </div>
-            </div>
-          );
-        
-        case 2: // Address Information
-          return (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="address">Address*</Label>
-                <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => handleChange("address", e.target.value)}
-                  placeholder="Street address"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    value={formData.city}
-                    onChange={(e) => handleChange("city", e.target.value)}
-                    placeholder="City"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    value={formData.state}
-                    onChange={(e) => handleChange("state", e.target.value)}
-                    placeholder="State/Province"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="zip_code">Postal Code</Label>
-                  <Input
-                    id="zip_code"
-                    value={formData.zip_code}
-                    onChange={(e) => handleChange("zip_code", e.target.value)}
-                    placeholder="Postal/Zip code"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Select
-                    value={formData.country}
-                    onValueChange={(value) => handleChange("country", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select country" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="India">India</SelectItem>
-                      <SelectItem value="United States">United States</SelectItem>
-                      <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                      <SelectItem value="Canada">Canada</SelectItem>
-                      <SelectItem value="Australia">Australia</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-          );
-        
-        case 3: // Opening Hours
-          return (
-            <div className="py-4 space-y-4">
-              <p className="text-sm text-muted-foreground mb-4">
-                Set operating hours for this location. These will be the default working hours for your team and visible to clients.
-              </p>
-              
-              {locationHours.map((day, index) => {
-                const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-                return (
-                  <div key={index} className="grid grid-cols-1 gap-4 p-4 border rounded-md">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-medium">{daysOfWeek[day.day_of_week]}</Label>
-                      <div className="flex items-center space-x-2">
-                        <Label htmlFor={`closed-${index}`} className="text-sm">Closed</Label>
-                        <Checkbox 
-                          id={`closed-${index}`}
-                          checked={day.is_closed}
-                          onCheckedChange={(checked) => updateDayHours(index, 'is_closed', !!checked)}
+        <div className="space-y-4">
+          {locationHours.map((day, index) => {
+            const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            return (
+              <Card key={index} className={cn(day.is_closed ? "bg-muted/10" : "")}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-base font-medium">{daysOfWeek[day.day_of_week]}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={`closed-${index}`} className="text-sm cursor-pointer">
+                        {day.is_closed ? "Closed" : "Open"}
+                      </Label>
+                      <div 
+                        className={cn(
+                          "w-12 h-6 rounded-full flex items-center px-1 cursor-pointer transition-colors",
+                          day.is_closed ? "bg-muted justify-start" : "bg-green-500 justify-end" 
+                        )}
+                        onClick={() => updateDayHours(index, 'is_closed', !day.is_closed)}
+                      >
+                        <div className="h-4 w-4 rounded-full bg-white" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {!day.is_closed && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor={`start-time-${index}`} className="text-sm font-medium">Open</Label>
+                        <Input
+                          id={`start-time-${index}`}
+                          type="time"
+                          value={day.start_time}
+                          onChange={(e) => updateDayHours(index, 'start_time', e.target.value)}
+                          className="h-10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`end-time-${index}`} className="text-sm font-medium">Close</Label>
+                        <Input
+                          id={`end-time-${index}`}
+                          type="time"
+                          value={day.end_time}
+                          onChange={(e) => updateDayHours(index, 'end_time', e.target.value)}
+                          className="h-10"
                         />
                       </div>
                     </div>
-                    
-                    {!day.is_closed && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`start-time-${index}`}>Open</Label>
-                          <Input
-                            id={`start-time-${index}`}
-                            type="time"
-                            value={day.start_time}
-                            onChange={(e) => updateDayHours(index, 'start_time', e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`end-time-${index}`}>Close</Label>
-                          <Input
-                            id={`end-time-${index}`}
-                            type="time"
-                            value={day.end_time}
-                            onChange={(e) => updateDayHours(index, 'end_time', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        
-        default:
-          return null;
-      }
-    }
-
-    return null;
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
-  const totalSteps = 3;
+  if (isFetching) {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="w-[98vw] max-w-none h-[95vh] overflow-auto p-0 mt-[5vh] rounded-t-xl rounded-b-none">
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading location data...</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (mode !== "full") {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="w-[98vw] max-w-none h-[100vh] overflow-auto p-6 mt-[5vh] rounded-t-xl rounded-b-none">
+          <DialogHeader>
+            <DialogTitle className="text-xl">{getDialogTitle()}</DialogTitle>
+          </DialogHeader>
+          {mode === "contact" && renderContactSection()}
+          {mode === "billing" && (
+            <div className="space-y-6">
+              <div className="bg-primary/5 p-4 rounded-md mb-8">
+                <h3 className="font-medium text-lg mb-2">Billing Details</h3>
+                <p className="text-muted-foreground text-sm">Update billing information for this location.</p>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-base font-medium flex items-center">
+                    <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                    Company Name <span className="text-destructive ml-1">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                    placeholder="Company name"
+                    className={cn("h-12 text-base", errors.name && touched.name ? "border-destructive" : "")}
+                  />
+                  {errors.name && touched.name && (
+                    <div className="text-sm text-destructive flex items-center mt-1">
+                      <AlertCircle className="h-3 w-3 mr-1" /> {errors.name}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {mode === "location" && renderAddressSection()}
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose} disabled={isLoading} className="h-11">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={isLoading}
+              className="h-11 min-w-[100px]"
+            >
+              {isLoading ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className={mode === "full" ? "w-full max-w-4xl h-[90vh] overflow-auto" : "sm:max-w-[500px]"}>
-        <DialogHeader className="flex flex-row items-center">
-          {mode === "full" && currentStep > 1 && (
-            <Button variant="ghost" size="sm" onClick={() => setCurrentStep(prev => prev - 1)} className="mr-2">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          )}
-          <DialogTitle>{getDialogTitle()}</DialogTitle>
-        </DialogHeader>
-
-        {renderStepContent()}
-
-        <DialogFooter>
-          {mode === "full" && (
-            <div className="w-full flex justify-between items-center mb-4">
-              <div className="flex space-x-2">
-                {Array.from({ length: totalSteps }).map((_, i) => (
+      <DialogContent className="w-[98vw] max-w-none h-[95vh] overflow-auto p-0 mt-[5vh] rounded-t-xl rounded-b-none">
+        <div className="flex flex-col h-full">
+          <div className="p-4 md:p-6 border-b flex items-center justify-between sticky top-0 bg-background z-10">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-full"
+                onClick={onClose}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+              <DialogTitle className="text-lg md:text-xl">{getDialogTitle()}</DialogTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={onClose} disabled={isLoading} className="h-10">
+                Cancel
+              </Button>
+              {currentStep === totalSteps && (
+                <Button 
+                  onClick={handleSubmit} 
+                  disabled={isLoading || Object.keys(errors).length > 0}
+                  className="h-10 min-w-[80px]"
+                >
+                  {isLoading ? "Saving..." : "Save"}
+                </Button>
+              )}
+            </div>
+          </div>
+          {/* Step indicator - Improved */}
+          <div className="px-4 py-3 border-b bg-muted/10">
+            <div className="max-w-4xl mx-auto w-full">
+              <div className="flex items-center relative">
+                {/* Progress connecting lines */}
+                <div className="absolute top-4 left-[12%] right-[12%] h-[2px] bg-muted"></div>
+                <div 
+                  className={cn(
+                    "absolute top-4 left-[12%] h-[2px] bg-primary transition-all",
+                    currentStep >= 2 ? "w-[38%]" : "w-0"
+                  )}
+                ></div>
+                <div 
+                  className={cn(
+                    "absolute top-4 left-[50%] h-[2px] bg-primary transition-all",
+                    currentStep >= 3 ? "w-[38%]" : "w-0"
+                  )}
+                ></div>
+                
+                {/* Step circles */}
+                {['General Info', 'Address', 'Business Hours'].map((stepName, idx) => (
                   <div 
-                    key={i}
-                    className={`h-2 w-8 rounded-full ${currentStep === i + 1 ? 'bg-primary' : 'bg-gray-300'}`}
-                  />
+                    key={idx} 
+                    className={cn(
+                      "flex flex-col items-center text-center z-10 flex-1", 
+                      idx + 1 <= currentStep ? "text-primary" : "text-muted-foreground"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center mb-1 text-sm font-medium border", 
+                      currentStep === idx + 1 ? "bg-primary text-primary-foreground border-primary" : 
+                      idx + 1 < currentStep ? "bg-primary/20 text-primary border-primary" : 
+                      "bg-background text-muted-foreground border-muted"
+                    )}>
+                      {idx + 1}
+                    </div>
+                    <span className="text-xs md:text-sm">{stepName}</span>
+                  </div>
                 ))}
               </div>
-              <div className="text-sm text-muted-foreground">
-                Step {currentStep} of {totalSteps}
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <div className="max-w-4xl mx-auto w-full py-6">
+              {currentStep === 1 && (
+                <div className="space-y-6">
+                  <div className="bg-primary/5 p-4 md:p-6 rounded-md mb-4 mx-4 md:mx-0">
+                    <h3 className="font-semibold text-lg mb-2">Location Details</h3>
+                    <p className="text-muted-foreground">
+                      Enter general information about this location including name, email, and contact details.
+                    </p>
+                  </div>
+                  {renderContactSection()}
+                </div>
+              )}
+              {currentStep === 2 && (
+                <div className="space-y-6">
+                  <div className="bg-primary/5 p-4 md:p-6 rounded-md mb-4 mx-4 md:mx-0">
+                    <h3 className="font-semibold text-lg mb-2">Location Address</h3>
+                    <p className="text-muted-foreground">
+                      Enter the physical address details of this location. This information will be visible to your clients.
+                    </p>
+                  </div>
+                  {renderAddressSection()}
+                </div>
+              )}
+              {currentStep === 3 && (
+                <div className="space-y-6">
+                  <div className="bg-primary/5 p-4 md:p-6 rounded-md mb-4 mx-4 md:mx-0">
+                    <h3 className="font-semibold text-lg mb-2">Business Hours</h3>
+                    <p className="text-muted-foreground">
+                      Set the operating hours for this location. These will appear on your booking portal and help clients know when you're open.
+                    </p>
+                  </div>
+                  {renderHoursSection()}
+                </div>
+              )}
+              {Object.keys(errors).length > 0 && (
+                <div className="mt-8 bg-destructive/10 border border-destructive/20 p-4 rounded-md mx-4 md:mx-0">
+                  <h3 className="text-destructive flex items-center text-sm font-medium mb-2">
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Please fix the following errors:
+                  </h3>
+                  <ul className="list-disc pl-5 text-sm space-y-1">
+                    {Object.entries(errors).map(([field, message]) => (
+                      <li key={field}>{message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="border-t p-4 pb-[5vh] bg-background sticky bottom-0 shadow-md">
+            <div className="max-w-4xl mx-auto w-full">
+              <div className="flex items-center justify-between">
+                <Button 
+                  variant="outline" 
+                  onClick={handlePrevStep} 
+                  disabled={currentStep === 1 || isLoading}
+                  className="h-11 px-6 min-w-[120px] flex items-center"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Button>
+                
+                <div className="text-sm font-medium">
+                  Step {currentStep} of {totalSteps}
+                </div>
+                
+                <Button 
+                  onClick={currentStep < totalSteps ? handleNextStep : handleSubmit}
+                  disabled={isLoading || (currentStep === totalSteps && Object.keys(errors).length > 0)}
+                  className="h-11 px-6 min-w-[120px] flex items-center"
+                >
+                  {currentStep < totalSteps ? (
+                    <>
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </>
+                  ) : (
+                    isLoading ? "Saving..." : "Save Location"
+                  )}
+                </Button>
               </div>
             </div>
-          )}
-          
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={isLoading}>
-              Cancel
-            </Button>
-            
-            {mode === "full" && currentStep < totalSteps ? (
-              <Button 
-                onClick={() => setCurrentStep(prev => prev + 1)} 
-                disabled={!validateCurrentStep() || isLoading}
-              >
-                Next <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            ) : (
-              <Button onClick={handleSubmit} disabled={isLoading || isFetching}>
-                {isLoading ? "Saving..." : "Save"}
-              </Button>
-            )}
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

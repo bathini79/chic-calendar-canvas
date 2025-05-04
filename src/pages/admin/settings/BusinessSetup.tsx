@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link, Routes, Route, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,17 @@ export default function BusinessSetup() {
 
   return (
     <div className="container py-6 max-w-6xl">
-     
+      <div className="flex items-center mb-6">
+        <Button variant="ghost" size="sm" asChild className="mr-2">
+          <Link to="/admin/settings">
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Back
+          </Link>
+        </Button>
+        <div className="text-sm text-muted-foreground">
+          Workspace settings • Business setup
+        </div>
+      </div>
 
       <Routes>
         <Route path="/" element={

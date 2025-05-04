@@ -1,13 +1,13 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, MoreHorizontal, Building2, Star } from "lucide-react";
+import { Plus, MoreHorizontal, Building2, Star, Trash } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LocationDialog } from "./LocationDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 interface Location {
@@ -25,6 +25,9 @@ export function LocationsList() {
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>(undefined);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [locationToDelete, setLocationToDelete] = useState<Location | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
   const fetchLocations = async () => {
@@ -63,21 +66,64 @@ export function LocationsList() {
     navigate(`/admin/settings/business-setup/locations/${id}`);
   };
 
-  const handleDeleteLocation = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this location?")) return;
+  const handleDeleteClick = (e: React.MouseEvent, location: Location) => {
+    e.stopPropagation();
+    setLocationToDelete(location);
+    setDeleteDialogOpen(true);
+  };
 
+  const handleDeleteLocation = async () => {
+    if (!locationToDelete) return;
+    
+    setIsDeleting(true);
     try {
+      // First delete from location_hours table
+      const { error: hoursError } = await supabase
+        .from("location_hours")
+        .delete()
+        .eq("location_id", locationToDelete.id);
+
+      if (hoursError) throw hoursError;
+      
+      // Delete from receipt_settings if exists
+      const { error: receiptError } = await supabase
+        .from("receipt_settings")
+        .delete()
+        .eq("location_id", locationToDelete.id);
+
+      // Ignore error if no receipt settings found
+      
+      // Delete from location_tax_settings if exists
+      const { error: taxError } = await supabase
+        .from("location_tax_settings")
+        .delete()
+        .eq("location_id", locationToDelete.id);
+
+      // Ignore error if no tax settings found
+      
+      // Check for employee_locations and delete those
+      const { error: employeeLocError } = await supabase
+        .from("employee_locations")
+        .delete()
+        .eq("location_id", locationToDelete.id);
+
+      // Finally delete the location
       const { error } = await supabase
         .from("locations")
         .delete()
-        .eq("id", id);
+        .eq("id", locationToDelete.id);
 
       if (error) throw error;
-      toast.success("Location deleted successfully");
+      
+      toast.success(`Location ${locationToDelete.name} deleted successfully`);
+      setDeleteDialogOpen(false);
+      setLocationToDelete(null);
       fetchLocations();
     } catch (error: any) {
       toast.error("Failed to delete location: " + error.message);
       console.error(error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -174,10 +220,7 @@ export function LocationsList() {
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           className="text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteLocation(location.id);
-                          }}
+                          onClick={(e) => handleDeleteClick(e, location)}
                         >
                           Delete
                         </DropdownMenuItem>
@@ -197,6 +240,24 @@ export function LocationsList() {
         locationId={selectedLocationId}
         onSuccess={fetchLocations}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Location</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the location{" "}
+              <span className="font-semibold">{locationToDelete?.name}</span>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteLocation} disabled={isDeleting}>
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

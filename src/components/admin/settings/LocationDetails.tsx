@@ -76,7 +76,10 @@ export function LocationDetails() {
   const [locationHours, setLocationHours] = useState<LocationHours[]>([]);
   
   const fetchLocationDetails = async () => {
-    if (!locationId) return;
+    if (!locationId) {
+      setIsLoading(false);
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -122,8 +125,8 @@ export function LocationDetails() {
         const productTaxId = taxSettingsData.product_tax_id;
         
         const [serviceTaxResponse, productTaxResponse] = await Promise.all([
-          serviceTaxId ? supabase.from("tax_rates").select("*").eq("id", serviceTaxId).single() : null,
-          productTaxId ? supabase.from("tax_rates").select("*").eq("id", productTaxId).single() : null
+          serviceTaxId ? supabase.from("tax_rates").select("*").eq("id", serviceTaxId).single() : Promise.resolve({data: null, error: null}),
+          productTaxId ? supabase.from("tax_rates").select("*").eq("id", productTaxId).single() : Promise.resolve({data: null, error: null})
         ]);
         
         taxSettings = {
