@@ -146,9 +146,15 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
         }
 
         toast.success("Staff member updated successfully");
-        // Invalidate the employees query to refresh the list
+        // Invalidate all queries related to employees to ensure complete refresh
         queryClient.invalidateQueries({ queryKey: ["employees-with-locations"] });
-        onOpenChange(false);
+        queryClient.invalidateQueries({ queryKey: ["employees"] });
+        queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+        
+        // Allow some time for data to update before closing the dialog
+        setTimeout(() => {
+          onOpenChange(false);
+        }, 300);
       }
       // Creating new employee - first create temporary record and send OTP
       else {

@@ -1,4 +1,3 @@
-
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { CategoryMultiSelect } from "@/components/categories/CategoryMultiSelect";
 import { useState } from "react";
-import { Image, X } from "lucide-react";
+import { Image, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import * as z from "zod";
@@ -53,6 +52,7 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
   );
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
+  const [loading, setLoading] = useState(false);
 
   const form = useForm<ServiceFormData>({
     resolver: zodResolver(formSchema),
@@ -149,6 +149,7 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
   };
 
   const onSubmit = async (data: ServiceFormData) => {
+    setLoading(true);
     try {
       if (initialData?.id) {
         // Update existing service
@@ -167,25 +168,45 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
 
         if (serviceError) throw serviceError;
 
-        // Delete existing category relationships
-        const { error: deleteError } = await supabase
+        // Instead of deleting and reinserting, use a transaction approach to handle categories
+        const existingCategoriesRes = await supabase
           .from('services_categories')
-          .delete()
+          .select('category_id')
           .eq('service_id', initialData.id);
-
-        if (deleteError) throw deleteError;
-
-        // Insert new category relationships
-        const { error: categoriesError } = await supabase
-          .from('services_categories')
-          .insert(
-            data.categories.map(categoryId => ({
-              service_id: initialData.id,
-              category_id: categoryId,
-            }))
-          );
-
-        if (categoriesError) throw categoriesError;
+          
+        const existingCategoriesIds = existingCategoriesRes.data?.map(c => c.category_id) || [];
+        
+        // Categories to add (new ones that don't exist yet)
+        const categoriesToAdd = data.categories
+          .filter(catId => !existingCategoriesIds.includes(catId))
+          .map(categoryId => ({
+            service_id: initialData.id,
+            category_id: categoryId,
+          }));
+          
+        // Categories to remove (ones that exist but aren't in the new selection)
+        const categoriesToRemove = existingCategoriesIds
+          .filter(catId => !data.categories.includes(catId));
+          
+        // Add new categories
+        if (categoriesToAdd.length > 0) {
+          const { error: addCategoriesError } = await supabase
+            .from('services_categories')
+            .insert(categoriesToAdd);
+            
+          if (addCategoriesError) throw addCategoriesError;
+        }
+        
+        // Remove deselected categories
+        if (categoriesToRemove.length > 0) {
+          const { error: removeCategoriesError } = await supabase
+            .from('services_categories')
+            .delete()
+            .eq('service_id', initialData.id)
+            .in('category_id', categoriesToRemove);
+            
+          if (removeCategoriesError) throw removeCategoriesError;
+        }
 
         // Handle service locations
         // First delete existing location relationships
@@ -256,6 +277,8 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
       onSuccess();
     } catch (error: any) {
       toast.error(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -464,7 +487,8 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit">
+          <Button type="submit" disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {initialData ? 'Update Service' : 'Create Service'}
           </Button>
         </div>
