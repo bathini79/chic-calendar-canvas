@@ -1,13 +1,15 @@
-
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ChevronDown, ChevronUp, Package, Scissors } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, Clock, Package, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/cart/CartContext";
+import { format, addDays } from "date-fns";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 interface Service {
   id: string;
@@ -42,6 +44,16 @@ interface CartItem {
 interface Employee {
   id: string;
   name: string;
+  services: string[];
+}
+
+interface StylistAvailability {
+  id: string;
+  name: string;
+  isAvailable: boolean;
+  hasShiftToday: boolean; 
+  onTimeOff: boolean;
+  hasBookingConflict: boolean;
 }
 
 interface ServiceSelectorProps {
@@ -53,9 +65,14 @@ interface ServiceSelectorProps {
 export function ServiceSelector({ items, selectedStylists, onStylistSelect }: ServiceSelectorProps) {
   const [expandedPackages, setExpandedPackages] = useState<Record<string, boolean>>({});
   const [expandedIndividualServices, setExpandedIndividualServices] = useState(false);
-  const { selectedLocation } = useCart();
+  const { selectedLocation, selectedDate, selectedTimeSlots } = useCart();
+  const [stylistAvailability, setStylistAvailability] = useState<Record<string, StylistAvailability[]>>({});
+  const [dateSelected, setDateSelected] = useState<boolean>(false);
 
-  // Query for additional services that might be customized in packages
+  useEffect(() => {
+    setDateSelected(!!selectedDate);
+  }, [selectedDate]);
+
   const { data: services } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -69,45 +86,53 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     enabled: items.some(item => item.customized_services?.length > 0)
   });
 
-  // Fetch employees that are assigned to the current location and the specific services
+  const serviceIds = React.useMemo(() => {
+    const ids: string[] = [];
+    items.forEach(item => {
+      if (item.service_id) {
+        ids.push(item.service_id);
+      }
+      
+      if (item.package?.package_services) {
+        item.package.package_services.forEach(ps => {
+          if (ps.service && ps.service.id) {
+            ids.push(ps.service.id);
+          }
+        });
+      }
+      
+      if (item.customized_services?.length) {
+        ids.push(...item.customized_services);
+      }
+    });
+    return [...new Set(ids)];
+  }, [items]);
+
+  const serviceTimeSlots = React.useMemo(() => {
+    const result: { serviceId: string, timeSlot: string }[] = [];
+    
+    for (const serviceId of serviceIds) {
+      const timeSlot = selectedTimeSlots[serviceId];
+      if (timeSlot) {
+        result.push({ serviceId, timeSlot });
+      }
+    }
+    
+    return result;
+  }, [serviceIds, selectedTimeSlots]);
+
   const { data: employees, isLoading: isLoadingEmployees } = useQuery({
-    queryKey: ['employees-for-services', selectedLocation, items],
+    queryKey: ['employees-for-services', selectedLocation, serviceIds],
     queryFn: async () => {
-      // Extract all service IDs from cart items (both individual services and from packages)
-      const serviceIds: string[] = [];
-      
-      items.forEach(item => {
-        // Add individual service IDs
-        if (item.service_id) {
-          serviceIds.push(item.service_id);
-        }
-        
-        // Add service IDs from packages
-        if (item.package?.package_services) {
-          item.package.package_services.forEach(ps => {
-            if (ps.service.id) {
-              serviceIds.push(ps.service.id);
-            }
-          });
-        }
-        
-        // Add customized service IDs
-        if (item.customized_services?.length) {
-          serviceIds.push(...item.customized_services);
-        }
-      });
-      
-      // If no services or no location, return empty array
       if (serviceIds.length === 0 || !selectedLocation) {
         return [];
       }
       
-      // First get employees assigned to the location
       const { data: locationEmployees, error: locationError } = await supabase
         .from('employees')
         .select(`
           *,
-          employee_locations!inner(*)
+          employee_locations!inner(location_id)
         `)
         .eq('employment_type', 'stylist')
         .eq('status', 'active')
@@ -116,10 +141,8 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
       if (locationError) throw locationError;
       if (!locationEmployees?.length) return [];
       
-      // Get employee IDs
       const employeeIds = locationEmployees.map(emp => emp.id);
       
-      // Then get employees who have skills for these services
       const { data: skillsData, error: skillsError } = await supabase
         .from('employee_skills')
         .select('employee_id, service_id')
@@ -128,17 +151,6 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
         
       if (skillsError) throw skillsError;
       
-      // Create a map of service_id -> employee_ids who can perform that service
-      const serviceEmployeeMap: Record<string, string[]> = {};
-      
-      skillsData?.forEach(skill => {
-        if (!serviceEmployeeMap[skill.service_id]) {
-          serviceEmployeeMap[skill.service_id] = [];
-        }
-        serviceEmployeeMap[skill.service_id].push(skill.employee_id);
-      });
-      
-      // Create a map of employee_id -> services they can perform
       const employeeServiceMap: Record<string, string[]> = {};
       
       skillsData?.forEach(skill => {
@@ -148,27 +160,215 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
         employeeServiceMap[skill.employee_id].push(skill.service_id);
       });
       
-      // Return all employees that are assigned to the location,
-      // with a new property showing which services they can perform
       return locationEmployees.map(emp => ({
         ...emp,
         services: employeeServiceMap[emp.id] || []
       }));
     },
-    enabled: !!selectedLocation && items.length > 0
+    enabled: !!selectedLocation && serviceIds.length > 0
   });
 
-  // Group items by package and standalone services
+  const { data: regularShifts, isLoading: isLoadingShifts } = useQuery({
+    queryKey: ['regular-shifts', selectedLocation, selectedDate],
+    queryFn: async () => {
+      if (!selectedLocation || !selectedDate) return [];
+      
+      const dayOfWeek = selectedDate.getDay();
+      
+      const { data, error } = await supabase
+        .from('recurring_shifts')
+        .select('*')
+        .eq('location_id', selectedLocation)
+        .eq('day_of_week', dayOfWeek);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedLocation && !!selectedDate
+  });
+
+  const { data: timeOffRequests, isLoading: isLoadingTimeOff } = useQuery({
+    queryKey: ['time-off-requests', selectedDate],
+    queryFn: async () => {
+      if (!selectedDate) return [];
+      
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      const { data, error } = await supabase
+        .from('time_off_requests')
+        .select('*')
+        .eq('status', 'approved')
+        .lte('start_date', dateStr)
+        .gte('end_date', dateStr);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedDate
+  });
+
+  const { data: existingBookings, isLoading: isLoadingBookings } = useQuery({
+    queryKey: ['bookings', selectedDate, selectedLocation],
+    queryFn: async () => {
+      if (!selectedDate || !selectedLocation) return [];
+      
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*, employee:employees(*), appointment:appointments(*)')
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString())
+        .eq('appointments.location', selectedLocation);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedDate && !!selectedLocation
+  });
+
+  const workingStylists = React.useMemo(() => {
+    if (!regularShifts) return new Set<string>();
+    
+    const stylistIds = new Set<string>();
+    regularShifts.forEach(shift => {
+      stylistIds.add(shift.employee_id);
+    });
+    return stylistIds;
+  }, [regularShifts]);
+
+  const stylistsOnTimeOff = React.useMemo(() => {
+    if (!timeOffRequests) return new Set<string>();
+    
+    const stylistIds = new Set<string>();
+    timeOffRequests.forEach(timeOff => {
+      stylistIds.add(timeOff.employee_id);
+    });
+    return stylistIds;
+  }, [timeOffRequests]);
+  
+  useEffect(() => {
+    if (!employees || !selectedDate) return;
+    
+    const availabilityMap: Record<string, StylistAvailability[]> = {};
+    
+    for (const serviceId of serviceIds) {
+      const serviceEmployees = employees.filter(emp => 
+        emp.services.includes(serviceId) || emp.services.length === 0
+      );
+      
+      const availableStylistsForService: StylistAvailability[] = serviceEmployees.map(employee => {
+        const onTimeOff = stylistsOnTimeOff.has(employee.id);
+        const hasShiftToday = workingStylists.has(employee.id);
+        const hasBookingConflict = false;
+        const isAvailable = hasShiftToday && !onTimeOff;
+        
+        return {
+          id: employee.id,
+          name: employee.name,
+          isAvailable,
+          hasShiftToday,
+          onTimeOff,
+          hasBookingConflict
+        };
+      });
+      
+      availabilityMap[serviceId] = availableStylistsForService;
+    }
+    
+    for (const { serviceId, timeSlot } of serviceTimeSlots) {
+      if (!availabilityMap[serviceId]) continue;
+      
+      availabilityMap[serviceId] = availabilityMap[serviceId].map(stylistAvail => {
+        if (!stylistAvail.isAvailable) return stylistAvail;
+        
+        const [hours, minutes] = timeSlot.split(':').map(Number);
+        
+        const appointmentStart = new Date(selectedDate);
+        appointmentStart.setHours(hours, minutes, 0, 0);
+        
+        const service = items.find(item => item.service_id === serviceId)?.service;
+        const packageService = items.find(item => {
+          return item.package?.package_services?.some(
+            (ps: any) => ps.service.id === serviceId
+          );
+        })?.package?.package_services?.find(
+          (ps: any) => ps.service.id === serviceId
+        );
+        
+        const duration = service?.duration || packageService?.service?.duration || 60;
+        const appointmentEnd = new Date(appointmentStart.getTime() + duration * 60 * 1000);
+        
+        let withinShift = false;
+        const stylistShifts = regularShifts?.filter(
+          shift => shift.employee_id === stylistAvail.id
+        ) || [];
+        
+        if (stylistShifts.length > 0) {
+          withinShift = stylistShifts.some(shift => {
+            const shiftStart = new Date(selectedDate);
+            const shiftEnd = new Date(selectedDate);
+            
+            const [startHour, startMinute] = shift.start_time.split(':').map(Number);
+            const [endHour, endMinute] = shift.end_time.split(':').map(Number);
+            
+            shiftStart.setHours(startHour, startMinute, 0, 0);
+            shiftEnd.setHours(endHour, endMinute, 0, 0);
+            
+            return appointmentStart >= shiftStart && appointmentEnd <= shiftEnd;
+          });
+        }
+        
+        if (!withinShift) {
+          return {
+            ...stylistAvail,
+            isAvailable: false,
+            hasBookingConflict: false
+          };
+        }
+        
+        const hasConflict = existingBookings?.some(booking => {
+          if (booking.employee_id !== stylistAvail.id) return false;
+          
+          const bookingStart = new Date(booking.start_time);
+          const bookingEnd = new Date(booking.end_time);
+          
+          return (appointmentStart < bookingEnd && appointmentEnd > bookingStart);
+        }) || false;
+        
+        return {
+          ...stylistAvail,
+          isAvailable: !hasConflict && withinShift,
+          hasBookingConflict: hasConflict
+        };
+      });
+    }
+    
+    setStylistAvailability(availabilityMap);
+  }, [
+    employees,
+    selectedDate,
+    serviceTimeSlots,
+    workingStylists,
+    stylistsOnTimeOff,
+    existingBookings,
+    items,
+    serviceIds,
+    regularShifts
+  ]);
+
   const groupedItems = items.reduce((acc: any, item) => {
     if (item.package_id && item.package) {
       const packageServices: PackageService[] = [];
       
-      // Add regular package services
       if (item.package.package_services) {
         packageServices.push(...item.package.package_services);
       }
       
-      // Add customized services
       if (item.customized_services?.length && services) {
         const customizedServiceObjects = item.customized_services
           .map(serviceId => {
@@ -215,7 +415,6 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     setExpandedIndividualServices(!expandedIndividualServices);
   };
 
-  // Get the price for a service, prioritizing package_selling_price if available
   const getServicePrice = (service: Service, packageService?: PackageService): number => {
     if (packageService && packageService.package_selling_price !== undefined && packageService.package_selling_price !== null) {
       return packageService.package_selling_price;
@@ -223,12 +422,6 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     return service.selling_price;
   };
 
-  // Calculate total services across all items
-  const totalServices = Object.values(groupedItems.packages).reduce(
-    (total, pkg) => total + pkg.services.length, 0
-  ) + groupedItems.services.length;
-
-  // Format duration
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
@@ -239,26 +432,96 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
     return `${remainingMinutes}m`;
   };
 
-  // Get employees who can perform a specific service
   const getEmployeesForService = (serviceId: string) => {
     if (!employees || !serviceId) return [];
     
-    // If we have skills data, filter employees who can perform this service
-    return employees.filter(emp => 
-      // Either the employee has the skill for this service
-      emp.services.includes(serviceId) ||
-      // Or the employee has no specific skill assignments (can do everything)
-      emp.services.length === 0
-    );
+    if (!selectedDate) {
+      return employees.filter(emp => 
+        emp.services.includes(serviceId) || emp.services.length === 0
+      );
+    }
+    
+    return employees.filter(emp => {
+      const canPerformService = emp.services.includes(serviceId) || emp.services.length === 0;
+      if (!canPerformService) return false;
+      
+      if (!selectedTimeSlots[serviceId]) {
+        return workingStylists.has(emp.id) && !stylistsOnTimeOff.has(emp.id);
+      }
+      
+      const availability = stylistAvailability[serviceId]?.find(a => a.id === emp.id);
+      
+      if (!availability) {
+        return workingStylists.has(emp.id) && !stylistsOnTimeOff.has(emp.id);
+      }
+      
+      return availability.isAvailable;
+    });
+  };
+
+  const getStylistAvailabilityStatus = (serviceId: string, stylistId: string): {
+    isAvailable: boolean;
+    reason?: string;
+  } => {
+    if (!selectedDate) {
+      return { isAvailable: true };
+    }
+    
+    if (!workingStylists.has(stylistId)) {
+      return { isAvailable: false, reason: "Stylist is not working on this day" };
+    }
+    
+    if (stylistsOnTimeOff.has(stylistId)) {
+      return { isAvailable: false, reason: "Stylist is on time off" };
+    }
+    
+    if (!selectedTimeSlots[serviceId]) {
+      return { isAvailable: true };
+    }
+    
+    const availabilityList = stylistAvailability[serviceId] || [];
+    const stylistAvail = availabilityList.find(a => a.id === stylistId);
+    
+    if (!stylistAvail) {
+      return { isAvailable: true };
+    }
+    
+    if (!stylistAvail.isAvailable) {
+      if (stylistAvail.hasBookingConflict) {
+        return { isAvailable: false, reason: "Stylist has another booking at this time" };
+      } else {
+        return { isAvailable: false, reason: "Stylist is not scheduled to work at this time" };
+      }
+    }
+    
+    return { isAvailable: true };
+  };
+
+  const anyAvailableForService = (serviceId: string): boolean => {
+    if (!selectedDate) return true;
+    
+    const serviceEmployees = employees?.filter(emp => 
+      emp.services.includes(serviceId) || emp.services.length === 0
+    ) || [];
+    
+    return serviceEmployees.some(emp => {
+      const status = getStylistAvailabilityStatus(serviceId, emp.id);
+      return status.isAvailable;
+    });
   };
 
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">Select Stylists</CardTitle>
+        {!selectedDate && (
+          <div className="mt-2 flex items-center gap-2 text-sm p-2 bg-amber-50 text-amber-800 rounded-md">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <p>Please select a date and time to see available stylists</p>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Render Package Services */}
         {Object.entries(groupedItems.packages).map(([packageId, packageData]) => (
           <div key={packageId} className="space-y-4">
             <Button 
@@ -285,21 +548,18 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
             {expandedPackages[packageId] && (
               <div className="space-y-3 pl-4">
                 {packageData.services.map((ps: PackageService) => {
-                  // Determine if this is a package service with package_selling_price
                   const isPackageService = packageData.package.package_services.some(
                     basePs => basePs.service.id === ps.service.id
                   );
                   
-                  // Get the corresponding base package service if exists
                   const basePackageService = isPackageService 
                     ? packageData.package.package_services.find(basePs => basePs.service.id === ps.service.id)
                     : undefined;
                   
-                  // Calculate the display price
                   const displayPrice = getServicePrice(ps.service, basePackageService);
                   
-                  // Get available employees for this service
                   const availableEmployees = getEmployeesForService(ps.service.id);
+                  const hasAvailableStylist = anyAvailableForService(ps.service.id);
                   
                   return (
                     <div 
@@ -307,27 +567,64 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
                       className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{ps.service.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium truncate">{ps.service.name}</p>
+                          {selectedDate && !hasAvailableStylist && (
+                            <Badge variant="outline" className="text-amber-600 bg-amber-50 border-amber-200">
+                              No stylists available
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {formatDuration(ps.service.duration)} • ₹{displayPrice}
                         </p>
                       </div>
-                      <Select 
-                        value={selectedStylists[ps.service.id] || ''} 
-                        onValueChange={(value) => onStylistSelect(ps.service.id, value)}
-                      >
-                        <SelectTrigger className="w-full sm:w-[200px]">
-                          <SelectValue placeholder="Select stylist" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="any">Any Available Stylist</SelectItem>
-                          {availableEmployees.map((employee) => (
-                            <SelectItem key={employee.id} value={employee.id}>
-                              {employee.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <TooltipProvider>
+                        <Select 
+                          value={selectedStylists[ps.service.id] || ''} 
+                          onValueChange={(value) => onStylistSelect(ps.service.id, value)}
+                        >
+                          <SelectTrigger className="w-full sm:w-[200px]">
+                            <SelectValue placeholder="Select stylist" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="any">Any Available Stylist</SelectItem>
+                            {employees?.filter(emp => 
+                              emp.services.includes(ps.service.id) || 
+                              emp.services.length === 0
+                            ).map((employee) => {
+                              const availability = getStylistAvailabilityStatus(ps.service.id, employee.id);
+                              const isUnavailable = selectedDate && !availability.isAvailable;
+                              
+                              return (
+                                <Tooltip key={employee.id}>
+                                  <TooltipTrigger asChild>
+                                    <div>
+                                      <SelectItem 
+                                        value={employee.id} 
+                                        disabled={isUnavailable}
+                                        className={isUnavailable ? "opacity-50" : ""}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span>{employee.name}</span>
+                                          {isUnavailable && (
+                                            <Clock className="h-3 w-3 text-amber-500" />
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    </div>
+                                  </TooltipTrigger>
+                                  {isUnavailable && (
+                                    <TooltipContent>
+                                      <p className="text-xs">{availability.reason}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </TooltipProvider>
                     </div>
                   );
                 })}
@@ -337,7 +634,6 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
           </div>
         ))}
 
-        {/* Render Individual Services */}
         {groupedItems.services.length > 0 && (
           <div className="space-y-4">
             <Button 
@@ -364,8 +660,8 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
             {expandedIndividualServices && (
               <div className="space-y-3 pl-4">
                 {groupedItems.services.map(({ cartItemId, service }) => {
-                  // Get available employees for this service
                   const availableEmployees = getEmployeesForService(service.id);
+                  const hasAvailableStylist = anyAvailableForService(service.id);
                   
                   return (
                     <div 
@@ -373,27 +669,64 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
                       className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{service.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium truncate">{service.name}</p>
+                          {selectedDate && !hasAvailableStylist && (
+                            <Badge variant="outline" className="text-amber-600 bg-amber-50 border-amber-200">
+                              No stylists available
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {formatDuration(service.duration)} • ₹{service.selling_price}
                         </p>
                       </div>
-                      <Select 
-                        value={selectedStylists[service.id] || ''} 
-                        onValueChange={(value) => onStylistSelect(service.id, value)}
-                      >
-                        <SelectTrigger className="w-full sm:w-[200px]">
-                          <SelectValue placeholder="Select stylist" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="any">Any Available Stylist</SelectItem>
-                          {availableEmployees.map((employee) => (
-                            <SelectItem key={employee.id} value={employee.id}>
-                              {employee.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <TooltipProvider>
+                        <Select 
+                          value={selectedStylists[service.id] || ''} 
+                          onValueChange={(value) => onStylistSelect(service.id, value)}
+                        >
+                          <SelectTrigger className="w-full sm:w-[200px]">
+                            <SelectValue placeholder="Select stylist" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="any">Any Available Stylist</SelectItem>
+                            {employees?.filter(emp => 
+                              emp.services.includes(service.id) || 
+                              emp.services.length === 0
+                            ).map((employee) => {
+                              const availability = getStylistAvailabilityStatus(service.id, employee.id);
+                              const isUnavailable = selectedDate && !availability.isAvailable;
+                              
+                              return (
+                                <Tooltip key={employee.id}>
+                                  <TooltipTrigger asChild>
+                                    <div>
+                                      <SelectItem 
+                                        value={employee.id} 
+                                        disabled={isUnavailable}
+                                        className={isUnavailable ? "opacity-50" : ""}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span>{employee.name}</span>
+                                          {isUnavailable && (
+                                            <Clock className="h-3 w-3 text-amber-500" />
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    </div>
+                                  </TooltipTrigger>
+                                  {isUnavailable && (
+                                    <TooltipContent>
+                                      <p className="text-xs">{availability.reason}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </TooltipProvider>
                     </div>
                   );
                 })}
@@ -401,6 +734,12 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
             )}
           </div>
         )}
+        
+        {isLoadingEmployees || isLoadingShifts || isLoadingTimeOff || isLoadingBookings ? (
+          <div className="text-center py-2 text-sm text-muted-foreground">
+            Loading stylist availability...
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

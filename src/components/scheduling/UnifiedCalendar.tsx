@@ -18,6 +18,11 @@ interface TimeSlot {
   endTime: string;
 }
 
+interface StaffAvailability {
+  id: string;
+  isAvailable: boolean;
+}
+
 interface UnifiedCalendarProps {
   selectedDate: Date | null;
   onDateSelect: (date: Date | null) => void;
@@ -39,6 +44,9 @@ export function UnifiedCalendar({
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const isMobile = useIsMobile();
+
+  // Track availability of stylists at different time slots
+  const [stylistAvailability, setStylistAvailability] = useState<Record<string, StaffAvailability[]>>({});
 
   useEffect(() => {
     const today = startOfToday();
@@ -64,6 +72,35 @@ export function UnifiedCalendar({
     }, 0);
   }, [sortedItems]);
 
+  // Extract all service IDs from items
+  const serviceIds = useMemo(() => {
+    const ids: string[] = [];
+    items.forEach(item => {
+      if (item.service_id) {
+        ids.push(item.service_id);
+      }
+      
+      if (item.package?.package_services) {
+        item.package.package_services.forEach((ps: any) => {
+          if (ps.service && ps.service.id) {
+            ids.push(ps.service.id);
+          }
+        });
+      }
+      
+      if (item.customized_services?.length) {
+        ids.push(...item.customized_services);
+      }
+    });
+    return [...new Set(ids)]; // Remove duplicates
+  }, [items]);
+
+  // Extract all selected stylist IDs
+  const selectedStylistIds = useMemo(() => {
+    return Object.values(selectedStylists)
+      .filter(id => id && id !== 'any');
+  }, [selectedStylists]);
+
   const { data: locationData } = useQuery({
     queryKey: ['location', locationId],
     queryFn: async () => {
@@ -84,6 +121,87 @@ export function UnifiedCalendar({
     enabled: !!locationId
   });
 
+  // Query for employee skills to know which stylists can perform services
+  const { data: employeeSkills } = useQuery({
+    queryKey: ['employee-skills', serviceIds],
+    queryFn: async () => {
+      if (serviceIds.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from('employee_skills')
+        .select('employee_id, service_id')
+        .in('service_id', serviceIds);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: serviceIds.length > 0
+  });
+
+  // Fetch all location employees
+  const { data: locationEmployees } = useQuery({
+    queryKey: ['location-employees', locationId],
+    queryFn: async () => {
+      if (!locationId) return [];
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .select(`
+          *,
+          employee_locations!inner(location_id)
+        `)
+        .eq('employment_type', 'stylist')
+        .eq('status', 'active')
+        .eq('employee_locations.location_id', locationId);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!locationId
+  });
+
+  // Query for regular shifts
+  const { data: regularShifts } = useQuery({
+    queryKey: ['regular-shifts', locationId, selectedDate],
+    queryFn: async () => {
+      if (!locationId || !selectedDate) return [];
+      
+      const dayOfWeek = selectedDate.getDay();
+      
+      const { data, error } = await supabase
+        .from('recurring_shifts')
+        .select('*')
+        .eq('location_id', locationId)
+        .eq('day_of_week', dayOfWeek);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!locationId && !!selectedDate
+  });
+
+  // Query for time off requests
+  const { data: timeOffRequests } = useQuery({
+    queryKey: ['time-off-requests', locationId, selectedDate],
+    queryFn: async () => {
+      if (!locationId || !selectedDate) return [];
+      
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      const { data, error } = await supabase
+        .from('time_off_requests')
+        .select('*')
+        .eq('status', 'approved')
+        .lte('start_date', dateStr)
+        .gte('end_date', dateStr);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!locationId && !!selectedDate
+  });
+
+  // Query for existing bookings
   const { data: existingBookings } = useQuery({
     queryKey: ['bookings', selectedDate, locationId],
     queryFn: async () => {
@@ -108,6 +226,85 @@ export function UnifiedCalendar({
     enabled: !!selectedDate && !!locationId
   });
 
+  // Get service to employees mapping
+  const serviceToEmployeesMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    
+    if (employeeSkills) {
+      employeeSkills.forEach(skill => {
+        if (!map[skill.service_id]) {
+          map[skill.service_id] = [];
+        }
+        map[skill.service_id].push(skill.employee_id);
+      });
+    }
+    
+    return map;
+  }, [employeeSkills]);
+
+  // Check if a stylist is available at a specific time
+  const isStylistAvailableAtTime = (
+    stylistId: string, 
+    timeString: string,
+    serviceDuration: number
+  ): boolean => {
+    // If no selected date, we can't check availability
+    if (!selectedDate) return false;
+    
+    // Create DateTime objects for the slot
+    const slotStart = new Date(selectedDate);
+    const [hours, minutes] = timeString.split(':').map(Number);
+    slotStart.setHours(hours, minutes, 0, 0);
+    
+    const slotEnd = addMinutes(slotStart, serviceDuration);
+    
+    // Check if on time off
+    const onTimeOff = timeOffRequests?.some(
+      timeOff => timeOff.employee_id === stylistId
+    );
+    
+    if (onTimeOff) return false;
+    
+    // Check regular shifts
+    const stylistShifts = regularShifts?.filter(
+      shift => shift.employee_id === stylistId
+    );
+    
+    // If no shifts found, stylist doesn't work this day
+    if (!stylistShifts || stylistShifts.length === 0) return false;
+    
+    // Check if the slot is within any of the stylist's shifts
+    const withinShift = stylistShifts.some(shift => {
+      const shiftStart = new Date(selectedDate);
+      const shiftEnd = new Date(selectedDate);
+      
+      const [startHour, startMinute] = shift.start_time.split(':').map(Number);
+      const [endHour, endMinute] = shift.end_time.split(':').map(Number);
+      
+      shiftStart.setHours(startHour, startMinute, 0, 0);
+      shiftEnd.setHours(endHour, endMinute, 0, 0);
+      
+      // Fix: The appointment should be allowed to start any time before shift ends
+      // as long as there's enough time to complete the service before closing
+      return slotStart >= shiftStart && slotEnd <= shiftEnd;
+    });
+    
+    if (!withinShift) return false;
+    
+    // Check if stylist has existing bookings
+    const hasConflict = existingBookings?.some(booking => {
+      if (booking.employee_id !== stylistId) return false;
+      
+      const bookingStart = new Date(booking.start_time);
+      const bookingEnd = new Date(booking.end_time);
+      
+      return (slotStart < bookingEnd && slotEnd > bookingStart);
+    });
+    
+    return !hasConflict;
+  };
+
+  // Update time slots based on all availability factors
   useEffect(() => {
     if (!selectedDate || !locationData) return;
 
@@ -121,10 +318,6 @@ export function UnifiedCalendar({
         (h: any) => h.day_of_week === dayOfWeek
       );
 
-      const hasSpecificStylists = Object.values(selectedStylists).some(
-        id => id && id !== 'any'
-      );
-
       if (locationHours && !locationHours.is_closed) {
         const [startHour, startMinute] = locationHours.start_time.split(':').map(Number);
         const [endHour, endMinute] = locationHours.end_time.split(':').map(Number);
@@ -132,6 +325,10 @@ export function UnifiedCalendar({
         let currentHour = startHour;
         let currentMinute = startMinute;
 
+        // Track stylist availability for each time slot
+        const availabilityByTime: Record<string, StaffAvailability[]> = {};
+
+        // Generate time slots in 30-minute increments
         while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
           const timeString = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
           const slotStart = new Date(selectedDate);
@@ -153,24 +350,77 @@ export function UnifiedCalendar({
             continue;
           }
           
-          // Only add the slot if it ends before closing time
+          // Only add the slot if it ends before or at closing time
+          // Fix: Allow slots that end exactly at closing time
           if (slotEnd <= closingTime) {
-            const hasConflict = existingBookings?.some(booking => {
-              const bookingStart = new Date(booking.start_time);
-              const bookingEnd = new Date(booking.end_time);
+            // Create empty availability array for this time slot
+            availabilityByTime[timeString] = [];
+            
+            // Check stylist availability for this time slot
+            let hasAnyAvailableStylist = false;
+            
+            // For each service, check if there's at least one stylist available
+            for (const serviceId of serviceIds) {
+              // Get the stylists who can perform this service
+              const stylistsForService = serviceToEmployeesMap[serviceId] || [];
               
-              return (
-                (slotStart <= bookingEnd && slotEnd >= bookingStart)
-              );
-            });
-
+              // If a specific stylist is selected for this service
+              const selectedStylist = Object.entries(selectedStylists)
+                .find(([id, _]) => id === serviceId)?.[1];
+              
+              if (selectedStylist && selectedStylist !== 'any') {
+                // Check if this specific stylist is available
+                const isAvailable = isStylistAvailableAtTime(
+                  selectedStylist,
+                  timeString,
+                  totalDuration
+                );
+                
+                availabilityByTime[timeString].push({
+                  id: selectedStylist,
+                  isAvailable
+                });
+                
+                if (isAvailable) {
+                  hasAnyAvailableStylist = true;
+                }
+              } else {
+                // Check if any stylist who can perform this service is available
+                const availableStylist = stylistsForService.some(stylistId => 
+                  isStylistAvailableAtTime(stylistId, timeString, totalDuration)
+                );
+                
+                if (availableStylist) {
+                  hasAnyAvailableStylist = true;
+                }
+                
+                // Add all potential stylists to the availability array
+                stylistsForService.forEach(stylistId => {
+                  const isAvailable = isStylistAvailableAtTime(
+                    stylistId,
+                    timeString,
+                    totalDuration
+                  );
+                  
+                  availabilityByTime[timeString].push({
+                    id: stylistId,
+                    isAvailable
+                  });
+                });
+              }
+            }
+            
             const firstItemId = sortedItems.length > 0 ? sortedItems[0].id : '';
             const isSelected = firstItemId && selectedTimeSlots[firstItemId] === timeString;
+            
+            // If "any stylist" option is enabled, consider general availability
+            const anyAvailable = hasAnyAvailableStylist || 
+              Object.values(selectedStylists).some(s => s === 'any');
 
             slots.push({
               time: timeString,
               endTime: format(slotEnd, 'HH:mm'),
-              isAvailable: !hasConflict,
+              isAvailable: anyAvailable,
               isSelected,
             });
           }
@@ -182,14 +432,31 @@ export function UnifiedCalendar({
             currentMinute = 0;
           }
         }
+
+        // Store stylist availability data
+        setStylistAvailability(availabilityByTime);
+
+        return slots.sort((a, b) => a.time.localeCompare(b.time));
       }
       
-      return slots.sort((a, b) => a.time.localeCompare(b.time));
+      return [];
     };
 
     const generatedSlots = generateTimeSlots();
     setTimeSlots(generatedSlots);
-  }, [selectedDate, existingBookings, selectedTimeSlots, selectedStylists, locationData, totalDuration, sortedItems]);
+  }, [
+    selectedDate, 
+    existingBookings, 
+    regularShifts,
+    timeOffRequests,
+    selectedTimeSlots, 
+    selectedStylists, 
+    locationData, 
+    totalDuration, 
+    sortedItems,
+    serviceIds,
+    serviceToEmployeesMap
+  ]);
 
   const calculateSequentialTimeSlots = (startTimeString: string) => {
     if (!selectedDate || sortedItems.length === 0) return {};

@@ -75,6 +75,38 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     appointmentId, // Pass the appointmentId to useStaffAvailability
   });
 
+  // Query to fetch employee skills (which service each stylist can perform)
+  const { data: employeeSkills } = useQuery({
+    queryKey: ['employee-skills', locationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employee_skills')
+        .select(`
+          employee_id,
+          service_id
+        `);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Create a map of service_id to qualified stylists
+  const serviceToStylistsMap = React.useMemo(() => {
+    const map: Record<string, string[]> = {};
+    
+    if (employeeSkills) {
+      employeeSkills.forEach(skill => {
+        if (!map[skill.service_id]) {
+          map[skill.service_id] = [];
+        }
+        map[skill.service_id].push(skill.employee_id);
+      });
+    }
+    
+    return map;
+  }, [employeeSkills]);
+
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
@@ -313,8 +345,36 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     return service?.duration || 60; // Default to 60 minutes if not found
   };
 
+  // Function to check if a stylist can perform a specific service
+  const canStylistPerformService = (stylistId: string, serviceId: string): boolean => {
+    // "Any" option can perform any service
+    if (stylistId === 'any') return true;
+    
+    // If we have no service-to-stylists map or no service ID, allow all stylists
+    if (!serviceToStylistsMap || !serviceId) return true;
+    
+    // Get stylists who can perform this service
+    const qualifiedStylists = serviceToStylistsMap[serviceId] || [];
+    
+    // If no specific stylists are assigned to this service, all can perform it
+    if (qualifiedStylists.length === 0) return true;
+    
+    // Otherwise, check if this stylist is in the qualified list
+    return qualifiedStylists.includes(stylistId);
+  };
+
   // Function to render the stylist selection dropdown
   const renderStylistDropdown = (itemId: string, value: string, colorIndicator = false) => {
+    // Get qualified stylists for this service
+    const serviceId = itemId; // In most cases, itemId is the serviceId
+    const qualifiedStylistIds = serviceToStylistsMap[serviceId] || [];
+    
+    // Filter the list of stylists to only include those who can perform this service
+    // If no specific stylists are assigned, show all stylists (they all can perform it)
+    const filteredStylists = qualifiedStylistIds.length === 0
+      ? stylists
+      : stylists.filter(stylist => qualifiedStylistIds.includes(stylist.id));
+
     return (
       <TooltipProvider delayDuration={300}>
         <Select 
@@ -326,7 +386,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           </SelectTrigger>
           <SelectContent align="center" side="bottom">
             <SelectItem value="any">Any Available Stylist</SelectItem>
-            {stylists.map((stylist) => {
+            {filteredStylists.map((stylist) => {
               const available = isStylistAvailable(stylist.id);
               
               return (
