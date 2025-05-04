@@ -3,23 +3,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, MapPin, Building2, AtSign, Phone, Clock, Calendar, Check, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { TimeInput } from "@/components/ui/time-input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LocationDialogProps {
   isOpen: boolean;
   onClose: () => void;
   locationId?: string;
   onSuccess?: () => void;
-  mode?: "full" | "contact" | "receipt" | "billing" | "location";
+  mode?: "full" | "contact" | "receipt" | "billing" | "location" | "hours";
 }
 
 interface LocationFormData {
@@ -70,6 +69,7 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
+  const isMobile = useIsMobile();
 
   const initializeLocationHours = () => {
     const daysOfWeek = [0, 1, 2, 3, 4, 5, 6];
@@ -150,6 +150,7 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
       setActiveTab("general");
       setErrors({});
       setTouched({});
+      setCurrentStep(1);
     }
   }, [isOpen, locationId]);
 
@@ -239,9 +240,30 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
 
   const handleNextStep = () => {
     if (currentStep < totalSteps) {
+      if (currentStep === 1) {
+        // Validate name field before proceeding
+        if (!formData.name.trim()) {
+          setErrors(prev => ({ ...prev, name: "Location name is required" }));
+          setTouched(prev => ({ ...prev, name: true }));
+          return;
+        }
+      }
+      
+      if (currentStep === 2) {
+        // Validate address field before proceeding
+        if (!formData.address.trim()) {
+          setErrors(prev => ({ ...prev, address: "Address is required" }));
+          setTouched(prev => ({ ...prev, address: true }));
+          return;
+        }
+      }
+      
       setCurrentStep(prev => prev + 1);
       if (currentStep === 1) setActiveTab("address");
       if (currentStep === 2) setActiveTab("hours");
+      
+      // Scroll to top when changing steps
+      window.scrollTo(0, 0);
     }
   };
 
@@ -250,6 +272,9 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
       setCurrentStep(prev => prev - 1);
       if (currentStep === 2) setActiveTab("general");
       if (currentStep === 3) setActiveTab("address");
+      
+      // Scroll to top when changing steps
+      window.scrollTo(0, 0);
     }
   };
 
@@ -350,14 +375,15 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
     if (mode === "receipt") return "Edit Receipt Settings";
     if (mode === "billing") return "Edit Billing Details";
     if (mode === "location") return "Edit Location";
+    if (mode === "hours") return "Edit Opening Hours";
     return locationId ? "Edit Location" : "Add Location";
   };
 
   const renderContactSection = () => {
     return (
-      <div className="space-y-6 px-4 md:px-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
+      <div className="space-y-6 px-4 sm:px-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="space-y-2.5">
             <Label htmlFor="name" className="text-base font-medium flex items-center">
               <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
               Location Name <span className="text-destructive ml-1">*</span>
@@ -376,13 +402,15 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="is_active" className="text-base font-medium">Status</Label>
-            <div className="flex items-center gap-4 h-12">
+          <div className="space-y-2.5">
+            <Label htmlFor="is_active" className="text-base font-medium flex items-center">
+              Status
+            </Label>
+            <div className="flex items-center gap-3 h-12">
               <div 
                 className={cn(
-                  "px-4 py-2 rounded-md border flex items-center gap-2 cursor-pointer flex-1 justify-center",
-                  formData.is_active ? "bg-primary/10 border-primary" : "bg-muted/20"
+                  "px-4 py-2 rounded-md border flex items-center gap-2 cursor-pointer flex-1 justify-center transition-all",
+                  formData.is_active ? "bg-primary/10 border-primary text-primary font-medium" : "bg-muted/10"
                 )}
                 onClick={() => handleChange("is_active", true)}
               >
@@ -391,8 +419,8 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
               </div>
               <div 
                 className={cn(
-                  "px-4 py-2 rounded-md border flex items-center gap-2 cursor-pointer flex-1 justify-center",
-                  !formData.is_active ? "bg-muted/30 border-muted-foreground" : "bg-muted/10"
+                  "px-4 py-2 rounded-md border flex items-center gap-2 cursor-pointer flex-1 justify-center transition-all",
+                  !formData.is_active ? "bg-muted/30 border-muted-foreground font-medium" : "bg-muted/10"
                 )}
                 onClick={() => handleChange("is_active", false)}
               >
@@ -403,8 +431,8 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="space-y-2.5">
             <Label htmlFor="email" className="text-base font-medium flex items-center">
               <AtSign className="h-4 w-4 mr-2 text-muted-foreground" />
               Email
@@ -424,7 +452,7 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <Label htmlFor="phone" className="text-base font-medium flex items-center">
               <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
               Phone
@@ -449,8 +477,8 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
 
   const renderAddressSection = () => {
     return (
-      <div className="space-y-6 px-4 md:px-0">
-        <div className="space-y-2">
+      <div className="space-y-6 px-4 sm:px-6">
+        <div className="space-y-2.5">
           <Label htmlFor="address" className="text-base font-medium flex items-center">
             <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
             Address <span className="text-destructive ml-1">*</span>
@@ -469,8 +497,8 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="space-y-2.5">
             <Label htmlFor="city" className="text-base font-medium">City</Label>
             <Input
               id="city"
@@ -481,7 +509,7 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <Label htmlFor="state" className="text-base font-medium">State/Province</Label>
             <Input
               id="state"
@@ -493,8 +521,8 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="space-y-2.5">
             <Label htmlFor="zip_code" className="text-base font-medium">Postal Code</Label>
             <Input
               id="zip_code"
@@ -505,7 +533,7 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <Label htmlFor="country" className="text-base font-medium">Country</Label>
             <Select
               value={formData.country}
@@ -529,63 +557,64 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
   };
 
   const renderHoursSection = () => {
+    const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    
     return (
-      <div className="space-y-6 px-4 md:px-0">
-        <div className="flex items-center">
-          <Clock className="h-5 w-5 mr-2 text-primary" />
-          <h3 className="text-lg font-medium">Business Hours</h3>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Set operating hours for this location. These will be the default working hours for your team and visible to clients.
-        </p>
-
-        <div className="space-y-4">
+      <div className="space-y-6 px-4 sm:px-6">
+        <div className="space-y-3">
           {locationHours.map((day, index) => {
-            const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
             return (
-              <Card key={index} className={cn(day.is_closed ? "bg-muted/10" : "")}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
+              <Card 
+                key={index} 
+                className={cn(
+                  "overflow-hidden transition-all border",
+                  day.is_closed ? "bg-muted/10" : "hover:border-muted-foreground/30"
+                )}
+              >
+                <CardContent className="p-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-4">
+                    <div className="flex items-center gap-2 mb-2 sm:mb-0 sm:flex-1">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span className="text-base font-medium">{daysOfWeek[day.day_of_week]}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor={`closed-${index}`} className="text-sm cursor-pointer">
-                        {day.is_closed ? "Closed" : "Open"}
-                      </Label>
+                    
+                    <div 
+                      className={cn(
+                        "px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 cursor-pointer transition-colors w-fit",
+                        day.is_closed ? "bg-muted/20 text-muted-foreground" : "bg-green-500/10 text-green-600"
+                      )}
+                      onClick={() => updateDayHours(index, 'is_closed', !day.is_closed)}
+                    >
                       <div 
                         className={cn(
-                          "w-12 h-6 rounded-full flex items-center px-1 cursor-pointer transition-colors",
-                          day.is_closed ? "bg-muted justify-start" : "bg-green-500 justify-end" 
+                          "w-3.5 h-3.5 rounded-full",
+                          day.is_closed ? "bg-muted-foreground" : "bg-green-500"
                         )}
-                        onClick={() => updateDayHours(index, 'is_closed', !day.is_closed)}
-                      >
-                        <div className="h-4 w-4 rounded-full bg-white" />
-                      </div>
+                      />
+                      {day.is_closed ? "Closed" : "Open"}
                     </div>
                   </div>
                   
                   {!day.is_closed && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="border-t p-4 grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor={`start-time-${index}`} className="text-sm font-medium">Open</Label>
+                        <Label htmlFor={`start-time-${index}`} className="text-sm font-medium">Open Time</Label>
                         <Input
                           id={`start-time-${index}`}
                           type="time"
                           value={day.start_time}
                           onChange={(e) => updateDayHours(index, 'start_time', e.target.value)}
-                          className="h-10"
+                          className="h-10 text-base"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor={`end-time-${index}`} className="text-sm font-medium">Close</Label>
+                        <Label htmlFor={`end-time-${index}`} className="text-sm font-medium">Close Time</Label>
                         <Input
                           id={`end-time-${index}`}
                           type="time"
                           value={day.end_time}
                           onChange={(e) => updateDayHours(index, 'end_time', e.target.value)}
-                          className="h-10"
+                          className="h-10 text-base"
                         />
                       </div>
                     </div>
@@ -599,13 +628,65 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
     );
   };
 
+  const renderStepIndicator = () => {
+    return (
+      <div className="p-4 border-b bg-muted/5">
+        <div className="max-w-4xl mx-auto w-full">
+          <div className="flex items-center relative">
+            {/* Progress connecting lines */}
+            <div className="absolute top-4 left-[12%] right-[12%] h-0.5 bg-muted"></div>
+            <div 
+              className={cn(
+                "absolute top-4 left-[12%] h-0.5 bg-primary transition-all",
+                currentStep >= 2 ? "w-[38%]" : "w-0"
+              )}
+              style={{ transitionProperty: 'width', transitionDuration: '300ms' }}
+            ></div>
+            <div 
+              className={cn(
+                "absolute top-4 left-[50%] h-0.5 bg-primary transition-all",
+                currentStep >= 3 ? "w-[38%]" : "w-0"
+              )}
+              style={{ transitionProperty: 'width', transitionDuration: '300ms' }}
+            ></div>
+            
+            {/* Step circles */}
+            {[
+              { name: 'Details', icon: <Building2 className="h-3.5 w-3.5" /> },
+              { name: 'Address', icon: <MapPin className="h-3.5 w-3.5" /> },
+              { name: 'Hours', icon: <Clock className="h-3.5 w-3.5" /> }
+            ].map((step, idx) => (
+              <div 
+                key={idx} 
+                className={cn(
+                  "flex flex-col items-center text-center z-10 flex-1", 
+                  idx + 1 <= currentStep ? "text-primary" : "text-muted-foreground"
+                )}
+              >
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center mb-1 text-sm font-medium border transition-all", 
+                  currentStep === idx + 1 ? "bg-primary text-primary-foreground border-primary" : 
+                  idx + 1 < currentStep ? "bg-primary/20 text-primary border-primary" : 
+                  "bg-background text-muted-foreground border-muted"
+                )}>
+                  {step.icon}
+                </div>
+                <span className="text-xs font-medium">{step.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (isFetching) {
     return (
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="w-[98vw] max-w-none h-[95vh] overflow-auto p-0 mt-[5vh] rounded-t-xl rounded-b-none">
+        <DialogContent className="w-[98vw] max-w-3xl h-[95vh] overflow-auto p-0 mt-[5vh] rounded-t-2xl rounded-b-2xl">
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+              <div className="animate-spin h-8 w-8 border-3 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
               <p className="text-muted-foreground">Loading location data...</p>
             </div>
           </div>
@@ -614,44 +695,55 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
     );
   }
 
+  const dialogMaxWidth = mode === "full" ? "max-w-4xl" : "max-w-xl";
+
   if (mode !== "full") {
     return (
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="w-[98vw] max-w-none h-[100vh] overflow-auto p-6 mt-[5vh] rounded-t-xl rounded-b-none">
-          <DialogHeader>
-            <DialogTitle className="text-xl">{getDialogTitle()}</DialogTitle>
+        <DialogContent className={`w-[98vw] ${dialogMaxWidth} p-0 mt-[5vh] rounded-xl`}>
+          <DialogHeader className="px-6 py-4 border-b sticky top-0 bg-background z-10">
+            <DialogTitle className="text-xl font-semibold">{getDialogTitle()}</DialogTitle>
           </DialogHeader>
-          {mode === "contact" && renderContactSection()}
-          {mode === "billing" && (
-            <div className="space-y-6">
-              <div className="bg-primary/5 p-4 rounded-md mb-8">
-                <h3 className="font-medium text-lg mb-2">Billing Details</h3>
-                <p className="text-muted-foreground text-sm">Update billing information for this location.</p>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-base font-medium flex items-center">
-                    <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
-                    Company Name <span className="text-destructive ml-1">*</span>
-                  </Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleChange("name", e.target.value)}
-                    placeholder="Company name"
-                    className={cn("h-12 text-base", errors.name && touched.name ? "border-destructive" : "")}
-                  />
-                  {errors.name && touched.name && (
-                    <div className="text-sm text-destructive flex items-center mt-1">
-                      <AlertCircle className="h-3 w-3 mr-1" /> {errors.name}
+          
+          <ScrollArea className="max-h-[70vh]">
+            <div className="p-6">
+              {mode === "contact" && renderContactSection()}
+              {mode === "billing" && (
+                <div className="space-y-6">
+                  <div className="bg-primary/5 p-4 rounded-lg mb-4">
+                    <h3 className="font-medium text-lg mb-2">Billing Details</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Update billing information for this location.
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2.5">
+                      <Label htmlFor="name" className="text-base font-medium flex items-center">
+                        <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                        Company Name <span className="text-destructive ml-1">*</span>
+                      </Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => handleChange("name", e.target.value)}
+                        placeholder="Company name"
+                        className={cn("h-12 text-base", errors.name && touched.name ? "border-destructive" : "")}
+                      />
+                      {errors.name && touched.name && (
+                        <div className="text-sm text-destructive flex items-center mt-1">
+                          <AlertCircle className="h-3 w-3 mr-1" /> {errors.name}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
+              {mode === "location" && renderAddressSection()}
+              {mode === "hours" && renderHoursSection()}
             </div>
-          )}
-          {mode === "location" && renderAddressSection()}
-          <DialogFooter>
+          </ScrollArea>
+          
+          <DialogFooter className="p-6 border-t flex flex-row justify-end gap-3">
             <Button variant="outline" onClick={onClose} disabled={isLoading} className="h-11">
               Cancel
             </Button>
@@ -660,7 +752,12 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
               disabled={isLoading}
               className="h-11 min-w-[100px]"
             >
-              {isLoading ? "Saving..." : "Save"}
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
+                  Saving...
+                </span>
+              ) : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -670,83 +767,48 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[98vw] max-w-none h-[95vh] overflow-auto p-0 mt-[5vh] rounded-t-xl rounded-b-none">
+      <DialogContent className="w-[98vw] max-w-4xl h-[95vh] overflow-hidden p-0 mt-[5vh] rounded-xl">
         <div className="flex flex-col h-full">
           <div className="p-4 md:p-6 border-b flex items-center justify-between sticky top-0 bg-background z-10">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="rounded-full"
+                className="rounded-full shrink-0"
                 onClick={onClose}
               >
                 <X className="h-5 w-5" />
               </Button>
-              <DialogTitle className="text-lg md:text-xl">{getDialogTitle()}</DialogTitle>
+              <DialogTitle className="text-xl font-semibold">{getDialogTitle()}</DialogTitle>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={onClose} disabled={isLoading} className="h-10">
-                Cancel
+            
+            {!isMobile && currentStep === totalSteps && (
+              <Button 
+                onClick={handleSubmit} 
+                disabled={isLoading || Object.keys(errors).length > 0}
+                className="h-10 px-5"
+              >
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
+                    Saving...
+                  </span>
+                ) : "Save Location"}
               </Button>
-              {currentStep === totalSteps && (
-                <Button 
-                  onClick={handleSubmit} 
-                  disabled={isLoading || Object.keys(errors).length > 0}
-                  className="h-10 min-w-[80px]"
-                >
-                  {isLoading ? "Saving..." : "Save"}
-                </Button>
-              )}
-            </div>
+            )}
           </div>
-          {/* Step indicator - Improved */}
-          <div className="px-4 py-3 border-b bg-muted/10">
-            <div className="max-w-4xl mx-auto w-full">
-              <div className="flex items-center relative">
-                {/* Progress connecting lines */}
-                <div className="absolute top-4 left-[12%] right-[12%] h-[2px] bg-muted"></div>
-                <div 
-                  className={cn(
-                    "absolute top-4 left-[12%] h-[2px] bg-primary transition-all",
-                    currentStep >= 2 ? "w-[38%]" : "w-0"
-                  )}
-                ></div>
-                <div 
-                  className={cn(
-                    "absolute top-4 left-[50%] h-[2px] bg-primary transition-all",
-                    currentStep >= 3 ? "w-[38%]" : "w-0"
-                  )}
-                ></div>
-                
-                {/* Step circles */}
-                {['General Info', 'Address', 'Business Hours'].map((stepName, idx) => (
-                  <div 
-                    key={idx} 
-                    className={cn(
-                      "flex flex-col items-center text-center z-10 flex-1", 
-                      idx + 1 <= currentStep ? "text-primary" : "text-muted-foreground"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center mb-1 text-sm font-medium border", 
-                      currentStep === idx + 1 ? "bg-primary text-primary-foreground border-primary" : 
-                      idx + 1 < currentStep ? "bg-primary/20 text-primary border-primary" : 
-                      "bg-background text-muted-foreground border-muted"
-                    )}>
-                      {idx + 1}
-                    </div>
-                    <span className="text-xs md:text-sm">{stepName}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-auto">
-            <div className="max-w-4xl mx-auto w-full py-6">
+          
+          {renderStepIndicator()}
+          
+          <ScrollArea className="flex-1">
+            <div className="py-6 max-w-3xl mx-auto w-full">
               {currentStep === 1 && (
                 <div className="space-y-6">
-                  <div className="bg-primary/5 p-4 md:p-6 rounded-md mb-4 mx-4 md:mx-0">
-                    <h3 className="font-semibold text-lg mb-2">Location Details</h3>
+                  <div className="bg-primary/5 p-5 rounded-lg mb-4 mx-4 sm:mx-6">
+                    <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      Location Details
+                    </h3>
                     <p className="text-muted-foreground">
                       Enter general information about this location including name, email, and contact details.
                     </p>
@@ -754,10 +816,14 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
                   {renderContactSection()}
                 </div>
               )}
+              
               {currentStep === 2 && (
                 <div className="space-y-6">
-                  <div className="bg-primary/5 p-4 md:p-6 rounded-md mb-4 mx-4 md:mx-0">
-                    <h3 className="font-semibold text-lg mb-2">Location Address</h3>
+                  <div className="bg-primary/5 p-5 rounded-lg mb-4 mx-4 sm:mx-6">
+                    <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-primary" />
+                      Location Address
+                    </h3>
                     <p className="text-muted-foreground">
                       Enter the physical address details of this location. This information will be visible to your clients.
                     </p>
@@ -765,10 +831,14 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
                   {renderAddressSection()}
                 </div>
               )}
+              
               {currentStep === 3 && (
                 <div className="space-y-6">
-                  <div className="bg-primary/5 p-4 md:p-6 rounded-md mb-4 mx-4 md:mx-0">
-                    <h3 className="font-semibold text-lg mb-2">Business Hours</h3>
+                  <div className="bg-primary/5 p-5 rounded-lg mb-4 mx-4 sm:mx-6">
+                    <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-primary" />
+                      Business Hours
+                    </h3>
                     <p className="text-muted-foreground">
                       Set the operating hours for this location. These will appear on your booking portal and help clients know when you're open.
                     </p>
@@ -776,8 +846,9 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
                   {renderHoursSection()}
                 </div>
               )}
+              
               {Object.keys(errors).length > 0 && (
-                <div className="mt-8 bg-destructive/10 border border-destructive/20 p-4 rounded-md mx-4 md:mx-0">
+                <div className="mt-8 bg-destructive/10 border border-destructive/20 p-4 rounded-lg mx-4 sm:mx-6">
                   <h3 className="text-destructive flex items-center text-sm font-medium mb-2">
                     <AlertCircle className="h-4 w-4 mr-2" />
                     Please fix the following errors:
@@ -789,39 +860,53 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
                   </ul>
                 </div>
               )}
+              
+              {/* Add some padding at the bottom to prevent content from being hidden behind the footer */}
+              <div className="h-28"></div>
             </div>
-          </div>
-          <div className="border-t p-4 pb-[5vh] bg-background sticky bottom-0 shadow-md">
-            <div className="max-w-4xl mx-auto w-full">
+          </ScrollArea>
+          
+          <div className="border-t p-4 sm:p-6 bg-background sticky bottom-0 shadow-md">
+            <div className="max-w-3xl mx-auto w-full">
               <div className="flex items-center justify-between">
                 <Button 
                   variant="outline" 
                   onClick={handlePrevStep} 
                   disabled={currentStep === 1 || isLoading}
-                  className="h-11 px-6 min-w-[120px] flex items-center"
+                  className="h-11 px-4 sm:px-6 min-w-[100px] flex items-center gap-1"
                 >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  <ChevronLeft className="h-4 w-4" />
                   Previous
                 </Button>
                 
-                <div className="text-sm font-medium">
-                  Step {currentStep} of {totalSteps}
-                </div>
+                {!isMobile && (
+                  <div className="text-sm font-medium bg-muted/20 px-3 py-1.5 rounded-full">
+                    Step {currentStep} of {totalSteps}
+                  </div>
+                )}
                 
-                <Button 
-                  onClick={currentStep < totalSteps ? handleNextStep : handleSubmit}
-                  disabled={isLoading || (currentStep === totalSteps && Object.keys(errors).length > 0)}
-                  className="h-11 px-6 min-w-[120px] flex items-center"
-                >
-                  {currentStep < totalSteps ? (
-                    <>
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </>
-                  ) : (
-                    isLoading ? "Saving..." : "Save Location"
-                  )}
-                </Button>
+                {currentStep < totalSteps ? (
+                  <Button 
+                    onClick={handleNextStep}
+                    className="h-11 px-4 sm:px-6 min-w-[100px] flex items-center gap-1"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleSubmit} 
+                    disabled={isLoading || Object.keys(errors).length > 0}
+                    className="h-11 px-4 sm:px-6 min-w-[100px]"
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
+                        Saving...
+                      </span>
+                    ) : "Save Location"}
+                  </Button>
+                )}
               </div>
             </div>
           </div>

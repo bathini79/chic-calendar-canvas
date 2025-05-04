@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LocationHours {
   day_of_week: number;
@@ -66,7 +67,7 @@ export function LocationDetails() {
   const [location, setLocation] = useState<Location | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editDialogMode, setEditDialogMode] = useState<"full" | "contact" | "receipt" | "billing" | "location">("full");
+  const [editDialogMode, setEditDialogMode] = useState<"full" | "contact" | "receipt" | "billing" | "location" | "hours">("full");
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettingsFormData>({
     prefix: "",
     next_number: 1
@@ -74,6 +75,7 @@ export function LocationDetails() {
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [taxDialogOpen, setTaxDialogOpen] = useState(false);
   const [locationHours, setLocationHours] = useState<LocationHours[]>([]);
+  const isMobile = useIsMobile();
   
   const fetchLocationDetails = async () => {
     if (!locationId) {
@@ -164,7 +166,7 @@ export function LocationDetails() {
     fetchLocationDetails();
   }, [locationId]);
   
-  const handleEditLocation = (mode: "full" | "contact" | "receipt" | "billing" | "location" = "full") => {
+  const handleEditLocation = (mode: "full" | "contact" | "receipt" | "billing" | "location" | "hours" = "full") => {
     setEditDialogMode(mode);
     setEditDialogOpen(true);
   };
@@ -251,49 +253,25 @@ export function LocationDetails() {
   };
   
   return (
-    <div className="container py-6 max-w-6xl">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" size="sm" asChild className="mr-2">
-          <Link to="/admin/settings/business-setup">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back
-          </Link>
-        </Button>
-        <div className="text-sm text-muted-foreground">
-          Workspace settings • Business setup • {location.name}
+    <div className="container px-4 py-4 sm:py-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Button variant="ghost" size="sm" asChild className="mr-2">
+            <Link to="/admin/settings">
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back
+            </Link>
+          </Button>
+          <h1 className="text-xl sm:text-2xl font-bold">{location.name}</h1>
         </div>
-      </div>
-      
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{location.name}</h1>
         <Button variant="outline" onClick={() => handleEditLocation()}>
           <Edit2 className="h-4 w-4 mr-2" />
           Edit Location
         </Button>
       </div>
       
-      <Card className="mb-8 bg-primary text-primary-foreground">
-        <CardContent className="pt-6 pb-8">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold">Get your business online</h2>
-              <p>
-                Increase your bookings by listing your business online on marketplaces and allow your clients to book 
-                with you directly through your website and social media pages.
-              </p>
-              <Button variant="secondary" className="mt-4">
-                Enable online listing
-              </Button>
-            </div>
-            <div className="hidden md:block">
-              <div className="w-48 h-48 bg-primary-foreground/20 rounded-md"></div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Contact details</CardTitle>
             <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation("contact")}>
@@ -304,7 +282,7 @@ export function LocationDetails() {
             <div className="space-y-4">
               <div>
                 <div className="text-sm text-muted-foreground">Location email address</div>
-                <div>{location.email || "Not set"}</div>
+                <div className="break-words">{location.email || "Not set"}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Location contact number</div>
@@ -314,7 +292,7 @@ export function LocationDetails() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Billing details for client sales</CardTitle>
             <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation("billing")}>
@@ -329,13 +307,13 @@ export function LocationDetails() {
             <div className="space-y-2">
               <div className="font-medium">Company details</div>
               <div>{location.name}</div>
-              <div>{fullAddress}</div>
+              <div className="break-words">{fullAddress}</div>
             </div>
           </CardContent>
         </Card>
       </div>
       
-      <Card className="mb-6">
+      <Card className="mb-8 w-full">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Location</CardTitle>
           <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation("location")}>
@@ -346,21 +324,16 @@ export function LocationDetails() {
           <div className="space-y-4">
             <div>
               <div className="text-sm text-muted-foreground">Business address</div>
-              <div>{fullAddress}</div>
-            </div>
-            <div className="aspect-video bg-muted rounded-md w-full">
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                Map view would be displayed here
-              </div>
+              <div className="break-words">{fullAddress}</div>
             </div>
           </div>
         </CardContent>
       </Card>
       
-      <Card className="mb-6">
+      <Card className="mb-8 w-full">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Opening hours</CardTitle>
-          <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation()}>
+          <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleEditLocation("hours")}>
             Edit
           </Button>
         </CardHeader>
@@ -370,37 +343,66 @@ export function LocationDetails() {
             You can amend business closed periods for events like Bank Holidays in Settings.
           </p>
           
-          <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
-            {daysOfWeek.map((day, index) => {
-              const dayHours = location.hours?.find(h => h.day_of_week === index);
-              const isClosed = dayHours?.is_closed || false;
-              
-              return (
-                <div 
-                  key={day} 
-                  className={`p-4 rounded-md text-center ${
-                    isClosed ? "bg-muted" : "bg-primary/10"
-                  }`}
-                >
-                  <div className="font-medium mb-2">{day}</div>
-                  {isClosed ? (
-                    <div className="text-muted-foreground">Closed</div>
-                  ) : (
-                    <>
-                      <div>{dayHours?.start_time || "9:00"}</div>
-                      <div className="text-muted-foreground">-</div>
-                      <div>{dayHours?.end_time || "18:00"}</div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {isMobile ? (
+            <div className="space-y-2">
+              {daysOfWeek.map((day, index) => {
+                const dayHours = location.hours?.find(h => h.day_of_week === index);
+                const isClosed = dayHours?.is_closed || false;
+                
+                return (
+                  <div 
+                    key={day} 
+                    className={`p-3 rounded-md ${
+                      isClosed ? "bg-muted" : "bg-primary/10"
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="font-medium">{day}</div>
+                      {isClosed ? (
+                        <div className="text-muted-foreground">Closed</div>
+                      ) : (
+                        <div className="text-right">
+                          {dayHours?.start_time || "9:00"} - {dayHours?.end_time || "18:00"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
+              {daysOfWeek.map((day, index) => {
+                const dayHours = location.hours?.find(h => h.day_of_week === index);
+                const isClosed = dayHours?.is_closed || false;
+                
+                return (
+                  <div 
+                    key={day} 
+                    className={`p-4 rounded-md text-center ${
+                      isClosed ? "bg-muted" : "bg-primary/10"
+                    }`}
+                  >
+                    <div className="font-medium mb-2">{day}</div>
+                    {isClosed ? (
+                      <div className="text-muted-foreground">Closed</div>
+                    ) : (
+                      <>
+                        <div>{dayHours?.start_time || "9:00"}</div>
+                        <div className="text-muted-foreground">-</div>
+                        <div>{dayHours?.end_time || "18:00"}</div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Tax defaults</CardTitle>
             <Button variant="ghost" size="sm" className="text-primary" onClick={() => setTaxDialogOpen(true)}>
@@ -425,7 +427,7 @@ export function LocationDetails() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Receipt sequencing</CardTitle>
             <Button variant="ghost" size="sm" className="text-primary" onClick={() => setReceiptDialogOpen(true)}>
