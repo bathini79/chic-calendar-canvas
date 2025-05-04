@@ -1,17 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { RegularShifts } from './RegularShifts';
-import { SpecificShifts } from './SpecificShifts';
-import { TimeOffRequests } from './TimeOffRequests';
 import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Search } from 'lucide-react';
 
 export function StaffShifts() {
-  const [activeTab, setActiveTab] = useState("regular");
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [employees, setEmployees] = useState<any[]>([]);
   const [dataVersion, setDataVersion] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch locations
   useEffect(() => {
@@ -70,15 +68,22 @@ export function StaffShifts() {
   const refreshData = () => {
     setDataVersion(prev => prev + 1);
   };
+  
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
 
   return (
     <div className="space-y-6">
-          <RegularShifts 
-            locations={locations}
-            selectedLocation={selectedLocation}
-            setSelectedLocation={setSelectedLocation}
-            employees={employees}
-          />
+      <RegularShifts 
+        locations={locations}
+        selectedLocation={selectedLocation}
+        setSelectedLocation={setSelectedLocation}
+        employees={employees}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+      />
     </div>
   );
 }

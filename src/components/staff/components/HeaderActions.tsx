@@ -24,18 +24,18 @@ export function HeaderActions({ onAdd, view, onViewChange, searchQuery, onSearch
       </div>
 
       <div className={`flex ${isMobile ? 'flex-col' : 'items-center'} gap-4 ${isMobile ? 'w-full' : ''}`}>
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search staff members..."
-            className="w-full pl-8"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-        </div>
-        
         <div className={`flex items-center gap-2 ${isMobile ? 'justify-between w-full' : ''}`}>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search staff members..."
+              className="pl-8 w-[200px] lg:w-[250px]"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </div>
+          
           <div className="flex items-center gap-2">
             <Button
               variant={view === "grid" ? "default" : "outline"}

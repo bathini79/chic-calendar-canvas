@@ -1,24 +1,29 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Info, Pencil, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from '@/hooks/use-toast';
 import { StaffMemberRow } from './StaffMemberRow';
+import { DataPagination, STANDARD_PAGE_SIZES } from "@/components/common/DataPagination";
+import { Input } from "@/components/ui/input";
 
 interface RegularShiftsProps {
   locations: any[];
   selectedLocation: string;
   setSelectedLocation: (locationId: string) => void;
   employees: any[];
+  searchQuery: string;
+  onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export function RegularShifts({ 
   locations,
   selectedLocation,
   setSelectedLocation,
-  employees
+  employees,
+  searchQuery,
+  onSearchChange
 }: RegularShiftsProps) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekStart, setWeekStart] = useState(startOfWeek(selectedDate, { weekStartsOn: 6 })); // Start on Saturday
@@ -29,12 +34,43 @@ export function RegularShifts({
   const [timeOffRequests, setTimeOffRequests] = useState<any[]>([]);
   const [dataVersion, setDataVersion] = useState(0);
   const { toast } = useToast();
+  
+  // Add pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(STANDARD_PAGE_SIZES[0]); // Use first standard size (10)
+  const [filteredEmployees, setFilteredEmployees] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     if (locations?.length > 0) {
       setSelectedLocation(locations[0]?.id);
     }
   }, [locations, setSelectedLocation]);
+
+  // Filter employees based on search query
+  useEffect(() => {
+    if (!employees) {
+      setFilteredEmployees([]);
+      setTotalCount(0);
+      return;
+    }
+    
+    let filtered = employees;
+    
+    if (searchQuery) {
+      filtered = employees.filter(emp => 
+        emp.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    setTotalCount(filtered.length);
+    
+    // Apply pagination
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedEmployees = filtered.slice(startIndex, startIndex + pageSize);
+    
+    setFilteredEmployees(paginatedEmployees);
+  }, [employees, searchQuery, currentPage, pageSize]);
 
   // Generate week days
   useEffect(() => {
@@ -158,7 +194,7 @@ export function RegularShifts({
       </div>
 
       <div className="flex flex-col md:flex-row justify-between gap-4">
-        <div>
+        <div className="flex items-center space-x-2">
           <select 
             className="border rounded-md p-2"
             value={selectedLocation}
@@ -168,6 +204,17 @@ export function RegularShifts({
               <option key={loc.id} value={loc.id}>{loc.name}</option>
             ))}
           </select>
+          
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              type="text"
+              placeholder="Search team members..."
+              value={searchQuery}
+              onChange={onSearchChange}
+              className="pl-9 h-10 w-[200px] lg:w-[250px]"
+            />
+          </div>
         </div>
         
         <div className="flex items-center space-x-2">
@@ -196,12 +243,21 @@ export function RegularShifts({
             </tr>
           </thead>
           <tbody>
-            {employees.length === 0 ? (
+            {filteredEmployees.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-4">No staff members found</td>
+                <td colSpan={8} className="text-center py-8">
+                  <div className="flex flex-col items-center justify-center">
+                    <p className="text-lg font-medium mb-2">No staff members found</p>
+                    <p className="text-muted-foreground mb-4">
+                      {searchQuery
+                        ? `No results for "${searchQuery}"`
+                        : "No staff members available for this location"}
+                    </p>
+                  </div>
+                </td>
               </tr>
             ) : (
-              employees.map((employee) => (
+              filteredEmployees.map((employee) => (
                 <StaffMemberRow 
                   key={employee.id} 
                   employee={employee}
@@ -217,7 +273,22 @@ export function RegularShifts({
             )}
           </tbody>
         </table>
-      </div>      
+      </div>
+
+      {/* Pagination */}
+      {totalCount > 0 && (
+        <div className="px-4 py-4 border-t border-gray-200">
+          <DataPagination
+            currentPage={currentPage}
+            totalItems={totalCount}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={STANDARD_PAGE_SIZES}
+          />
+        </div>
+      )}
+      
       {/* Mobile add button */}
       <Button className="fixed bottom-4 right-4 md:hidden rounded-full h-14 w-14 flex items-center justify-center shadow-lg" size="icon">
         <Plus className="h-6 w-6" />
