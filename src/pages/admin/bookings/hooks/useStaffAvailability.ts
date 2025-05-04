@@ -48,20 +48,26 @@ export function useStaffAvailability({
       setError(null);
 
       try {
-        // 1. Get all stylists for this location
+        // 1. Get all staff members with perform_services permission for this location
         const { data: employees, error: employeeError } = await supabase
           .from('employees')
           .select(`
             *,
-            employee_locations!inner(location_id)
+            employee_locations!inner(location_id),
+            employment_types!inner(permissions)
           `)
-          .eq('employment_type', 'stylist')
           .eq('status', 'active')
           .eq('employee_locations.location_id', locationId);
 
         if (employeeError) throw employeeError;
         
-        if (!employees || employees.length === 0) {
+        // Filter to only staff with perform_services permission
+        const staffWithPermission = employees?.filter(employee => {
+          const permissions = employee.employment_types?.permissions || [];
+          return Array.isArray(permissions) && permissions.includes('perform_services');
+        });
+        
+        if (!staffWithPermission || staffWithPermission.length === 0) {
           setAvailableStylists([]);
           setAvailableStylistsInfo([]);
           setIsLoading(false);
@@ -80,7 +86,7 @@ export function useStaffAvailability({
         const { data: recurringShifts, error: shiftError } = await supabase
           .from('recurring_shifts')
           .select('*')
-          .in('employee_id', employees.map(e => e.id))
+          .in('employee_id', staffWithPermission.map(e => e.id))
           .eq('day_of_week', dayOfWeek)
           .eq('location_id', locationId);
         
@@ -96,7 +102,7 @@ export function useStaffAvailability({
         const { data: specificShifts, error: specificShiftError } = await supabase
           .from('shifts')
           .select('*')
-          .in('employee_id', employees.map(e => e.id))
+          .in('employee_id', staffWithPermission.map(e => e.id))
           .gte('start_time', todayStart.toISOString())
           .lte('end_time', todayEnd.toISOString())
           .eq('location_id', locationId);
@@ -108,7 +114,7 @@ export function useStaffAvailability({
         const { data: timeOff, error: timeOffError } = await supabase
           .from('time_off_requests')
           .select('*')
-          .in('employee_id', employees.map(e => e.id))
+          .in('employee_id', staffWithPermission.map(e => e.id))
           .lte('start_date', dateStr)
           .gte('end_date', dateStr)
           .eq('status', 'approved');
@@ -123,14 +129,14 @@ export function useStaffAvailability({
             *,
             appointment:appointments(id, status)
           `)
-          .in('employee_id', employees.map(e => e.id))
+          .in('employee_id', staffWithPermission.map(e => e.id))
           .gte('start_time', todayStart.toISOString())
           .lte('end_time', todayEnd.toISOString());
         
         if (bookingsError) throw bookingsError;
 
         // Process each stylist's availability
-        const stylistInfoArray = employees.map(employee => {
+        const stylistInfoArray = staffWithPermission.map(employee => {
           // Check if employee has time off
           const hasTimeOff = timeOff?.some(t => t.employee_id === employee.id);
           

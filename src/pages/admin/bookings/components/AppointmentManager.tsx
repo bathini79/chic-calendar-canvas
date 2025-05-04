@@ -681,6 +681,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   }
                   appointmentStatus={appointmentStatus}
                   loadingPayment={loadingPayment}
+                  employees={employees}
                 />
               )}
 

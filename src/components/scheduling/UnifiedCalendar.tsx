@@ -148,14 +148,21 @@ export function UnifiedCalendar({
         .from('employees')
         .select(`
           *,
-          employee_locations!inner(location_id)
+          employee_locations!inner(location_id),
+          employment_types!inner(permissions)
         `)
-        .eq('employment_type', 'stylist')
         .eq('status', 'active')
         .eq('employee_locations.location_id', locationId);
       
       if (error) throw error;
-      return data || [];
+      
+      // Filter employees to only those with perform_services permission
+      const staffWithPermission = data?.filter(employee => {
+        const permissions = employee.employment_types?.permissions || [];
+        return Array.isArray(permissions) && permissions.includes('perform_services');
+      });
+      
+      return staffWithPermission || [];
     },
     enabled: !!locationId
   });

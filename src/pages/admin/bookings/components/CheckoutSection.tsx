@@ -71,6 +71,7 @@ interface CheckoutSectionProps {
   customizedServices?: Record<string, string[]>;
   locationId?: string;
   loadingPayment?: boolean;
+  employees: any[];
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -98,20 +99,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   customizedServices = {},
   locationId,
   loadingPayment = false,
+  employees,
 }) => {
-  const { data: employees } = useQuery({
-    queryKey: ["employees"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("employment_type", "stylist");
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const membership = useMembershipInCheckout({
     selectedCustomer,
     selectedServices,

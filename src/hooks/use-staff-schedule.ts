@@ -25,26 +25,32 @@ export function useStaffSchedule({
       setError(null);
 
       try {
-        // 1. Get all stylists for this location
+        // 1. Get all staff with perform_services permission for this location
         const { data: employees, error: employeeError } = await supabase
           .from('employees')
           .select(`
             id,
-            employee_locations!inner(location_id)
+            employee_locations!inner(location_id),
+            employment_types!inner(permissions)
           `)
-          .eq('employment_type', 'stylist')
           .eq('status', 'active')
           .eq('employee_locations.location_id', locationId);
 
         if (employeeError) throw employeeError;
         
-        if (!employees || employees.length === 0) {
+        // Filter employees to only those with perform_services permission
+        const staffWithPermission = employees?.filter(employee => {
+          const permissions = employee.employment_types?.permissions || [];
+          return Array.isArray(permissions) && permissions.includes('perform_services');
+        }) || [];
+        
+        if (!staffWithPermission || staffWithPermission.length === 0) {
           setScheduledStaffIds([]);
           setIsLoading(false);
           return;
         }
 
-        const employeeIds = employees.map(e => e.id);
+        const employeeIds = staffWithPermission.map(e => e.id);
         
         // 2. Get recurring shifts for this day of week
         const dayOfWeek = selectedDate.getDay();

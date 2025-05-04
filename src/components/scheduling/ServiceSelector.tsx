@@ -132,16 +132,23 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
         .from('employees')
         .select(`
           *,
-          employee_locations!inner(location_id)
+          employee_locations!inner(location_id),
+          employment_types!inner(permissions)
         `)
-        .eq('employment_type', 'stylist')
         .eq('status', 'active')
         .eq('employee_locations.location_id', selectedLocation);
         
       if (locationError) throw locationError;
-      if (!locationEmployees?.length) return [];
       
-      const employeeIds = locationEmployees.map(emp => emp.id);
+      // Filter employees to only those with perform_services permission
+      const staffWithPermission = locationEmployees?.filter(employee => {
+        const permissions = employee.employment_types?.permissions || [];
+        return Array.isArray(permissions) && permissions.includes('perform_services');
+      }) || [];
+      
+      if (!staffWithPermission.length) return [];
+      
+      const employeeIds = staffWithPermission.map(emp => emp.id);
       
       const { data: skillsData, error: skillsError } = await supabase
         .from('employee_skills')
@@ -160,7 +167,7 @@ export function ServiceSelector({ items, selectedStylists, onStylistSelect }: Se
         employeeServiceMap[skill.employee_id].push(skill.service_id);
       });
       
-      return locationEmployees.map(emp => ({
+      return staffWithPermission.map(emp => ({
         ...emp,
         services: employeeServiceMap[emp.id] || []
       }));

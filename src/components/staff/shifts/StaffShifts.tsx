@@ -38,17 +38,23 @@ export function StaffShifts() {
         let query = supabase.from('employees')
           .select(`
             *,
-            employee_locations(*)
+            employee_locations(*),
+            employment_types!inner(permissions)
           `)
-          .eq('employment_type', 'stylist')
           .eq('status', 'active');
         
         const { data, error } = await query;
         
         if (error) throw error;
         
+        // Filter employees to only those with perform_services permission
+        let employeesWithPermission = data?.filter(employee => {
+          const permissions = employee.employment_types?.permissions || [];
+          return Array.isArray(permissions) && permissions.includes('perform_services');
+        }) || [];
+        
         // Filter by location if needed
-        let filteredEmployees = data || [];
+        let filteredEmployees = employeesWithPermission;
         if (selectedLocation !== "all") {
           filteredEmployees = filteredEmployees.filter(emp => 
             emp.employee_locations?.some((loc: any) => loc.location_id === selectedLocation)

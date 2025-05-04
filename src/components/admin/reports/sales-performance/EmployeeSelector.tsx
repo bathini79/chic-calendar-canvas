@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { 
   Select, 
@@ -26,13 +25,25 @@ export const EmployeeSelector = ({ value, onValueChange }: EmployeeSelectorProps
         setIsLoading(true);
         const { data, error } = await supabase
           .from('employees')
-          .select('id, name')
-          .eq('employment_type', 'stylist')
-          .eq('status', 'active')
-          .order('name');
+          .select(`
+            id, 
+            name,
+            employment_types!inner(permissions)
+          `)
+          .eq('status', 'active');
 
         if (error) throw error;
-        setEmployees(data || []);
+
+        // Filter to employees with perform_services permission
+        const employeesWithPermission = data?.filter(employee => {
+          const permissions = employee.employment_types?.permissions || [];
+          return Array.isArray(permissions) && permissions.includes('perform_services');
+        }) || [];
+
+        setEmployees([
+          { id: 'all', name: 'All Stylists' },
+          ...employeesWithPermission
+        ]);
       } catch (error) {
         console.error('Error fetching employees:', error);
       } finally {
@@ -51,7 +62,6 @@ export const EmployeeSelector = ({ value, onValueChange }: EmployeeSelectorProps
       <SelectContent>
         <SelectGroup>
           <SelectLabel>Employees</SelectLabel>
-          <SelectItem value="all">All Employees</SelectItem>
           {employees.map((employee) => (
             <SelectItem key={employee.id} value={employee.id}>
               {employee.name}

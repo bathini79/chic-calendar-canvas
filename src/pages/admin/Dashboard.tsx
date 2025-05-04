@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -37,9 +36,20 @@ export default function AdminDashboard() {
 
   const fetchEmployees = async () => {
     try {
-      const { data, error } = await supabase.from("employees").select("*").eq("employment_type", "stylist");
+      const { data, error } = await supabase
+        .from("employees")
+        .select("*, employment_types!inner(permissions)")
+        .eq("status", "active");
+
       if (error) throw error;
-      const employeeWithAvatar = data.map(employee => ({
+      
+      // Filter employees to only those with perform_services permission
+      const staffWithPermission = data?.filter(employee => {
+        const permissions = employee.employment_types?.permissions || [];
+        return Array.isArray(permissions) && permissions.includes('perform_services');
+      }) || [];
+      
+      const employeeWithAvatar = staffWithPermission.map(employee => ({
         ...employee,
         avatar: employee.name.split(" ").map(n => n[0]).join(""),
       }));

@@ -27,7 +27,7 @@ type Stylist = {
   id: string;
   name: string;
   employment_type: 'stylist';
-  status: 'active' | 'inactive';
+  status: 'active';
 };
 
 export interface ServiceSelectorProps {
@@ -79,12 +79,33 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   const { data: employeeSkills } = useQuery({
     queryKey: ['employee-skills', locationId],
     queryFn: async () => {
+      // Get all employees with the perform_services permission first
+      const { data: employees, error: employeeError } = await supabase
+        .from('employees')
+        .select(`
+          id,
+          employment_types!inner(permissions)
+        `)
+        .eq('status', 'active');
+      
+      if (employeeError) throw employeeError;
+      
+      // Filter to employees with the perform_services permission
+      const staffWithPermission = employees?.filter(employee => {
+        const permissions = employee.employment_types?.permissions || [];
+        return Array.isArray(permissions) && permissions.includes('perform_services');
+      }) || [];
+      
+      const staffIds = staffWithPermission.map(emp => emp.id);
+      
+      // Then get their skills
       const { data, error } = await supabase
         .from('employee_skills')
         .select(`
           employee_id,
           service_id
-        `);
+        `)
+        .in('employee_id', staffIds);
       
       if (error) throw error;
       return data;

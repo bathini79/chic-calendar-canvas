@@ -14,6 +14,11 @@ interface PermissionsManagerProps {
 // Define all available permissions
 const AVAILABLE_PERMISSIONS = [
   {
+    id: "perform_services",
+    name: "Perform Services",
+    description: "Perform haircuts, treatments, and other salon services on customers"
+  },
+  {
     id: "book_appointments",
     name: "Book Appointments",
     description: "Create and manage appointments"

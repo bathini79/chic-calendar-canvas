@@ -171,27 +171,35 @@ export default function AdminBookings() {
           return;
         }
         
+        // Get all employees with location filter and employment_type_permissions
         const { data, error } = await supabase
           .from("employees")
           .select(`
             *,
-            employee_locations!inner(location_id)
+            employee_locations!inner(location_id),
+            employment_types!inner(permissions)
           `)
-          .eq("employment_type", "stylist")
           .eq("status", "active")
           .eq("employee_locations.location_id", selectedLocationId);
         
         if (error) throw error;
         
-        let employeeList = data.map((employee) => ({
-          ...employee,
-          avatar: employee.name
-            .split(" ")
-            .map((n) => n[0])
-            .join(""),
-          is_active: true,
-          photo_url: employee.photo_url || null // Add missing property
-        }));
+        // Filter employees to only those with perform_services permission
+        let employeeList = data
+          .filter(employee => {
+            // Check if the employee has the perform_services permission
+            const permissions = employee.employment_types?.permissions || [];
+            return Array.isArray(permissions) && permissions.includes('perform_services');
+          })
+          .map((employee) => ({
+            ...employee,
+            avatar: employee.name
+              .split(" ")
+              .map((n) => n[0])
+              .join(""),
+            is_active: true,
+            photo_url: employee.photo_url || null // Add missing property
+          }));
 
         const defaultEmployeeName = `${businessDetails?.name || 'Salon'} Employee`;
         const defaultEmployee: Employee = {
@@ -207,7 +215,7 @@ export default function AdminBookings() {
           is_active: true,
           photo_url: null // Add missing property
         };
-        
+
         employeeList = [defaultEmployee, ...employeeList];
         setEmployees(employeeList);
       } catch (error) {

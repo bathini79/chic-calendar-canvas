@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -110,12 +109,18 @@ export const RecentSales = ({ timeRange, setTimeRange, locations, recentSalesLoc
         // Get all employees
         const { data: employeesData, error: employeesError } = await supabase
           .from("employees")
-          .select("*")
-          .eq("employment_type", "stylist");
+          .select("*, employment_types!inner(permissions)")
+          .eq("status", "active");
         
         if (employeesError) throw employeesError;
         
-        const employees = employeesData.length;
+        // Filter employees to only those with             permission
+        const staffWithPermission = employeesData.filter(employee => {
+          const permissions = employee.employment_types?.permissions || [];
+          return Array.isArray(permissions) && permissions.includes('perform_services');
+        });
+        
+        const employees = staffWithPermission.length;
       }
       
       // Get appointments for current period

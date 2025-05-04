@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,8 +25,7 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
       // First get all stylists
       let stylistsQuery = supabase
         .from("employees")
-        .select("id, name, photo_url")
-        .eq("employment_type", "stylist")
+        .select("id, name, photo_url, employment_types!inner(permissions)")
         .eq("status", "active");
 
       if (topStylistsLocationId !== "all") {
@@ -42,8 +40,20 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
         }
       }
 
-      const { data: stylists, error: stylistsError } = await stylistsQuery;
+      const { data: employees, error: stylistsError } = await stylistsQuery;
       if (stylistsError) throw stylistsError;
+      
+      // Filter employees to only those with perform_services permission
+      const staffWithPermission = employees.filter(employee => {
+        const permissions = employee.employment_types?.permissions || [];
+        return Array.isArray(permissions) && permissions.includes('perform_services');
+      });
+      
+      if (staffWithPermission.length === 0) {
+        setTopStylists([]);
+        setIsLoading(false);
+        return;
+      }
 
       // Then get all bookings for this month
       let bookingsQuery = supabase
@@ -77,7 +87,7 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
 
       // Calculate bookings and revenue by stylist
       const stylistPerformance: Record<string, StylistPerformance> = {};
-      stylists?.forEach(stylist => {
+      staffWithPermission.forEach(stylist => {
         stylistPerformance[stylist.id] = {
           id: stylist.id,
           name: stylist.name,
