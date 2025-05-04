@@ -41,7 +41,9 @@ export function DataPagination({
   showPageSizeSelector = true,
   pageSizeOptions = STANDARD_PAGE_SIZES,
 }: DataPaginationProps) {
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  // Use actual value or default to 0, ensuring it's a number
+  const safeTotal = typeof totalItems === 'number' ? totalItems : 0;
+  const totalPages = Math.max(1, Math.ceil(safeTotal / pageSize));
   
   // If current page is invalid (larger than total pages), reset to page 1
   useEffect(() => {
@@ -112,13 +114,17 @@ export function DataPagination({
     return pages;
   };
 
+  // Calculate display values for showing x to y of z items
+  const startItem = safeTotal > 0 ? (currentPage - 1) * pageSize + 1 : 0;
+  const endItem = Math.min(currentPage * pageSize, safeTotal);
+
   return (
     <div className={`flex flex-col sm:flex-row justify-between items-center gap-4 w-full ${className}`}>
       {/* Info text showing current range and total */}
       <div className="text-sm text-muted-foreground order-2 sm:order-1">
-        {totalItems > 0 ? (
+        {safeTotal > 0 ? (
           <>
-            Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} items
+            Showing {startItem} to {endItem} of {safeTotal} items
           </>
         ) : (
           <>No items found</>
