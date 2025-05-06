@@ -319,25 +319,16 @@ export default function AdminBookings() {
       <div className="flex flex-col h-screen bg-gray-50 relative">
         <header className="p-4 border-b bg-white flex justify-between items-center">          
           <div className="flex items-center space-x-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button>
-                  <Plus className="mr-1 h-4 w-4" />
-                  Add
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={openAddAppointmentFromButton}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  <span>Add Appointment</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setIsAddSaleOpen(true)}>
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  <span>Add Sale</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
+            {/* Calendar controls moved here */}
+            <CalendarHeader
+              currentDate={currentDate}
+              onToday={goToday}
+              onPrevious={goPrev}
+              onNext={goNext}
+              className="mr-2"
+            />
+            
+            {/* Location selector */}
             <div className="flex items-center space-x-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               <Select 
@@ -357,14 +348,29 @@ export default function AdminBookings() {
               </Select>
             </div>
           </div>
+
+          {/* Add button moved to right */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="mr-1 h-4 w-4" />
+                Add
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={openAddAppointmentFromButton}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                <span>Add Appointment</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsAddSaleOpen(true)}>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                <span>Add Sale</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
         <StatsPanel stats={stats} />
-        <CalendarHeader
-          currentDate={currentDate}
-          onToday={goToday}
-          onPrevious={goPrev}
-          onNext={goNext}
-        />
+        
         <TimeSlots
           employees={scheduledEmployees}
           formatTime={formatTime}
