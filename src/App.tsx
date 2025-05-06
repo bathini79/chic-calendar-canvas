@@ -25,6 +25,7 @@ import Team from "./pages/admin/settings/Team";
 import Reports from "./pages/admin/Reports";
 import VerifyEmployeePage from "./pages/verify";
 import { Toaster } from "@/components/ui/sonner"; // Import the Sonner Toaster
+import AdminProfile from "@/components/admin/AdminProfile"; // Import the AdminProfile component
 
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -85,6 +86,7 @@ export default function App() {
             <Route path="staff" element={<Staff />} />
             <Route path="inventory" element={<Inventory />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="profile" element={<AdminProfile />} />
             <Route path="settings" element={<Settings />} />
             <Route path="settings/business-setup" element={<BusinessSetup />} />
             <Route path="settings/business-setup/*" element={<BusinessSetup />} />

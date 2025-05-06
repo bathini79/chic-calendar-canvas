@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/react-query";
@@ -54,17 +54,11 @@ const Auth = () => {
   const [selectedCountry, setSelectedCountry] = useState({ name: "India", code: "+91", flag: "🇮🇳" });
   const [referralSource, setReferralSource] = useState(referralSourceParam || "");
   const [messagingChannel, setMessagingChannel] = useState<"SMS" | "WhatsApp">("SMS");
+  const [checkingSession, setCheckingSession] = useState(true);
 
-  const { data: session } = useQuery({
-    queryKey: ["session"],
-    queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      return session;
-    },
-  });
-
-  // Handle routing based on user role
+  // Handle routing based on user role - simplified and with console logs for debugging
   const handleRouteBasedOnRole = async (userId: string) => {
+    console.log("Checking user role for userId:", userId);
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
@@ -78,9 +72,13 @@ const Auth = () => {
         return;
       }
       
-      if (profileData?.role === 'admin') {
+      console.log("User role data:", profileData);
+      
+      if (profileData?.role === 'admin' || profileData?.role === 'employee') {
+        console.log("Routing to admin");
         navigate("/admin");
       } else {
+        console.log("Routing to services");
         navigate("/services");
       }
     } catch (err) {
@@ -89,24 +87,68 @@ const Auth = () => {
     }
   };
 
+  // Check if user is already logged in on component mount
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN') {
-        await queryClient.invalidateQueries({ queryKey: ["session"] });
-        if (session?.user?.id) {
-          handleRouteBasedOnRole(session.user.id);
-        } else {
-          navigate("/services");
+    let isMounted = true;
+    
+    async function checkSession() {
+      console.log("Checking session...");
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error getting session:", error);
+          if (isMounted) setCheckingSession(false);
+          return;
         }
+        
+        console.log("Session data:", data.session);
+        
+        if (data.session?.user?.id) {
+          // User is already logged in, redirect based on role
+          console.log("User is logged in, redirecting based on role");
+          handleRouteBasedOnRole(data.session.user.id);
+        } else {
+          // User is not logged in, show auth form
+          console.log("No active session, showing login form");
+          if (isMounted) setCheckingSession(false);
+        }
+      } catch (error) {
+        console.error("Exception in checkSession:", error);
+        if (isMounted) setCheckingSession(false);
+      }
+    }
+
+    checkSession();
+
+    // Setup auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state changed:", event, session?.user?.id);
+      
+      if (event === 'SIGNED_IN' && session?.user?.id) {
+        handleRouteBasedOnRole(session.user.id);
       }
     });
 
-    if (session?.user?.id) {
-      handleRouteBasedOnRole(session.user.id);
-    }
+    // Cleanup
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
-    return () => subscription.unsubscribe();
-  }, [navigate, session]);
+  // Add a timeout to prevent infinite loading
+  useEffect(() => {
+    // If still checking after 5 seconds, set to false to prevent infinite loading
+    const timeout = setTimeout(() => {
+      if (checkingSession) {
+        console.log("Session check timed out, showing login form");
+        setCheckingSession(false);
+      }
+    }, 5000);
+    
+    return () => clearTimeout(timeout);
+  }, [checkingSession]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -136,7 +178,6 @@ const Auth = () => {
     setSelectedCountry(country);
   };
 
-  // Renamed from sendWhatsAppOTP to sendOTP for more generic naming
   const sendOTP = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
       const errorMessage = "Please enter a valid phone number";
@@ -197,7 +238,6 @@ const Auth = () => {
     }
   };
 
-  // Renamed from verifyWhatsAppOTP to verifyOTP for more generic naming
   const verifyOTP = async () => {
     if (!otp || otp.length !== 6) {
       const errorMessage = "Please enter a valid 6-digit OTP";
@@ -316,6 +356,18 @@ const Auth = () => {
     setResendCountdown(30);
     sendOTP();
   };
+
+  // If still checking session, show loading spinner
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md flex flex-col items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+          <p className="text-sm text-muted-foreground">Checking login status...</p>
+        </Card>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     if (!otpSent) {
