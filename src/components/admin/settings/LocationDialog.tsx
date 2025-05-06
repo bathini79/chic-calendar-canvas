@@ -705,7 +705,7 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
             <DialogTitle className="text-xl font-semibold">{getDialogTitle()}</DialogTitle>
           </DialogHeader>
           
-          <ScrollArea className="max-h-[70vh]">
+          <ScrollArea className="max-h-[70vh] overflow-y-auto" style={{msOverflowStyle: "auto", WebkitOverflowScrolling: "touch"}}>
             <div className="p-6">
               {mode === "contact" && renderContactSection()}
               {mode === "billing" && (
@@ -800,7 +800,7 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
           
           {renderStepIndicator()}
           
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 overflow-y-auto" style={{msOverflowStyle: "auto", WebkitOverflowScrolling: "touch"}}>
             <div className="py-6 max-w-3xl mx-auto w-full">
               {currentStep === 1 && (
                 <div className="space-y-6">

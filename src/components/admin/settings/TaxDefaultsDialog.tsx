@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -139,62 +139,64 @@ export function TaxDefaultsDialog({ isOpen, onClose, locationId, onSuccess }: Ta
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Edit Tax Defaults</DialogTitle>
         </DialogHeader>
         
-        {isFetching ? (
-          <div className="py-4 text-center">Loading tax settings...</div>
-        ) : (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="service-tax">Services Tax</Label>
-              <Select
-                value={serviceTaxId}
-                onValueChange={setServiceTaxId}
-              >
-                <SelectTrigger id="service-tax">
-                  <SelectValue placeholder="Select tax rate for services" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Tax</SelectItem>
-                  {taxRates.map((tax) => (
-                    <SelectItem key={tax.id} value={tax.id}>
-                      {tax.name} ({tax.percentage}%)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                This tax will be applied to all services at this location.
-              </p>
+        <ScrollArea className="overflow-y-auto" style={{msOverflowStyle: "auto", WebkitOverflowScrolling: "touch"}}>
+          {isFetching ? (
+            <div className="py-4 text-center">Loading tax settings...</div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="service-tax">Services Tax</Label>
+                <Select
+                  value={serviceTaxId}
+                  onValueChange={setServiceTaxId}
+                >
+                  <SelectTrigger id="service-tax">
+                    <SelectValue placeholder="Select tax rate for services" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Tax</SelectItem>
+                    {taxRates.map((tax) => (
+                      <SelectItem key={tax.id} value={tax.id}>
+                        {tax.name} ({tax.percentage}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This tax will be applied to all services at this location.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="product-tax">Products Tax</Label>
+                <Select
+                  value={productTaxId}
+                  onValueChange={setProductTaxId}
+                >
+                  <SelectTrigger id="product-tax">
+                    <SelectValue placeholder="Select tax rate for products" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Tax</SelectItem>
+                    {taxRates.map((tax) => (
+                      <SelectItem key={tax.id} value={tax.id}>
+                        {tax.name} ({tax.percentage}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This tax will be applied to all products at this location.
+                </p>
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="product-tax">Products Tax</Label>
-              <Select
-                value={productTaxId}
-                onValueChange={setProductTaxId}
-              >
-                <SelectTrigger id="product-tax">
-                  <SelectValue placeholder="Select tax rate for products" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Tax</SelectItem>
-                  {taxRates.map((tax) => (
-                    <SelectItem key={tax.id} value={tax.id}>
-                      {tax.name} ({tax.percentage}%)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                This tax will be applied to all products at this location.
-              </p>
-            </div>
-          </div>
-        )}
+          )}
+        </ScrollArea>
         
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isLoading}>

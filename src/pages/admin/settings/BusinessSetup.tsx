@@ -51,9 +51,7 @@ export default function BusinessSetup() {
                   >
                     <span>Locations</span>
                   </div>
-                  <div className="px-4 py-2 cursor-pointer">
-                    <span>Client sources</span>
-                  </div>
+                  
                 </CardContent>
               </Card>
             </div>
