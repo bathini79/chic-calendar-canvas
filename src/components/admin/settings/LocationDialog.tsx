@@ -782,20 +782,7 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
               <DialogTitle className="text-xl font-semibold">{getDialogTitle()}</DialogTitle>
             </div>
             
-            {!isMobile && currentStep === totalSteps && (
-              <Button 
-                onClick={handleSubmit} 
-                disabled={isLoading || Object.keys(errors).length > 0}
-                className="h-10 px-5"
-              >
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
-                    Saving...
-                  </span>
-                ) : "Save Location"}
-              </Button>
-            )}
+            
           </div>
           
           {renderStepIndicator()}
