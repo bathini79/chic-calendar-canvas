@@ -1,4 +1,3 @@
-
 export const countryCodes = [
   { name: "India", code: "+91", flag: "🇮🇳" },
   { name: "United States", code: "+1", flag: "🇺🇸" },
@@ -68,4 +67,29 @@ export function extractPhoneWithoutCode(fullPhone: string): string {
   const countryCode = parsePhoneCountryCode(fullPhone);
   if (!countryCode) return fullPhone;
   return fullPhone.substring(countryCode.code.length);
+}
+
+// Parse phone to separate country code and phone number parts
+export function parsePhoneNumber(fullPhone: string): { countryCode: string; phoneNumber: string } {
+  // Add + prefix if not already there for proper parsing
+  const phoneWithPlus = fullPhone.startsWith('+') ? fullPhone : '+' + fullPhone;
+  
+  // Sort country codes by length (longest first) to avoid partial matches
+  const sortedCodes = [...countryCodes].sort((a, b) => b.code.length - a.code.length);
+  
+  // Try to find matching country code
+  for (const country of sortedCodes) {
+    if (phoneWithPlus.startsWith(country.code)) {
+      return {
+        countryCode: country.code,
+        phoneNumber: phoneWithPlus.substring(country.code.length)
+      };
+    }
+  }
+  
+  // If no match found, default to returning the whole string as phone number
+  return {
+    countryCode: '+91', // Default to India code
+    phoneNumber: fullPhone.replace(/^\+/, '') // Remove + if present in the original string
+  };
 }

@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -51,11 +50,13 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
         value = value.slice(0, 10);
       }
       
+      // Display formatted (with spaces) but pass only digits to onChange
       const formattedValue = formatPhoneNumber(value);
       e.target.value = formattedValue;
       
       if (onChange) {
-        onChange(formattedValue);
+        // Pass only digits to onChange handler
+        onChange(value);
       }
     };
 

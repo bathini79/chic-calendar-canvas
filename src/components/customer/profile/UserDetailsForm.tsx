@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -112,6 +111,9 @@ export function UserDetailsForm() {
         }
       });
       
+      // Normalize phone number by removing + prefix if present
+      const normalizedPhone = values.phone ? values.phone.replace(/^\+/, '') : values.phone;
+      
       // Check if profile exists
       if (profileId) {
         // Update existing profile
@@ -119,7 +121,7 @@ export function UserDetailsForm() {
           .from('profiles')
           .update({
             full_name: values.fullName,
-            phone_number: values.phone,
+            phone_number: normalizedPhone,
             updated_at: new Date().toISOString(),
           })
           .eq('id', userId);
@@ -132,7 +134,7 @@ export function UserDetailsForm() {
           .insert({
             id: userId,
             full_name: values.fullName,
-            phone_number: values.phone,
+            phone_number: normalizedPhone,
           });
 
         if (error) throw error;

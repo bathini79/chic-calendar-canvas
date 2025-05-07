@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { CountryCodeDropdown } from "@/components/ui/country-code-dropdown";
 import { toast } from "sonner";
 import { LoaderCircle } from "lucide-react";
+import { countryCodes, parsePhoneNumber } from "@/lib/country-codes";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -128,12 +129,14 @@ export function StaffForm({
 
   useEffect(() => {
     if (initialData) {
+      // Parse the phone number to get country code and local number separately
+      const phoneWithPlus = initialData.phone?.startsWith('+') ? initialData.phone : '+' + initialData.phone;
+      const { countryCode, phoneNumber } = parsePhoneNumber(phoneWithPlus);
+
       form.reset({
         name: initialData.name || "",
         email: initialData.email || "",
-        phone: initialData.phone
-          ? initialData.phone.replace(/^\+\d+\s/, "")
-          : "",
+        phone: phoneNumber, // Just the local part without country code
         photo_url: initialData.photo_url || "",
         status: initialData.status || "active",
         employment_type_id: initialData.employment_type_id || "",
@@ -142,6 +145,14 @@ export function StaffForm({
         locations:
           initialData.employee_locations?.map((l: any) => l.location_id) || [],
       });
+
+      // Set the selected country based on the detected country code
+      if (countryCode) {
+        const matchedCountry = countryCodes.find((c) => c.code === countryCode);
+        if (matchedCountry) {
+          setSelectedCountry(matchedCountry);
+        }
+      }
 
       if (initialData.photo_url) {
         setImages([initialData.photo_url]);
@@ -167,11 +178,25 @@ export function StaffForm({
   const checkPhoneExists = async (phone: string) => {
     if (!phone || phone.length < 10) return false;
 
-    const formattedPhone = `${selectedCountry.code.slice(1)}${phone}`;
+    // Skip check if we're editing and the phone hasn't changed
+    if (initialData && employeeId) {
+      // Get the original phone without the country code
+      const phoneWithPlus = initialData.phone?.startsWith('+') ? initialData.phone : '+' + initialData.phone;
+      const { phoneNumber: originalPhoneNumber } = parsePhoneNumber(phoneWithPlus);
+      
+      // If we're just updating other fields and the phone number hasn't changed
+      if (phone === originalPhoneNumber) {
+        return false; // Skip the existence check - this is the same phone number
+      }
+    }
+
+    // Remove + from country code when checking
+    const formattedPhone = `${selectedCountry.code.replace('+', '')}${phone}`;
 
     try {
       setIsPhoneCheckLoading(true);
 
+      // Check if this phone exists in other employees
       const { data: employeeData, error: employeeError } = await supabase
         .from("employees")
         .select("id")
@@ -179,6 +204,7 @@ export function StaffForm({
 
       if (employeeError) throw employeeError;
 
+      // Check if this phone exists in profiles table
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("id")
@@ -186,7 +212,11 @@ export function StaffForm({
 
       if (profileError) throw profileError;
 
-      const employeeExists = employeeData.some((e) => e.id !== employeeId);
+      // For an existing employee (update case), exclude the current employee from the check
+      const employeeExists = employeeId 
+        ? employeeData.some(e => e.id !== employeeId) 
+        : employeeData.length > 0;
+        
       const profileExists = profileData.length > 0;
 
       if (employeeExists || profileExists) {
@@ -212,7 +242,8 @@ export function StaffForm({
     const updatedData = {
       ...data,
       photo_url: images[0] || null,
-      phone: `${selectedCountry.code}${data.phone}`, // Include full country code with +
+      // Remove + from country code when submitting
+      phone: `${selectedCountry.code.replace('+', '')}${data.phone}`,
     };
 
     onSubmit(updatedData);
@@ -407,7 +438,28 @@ export function StaffForm({
                 <ServiceMultiSelect
                   selectedServices={field.value}
                   onServiceSelect={(serviceId) => {
-                    setSelectedSkills([...field.value, serviceId]);
+                    // Special handling for "all" services
+                    if (serviceId === 'all') {
+                      console.log("ALL SERVICES selected");
+                      // Get all services from the database and select them
+                      supabase
+                        .from('services')
+                        .select('id')
+                        .then(({ data, error }) => {
+                          if (!error && data) {
+                            console.log("Got services data:", data.length, "services");
+                            const allServiceIds = data.map(s => s.id);
+                            setSelectedSkills(allServiceIds);
+                            form.setValue("skills", allServiceIds);
+                          } else {
+                            console.error("Error fetching services:", error);
+                          }
+                        });
+                    } else {
+                      console.log("Single service selected:", serviceId);
+                      // Normal single service selection
+                      setSelectedSkills([...field.value, serviceId]);
+                    }
                   }}
                   onServiceRemove={(serviceId) => {
                     setSelectedSkills(

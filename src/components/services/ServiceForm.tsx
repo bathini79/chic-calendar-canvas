@@ -53,6 +53,7 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>(initialData?.image_urls || []);
   const [loading, setLoading] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
   const form = useForm<ServiceFormData>({
     resolver: zodResolver(formSchema),
@@ -94,6 +95,29 @@ export function ServiceForm({ initialData, onSuccess, onCancel }: ServiceFormPro
     const newCategories = selectedCategories.filter(id => id !== categoryId);
     setSelectedCategories(newCategories);
     form.setValue('categories', newCategories);
+  };
+
+  const handleServiceSelect = (serviceId: string) => {
+    // Special handling for selecting all services at once
+    if (serviceId === '__ALL_SERVICES__' && services) {
+      const allServiceIds = services
+        .filter(service => true) // Include all services
+        .map(service => service.id);
+      
+      setSelectedServices(allServiceIds);
+      form.setValue('services', allServiceIds);
+      return;
+    }
+    
+    setSelectedServices([...selectedServices, serviceId]);
+  };
+  
+  const handleServiceRemove = (serviceId: string) => {
+    setSelectedServices(prev => {
+      const updated = prev.filter(id => id !== serviceId);
+      form.setValue('services', updated);
+      return updated;
+    });
   };
 
   const handleLocationChange = (locationId: string) => {

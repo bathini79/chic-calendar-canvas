@@ -5,6 +5,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectLabel,
+  SelectSeparator,
 } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +35,7 @@ export function ServiceMultiSelect({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [serviceLocations, setServiceLocations] = useState<Record<string, string[]>>({});
   const [commonLocation, setCommonLocation] = useState<string | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   // Fetch all services
   const { data: services } = useQuery({
@@ -92,6 +95,11 @@ export function ServiceMultiSelect({
 
   // Validate locations when selected services change
   useEffect(() => {
+    // Skip validation if we're in the middle of removal operation
+    if (isRemoving) {
+      return;
+    }
+    
     if (selectedServices.length > 1 && Object.keys(serviceLocations).length > 0) {
       const validationResult = validateServiceLocations(selectedServices);
       
@@ -107,7 +115,7 @@ export function ServiceMultiSelect({
         onLocationValidation(false);
       }
     }
-  }, [selectedServices, serviceLocations, locationError]);
+  }, [selectedServices, serviceLocations, locationError, isRemoving]);
 
   // Function to validate that all selected services share at least one location
   const validateServiceLocations = (serviceIds: string[]) => {
@@ -148,7 +156,6 @@ export function ServiceMultiSelect({
       const locationName = locations?.find(l => l.id === commonLocations[0])?.name;
       if (locationName && selectedServices.length > 1) {
         // We can show a success message here, but it's optional
-        // setLocationMessage(`All selected services are available at ${locationName}`);
       }
     }
     
@@ -185,41 +192,41 @@ export function ServiceMultiSelect({
     return true;
   };
 
-  // Handle service selection with location validation
-  const handleServiceSelect = (serviceId: string) => {
-    if (canAddService(serviceId)) {
-      onServiceSelect(serviceId);
-    } else {
-      const serviceName = services?.find(s => s.id === serviceId)?.name || serviceId;
-      const existingServiceNames = selectedServices
-        .map(id => services?.find(s => s.id === id)?.name || id)
-        .join(", ");
-      
-      // Get location names for better error message
-      const serviceLocationNames = serviceLocations[serviceId]?.map(locId => 
-        locations?.find(l => l.id === locId)?.name || locId
-      ).join(", ");
-      
-      const existingLocations = commonLocation ? 
-        locations?.find(l => l.id === commonLocation)?.name || commonLocation :
-        "different locations";
-      
-      setLocationError(`Cannot add "${serviceName}" (available at ${serviceLocationNames}) because it does not share a location with the already selected services (${existingServiceNames}) which are at ${existingLocations}.`);
-    }
+  // Handle service removal with the isRemoving flag to prevent unwanted updates
+  const handleServiceRemove = (serviceId: string) => {
+    setIsRemoving(true);
+    onServiceRemove(serviceId);
+    
+    // Reset the flag after a brief delay to allow state updates to complete
+    setTimeout(() => {
+      setIsRemoving(false);
+    }, 0);
   };
 
   const availableServices = services?.filter(
     service => !selectedServices.includes(service.id) && !excludeServices.includes(service.id)
   );
 
+  // Check if all available services are already selected
+  const allSelected = availableServices?.length === 0 && services?.length > 0 && 
+    services.length === (selectedServices.length + excludeServices.length);
+
   return (
     <div className="space-y-2">
-      <Select onValueChange={handleServiceSelect}>
+      <Select onValueChange={onServiceSelect}>
         <SelectTrigger>
           <SelectValue placeholder="Select services" />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
+            {!allSelected && (
+              <>
+                <SelectLabel>Quick Select</SelectLabel>
+                <SelectItem value="all">All Services</SelectItem>
+                <SelectSeparator />
+                <SelectLabel>Individual Services</SelectLabel>
+              </>
+            )}
             {availableServices?.map((service) => (
               <SelectItem 
                 key={service.id} 
@@ -242,7 +249,7 @@ export function ServiceMultiSelect({
         </Alert>
       )}
       
-      {commonLocation && selectedServices.length > 1 && (
+      {commonLocation && selectedServices.length > 1 && !isRemoving && (
         <Alert className="mt-2 bg-green-50 text-green-800 border-green-200">
           <AlertCircle className="h-4 w-4 text-green-600" />
           <AlertTitle>Common Location</AlertTitle>
@@ -253,19 +260,28 @@ export function ServiceMultiSelect({
       )}
       
       <div className="flex flex-wrap gap-2">
-        {services?.filter(service => selectedServices.includes(service.id)).map((service) => (
-          <Badge key={service.id} variant="secondary">
-            {service.name}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4 ml-1 hover:bg-transparent"
-              onClick={() => onServiceRemove(service.id)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </Badge>
-        ))}
+        {selectedServices.length === 0 ? (
+          <div className="text-muted-foreground text-sm">No services selected</div>
+        ) : selectedServices.length === services?.length ? (
+          <Badge variant="secondary">All Services</Badge>
+        ) : (
+          services?.filter(service => selectedServices.includes(service.id)).map((service) => (
+            <Badge key={service.id} variant="secondary">
+              {service.name}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 ml-1 hover:bg-transparent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleServiceRemove(service.id);
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </Badge>
+          ))
+        )}
       </div>
     </div>
   );

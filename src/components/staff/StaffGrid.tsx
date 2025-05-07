@@ -188,16 +188,7 @@ export function StaffGrid({ searchQuery, onEdit }: StaffGridProps) {
                       {member.status}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1 justify-center">
-                    {member.employee_skills?.map((skill: any) => (
-                      <span
-                        key={skill.service.id}
-                        className="text-xs bg-muted px-2 py-1 rounded-full"
-                      >
-                        {skill.service.name}
-                      </span>
-                    ))}
-                  </div>
+                  
                 </div>
               </CardContent>
               <CardFooter className="flex flex-wrap justify-center gap-2 p-2 sm:p-4">

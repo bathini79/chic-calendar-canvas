@@ -99,11 +99,14 @@ export default function AdminProfile() {
 
     setIsUpdating(true);
     try {
+      // Ensure phone number doesn't have + prefix
+      const normalizedPhone = formData.phone_number.replace(/^\+/, '');
+      
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: formData.full_name,
-          phone_number: formData.phone_number,
+          phone_number: normalizedPhone,
           // Avatar updates would be handled separately with storage API
         })
         .eq('id', session.user.id);

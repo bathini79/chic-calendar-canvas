@@ -87,12 +87,15 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
 
       // If editing existing employee
       if (employeeId) {
+        // Make sure phone doesn't contain + prefix
+        const phone = data.phone.replace(/^\+/, '');
+        
         const { error } = await supabase
           .from("employees")
           .update({
             name: data.name,
-            email: data.email || `${data.phone.replace(/\D/g, '')}@staff.internal`, // Ensure email is never null
-            phone: data.phone,
+            email: data.email || `${phone.replace(/\D/g, '')}@staff.internal`, // Ensure email is never null
+            phone: phone,
             photo_url: data.photo_url,
             status: data.status,
             employment_type_id: data.employment_type_id,
@@ -161,14 +164,16 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
         // Get the current window location to create the verification link
         const baseUrl = window.location.origin;
 
-        // Store form data for later use
-        setTempEmployeeData(data);
+        // Store form data for later use and ensure phone doesn't have + prefix
+        const updatedData = {...data};
+        updatedData.phone = data.phone.replace(/^\+/, '');
+        setTempEmployeeData(updatedData);
 
         // Call the employee-onboarding edge function to create temporary employee record and send OTP
         const { data: responseData, error } = await supabase.functions.invoke('employee-onboarding', {
           body: {
             employeeData: {
-              ...data,
+              ...updatedData,
               status: 'inactive', // Always set to inactive for new employees
               baseUrl
             },
