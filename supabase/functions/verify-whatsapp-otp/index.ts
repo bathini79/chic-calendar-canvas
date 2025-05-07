@@ -16,11 +16,13 @@ serve(async (req) => {
   try {
     // Parse the request body
     const data = await req.json();
-    const { phoneNumber, code, provider = 'any' } = data;
+    const { phoneNumber, code, provider = 'any', skipOtpVerification = false } = data;
     const fullName = data.fullName || null;
+    const email = data.email || null;
     const lead_source = data.lead_source || null;
     
-    if (!phoneNumber || !code) {
+    // Only require code if not skipping OTP verification
+    if (!phoneNumber || (!code && !skipOtpVerification)) {
       throw new Error('Phone number and verification code are required');
     }
     
@@ -53,52 +55,60 @@ serve(async (req) => {
     
     console.log("Normalized phone for OTP verification:", normalizedPhone);
     
-    // Step 1: Verify OTP from database
-    const { data: otpData, error: otpError } = await supabaseAdmin
-      .from('phone_auth_codes')
-      .select('*')
-      .eq('phone_number', normalizedPhone)
-      .eq('code', code)
-      .single();
+    let userName = fullName;
+    let userLeadSource = lead_source;
+    
+    // Skip OTP verification if requested (admin only flow)
+    if (!skipOtpVerification) {
+      // Step 1: Verify OTP from database
+      const { data: otpData, error: otpError } = await supabaseAdmin
+        .from('phone_auth_codes')
+        .select('*')
+        .eq('phone_number', normalizedPhone)
+        .eq('code', code)
+        .single();
+        
+      if (otpError || !otpData) {
+        console.error('Customer OTP verification error:', otpError || "No matching OTP found");
+        console.log("Checking database for phone:", normalizedPhone, "code:", code);
+        return new Response(
+          JSON.stringify({ 
+            error: 'invalid_code',
+            message: 'Invalid verification code'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 // Using 200 to avoid non-2xx handling issues
+          }
+        );
+      }
       
-    if (otpError || !otpData) {
-      console.error('Customer OTP verification error:', otpError || "No matching OTP found");
-      console.log("Checking database for phone:", normalizedPhone, "code:", code);
-      return new Response(
-        JSON.stringify({ 
-          error: 'invalid_code',
-          message: 'Invalid verification code'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 // Using 200 to avoid non-2xx handling issues
-        }
-      );
+      // Check if OTP has expired
+      const expiresAt = new Date(otpData.expires_at);
+      const currentTime = new Date();
+      
+      if (currentTime > expiresAt) {
+        console.error('Customer OTP expired');
+        return new Response(
+          JSON.stringify({ 
+            error: 'code_expired',
+            message: 'Verification code has expired'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          }
+        );
+      }
+      
+      // Extract fullName and lead_source from OTP data or use provided values
+      userName = fullName || otpData.full_name || '';
+      userLeadSource = lead_source || otpData.lead_source || null;
+      
+      console.log("OTP validated for customer login user:", userName, "lead source:", userLeadSource);
+    } else {
+      console.log("Skipping OTP verification for admin-created user:", userName);
     }
-    
-    // Check if OTP has expired
-    const expiresAt = new Date(otpData.expires_at);
-    const currentTime = new Date();
-    
-    if (currentTime > expiresAt) {
-      console.error('Customer OTP expired');
-      return new Response(
-        JSON.stringify({ 
-          error: 'code_expired',
-          message: 'Verification code has expired'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      );
-    }
-    
-    // Extract fullName and lead_source from OTP data or use provided values
-    const userName = fullName || otpData.full_name || '';
-    const userLeadSource = lead_source || otpData.lead_source || null;
-    
-    console.log("OTP validated for customer login user:", userName, "lead source:", userLeadSource);
     
     // Step 2: Check if user exists by phone number
     const { data: existingUser, error: userError } = await supabaseAdmin
@@ -109,7 +119,7 @@ serve(async (req) => {
     
     let userId = null;
     let isNewUser = false;
-    let credentials = null;
+    let credentials: { email: string; password: string } | null = null;
     
     // Step 3: Handle authentication based on whether user exists
     if (userError || !existingUser) {
@@ -133,7 +143,7 @@ serve(async (req) => {
       try {
         // Generate a random email/password for the new user
         // This is needed because Supabase Auth requires an email
-        const tempEmail = `${crypto.randomUUID()}@placeholder.com`;
+        const tempEmail = email || `${crypto.randomUUID()}@placeholder.com`;
         const tempPassword = crypto.randomUUID();
         
         // Create the user in Supabase Auth
@@ -209,7 +219,7 @@ serve(async (req) => {
       }
       
       // Extract email from user data
-      const email = userData.user.email;
+      const userEmail = userData.user.email;
       
       // Generate a one-time password for this login
       const tempPassword = crypto.randomUUID();
@@ -264,14 +274,16 @@ serve(async (req) => {
           .eq('id', userId);
       }
       
-      credentials = { email, password: tempPassword };
+      credentials = { email: userEmail, password: tempPassword };
     }
     
-    // Delete used OTP
-    await supabaseAdmin
-      .from('phone_auth_codes')
-      .delete()
-      .eq('phone_number', normalizedPhone);
+    // Delete used OTP if we verified one
+    if (!skipOtpVerification) {
+      await supabaseAdmin
+        .from('phone_auth_codes')
+        .delete()
+        .eq('phone_number', normalizedPhone);
+    }
     
     // Return user data and credentials
     return new Response(

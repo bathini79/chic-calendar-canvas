@@ -13,6 +13,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { LoaderCircle } from "lucide-react";
 import { CountryCode } from "@/lib/country-codes";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// Lead source options for the dropdown
+const leadSourceOptions = [
+  { value: "search_engine", label: "Google/Search Engine" },
+  { value: "social_media", label: "Social Media" },
+  { value: "friend_referral", label: "Friend Referral" },
+  { value: "advertisement", label: "Advertisement" },
+  { value: "walk_in", label: "Walk In" },
+  { value: "other", label: "Other" },
+];
 
 // Define the form schema with validation
 const createClientSchema = z.object({
@@ -21,6 +32,7 @@ const createClientSchema = z.object({
   phone_number: z.string().min(10, "Valid phone number is required"),
   lead_source: z.string().min(1, "How did you hear about us is required"),
   otp: z.string().optional(),
+  skip_otp: z.boolean().optional(),
 });
 
 type CreateClientFormData = z.infer<typeof createClientSchema>;
@@ -38,6 +50,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [skipOtp, setSkipOtp] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>({ 
     name: "India", 
     code: "+91", 
@@ -52,6 +65,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
       phone_number: "",
       lead_source: "",
       otp: "",
+      skip_otp: false,
     },
   });
 
@@ -154,6 +168,7 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
         
         form.reset();
         setOtpSent(false);
+        setSkipOtp(false);
         onSuccess(newCustomer);
         onClose();
       } else {
@@ -166,35 +181,91 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    form.trigger();
-    
-    if (!form.formState.isValid) {
-      return;
-    }
-    
-    if (!otpSent) {
-      sendVerificationOTP();
-    } else {
-      verifyOTPAndCreateCustomer();
+  // Function to create customer directly without OTP verification
+  const createCustomerDirectly = async () => {
+    try {
+      const formData = form.getValues();
+      
+      // Validate required fields
+      if (!formData.full_name) {
+        toast.error("Full name is required");
+        return;
+      }
+      if (!formData.phone_number) {
+        toast.error("Phone number is required");
+        return;
+      }
+      if (!formData.lead_source) {
+        toast.error("Lead source is required");
+        return;
+      }
+
+      setIsSubmitting(true);
+      
+      // Format phone number for API
+      const countryCodeWithoutPlus = selectedCountry.code.replace("+", "");
+      const formattedPhoneNumber = formData.phone_number.replace(/\s/g, "");
+      const fullPhoneNumber = `${countryCodeWithoutPlus}${formattedPhoneNumber}`;
+      
+      // Call Supabase edge function to create the user without OTP verification
+      const { data, error } = await supabase.functions.invoke('verify-whatsapp-otp', {
+        body: { 
+          phoneNumber: fullPhoneNumber,
+          fullName: formData.full_name,
+          email: formData.email || undefined,
+          lead_source: formData.lead_source,
+          skipOtpVerification: true,
+          provider: "admin"
+        }
+      });
+
+      if (error) {
+        toast.error("Failed to create client: " + error.message);
+        return;
+      }
+
+      if (data?.success) {
+        toast.success("Client created successfully");
+        
+        // Create customer object from response data
+        const newCustomer: Customer = {
+          id: data.userId,
+          full_name: data.fullName || formData.full_name,
+          phone_number: data.phoneNumber || fullPhoneNumber,
+          email: formData.email || undefined,
+        };
+        
+        form.reset();
+        setSkipOtp(false);
+        onSuccess(newCustomer);
+        onClose();
+      } else {
+        toast.error("Failed to create client: " + (data?.message || "Unknown error"));
+      }
+    } catch (error: any) {
+      toast.error("Error creating client: " + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleCancel = () => {
     form.reset();
     setOtpSent(false);
+    setSkipOtp(false);
     onClose();
   };
 
-  const leadSourceOptions = [
-    { value: "social_media", label: "Social Media" },
-    { value: "friend_referral", label: "Friend Referral" },
-    { value: "google", label: "Google Search" },
-    { value: "advertisement", label: "Advertisement" },
-    { value: "walk_in", label: "Walk-in" },
-    { value: "other", label: "Other" },
-  ];
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (skipOtp) {
+      await createCustomerDirectly();
+    } else if (otpSent) {
+      await verifyOTPAndCreateCustomer();
+    } else {
+      await sendVerificationOTP();
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -282,6 +353,31 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
               )}
             />
 
+            {!otpSent && (
+              <FormField
+                control={form.control}
+                name="skip_otp"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 py-2">
+                    <FormControl>
+                      <Checkbox 
+                        checked={skipOtp} 
+                        onCheckedChange={(checked) => {
+                          setSkipOtp(!!checked);
+                          field.onChange(!!checked);
+                        }}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Skip OTP verification (admin only)
+                      </FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
+
             {otpSent && (
               <FormField
                 control={form.control}
@@ -311,10 +407,10 @@ export const CreateClientDialog: React.FC<CreateClientDialogProps> = ({
                 {isSubmitting ? (
                   <>
                     <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                    {otpSent ? "Verifying..." : "Sending..."}
+                    {otpSent ? "Verifying..." : skipOtp ? "Creating Client..." : "Sending..."}
                   </>
                 ) : (
-                  otpSent ? "Verify & Create Client" : "Send Verification"
+                  otpSent ? "Verify & Create Client" : skipOtp ? "Create Client Directly" : "Send Verification"
                 )}
               </Button>
             </div>
