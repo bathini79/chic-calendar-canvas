@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Edit, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { DataPagination, STANDARD_PAGE_SIZES } from "@/components/common/DataPagination";
 
 interface ServicesListProps {
   searchQuery: string;
@@ -20,11 +22,37 @@ interface ServicesListProps {
 
 export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
   const queryClient = useQueryClient();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(STANDARD_PAGE_SIZES[0]); // Use first standard size (10)
+  const [totalCount, setTotalCount] = useState(0);
 
   const { data: services, isLoading } = useQuery({
-    queryKey: ['services'],
+    queryKey: ['services', currentPage, pageSize, searchQuery],
     queryFn: async () => {
-      const { data: servicesData, error } = await supabase
+      // First get the total count for pagination
+      let countQuery = supabase
+        .from("services")
+        .select("id", { count: "exact" })
+        .eq('status', 'active');
+      
+      if (searchQuery) {
+        countQuery = countQuery.ilike("name", `%${searchQuery}%`);
+      }
+      
+      const { count, error: countError } = await countQuery;
+      
+      if (countError) {
+        console.error("Error fetching count:", countError);
+        throw countError;
+      }
+      
+      setTotalCount(count || 0);
+      
+      // Then get the paginated data
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
+      let query = supabase
         .from('services')
         .select(`
           *,
@@ -35,7 +63,16 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
             )
           )
         `)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .order('name')
+        .range(from, to);
+      
+      // Apply server-side filter if search query exists
+      if (searchQuery) {
+        query = query.ilike("name", `%${searchQuery}%`);
+      }
+      
+      const { data: servicesData, error } = await query;
       
       if (error) {
         console.error("Error loading services:", error);
@@ -47,7 +84,7 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
         categories: service.services_categories?.map((sc: any) => sc.categories) || []
       }));
 
-      return transformedServices;
+      return transformedServices || [];
     },
   });
 
@@ -68,13 +105,6 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
     }
   };
 
-  const filteredServices = services?.filter(service =>
-    service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    service.categories.some((cat: any) => 
-      cat.name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  );
-
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -90,6 +120,7 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
           <TableRow>
             <TableHead className="w-[200px]">Service Name</TableHead>
             <TableHead className="w-[250px]">Categories</TableHead>
+            <TableHead>Gender</TableHead>
             <TableHead>Original Price</TableHead>
             <TableHead>Selling Price</TableHead>
             <TableHead>Duration</TableHead>
@@ -97,7 +128,7 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredServices?.map((service) => (
+          {services?.map((service) => (
             <TableRow key={service.id}>
               <TableCell className="font-medium">{service.name}</TableCell>
               <TableCell>
@@ -108,6 +139,13 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
                     </Badge>
                   ))}
                 </div>
+              </TableCell>
+              <TableCell>
+                <span className="capitalize">
+                  {service.gender === 'male' ? 'Male' : 
+                   service.gender === 'female' ? 'Female' : 
+                   service.gender || 'All'}
+                </span>
               </TableCell>
               <TableCell>₹{service.original_price}</TableCell>
               <TableCell>₹{service.selling_price}</TableCell>
@@ -126,6 +164,18 @@ export function ServicesList({ searchQuery, onEdit }: ServicesListProps) {
           ))}
         </TableBody>
       </Table>
+      
+      {/* Add pagination component */}
+      <div className="px-4 py-4 border-t border-gray-200">
+        <DataPagination
+          currentPage={currentPage}
+          totalItems={totalCount}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={STANDARD_PAGE_SIZES}
+        />
+      </div>
     </div>
   );
 }

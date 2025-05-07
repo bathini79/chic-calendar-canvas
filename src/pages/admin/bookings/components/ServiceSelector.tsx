@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useEffect } from "react";
-import { Package as PackageIcon, Plus, Minus, AlertCircle, Clock } from "lucide-react";
+import { Package as PackageIcon, Plus, Minus, AlertCircle, Clock, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useStaffAvailability } from "../hooks/useStaffAvailability";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 type Stylist = {
   id: string;
@@ -66,6 +67,11 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
   const [bookedStylistWarnings, setBookedStylistWarnings] = useState<Record<string, {message: string, status: string}>>({});
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [page, setPage] = useState(0);
+  const [hasMoreItems, setHasMoreItems] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const pageSize = 10; // Number of items per page
   
   // Get staff availability when appointment time is selected
   const { availableStylistsInfo, availableStylists, isLoading: isLoadingAvailability } = useStaffAvailability({
@@ -141,9 +147,9 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     },
   });
 
-  const { data: services } = useQuery({
-    queryKey: ['services', locationId],
-    queryFn: async () => {
+  const { data: services, fetchNextPage, hasNextPage, isFetchingNextPage } = useQuery({
+    queryKey: ['services', locationId, selectedCategory, searchQuery, page],
+    queryFn: async ({ pageParam = 0 }) => {
       let query = supabase
         .from('services')
         .select(`
@@ -152,7 +158,32 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
             categories(id, name)
           )
         `)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .order('name')
+        .range(pageParam * pageSize, (pageParam * pageSize) + pageSize - 1);
+      
+      // Apply search filter if query exists
+      if (searchQuery) {
+        query = query.ilike('name', `%${searchQuery}%`);
+      }
+      
+      // Apply category filter if selected
+      if (selectedCategory) {
+        const { data: categoryServices, error: categoryError } = await supabase
+          .from('services_categories')
+          .select('service_id')
+          .eq('category_id', selectedCategory);
+        
+        if (categoryError) throw categoryError;
+        
+        if (categoryServices && categoryServices.length > 0) {
+          const serviceIds = categoryServices.map(cs => cs.service_id);
+          query = query.in('id', serviceIds);
+        } else {
+          // If no services in this category, return empty array
+          return [];
+        }
+      }
       
       if (locationId) {
         // Get services associated with this location
@@ -170,15 +201,19 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         }
       }
       
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       
       if (error) throw error;
-      return data;
+      
+      // Update the hasMoreItems state based on whether we got a full page of results
+      setHasMoreItems(data.length === pageSize);
+      
+      return data || [];
     },
   });
 
   const { data: packages } = useQuery({
-    queryKey: ['packages', locationId],
+    queryKey: ['packages', locationId, searchQuery],
     queryFn: async () => {
       let query = supabase
         .from('packages')
@@ -190,6 +225,10 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           )
         `)
         .eq('status', 'active');
+
+      if (searchQuery) {
+        query = query.ilike('name', `%${searchQuery}%`);
+      }
 
       const { data, error } = await query;
       
@@ -451,12 +490,21 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         onCategorySelect={setSelectedCategory}
       />
 
-      <ScrollArea className="border rounded-md">
+      <Input
+        type="text"
+        placeholder="Search services or packages"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="mb-4"
+      />
+
+      <ScrollArea className="border rounded-md h-[500px]">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Duration</TableHead>
+              <TableHead>Gender</TableHead>
               <TableHead>Price</TableHead>
               <TableHead className="w-[200px]">Stylist</TableHead>
               <TableHead className="w-[100px]"></TableHead>
@@ -470,6 +518,13 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
               const isSelected = isService 
                 ? selectedServices.includes(item.id)
                 : isExpanded;
+
+              // Format gender display text
+              const genderDisplay = isService ? (
+                item.gender === 'male' ? 'Male' :
+                item.gender === 'female' ? 'Female' : 
+                'All'
+              ) : 'All';
 
               return (
                 <React.Fragment key={`${item.type}-${item.id}`}>
@@ -495,6 +550,9 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                         item.package_services?.reduce((sum: number, ps: any) => 
                           sum + (ps.service?.duration || 0), 0)
                       } min
+                    </TableCell>
+                    <TableCell>
+                      {genderDisplay}
                     </TableCell>
                     <TableCell>
                       ₹{isService ? item.selling_price : calculatePackagePrice(item)}
@@ -525,7 +583,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                   </TableRow>
                   {isPackage && isExpanded && (
                     <TableRow>
-                      <TableCell colSpan={5} className="bg-slate-50">
+                      <TableCell colSpan={6} className="bg-slate-50">
                         <div className="pl-8 pr-4 py-2 space-y-2">
                           {item.package_services?.map((ps: any) => (
                             <div
@@ -536,6 +594,11 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                                 <span className="text-sm font-medium">{ps.service.name}</span>
                                 <span className="text-sm text-muted-foreground">
                                   ({ps.service.duration} min)
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                  {ps.service.gender === 'male' ? '(Male)' :
+                                   ps.service.gender === 'female' ? '(Female)' : 
+                                   '(All)'}
                                 </span>
                               </div>
                               <div className="flex items-center gap-4">
@@ -588,6 +651,38 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
             })}
           </TableBody>
         </Table>
+        
+        {/* Infinite scroll loader */}
+        {hasMoreItems && (
+          <div 
+            className="py-4 text-center"
+            ref={(el) => {
+              if (!el) return;
+              
+              const observer = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting && !loadingMore && hasMoreItems) {
+                  setLoadingMore(true);
+                  setPage(prev => prev + 1);
+                  fetchNextPage({ pageParam: page + 1 })
+                    .finally(() => setLoadingMore(false));
+                }
+              }, { threshold: 0.5 });
+              
+              observer.observe(el);
+              
+              return () => observer.disconnect();
+            }}
+          >
+            {isFetchingNextPage ? (
+              <div className="flex justify-center items-center gap-2">
+                <div className="animate-spin h-4 w-4 border-2 border-primary rounded-full border-t-transparent"></div>
+                <span className="text-sm text-muted-foreground">Loading more...</span>
+              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground">Scroll for more</span>
+            )}
+          </div>
+        )}
       </ScrollArea>
       
       {isLoadingAvailability && (
