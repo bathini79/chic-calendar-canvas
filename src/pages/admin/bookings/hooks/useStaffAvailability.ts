@@ -72,12 +72,31 @@ export function useStaffAvailability({
           setAvailableStylistsInfo([]);
           setIsLoading(false);
           return;
+        }        // Start and end time for the appointment
+        // Create a proper Date object that clones the selected date
+        const appointmentStart = new Date(selectedDate.getTime());
+        // Properly parse the time string, handling both 24-hour and 12-hour formats
+        const timeMatch = selectedTime.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(am|pm))?$/i);
+        
+        if (timeMatch) {
+          let hours = parseInt(timeMatch[1], 10);
+          const minutes = parseInt(timeMatch[2], 10);
+          const seconds = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+          const ampm = timeMatch[4]?.toLowerCase();
+          
+          // Adjust hours for AM/PM if present
+          if (ampm === 'pm' && hours < 12) {
+            hours += 12;
+          } else if (ampm === 'am' && hours === 12) {
+            hours = 0;
+          }
+          
+          appointmentStart.setHours(hours, minutes, seconds, 0);
+        } else {
+          // Fallback to simple splitting (assuming 24-hour format)
+          const [hours, minutes] = selectedTime.split(':').map(Number);
+          appointmentStart.setHours(hours, minutes, 0, 0);
         }
-
-        // Start and end time for the appointment
-        const appointmentStart = new Date(selectedDate);
-        const [hours, minutes] = selectedTime.split(':').map(Number);
-        appointmentStart.setHours(hours, minutes, 0, 0);
         
         const appointmentEnd = addMinutes(appointmentStart, serviceDuration);
         
@@ -196,16 +215,19 @@ export function useStaffAvailability({
               name: employee.name,
               isAvailable: false
             };
-          }
-
-          // Check for conflicting bookings, excluding bookings that are part of the current appointment
+          }          // Check for conflicting bookings, excluding bookings that are part of the current appointment
           const conflictingBooking = bookings?.find(booking => {
             // Only check bookings for this employee
             if (booking.employee_id !== employee.id) return false;
             
-            // KEY FIX: Skip this booking if it belongs to the current appointment
+            // Skip this booking if it belongs to the current appointment
             if (appointmentId && booking.appointment?.id === appointmentId) {
-              console.log(`Excluding booking for appointment ${appointmentId}`);
+              return false;
+            }
+            
+            // Get booking status - if it's not booked, confirmed, or in progress, don't count as conflict
+            const status = booking.appointment?.status;
+            if (status !== 'booked' && status !== 'confirmed' && status !== 'inprogress') {
               return false;
             }
             
@@ -213,6 +235,20 @@ export function useStaffAvailability({
             const bookingStart = new Date(booking.start_time);
             const bookingEnd = new Date(booking.end_time);
             
+            // Make sure we're comparing the dates correctly
+            const bookingYear = bookingStart.getFullYear();
+            const bookingMonth = bookingStart.getMonth();
+            const bookingDay = bookingStart.getDate();
+            const appointmentYear = appointmentStart.getFullYear();
+            const appointmentMonth = appointmentStart.getMonth();
+            const appointmentDay = appointmentStart.getDate();
+            
+            // First check if we're on the same day - if not, there's no conflict
+            if (bookingYear !== appointmentYear || bookingMonth !== appointmentMonth || bookingDay !== appointmentDay) {
+              return false;
+            }
+            
+            // Now check for time overlap on the same day
             return (appointmentStart < bookingEnd && appointmentEnd > bookingStart);
           });
 

@@ -628,12 +628,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                       <span>Subtotal</span>
                       <span>₹{subtotal.toFixed(2)}</span>
                     </div>
-                    
-                    <div className="flex justify-between text-sm">
+
+                    {transaction?.tax_amount > 0 ? <div className="flex justify-between text-sm">
                       <span>{taxName ? `Tax (${taxName})` : 'Tax'}</span>
                       <span>₹{transaction.tax_amount.toFixed(2)}</span>
-                    </div>
-                    
+                    </div> : null}
+                    {transaction?.membership_discount > 0 ? (
                     <div className="flex justify-between text-sm text-green-600">
                       <span className="flex items-center gap-1">
                         <Percent className="h-3 w-3" />
@@ -641,16 +641,16 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                       </span>
                       <span>-₹{transaction.membership_discount.toFixed(2)}</span>
                     </div>
-                    
+                    ) : null}
                     <div className="flex justify-between text-sm text-green-600">
                       <span>
-                        {transaction.discount_value ?`Discount (${transaction.discount_type === 'percentage' ? 
-                          `${transaction.discount_value}%` : 
+                        {transaction?.discount_value > 0 ? `Discount (${transaction.discount_type === 'percentage' ?
+                          `${transaction.discount_value}%` :
                           '₹' + transaction.discount_value
                         })` : null}
                       </span>
                       <span>
-                      {transaction.discount_value > 0 ? 
+                      {transaction?.discount_value > 0 ? 
                         (transaction.discount_type === 'percentage' 
                           ? `-₹${(subtotal * (transaction.discount_value / 100)).toFixed(2)}`
                           : `-₹${transaction.discount_value.toFixed(2)}`) 

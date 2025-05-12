@@ -402,7 +402,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     </div>
                   )}
 
-                  {selectedCustomer && (
+                  {loyalty.isLoyaltyEnabled && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm items-center">
                         <span className="flex items-center gap-2 text-muted-foreground">
@@ -447,10 +447,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     </div>
                   )}
 
-                  <div className="flex justify-between text-sm">
+                  {roundOffDifference>0 ? <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Round Off</span>
                     <span>{roundOffDifference > 0 ? `+₹${formatPrice(roundOffDifference)}` : `₹${formatPrice(roundOffDifference)}`}</span>
-                  </div>
+                  </div> : null}
                 </div>
               </div>
             )}
