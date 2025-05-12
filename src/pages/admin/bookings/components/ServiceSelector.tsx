@@ -492,23 +492,24 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       </TooltipProvider>
     );
   };  return (
-    <div className="flex flex-col h-full space-x-2 mt-1">
-      <CategoryFilter
-        categories={categories || []}
-        selectedCategory={selectedCategory}
-        onCategorySelect={setSelectedCategory}
-      />
+    <div className="flex flex-col h-full w-full">
+      <div className="mb-2">
+        <CategoryFilter
+          categories={categories || []}
+          selectedCategory={selectedCategory}
+          onCategorySelect={setSelectedCategory}
+        />
 
-      <Input
-        type="text"
-        placeholder="Search services or packages"
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="mb-2"
-      />
+        <Input
+          type="text"
+          placeholder="Search services or packages"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
 
-      <div className="border overflow-auto flex-1">
-        <Table>
+      <div className="border overflow-auto flex-1 w-full">
+        <Table className="w-full">
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>

@@ -14,7 +14,7 @@ export function CategoryFilter({
 }: CategoryFilterProps) {
   return (
     <ScrollArea className="w-full p-2">
-      <div className="flex gap-2 pb-4">
+      <div className="flex gap-2 pb-2">
         <Badge
           variant={selectedCategory === null ? "default" : "outline"}
           className="cursor-pointer flex-none hover:bg-accent"
