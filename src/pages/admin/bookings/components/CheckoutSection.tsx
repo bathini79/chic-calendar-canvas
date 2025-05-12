@@ -287,6 +287,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         scrollContainerRef.current.scrollHeight;
     }
   }, [selectedItems, subtotal, total]);
+console.log("loyalty", loyalty);
 
   return (
     <div className="h-full w-full bg-gray-50">
@@ -402,7 +403,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     </div>
                   )}
 
-                  {selectedCustomer && (
+                  {loyalty.isLoyaltyEnabled && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm items-center">
                         <span className="flex items-center gap-2 text-muted-foreground">

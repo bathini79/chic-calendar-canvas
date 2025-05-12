@@ -326,28 +326,36 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     }, 0);
     return basePrice + additionalPrice;
   };
-
-  // Function to determine if a stylist is available
+  // Function to determine if a stylist is available (based on working schedule)
   const isStylistAvailable = (stylistId: string) => {
     if (!selectedDate || !selectedTime) return true;
     if (!availableStylistsInfo) return availableStylists.includes(stylistId);
 
     const stylistInfo = availableStylistsInfo.find((s) => s.id === stylistId);
+    
+    // First, check if the stylist is working (scheduled) at this time
+    // isAvailable will be false if stylist is not scheduled to work
+    if (!stylistInfo?.isAvailable && !stylistInfo?.bookingInfo) {
+      return false; // Stylist is not scheduled to work at this time
+    }
 
-    // If stylist is unavailable due to a booking conflict, check its status
+    // If they are working but have a booking conflict, check if it's a real conflict
     if (!stylistInfo?.isAvailable && stylistInfo?.bookingInfo) {
       const status = stylistInfo.bookingInfo.status;
-      // Only consider "booked" or "inprogress" as conflicts
+      // Only consider active bookings as real conflicts
       if (
         status !== "booked" &&
         status !== "inprogress" &&
         status !== "confirmed"
       ) {
-        return true; // Treat as available if not booked or in progress
+        return true; // Booking exists but is not active, so stylist is available
       }
+      
+      // Has active booking conflict
+      return false;
     }
 
-    return stylistInfo?.isAvailable ?? true;
+    return true; // Default to available
   };
 
   // Get the booking info for a stylist if they're unavailable
@@ -407,34 +415,38 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
     // Get stylist name
     const stylistName =
-      stylists.find((s) => s.id === stylistId)?.name || "Stylist";
-
-    // Format times for the warning message
+      stylists.find((s) => s.id === stylistId)?.name || "Stylist";    // Format times for the warning message with proper date handling
     const startTime = bookingInfo?.startTime
       ? new Date(bookingInfo.startTime).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
+          hour12: true // Explicitly use 12-hour format with AM/PM
         })
       : "";
     const endTime = bookingInfo?.endTime
       ? new Date(bookingInfo.endTime).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
+          hour12: true // Explicitly use 12-hour format with AM/PM
         })
       : "";
-
-    // Create warning message with booking details
+      
+    // Also get the date of the conflicting appointment
+    const conflictDate = bookingInfo?.startTime
+      ? new Date(bookingInfo.startTime).toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+        })
+      : "";    // Create warning message with booking details including date
     setBookedStylistWarnings((prev) => ({
       ...prev,
       [itemId]: {
-        message: `${stylistName} is already booked from ${startTime} to ${endTime}. They may have overlapping appointments.`,
+        message: `${stylistName} has a conflicting appointment on ${conflictDate} from ${startTime} to ${endTime}.`,
         status: bookingInfo?.status || "booked",
       },
-    }));
-
-    // Still allow selection but show a toast warning
+    }));// Still allow selection but show a toast warning with clearer message
     toast.warning(
-      `${stylistName} already has a booking during this time slot.`
+      `${stylistName} has a conflicting appointment on ${conflictDate} at ${startTime}.`
     );
     onStylistSelect(itemId, stylistId);
   };
@@ -549,16 +561,23 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                       >
                         <span className="flex items-center gap-2">
                           {stylist.name}
-                          {!available && colorIndicator && (
-                            <AlertCircle className="h-4 w-4 text-yellow-500" />
+                {!available && colorIndicator && (
+                            getStylistBookingInfo(stylist.id) ? (
+                              <AlertCircle className="h-4 w-4 text-yellow-500" title="Conflicting appointment" />
+                            ) : (
+                              <Clock className="h-4 w-4 text-gray-500" title="Not scheduled to work" />
+                            )
                           )}
                         </span>
                       </SelectItem>
                     </div>
-                  </TooltipTrigger>
-                  {!available && (
+                  </TooltipTrigger>                {!available && (
                     <TooltipContent side="right" align="start" className="z-50">
-                      <p>This stylist is not available at the selected time</p>
+                      {getStylistBookingInfo(stylist.id) ? (
+                        <p>This stylist has a conflicting appointment</p>
+                      ) : (
+                        <p>This stylist is not scheduled to work at this time</p>
+                      )}
                     </TooltipContent>
                   )}
                 </Tooltip>
@@ -731,8 +750,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                 ? "(Female)"
                 : "(All)"}
                 </span>
-              </div>
-              <div className="flex items-center gap-4">
+              </div>              <div className="flex items-center gap-4">
                 <span className="text-sm font-medium">
                   ₹
                   {ps.package_selling_price !== null &&
@@ -742,7 +760,8 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                 </span>
                 {renderStylistDropdown(
                   ps.service.id,
-                  selectedStylists[ps.service.id] || ""
+                  selectedStylists[ps.service.id] || "",
+                  true // Add color indicator here too
                 )}
               </div>
                 </div>
