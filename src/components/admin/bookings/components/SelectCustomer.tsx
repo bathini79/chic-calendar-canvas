@@ -48,19 +48,19 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
     setCustomersWithMemberships(membershipSet);
   }, [memberships]);
 
-  return (
-    <div className="w-full h-full overflow-hidden flex flex-col">
+  return (    <div className="w-full h-full overflow-hidden flex flex-col">
       <div className="p-6 border-b">
         {!selectedCustomer ? (
           <>
-            {" "}
             <h3 className="text-lg font-semibold mb-4">Select a client</h3>
-            <CustomerSearch
-              onSelect={(customer) => {
-                setSelectedCustomer(customer);
-                setShowCreateForm(false);
-              }}
-            />
+            <div>
+              <CustomerSearch
+                onSelect={(customer) => {
+                  setSelectedCustomer(customer);
+                  setShowCreateForm(false);
+                }}
+              />
+            </div>
             <div className="mt-4">
               <Button
                 variant="ghost"
@@ -76,7 +76,7 @@ export const SelectCustomer: React.FC<SelectCustomerProps> = ({
               </Button>
             </div>
           </>
-        ) : (
+        ) :(
           <div className="flex flex-col items-center gap-3">
           {/* Enlarged Avatar */}
           <Avatar className="h-16 w-16 bg-primary/10">

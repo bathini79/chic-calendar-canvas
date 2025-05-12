@@ -1,0 +1,5 @@
+# Defines the configuration for a single function
+schema_version = 1
+
+[function]
+verify_jwt = true

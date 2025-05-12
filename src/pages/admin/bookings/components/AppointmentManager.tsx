@@ -591,7 +591,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
             <div className="flex flex-col flex-1 min-h-0">
               {currentScreen === SCREEN.SERVICE_SELECTION && (
                 <>
-                  <div className="p-6 flex-shrink-0">
+                  <div className="p-6 pb-0 pt-2 flex-shrink-0">
                     <h3 className="text-lg font-semibold">Select Services</h3>
                   </div>
 
@@ -605,8 +605,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                       selectedStylists={selectedStylists}
                       stylists={employees}
                       onCustomPackage={handleCustomServiceToggle}
-                      customizedServices={customizedServices}
-                      locationId={locationId}
+                      customizedServices={customizedServices}                      locationId={locationId}
                       selectedDate={stateSelectedDate}
                       selectedTime={stateSelectedTime}
                       existingAppointment={!!existingAppointment}

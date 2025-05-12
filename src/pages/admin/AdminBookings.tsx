@@ -349,8 +349,7 @@ export default function AdminBookings() {
             </div>
           </div>
 
-          {/* Add button moved to right */}
-          <DropdownMenu>
+          {/* Add button moved to right */}          <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button>
                 <Plus className="mr-1 h-4 w-4" />
@@ -358,6 +357,10 @@ export default function AdminBookings() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={openAddAppointmentFromButton}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                <span>Add Appointment</span>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setIsAddSaleOpen(true)}>
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 <span>Add Sale</span>
