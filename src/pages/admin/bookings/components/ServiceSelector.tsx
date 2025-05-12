@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { cn } from "@/lib/utils";
@@ -66,11 +66,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
-  const [bookedStylistWarnings, setBookedStylistWarnings] = useState<Record<string, {message: string, status: string}>>({});
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [page, setPage] = useState(0);
-  const [hasMoreItems, setHasMoreItems] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [bookedStylistWarnings, setBookedStylistWarnings] = useState<Record<string, {message: string, status: string}>>({});  const [searchQuery, setSearchQuery] = useState<string>("");
   const pageSize = 10; // Number of items per page
   
   // Get staff availability when appointment time is selected
@@ -146,9 +142,14 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       return data;
     },
   });
-
-  const { data: services, fetchNextPage, hasNextPage, isFetchingNextPage } = useQuery({
-    queryKey: ['services', locationId, selectedCategory, searchQuery, page],
+  const { 
+    data: servicesData, 
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage,
+    isLoading: isLoadingServices
+  } = useInfiniteQuery({
+    queryKey: ['services', locationId, selectedCategory, searchQuery],
     queryFn: async ({ pageParam = 0 }) => {
       let query = supabase
         .from('services')
@@ -181,7 +182,10 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           query = query.in('id', serviceIds);
         } else {
           // If no services in this category, return empty array
-          return [];
+          return {
+            data: [],
+            nextPage: null
+          };
         }
       }
       
@@ -201,16 +205,23 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         }
       }
       
-      const { data, error, count } = await query;
+      const { data, error } = await query;
       
       if (error) throw error;
       
-      // Update the hasMoreItems state based on whether we got a full page of results
-      setHasMoreItems(data.length === pageSize);
+      // Calculate if there's a next page
+      const hasMore = data.length === pageSize;
       
-      return data || [];
+      return {
+        data: data || [],
+        nextPage: hasMore ? pageParam + 1 : null
+      };
     },
+    getNextPageParam: (lastPage) => lastPage.nextPage,
   });
+  
+  // Flatten the pages into a single services array
+  const services = servicesData?.pages.flatMap(page => page.data) || [];
 
   const { data: packages } = useQuery({
     queryKey: ['packages', locationId, searchQuery],
@@ -480,10 +491,8 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         </Select>
       </TooltipProvider>
     );
-  };
-
-  return (
-    <div className="space-y-6">
+  };  return (
+    <div className="flex flex-col h-full space-x-2 mt-1">
       <CategoryFilter
         categories={categories || []}
         selectedCategory={selectedCategory}
@@ -495,10 +504,10 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         placeholder="Search services or packages"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="mb-4"
+        className="mb-2"
       />
 
-      <ScrollArea className="border rounded-md h-[500px]">
+      <div className="border overflow-auto flex-1">
         <Table>
           <TableHeader>
             <TableRow>
@@ -509,8 +518,26 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
               <TableHead className="w-[200px]">Stylist</TableHead>
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
-          </TableHeader>
-          <TableBody>
+          </TableHeader>          <TableBody>
+            {isLoadingServices && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-6">
+                  <div className="flex justify-center items-center gap-2">
+                    <div className="animate-spin h-5 w-5 border-2 border-primary rounded-full border-t-transparent"></div>
+                    <span className="text-sm text-muted-foreground">Loading services...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+            
+            {!isLoadingServices && allItems.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-6">
+                  <span className="text-sm text-muted-foreground">No services found</span>
+                </TableCell>
+              </TableRow>
+            )}
+            
             {allItems.map((item) => {
               const isService = item.type === 'service';
               const isPackage = item.type === 'package';
@@ -651,20 +678,16 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
             })}
           </TableBody>
         </Table>
-        
-        {/* Infinite scroll loader */}
-        {hasMoreItems && (
+          {/* Infinite scroll loader */}
+        {hasNextPage && (
           <div 
             className="py-4 text-center"
             ref={(el) => {
               if (!el) return;
               
               const observer = new IntersectionObserver((entries) => {
-                if (entries[0].isIntersecting && !loadingMore && hasMoreItems) {
-                  setLoadingMore(true);
-                  setPage(prev => prev + 1);
-                  fetchNextPage({ pageParam: page + 1 })
-                    .finally(() => setLoadingMore(false));
+                if (entries[0].isIntersecting && !isFetchingNextPage && hasNextPage) {
+                  fetchNextPage();
                 }
               }, { threshold: 0.5 });
               
@@ -680,10 +703,9 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
               </div>
             ) : (
               <span className="text-sm text-muted-foreground">Scroll for more</span>
-            )}
-          </div>
+            )}          </div>
         )}
-      </ScrollArea>
+      </div>
       
       {isLoadingAvailability && (
         <div className="flex items-center justify-center py-2 text-sm text-muted-foreground">

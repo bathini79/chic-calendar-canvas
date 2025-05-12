@@ -506,9 +506,9 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
 
   return (
     <div
-      className={`fixed top-0 right-0 w-full  h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${currentScreen == SCREEN.SUMMARY ? `max-w-3xl`: `max-w-6xl`} ${
-        isOpen ? "translate-x-0" : "translate-x-full"
-      }`}
+      className={`fixed top-0 right-0 w-full  h-full bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl ${
+        currentScreen == SCREEN.SUMMARY ? `max-w-3xl` : `max-w-6xl`
+      } ${isOpen ? "translate-x-0" : "translate-x-full"}`}
     >
       <div className="flex flex-col h-full">
         <div className="flex flex-1 min-h-0">
@@ -523,8 +523,12 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
             </div>
           )}
 
-          <div className={`${currentScreen === SCREEN.SUMMARY ? 'w-full' : 'w-[70%]'} flex flex-col h-full`}>
-            <div className={`p-6 border-b flex-shrink-0 ${headerBgColor}`}>
+          <div
+            className={`${
+              currentScreen === SCREEN.SUMMARY ? "w-full" : "w-[70%]"
+            } flex flex-col h-full`}
+          >
+            <div className={`p-4 border-b flex-shrink-0 ${headerBgColor}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-start flex-col">
                   {stateSelectedDate && (
@@ -567,7 +571,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                             <SelectItem value="canceled">
                               <StatusBadge status="canceled" />
                             </SelectItem>
-                            {currentScreen === SCREEN.SUMMARY as typeof currentScreen &&
+                            {currentScreen ===
+                              (SCREEN.SUMMARY as typeof currentScreen) &&
                             newAppointmentId ? (
                               <SelectItem value="completed">
                                 <StatusBadge status="completed" />
@@ -591,11 +596,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
             <div className="flex flex-col flex-1 min-h-0">
               {currentScreen === SCREEN.SERVICE_SELECTION && (
                 <>
-                  <div className="p-6 pb-0 pt-2 flex-shrink-0">
-                    <h3 className="text-lg font-semibold">Select Services</h3>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto px-6 min-h-0">
+                  <div className="px-6 overflow-hidden flex-1">
                     <ServiceSelector
                       onServiceSelect={handleServiceSelect}
                       onPackageSelect={handlePackageSelect}
@@ -605,15 +606,15 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                       selectedStylists={selectedStylists}
                       stylists={employees}
                       onCustomPackage={handleCustomServiceToggle}
-                      customizedServices={customizedServices}                      locationId={locationId}
+                      customizedServices={customizedServices}
+                      locationId={locationId}
                       selectedDate={stateSelectedDate}
                       selectedTime={stateSelectedTime}
                       existingAppointment={!!existingAppointment}
                       appointmentId={existingAppointment?.id}
                     />
                   </div>
-
-                  <div className="p-6 border-t flex-shrink-0 flex flex-col gap-4 bg-white">
+                  <div className="p-2 border-t flex-shrink-0 flex flex-col gap-4 bg-white">
                     {errorMessage && (
                       <div className="text-red-500 text-sm text-left">
                         {errorMessage}
@@ -689,9 +690,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   <h3 className="text-xl font-semibold mb-6">
                     Appointment Summary
                   </h3>
-                  <SummaryView
-                    appointmentId={newAppointmentId}
-                  />
+                  <SummaryView appointmentId={newAppointmentId} />
                   <div className="mt-6 flex justify-end">
                     <Button
                       onClick={() => {
