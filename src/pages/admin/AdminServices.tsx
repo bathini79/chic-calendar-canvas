@@ -14,11 +14,11 @@ import { PackagesList } from "@/components/packages/PackagesList";
 import CategoriesList from "@/components/categories/CategoriesList";
 import CategoriesGrid from "@/components/categories/CategoriesGrid";
 
-const AdminServices = () => {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+const AdminServices = () => {  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [categoryViewMode, setCategoryViewMode] = useState<'grid' | 'list'>('grid');
-  const [packageViewMode, setPackageViewMode] = useState<'grid' | 'list'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [packageViewMode, setPackageViewMode] = useState<'grid' | 'list'>('grid');  const [searchQuery, setSearchQuery] = useState('');
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  const [packageSearchQuery, setPackageSearchQuery] = useState('');
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [packageDialogOpen, setPackageDialogOpen] = useState(false);
@@ -125,14 +125,12 @@ const AdminServices = () => {
               searchQuery={searchQuery}
               onEdit={handleEditService}
             />
-          </TabsContent>
-
-          <TabsContent value="categories" className="space-y-6">
+          </TabsContent>          <TabsContent value="categories" className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <SearchInput
-                  value=""
-                  onChange={() => {}}
+                  value={categorySearchQuery}
+                  onChange={setCategorySearchQuery}
                   placeholder="Search categories..."
                 />
               </div>
@@ -145,25 +143,27 @@ const AdminServices = () => {
             </div>
             {categories && categoryViewMode === 'grid' ? (
               <CategoriesGrid
-                categories={categories}
+                categories={categories.filter(category => 
+                  category.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+                )}
                 onEdit={handleEditCategory}
                 onDelete={refetchCategories}
               />
             ) : (
               <CategoriesList
-                categories={categories || []}
+                categories={categories ? categories.filter(category => 
+                  category.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+                ) : []}
                 onEdit={handleEditCategory}
                 onDelete={refetchCategories}
               />
             )}
-          </TabsContent>
-
-          <TabsContent value="packages" className="space-y-6">
+          </TabsContent>          <TabsContent value="packages" className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <SearchInput
-                  value={searchQuery}
-                  onChange={setSearchQuery}
+                  value={packageSearchQuery}
+                  onChange={setPackageSearchQuery}
                   placeholder="Search packages..."
                 />
               </div>
@@ -176,12 +176,12 @@ const AdminServices = () => {
             </div>
             {packageViewMode === 'grid' ? (
               <PackagesGrid
-                searchQuery={searchQuery}
+                searchQuery={packageSearchQuery}
                 onEdit={handleEditPackage}
               />
             ) : (
               <PackagesList
-                searchQuery={searchQuery}
+                searchQuery={packageSearchQuery}
                 onEdit={handleEditPackage}
               />
             )}
