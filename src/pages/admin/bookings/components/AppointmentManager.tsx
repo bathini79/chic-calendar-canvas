@@ -606,8 +606,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                       selectedStylists={selectedStylists}
                       stylists={employees}
                       onCustomPackage={handleCustomServiceToggle}
-                      customizedServices={customizedServices}
-                      locationId={locationId}
+                      customizedServices={customizedServices}                      locationId={locationId}
                       selectedDate={stateSelectedDate}
                       selectedTime={stateSelectedTime}
                       existingAppointment={!!existingAppointment}
