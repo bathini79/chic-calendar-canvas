@@ -287,7 +287,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         scrollContainerRef.current.scrollHeight;
     }
   }, [selectedItems, subtotal, total]);
-console.log("loyalty", loyalty);
 
   return (
     <div className="h-full w-full bg-gray-50">
@@ -448,10 +447,10 @@ console.log("loyalty", loyalty);
                     </div>
                   )}
 
-                  <div className="flex justify-between text-sm">
+                  {roundOffDifference>0 ? <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Round Off</span>
                     <span>{roundOffDifference > 0 ? `+₹${formatPrice(roundOffDifference)}` : `₹${formatPrice(roundOffDifference)}`}</span>
-                  </div>
+                  </div> : null}
                 </div>
               </div>
             )}
