@@ -355,7 +355,9 @@ export function StaffDialog({ open, onOpenChange, employeeId }: StaffDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="!top-auto !bottom-0 left-1/2 translate-x-[-50%] !translate-y-0 w-[98vw] h-[95vh] max-w-none border p-6 shadow-xl rounded-t-2xl !rounded-b-none"
+>
         <DialogHeader>
           <DialogTitle>
             {employeeId ? "Edit Staff Member" :
