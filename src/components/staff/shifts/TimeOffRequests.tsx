@@ -233,7 +233,7 @@ export function TimeOffRequests({ locations, employees, searchQuery }: TimeOffRe
               <TableRow key={request.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <div className="bg-purple-100 rounded-full h-8 w-8 flex items-center justify-center">
+                    <div className="bg-black-100 rounded-full h-8 w-8 flex items-center justify-center">
                       {request.employees?.name?.split(' ').map((n: string) => n[0]).join('') || '??'}
                     </div>
                     <span>{request.employees?.name || 'Unknown Employee'}</span>

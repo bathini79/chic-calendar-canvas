@@ -13,7 +13,8 @@ export type SectionPermission =
   | 'reports'
   | 'sales'
   | 'settings'
-  | 'perform_services';
+  | 'perform_services'
+  | 'employment_type_id';
 
 // Function to check if the current user has access to specific sections
 export function usePermissions() {

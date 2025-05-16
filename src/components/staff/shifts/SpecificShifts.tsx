@@ -287,7 +287,7 @@ export function SpecificShifts({
                 <tr key={employee.id} className="border-t">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
-                      <div className="bg-purple-100 rounded-full h-10 w-10 flex items-center justify-center">
+                      <div className="bg-black-100 rounded-full h-10 w-10 flex items-center justify-center">
                         {employee.name.split(' ').map((n: string) => n[0]).join('')}
                       </div>
                       <div>
