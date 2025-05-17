@@ -9,13 +9,15 @@ interface LocationsSectionProps {
   locations: any[];
   selectedLocations: string[];
   handleLocationChange: (locationId: string) => void;
+  isMobile?: boolean;
 }
 
 export function LocationsSection({ 
   form, 
   locations, 
   selectedLocations, 
-  handleLocationChange 
+  handleLocationChange,
+  isMobile = false
 }: LocationsSectionProps) {
   // Force set a minimum height for consistency
   React.useLayoutEffect(() => {
@@ -24,13 +26,12 @@ export function LocationsSection({
       window.scrollTo(0, 0);
     }
   }, []);
-
   return (
-    <div className="p-6 min-h-[500px]">
+    <div className={`p-6 ${isMobile ? 'min-h-[300px]' : 'min-h-[500px]'}`}>
       <div className="mb-6">
         <h2 className="text-xl font-medium mb-1">Locations</h2>
         <p className="text-sm text-muted-foreground">Select locations where this staff member works</p>
-      </div>      <FormField
+      </div><FormField
         control={form.control}
         name="locations"
         render={({ field }) => (

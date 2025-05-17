@@ -21,6 +21,7 @@ interface ServicesSectionProps {
   selectedSkills: string[];
   setSelectedSkills: React.Dispatch<React.SetStateAction<string[]>>;
   employmentTypes?: any[];
+  isMobile?: boolean;
 }
 
 interface Service {
@@ -46,6 +47,7 @@ export function ServicesSection({
   selectedSkills,
   setSelectedSkills,
   employmentTypes = [],
+  isMobile = false,
 }: ServicesSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [serviceLocations, setServiceLocations] = useState<
@@ -201,10 +203,9 @@ export function ServicesSection({
   const filteredServices = services.filter((service) =>
     service.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
+    <div className={`${isMobile ? "p-3 min-h-[300px]" : "p-6 min-h-[500px]"}`}>
+      <div className={`${isMobile ? "mb-3" : "mb-6"}`}>
         <h2 className="text-xl font-medium mb-1">Services</h2>
         <p className="text-sm text-muted-foreground">
           Manage services this staff member can provide
@@ -267,9 +268,12 @@ export function ServicesSection({
                       )}
                     </div>
                   )}
-
                   {/* Service list */}
-                  <div className="max-h-[300px] overflow-y-auto">
+                  <div
+                    className={`${
+                      isMobile ? "min-h-[150px] max-h-[430px]" : "max-h-[300px]"
+                    } overflow-y-auto overflow-x-hidden`}
+                  >
                     {filteredServices.length === 0 ? (
                       <div className="p-4 text-center text-muted-foreground">
                         No services match your search

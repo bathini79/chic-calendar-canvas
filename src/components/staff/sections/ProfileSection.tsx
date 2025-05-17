@@ -32,6 +32,7 @@ interface ProfileSectionProps {
   handlePhoneChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   employmentTypes?: any[];
   clearSectionError?: (sectionId: string) => void;
+  isMobile?: boolean;
 }
 
 export function ProfileSection({
@@ -43,6 +44,7 @@ export function ProfileSection({
   handlePhoneChange,
   employmentTypes = [],
   clearSectionError,
+  isMobile = false,
 }: ProfileSectionProps) {
   const [showServicesAlert, setShowServicesAlert] = useState(false);
 
@@ -60,9 +62,8 @@ export function ProfileSection({
   useEffect(() => {
     const employmentTypeId = form.getValues("employment_type_id");
     setShowServicesAlert(checkPerformServices(employmentTypeId));
-  }, [form.watch("employment_type_id"), employmentTypes]);
-  return (
-    <div className="p-6 h-full">
+  }, [form.watch("employment_type_id"), employmentTypes]);  return (
+    <div className={`p-6 h-full ${isMobile ? 'pb-20' : ''}`}>
       <div className="mb-6">
         <h2 className="text-xl font-medium mb-1">Profile</h2>
         <p className="text-sm text-muted-foreground">

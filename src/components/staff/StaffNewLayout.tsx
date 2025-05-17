@@ -41,6 +41,7 @@ interface StaffNewLayoutProps {
   employeeId?: string;
   isSubmitting?: boolean;
   use2FactorVerification?: boolean;
+  isMobile?: boolean;
 }
 
 export function StaffNewLayout({
@@ -50,6 +51,7 @@ export function StaffNewLayout({
   employeeId,
   isSubmitting = false,
   use2FactorVerification = false,
+  isMobile = false,
 }: StaffNewLayoutProps) {
   const [activeSection, setActiveSection] = useState("profile");
   const [images, setImages] = useState<string[]>([]);
@@ -461,8 +463,7 @@ export function StaffNewLayout({
     });
   };
   const renderActiveSection = () => {
-    switch (activeSection) {
-      case "profile":
+    switch (activeSection) {      case "profile":
         return (
           <ProfileSection
             form={form}
@@ -473,27 +474,27 @@ export function StaffNewLayout({
             handlePhoneChange={handlePhoneChange}
             employmentTypes={employmentTypes || []}
             clearSectionError={clearSectionError}
+            isMobile={isMobile}
           />
-        );
-      case "services":
+        );      case "services":
         return (
           <ServicesSection
             form={form}
             selectedSkills={selectedSkills}
             setSelectedSkills={setSelectedSkills}
             employmentTypes={employmentTypes || []}
+            isMobile={isMobile}
           />
-        );
-      case "locations":
+        );      case "locations":
         return (
           <LocationsSection
             form={form}
             locations={locations || []}
             selectedLocations={selectedLocations}
             handleLocationChange={handleLocationChange}
+            isMobile={isMobile}
           />
-        );
-      default:
+        );      default:
         return (
           <ProfileSection
             form={form}
@@ -504,6 +505,7 @@ export function StaffNewLayout({
             handlePhoneChange={handlePhoneChange}
             employmentTypes={employmentTypes || []}
             clearSectionError={clearSectionError}
+            isMobile={isMobile}
           />
         );
     }
@@ -604,14 +606,35 @@ export function StaffNewLayout({
         id="staff-form"
         onSubmit={form.handleSubmit(handleFormSubmit)}
         className="h-full flex flex-col"
-      >
-        <div className="flex flex-1 overflow-hidden">
-          <StaffSideNav
-            activeSection={activeSection}
-            onSectionChange={handleSectionChange}
-            sectionsWithErrors={sectionsWithErrors}
-            errorCounts={errorCounts}
-          />{" "}
+      >      <div className={`flex flex-1 overflow-hidden ${isMobile ? 'flex-col' : 'flex-row'}`}>
+          {isMobile ? (
+            <div className="border-b border-gray-200 mb-4 overflow-x-auto">              <div className="flex py-2 px-4 space-x-4">
+                {['profile', 'services', 'locations'].map((section) => (
+                  <button
+                    key={section}
+                    className={`px-3 py-2 text-sm whitespace-nowrap transition-colors rounded ${
+                      activeSection === section
+                        ? "bg-gray-100 text-gray-800 font-medium"
+                        : "text-gray-700 hover:bg-gray-50"
+                    } ${sectionsWithErrors.includes(section) && !isMobile ? "border-red-500 border" : ""}`}
+                    onClick={() => handleSectionChange(section)}
+                  >
+                    {section.charAt(0).toUpperCase() + section.slice(1)}
+                    {sectionsWithErrors.includes(section) && 
+                      <span className="ml-1 text-red-500">•</span>
+                    }
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <StaffSideNav
+              activeSection={activeSection}
+              onSectionChange={handleSectionChange}
+              sectionsWithErrors={sectionsWithErrors}
+              errorCounts={errorCounts}
+            />
+          )}
           <div
             ref={contentRef}
             className="flex-1 overflow-y-auto h-full"

@@ -12,21 +12,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LoaderCircle, ArrowLeft, AlertCircle } from "lucide-react";
+import { LoaderCircle, ArrowLeft, AlertCircle, X } from "lucide-react";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { StaffSideNav } from "./StaffSideNav";
-import { ProfileSection } from "./sections/ProfileSection";
-import { ServicesSection } from "./sections/ServicesSection";
-import { LocationsSection } from "./sections/LocationsSection";
-import { SettingsSection } from "./sections/SettingsSection";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { StaffNewLayout } from "./StaffNewLayout";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface StaffDialogProps {
   open: boolean;
@@ -39,6 +32,7 @@ export function StaffDialog({
   onOpenChange,
   employeeId,
 }: StaffDialogProps) {
+  const isMobile = useIsMobile();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(
@@ -450,29 +444,61 @@ export function StaffDialog({
         window.scrollTo(0, scrollY);
       };
     }
-  }, [open]);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>      <DialogContent
-        className="!top-auto !bottom-0 left-1/2 translate-x-[-50%] !translate-y-0 w-[98vw] h-[98vh] max-w-none border shadow-xl rounded-t-2xl !rounded-b-none pt-[3%] pl-[10%] pr-[10%] overflow-hidden flex flex-col"
-        hideCloseButton
-      >
-        {verificationStep === "form" && (
-          <div className="flex justify-end mt-[-1.5rem] gap-3">
+  }, [open]);  return (    <Dialog open={open} onOpenChange={onOpenChange}>      <DialogContent
+        className={`!top-auto !bottom-0 left-1/2 translate-x-[-50%] !translate-y-0 w-[98vw] max-w-none border shadow-xl rounded-t-2xl !rounded-b-none overflow-hidden flex flex-col
+          ${isMobile 
+            ? 'h-[95vh] pt-[0.5%] px-[1.5%]' 
+            : 'h-[98vh] pt-[3%] pl-[10%] pr-[10%]'
+          }`}      >{verificationStep === "form" && (          <div className="flex justify-end mt-0 mb-0 mr-0 gap-3 absolute top-2 right-2 z-10">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
-              className="whitespace-nowrap"
+              className={`whitespace-nowrap ${isMobile ? 'p-1.5 h-auto w-auto border-none shadow-none bg-transparent hover:bg-transparent' : ''}`}
               form="staff-form"
             >
-              Close
+              {isMobile ? <X size={20} strokeWidth={2.5} className="text-gray-600" /> : "Close"}
             </Button>
+            {!isMobile && (
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="whitespace-nowrap"
+                form="staff-form"
+              >
+                {isLoading && (
+                  <LoaderCircle
+                    className="animate-spin mr-2"
+                    size={16}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                )}
+                {employeeId ? "Update" : "Add"}
+              </Button>
+            )}
+          </div>
+        )}        <DialogHeader className={`flex justify-between items-start ${isMobile ? 'text-left mt-3' : ''}`}>
+          <div className={isMobile ? 'w-full text-left' : ''}>
+            <DialogTitle className={`!text-[1.75rem] font-semibold ${isMobile ? 'text-left' : ''}`}>
+              {employeeId
+                ? "Edit Staff Member"
+                : verificationStep === "otp"
+                ? "Verify Staff Member"
+                : verificationStep === "done"
+                ? "Staff Member Created"
+                : "Add Staff Member"}
+            </DialogTitle>
+
+          </div>
+        </DialogHeader>        {/* Sticky footer for mobile */}
+        {isMobile && verificationStep === "form" && (
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-50 flex justify-end gap-3">
             <Button
               type="submit"
               disabled={isLoading}
-              className="whitespace-nowrap"
+              className="whitespace-nowrap px-6 flex-1"
               form="staff-form"
             >
               {isLoading && (
@@ -487,28 +513,7 @@ export function StaffDialog({
             </Button>
           </div>
         )}
-        <DialogHeader className="flex justify-between items-start">
-          <div>
-            <DialogTitle className="!text-[2rem] font-semibold">
-              {employeeId
-                ? "Edit Staff Member"
-                : verificationStep === "otp"
-                ? "Verify Staff Member"
-                : verificationStep === "done"
-                ? "Staff Member Created"
-                : "Add Staff Member"}
-            </DialogTitle>
-            <DialogDescription>
-              {employeeId
-                ? "Update the information for this staff member."
-                : verificationStep === "otp"
-                ? "Enter the verification code sent to the staff member's phone."
-                : verificationStep === "done"
-                ? "Staff member has been successfully created and verified!"
-                : "Fill in the details to add a new staff member to your team."}
-            </DialogDescription>
-          </div>
-        </DialogHeader>
+        
         {error ? (
           <div className="py-4 text-center">
             <p className="text-destructive">Error: {error.message}</p>
@@ -657,8 +662,7 @@ export function StaffDialog({
             <p className="text-sm text-muted-foreground mt-4">
               Closing automatically...
             </p>
-          </div>        ) : (
-          <div className="flex-1 overflow-hidden">
+          </div>        ) : (          <div className={`flex-1 overflow-hidden ${isMobile ? 'pb-20' : ''}`}>
             <StaffNewLayout
               onSubmit={handleFormSubmit}
               onCancel={() => onOpenChange(false)}
@@ -666,6 +670,7 @@ export function StaffDialog({
               initialData={employeeData}
               isSubmitting={isLoading}
               use2FactorVerification={!employeeId}
+              isMobile={isMobile}
             />
           </div>
         )}
