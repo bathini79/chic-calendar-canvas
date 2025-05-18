@@ -271,7 +271,7 @@ export function ServicesSection({
                   {/* Service list */}
                   <div
                     className={`${
-                      isMobile ? "min-h-[150px] max-h-[430px]" : "max-h-[300px]"
+                      isMobile ? "min-h-[150px]" : "max-h-[300px]"
                     } overflow-y-auto overflow-x-hidden`}
                   >
                     {filteredServices.length === 0 ? (
