@@ -3,15 +3,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog-no-close";
-import { StaffForm } from "./StaffForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { LoaderCircle, ArrowLeft, AlertCircle, X } from "lucide-react";
 import {
   InputOTP,
@@ -35,29 +32,24 @@ export function StaffDialog({
   const isMobile = useIsMobile();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [verificationError, setVerificationError] = useState<string | null>(
-    null
-  );
-  const [verificationStep, setVerificationStep] = useState<
-    "form" | "otp" | "done"
-  >("form");
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [verificationStep, setVerificationStep] = useState<"form" | "otp" | "done">("form");
   const [verificationCode, setVerificationCode] = useState("");
+  const [tempEmployeeData, setTempEmployeeData] = useState<any>(null);
+  const [canResendOtp, setCanResendOtp] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(30);
+  const queryClient = useQueryClient();
+  
   // Auto-submit when verification code is completely filled
   useEffect(() => {
-    if (
-      verificationCode.length === 6 &&
-      verificationStep === "otp" &&
-      !isLoading
-    ) {
+    if (verificationCode.length === 6 && verificationStep === "otp" && !isLoading) {
       // Small delay to allow user to see the full code before submitting
       const timer = setTimeout(handleVerifyOTP, 300);
       return () => clearTimeout(timer);
     }
   }, [verificationCode, verificationStep, isLoading]);
-  const [tempEmployeeData, setTempEmployeeData] = useState<any>(null);
-  const [canResendOtp, setCanResendOtp] = useState(false);
-  const [resendCountdown, setResendCountdown] = useState(30);
-  const queryClient = useQueryClient(); // Reset error state and verification step when dialog opens/closes
+
+  // Reset error state and verification step when dialog opens/closes
   useEffect(() => {
     if (open) {
       setError(null);
@@ -80,7 +72,6 @@ export function StaffDialog({
           (otpInput as HTMLElement).focus();
         }
       }, 100);
-
       return () => clearTimeout(timer);
     }
   }, [verificationStep]);
@@ -88,7 +79,6 @@ export function StaffDialog({
   // Countdown timer for OTP resend
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-
     if (resendCountdown > 0) {
       timer = setInterval(() => {
         setResendCountdown((prev) => prev - 1);
@@ -96,7 +86,6 @@ export function StaffDialog({
     } else {
       setCanResendOtp(verificationStep === "otp");
     }
-
     return () => {
       if (timer) clearInterval(timer);
     };
@@ -108,16 +97,13 @@ export function StaffDialog({
     queryFn: async () => {
       try {
         if (!employeeId) return null;
-
         const { data, error } = await supabase
           .from("employees")
-          .select(
-            `
+          .select(`
             *,
             employee_skills(service_id),
             employee_locations(location_id)
-          `
-          )
+          `)
           .eq("id", employeeId)
           .single();
 
@@ -141,16 +127,25 @@ export function StaffDialog({
         // Make sure phone doesn't contain + prefix
         const phone = data.phone.replace(/^\+/, "");
 
+        // Create the employee update payload
+        const employeeUpdatePayload: any = {
+          name: data.name,
+          email: data.email || `${phone.replace(/\D/g, "")}@staff.internal`, // Ensure email is never null
+          phone: phone,
+          photo_url: data.photo_url,
+          status: data.status,
+          employment_type_id: data.employment_type_id,
+        };
+
+        // Add commission fields if provided
+        if (data.commission_type) {
+          employeeUpdatePayload.commission_type = data.commission_type;
+          employeeUpdatePayload.commission_template_id = data.commission_template_id || null;
+        }
+        
         const { error } = await supabase
           .from("employees")
-          .update({
-            name: data.name,
-            email: data.email || `${phone.replace(/\D/g, "")}@staff.internal`, // Ensure email is never null
-            phone: phone,
-            photo_url: data.photo_url,
-            status: data.status,
-            employment_type_id: data.employment_type_id,
-          })
+          .update(employeeUpdatePayload)
           .eq("id", employeeId);
 
         if (error) throw error;
@@ -187,18 +182,61 @@ export function StaffDialog({
 
         // Insert location assignments
         if (data.locations.length > 0) {
-          const locationsToInsert = data.locations.map(
-            (locationId: string) => ({
-              employee_id: employeeId,
-              location_id: locationId,
-            })
-          );
+          const locationsToInsert = data.locations.map((locationId: string) => ({
+            employee_id: employeeId,
+            location_id: locationId,
+          }));
 
           const { error: locationsInsertError } = await supabase
             .from("employee_locations")
             .insert(locationsToInsert);
-
+            
           if (locationsInsertError) throw locationsInsertError;
+        }
+
+        // Handle flat commission type with no template
+        if (data.commission_type === 'flat' && !data.commission_template_id && data.service_commissions) {
+          // Delete existing flat commission rules first 
+          await supabase.rpc('commission_delete_all_for_employee', { 
+            employee_id_param: employeeId 
+          });
+          
+          // Format and save flat commission rules
+          if (Object.keys(data.service_commissions).length > 0) {
+            const flatRules = Object.entries(data.service_commissions).map(([serviceId, percentage]) => ({
+              service_id: serviceId,
+              percentage: percentage
+            }));
+
+            const { error: flatError } = await supabase.rpc('commission_save_flat_rules', { 
+              employee_id_param: employeeId,
+              rules_json: flatRules
+            });
+
+            if (flatError) throw flatError;
+          }
+        }
+          
+        // Handle tiered commission type with no template
+        if (data.commission_type === 'tiered' && !data.commission_template_id && data.commission_slabs) {
+          // Delete is already handled by the function above
+          
+          // Format and save tiered slabs
+          if (data.commission_slabs && data.commission_slabs.length > 0) {
+            const tieredSlabs = data.commission_slabs.map((slab: any, index: number) => ({
+              min_amount: slab.min_amount,
+              max_amount: slab.max_amount,
+              percentage: slab.percentage,
+              order_index: index + 1
+            }));
+              
+            const { error: tieredError } = await supabase.rpc('commission_save_tiered_slabs', { 
+              employee_id_param: employeeId,
+              slabs_json: tieredSlabs
+            });
+                  
+            if (tieredError) throw tieredError;
+          }
         }
 
         toast.success("Staff member updated successfully");
@@ -425,7 +463,9 @@ export function StaffDialog({
   // Handle error display
   if (error && open) {
     toast.error(`There was an error: ${error.message}`);
-  } // Use effect to prevent scrolling of background content when dialog is open
+  }
+  
+  // Use effect to prevent scrolling of background content when dialog is open
   useEffect(() => {
     if (open) {
       // Save current scroll position
@@ -444,12 +484,19 @@ export function StaffDialog({
         window.scrollTo(0, scrollY);
       };
     }
-  }, [open]);  return (    <Dialog open={open} onOpenChange={onOpenChange}>      <DialogContent
+  }, [open]);
+  
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
         className={`!top-auto !bottom-0 left-1/2 translate-x-[-50%] !translate-y-0 w-[98vw] max-w-none border shadow-xl rounded-t-2xl !rounded-b-none overflow-hidden flex flex-col
           ${isMobile 
             ? 'h-[95vh] pt-[0.5%] px-[1.5%]' 
             : 'h-[98vh] pt-[3%] pl-[10%] pr-[10%]'
-          }`}      >{verificationStep === "form" && (          <div className="flex justify-end mt-0 mb-0 mr-0 gap-3 absolute top-2 right-2 z-10">
+          }`}
+      >
+        {verificationStep === "form" && (
+          <div className="flex justify-end mt-0 mb-0 mr-0 gap-3 absolute top-2 right-2 z-10">
             <Button
               type="button"
               variant="outline"
@@ -479,7 +526,9 @@ export function StaffDialog({
               </Button>
             )}
           </div>
-        )}        <DialogHeader className={`flex justify-between items-start ${isMobile ? 'text-left mt-3' : ''}`}>
+        )}
+        
+        <DialogHeader className={`flex justify-between items-start ${isMobile ? 'text-left mt-3' : ''}`}>
           <div className={isMobile ? 'w-full text-left' : ''}>
             <DialogTitle className={`!text-[1.75rem] font-semibold ${isMobile ? 'text-left' : ''}`}>
               {employeeId
@@ -490,9 +539,10 @@ export function StaffDialog({
                 ? "Staff Member Created"
                 : "Add Staff Member"}
             </DialogTitle>
-
           </div>
-        </DialogHeader>        {/* Sticky footer for mobile */}
+        </DialogHeader>
+        
+        {/* Sticky footer for mobile */}
         {isMobile && verificationStep === "form" && (
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-50 flex justify-end gap-3">
             <Button
@@ -526,7 +576,6 @@ export function StaffDialog({
           </div>
         ) : verificationStep === "otp" ? (
           <div className="space-y-4 py-4">
-            {" "}
             <div className="text-center mb-6 space-y-2">
               <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2">
                 <svg
@@ -553,9 +602,7 @@ export function StaffDialog({
               </p>
             </div>
             <div className="flex flex-col items-center justify-center gap-4">
-              {" "}
               <div className="w-full flex flex-col items-center justify-center my-4">
-                {" "}
                 <InputOTP
                   maxLength={6}
                   value={verificationCode}
@@ -578,7 +625,7 @@ export function StaffDialog({
                     <span>{verificationError}</span>
                   </div>
                 )}
-              </div>{" "}
+              </div>
               <div className="flex gap-3 justify-center w-full mt-3">
                 <Button
                   type="button"
@@ -662,7 +709,9 @@ export function StaffDialog({
             <p className="text-sm text-muted-foreground mt-4">
               Closing automatically...
             </p>
-          </div>        ) : (          <div className={`flex-1 overflow-hidden ${isMobile ? 'pb-20' : ''}`}>
+          </div>
+        ) : (
+          <div className={`flex-1 overflow-hidden ${isMobile ? 'pb-20' : ''}`}>
             <StaffNewLayout
               onSubmit={handleFormSubmit}
               onCancel={() => onOpenChange(false)}

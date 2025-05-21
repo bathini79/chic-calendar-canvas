@@ -3,6 +3,7 @@ import { StaffSideNav } from "./StaffSideNav";
 import { ProfileSection } from "./sections/ProfileSection";
 import { LocationsSection } from "./sections/LocationsSection";
 import { ServicesSection } from "./sections/ServicesSection";
+import { CommissionsSection } from "./sections/CommissionsSection";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,7 +30,10 @@ const formSchema = z.object({
   employment_type_id: z.string().min(1, "Employment type is required"),
   // Skills is conditionally required based on employment_type having perform_services permission
   skills: z.array(z.string()).optional().default([]),
-  locations: z.array(z.string()).min(1, "At least one location is required"),
+  locations: z.array(z.string()).min(1, "At least one location is required"),  // Commission fields  commission_type: z.enum(["flat", "tiered", "none", "template"]).optional(),
+  commission_template_id: z.string().optional(),
+  service_commissions: z.record(z.string(), z.number()).optional(),
+  global_commission_percentage: z.number().min(0).max(100).optional(),
 });
 
 type StaffFormData = z.infer<typeof formSchema>;
@@ -64,12 +68,12 @@ export function StaffNewLayout({
   const [selectedCountry, setSelectedCountry] = useState<{
     name: string;
     code: string;
-    flag: string;
-  }>({
+    flag: string;  }>({
     name: "India",
     code: "+91",
     flag: "🇮🇳",
   });
+  
   const form = useForm<StaffFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -125,6 +129,7 @@ export function StaffNewLayout({
         ? initialData.phone
         : "+" + initialData.phone;
       const { countryCode, phoneNumber } = parsePhoneNumber(phoneWithPlus);
+      
       form.reset({
         name: initialData.name || "",
         email: initialData.email || "",
@@ -279,11 +284,12 @@ export function StaffNewLayout({
       return false;
     } catch (error) {
       console.error("Error checking phone existence:", error);
-      return false;
-    } finally {
+      return false;    } finally {
       setIsPhoneCheckLoading(false);
     }
-  }; // Helper function to check which sections have validation errors and count them
+  }; 
+  
+  // Helper function to check which sections have validation errors and count them  
   const checkSectionsWithErrors = () => {
     const errors = form.formState.errors;
     const errorSections: string[] = [];
@@ -309,6 +315,15 @@ export function StaffNewLayout({
     if (errors.locations) {
       errorSections.push("locations");
       counts["locations"] = 1; // For array fields, we count it as 1 error
+    }    // Commission section errors
+    let commissionErrorCount = 0;
+    if (errors.commission_template_id) commissionErrorCount++;
+    if (errors.global_commission_percentage) commissionErrorCount++;
+    if (errors.service_commissions) commissionErrorCount++;
+    
+    if (commissionErrorCount > 0) {
+      errorSections.push("commissions");
+      counts["commissions"] = commissionErrorCount;
     }
 
     // Settings section errors
@@ -457,13 +472,14 @@ export function StaffNewLayout({
   const clearSectionError = (sectionId: string) => {
     setSectionsWithErrors((prev) => prev.filter((s) => s !== sectionId));
     setErrorCounts((prev) => {
-      const newCounts = { ...prev };
-      delete newCounts[sectionId];
+      const newCounts = { ...prev };      delete newCounts[sectionId];
       return newCounts;
     });
   };
+  
   const renderActiveSection = () => {
-    switch (activeSection) {      case "profile":
+    switch (activeSection) {
+      case "profile":
         return (
           <ProfileSection
             form={form}
@@ -474,9 +490,17 @@ export function StaffNewLayout({
             handlePhoneChange={handlePhoneChange}
             employmentTypes={employmentTypes || []}
             clearSectionError={clearSectionError}
+            isMobile={isMobile}          />
+        );
+      case "commissions":
+        return (
+          <CommissionsSection
+            form={form}
+            employeeId={employeeId}
             isMobile={isMobile}
           />
-        );      case "services":
+        );
+      case "services":
         return (
           <ServicesSection
             form={form}
@@ -485,7 +509,8 @@ export function StaffNewLayout({
             employmentTypes={employmentTypes || []}
             isMobile={isMobile}
           />
-        );      case "locations":
+        );
+      case "locations":
         return (
           <LocationsSection
             form={form}
@@ -494,7 +519,8 @@ export function StaffNewLayout({
             handleLocationChange={handleLocationChange}
             isMobile={isMobile}
           />
-        );      default:
+        );
+      default:
         return (
           <ProfileSection
             form={form}
@@ -509,18 +535,19 @@ export function StaffNewLayout({
           />
         );
     }
-  }; // Function to check if employment type has perform_services permission
+  };  // Function to check if employment type has perform_services permission
   const checkPerformServicesPermission = (employmentTypeId: string) => {
     if (!employmentTypeId || !employmentTypes) return false;
 
     const selectedType = employmentTypes.find(
       (type: any) => type.id === employmentTypeId
     );
-    const hasPermission =
-      selectedType?.permissions?.includes("perform_services") || false;
+    // Use optional chaining and type assertion to avoid TypeScript errors
+    const permissions = (selectedType as any)?.permissions;
+    const hasPermission = permissions ? permissions.includes("perform_services") : false;
 
-    console.log("Employment Type:", selectedType?.name);
-    console.log("Permissions:", selectedType?.permissions);
+    console.log("Employment Type:", (selectedType as any)?.name);
+    console.log("Permissions:", permissions);
     console.log("Has perform_services permission:", hasPermission);
 
     return hasPermission;
@@ -571,15 +598,17 @@ export function StaffNewLayout({
       } else {
         form.clearErrors("skills");
       }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [isServicesRequired]); // Create refs for all section content elements so we can control them separately
+    });    return () => subscription.unsubscribe();
+  }, [isServicesRequired]);
+  
+  // Create refs for all section content elements so we can control them separately
   const contentRef = React.useRef<HTMLDivElement>(null);
   const sectionRefs = {
     profile: React.useRef<HTMLDivElement>(null),
     services: React.useRef<HTMLDivElement>(null),
+
     locations: React.useRef<HTMLDivElement>(null),
+    commissions: React.useRef<HTMLDivElement>(null),
     settings: React.useRef<HTMLDivElement>(null),
   };
 
@@ -598,18 +627,18 @@ export function StaffNewLayout({
       });
     }
   };
-
   return (
     <Form {...form}>
-      {" "}
       <form
         id="staff-form"
         onSubmit={form.handleSubmit(handleFormSubmit)}
         className="h-full flex flex-col"
-      >      <div className={`flex flex-1 overflow-hidden ${isMobile ? 'flex-col' : 'flex-row'}`}>
+      >
+        <div className={`flex flex-1 overflow-hidden ${isMobile ? 'flex-col' : 'flex-row'}`}>
           {isMobile ? (
-            <div className="border-b border-gray-200 mb-4 overflow-x-auto">              <div className="flex py-2 px-4 space-x-4">
-                {['profile', 'services', 'locations'].map((section) => (
+            <div className="border-b border-gray-200 mb-4 overflow-x-auto">
+              <div className="flex py-2 px-4 space-x-4">
+                {['profile', 'services', 'locations', 'commissions'].map((section) => (
                   <button
                     key={section}
                     className={`px-3 py-2 text-sm whitespace-nowrap transition-colors rounded ${
@@ -631,14 +660,13 @@ export function StaffNewLayout({
             <StaffSideNav
               activeSection={activeSection}
               onSectionChange={handleSectionChange}
-              sectionsWithErrors={sectionsWithErrors}
-              errorCounts={errorCounts}
+              sectionsWithErrors={sectionsWithErrors}              errorCounts={errorCounts}
             />
           )}
           <div
             ref={contentRef}
             className="flex-1 overflow-y-auto h-full"
-            style={{ overflowAnchor: "none" }} // Prevent browser auto-scrolling
+            style={{ overflowAnchor: "none" }} /* Prevent browser auto-scrolling */
           >
             {renderActiveSection()}
           </div>
@@ -646,4 +674,11 @@ export function StaffNewLayout({
       </form>
     </Form>
   );
-} // Helper function to check if the selected employment type has perform_services permission
+}
+
+// Helper function to check if the selected employment type has perform_services permission
+function hasPerformServicesPermission(employmentTypeId: string, types: any[]): boolean {
+  if (!employmentTypeId || !types || types.length === 0) return false;
+  const employmentType = types.find(type => type.id === employmentTypeId);
+  return employmentType?.permissions?.includes("perform_services") || false;
+}
