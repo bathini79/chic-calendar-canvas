@@ -67,7 +67,7 @@ export function ProfileSection({
       <div className="mb-6">
         <h2 className="text-xl font-medium mb-1">Profile</h2>
         <p className="text-sm text-muted-foreground">
-          Manage your team members personal profile
+          Manage your Staff members personal profile
         </p>
       </div>
 

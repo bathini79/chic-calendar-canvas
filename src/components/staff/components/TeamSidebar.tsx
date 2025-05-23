@@ -44,7 +44,7 @@ export function TeamSidebar({
 }: TeamSidebarProps) {
   const navItems = [
     { 
-      label: "Team members", 
+      label: "Staff members", 
       value: "team-members" as TeamSection,
       icon: <Users size={16} />
     },

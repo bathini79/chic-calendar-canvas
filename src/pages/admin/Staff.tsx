@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { StaffDialog } from "@/components/staff/StaffDialog";
-import { StaffGrid } from "@/components/staff/StaffGrid";
-import { StaffList } from "@/components/staff/StaffList";
+import { StaffMembers } from "@/components/staff/StaffMembers";
 import { HeaderActions } from "@/components/staff/components/HeaderActions";
 import { useSupabaseCrud } from "@/hooks/use-supabase-crud";
 import { Database } from "@/integrations/supabase/types";
@@ -13,12 +12,10 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-type ViewMode = "grid" | "list";
 type Employee = Database['public']['Tables']['employees']['Row'];
 
 export default function Staff() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [view, setView] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | undefined>(undefined);
   const [activeSection, setActiveSection] = useState<TeamSection>("team-members");
@@ -62,8 +59,7 @@ export default function Staff() {
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-32">Loading...</div>;
-  }
-  // Render the appropriate content based on active section
+  }  // Render the appropriate content based on active section
   const renderContent = () => {
     switch (activeSection) {
       case "team-members":
@@ -71,23 +67,14 @@ export default function Staff() {
           <div className="space-y-4">
             <HeaderActions 
               onAdd={() => handleOpenDialog()} 
-              view={view} 
-              onViewChange={setView}
               searchQuery={searchQuery}
               onSearchChange={handleSearchChange}
             />
 
-            {view === "grid" ? (
-              <StaffGrid 
-                searchQuery={searchQuery}
-                onEdit={handleOpenDialog}
-              />
-            ) : (
-              <StaffList 
-                searchQuery={searchQuery}
-                onEdit={handleOpenDialog}
-              />
-            )}
+            <StaffMembers 
+              searchQuery={searchQuery}
+              onEdit={handleOpenDialog}
+            />
 
             <StaffDialog 
               open={isDialogOpen} 
