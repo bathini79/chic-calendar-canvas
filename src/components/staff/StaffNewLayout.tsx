@@ -29,8 +29,11 @@ const formSchema = z.object({
   status: z.enum(["active", "inactive"]).default("active"),
   employment_type_id: z.string().min(1, "Employment type is required"),
   // Skills is conditionally required based on employment_type having perform_services permission
-  skills: z.array(z.string()).optional().default([]),
-  locations: z.array(z.string()).min(1, "At least one location is required"),  // Commission fields  commission_type: z.enum(["flat", "tiered", "none", "template"]).optional(),
+  skills: z.array(z.string()).optional().default([]),  locations: z.array(z.string()).min(1, "At least one location is required"),  
+  
+  // Commission fields
+  service_commission_enabled: z.boolean().default(false),
+  commission_type: z.enum(["flat", "tiered" , "template"]).optional(),
   commission_template_id: z.string().optional(),
   service_commissions: z.record(z.string(), z.number()).optional(),
   global_commission_percentage: z.number().min(0).max(100).optional(),
@@ -129,8 +132,7 @@ export function StaffNewLayout({
         ? initialData.phone
         : "+" + initialData.phone;
       const { countryCode, phoneNumber } = parsePhoneNumber(phoneWithPlus);
-      
-      form.reset({
+        form.reset({
         name: initialData.name || "",
         email: initialData.email || "",
         phone: phoneNumber, // Just the local part without country code
@@ -141,6 +143,9 @@ export function StaffNewLayout({
           initialData.employee_skills?.map((s: any) => s.service_id) || [],
         locations:
           initialData.employee_locations?.map((l: any) => l.location_id) || [],
+        service_commission_enabled: initialData.service_commission_enabled || false,
+        commission_type: initialData.commission_type,
+        commission_template_id: initialData.commission_template_id || null,
       });
 
       // Set the selected country based on the detected country code

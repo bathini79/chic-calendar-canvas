@@ -36,12 +36,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { LoaderCircle, PlusCircle, Search } from "lucide-react";
+import { LoaderCircle, PlusCircle, Search, ToggleLeft, ToggleRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 // Define the Service and Category interfaces
 interface Service {
@@ -94,6 +95,9 @@ export function CommissionsSection({
   // State for commission slabs management
   const [slabs, setSlabs] = useState<TieredSlab[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Get the current value of service_commission_enabled from form
+  const serviceCommissionEnabled = form.watch("service_commission_enabled");
 
   // State for template handling
   const [templates, setTemplates] = useState<CommissionTemplate[]>([]);
@@ -166,144 +170,119 @@ export function CommissionsSection({
       setTemplates(templateData);
     }
   }, [templateData]);
-
-  // Query to fetch services and categories
-  const { data: serviceData, isLoading: servicesLoading } = useQuery({
-    queryKey: ["services"],
+  // Query to fetch services with categories, supporting pagination and filtering
+  const [locationFilter, setLocationFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
+  
+  // Query to fetch available locations
+  const { data: locations = [] } = useQuery({
+    queryKey: ['locations'],
     queryFn: async () => {
-      // Mock data for services and categories
-      const mockCategories: ServiceCategory[] = [
-        {
-          id: "1",
-          name: "Hair Services",
-          services: [
-            {
-              id: "101",
-              name: "Haircut",
-              price: 1000,
-              duration: 30,
-              category_id: "1",
-              category_name: "Hair Services",
-            },
-            {
-              id: "102",
-              name: "Hair Coloring",
-              price: 3000,
-              duration: 90,
-              category_id: "1",
-              category_name: "Hair Services",
-            },
-            {
-              id: "103",
-              name: "Hair Styling",
-              price: 2000,
-              duration: 60,
-              category_id: "1",
-              category_name: "Hair Services",
-            },
-          ],
-        },
-        {
-          id: "2",
-          name: "Skin Care",
-          services: [
-            {
-              id: "201",
-              name: "Facial",
-              price: 2500,
-              duration: 60,
-              category_id: "2",
-              category_name: "Skin Care",
-            },
-            {
-              id: "202",
-              name: "Skin Treatment",
-              price: 5000,
-              duration: 90,
-              category_id: "2",
-              category_name: "Skin Care",
-            },
-          ],
-        },
-        {
-          id: "3",
-          name: "Nail Services",
-          services: [
-            {
-              id: "301",
-              name: "Manicure",
-              price: 1500,
-              duration: 45,
-              category_id: "3",
-              category_name: "Nail Services",
-            },
-            {
-              id: "302",
-              name: "Pedicure",
-              price: 1800,
-              duration: 60,
-              category_id: "3",
-              category_name: "Nail Services",
-            },
-          ],
-        },
-      ];
-
-      /* When backend is ready:
       const { data, error } = await supabase
-        .from("service_categories")
-        .select(`
-          id, 
-          name,
-          services (
-            id, 
-            name, 
-            price, 
-            duration,
-            description,
-            category_id,
-            category_name
-          )
-        `);
+        .from('locations')
+        .select('id, name')
+        .order('name');
       
       if (error) {
-        throw new Error(error.message);
+        console.error("Error fetching locations:", error);
+        throw error;
       }
       
       return data || [];
-      */
-
-      return mockCategories;
+    },
+  });
+  
+  const { data: serviceData, isLoading: servicesLoading } = useQuery({
+    queryKey: ['services', locationFilter, categoryFilter, serviceSearch],
+    queryFn: async () => {
+      let query = supabase
+        .from('services')
+        .select(`
+          *,
+          services_categories(
+            categories (
+              id,
+              name
+            )
+          )
+        `)
+        .order('name');
+      
+      // Apply location filter if selected
+      if (locationFilter) {
+        query = query.eq('services_locations.location_id', locationFilter);
+      }
+      
+      // Apply category filter if selected
+      if (categoryFilter) {
+        query = query.eq('services_categories.categories.id', categoryFilter);
+      }
+      
+      // Apply search filter if provided
+      if (serviceSearch.trim()) {
+        query = query.ilike('name', `%${serviceSearch.trim()}%`);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching services:", error);
+        throw error;
+      }
+      
+      // Map DB data to the Service interface 
+      const processedServices = data?.map(service => {
+        const category = service.services_categories?.[0]?.categories;
+        return {
+          id: service.id,
+          name: service.name,
+          price: service.selling_price || 0, // Map selling_price to price
+          duration: service.duration || 0,
+          description: service.description || '',
+          category_id: category?.id || 'uncategorized',
+          category_name: category?.name || 'Uncategorized',
+        };
+      }) || [];
+      
+      return processedServices;
     },
   });
 
-  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>(
-    []
-  );
-
-  // Update service categories when data is available
+  // Group services by category
   useEffect(() => {
-    if (serviceData) {
-      setServiceCategories(serviceData);
+    if (serviceData && serviceData.length > 0) {
+      // Group services by category
+      const categoriesMap = serviceData.reduce((acc, service) => {
+        const categoryId = service.category_id || 'uncategorized';
+        const categoryName = service.category_name || 'Uncategorized';
+        
+        if (!acc[categoryId]) {
+          acc[categoryId] = {
+            id: categoryId,
+            name: categoryName,
+            services: []
+          };
+        }
+        
+        acc[categoryId].services.push(service);
+        return acc;
+      }, {} as Record<string, ServiceCategory>);
+      
+      // Convert map to array and sort categories by name
+      const categoriesArray = Object.values(categoriesMap).sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
+      
+      setServiceCategories(categoriesArray);
+    } else {
+      setServiceCategories([]);
     }
   }, [serviceData]);
-
-  // Filter services based on search term
+  // Use categories directly since filtering is now done in the query
   const filteredCategories = useMemo(() => {
-    if (!serviceSearch.trim()) {
-      return serviceCategories;
-    }
-
-    const searchTerm = serviceSearch.toLowerCase();
-    return serviceCategories
-      .map((category) => ({
-        ...category,
-        services: category.services.filter((service) =>
-          service.name.toLowerCase().includes(searchTerm)
-        ),
-      }))
-      .filter((category) => category.services.length > 0);
-  }, [serviceCategories, serviceSearch]);
+    return serviceCategories;
+  }, [serviceCategories]);
 
   // Get commission percentage for a service
   const getServiceCommission = (serviceId: string): number => {
@@ -796,11 +775,17 @@ export function CommissionsSection({
       ]);
     }
 
-    // Set default commission type to "none" if not already set
     if (!form.getValues("commission_type")) {
-      form.setValue("commission_type", "none");
+      form.setValue("commission_type", "tiered");
     }
   }, [employeeId]);
+
+  // Set initial service_commission_enabled to true for new employees with no saved state
+  useEffect(() => {
+    if (!employeeId && form.getValues("service_commission_enabled") === undefined) {
+      form.setValue("service_commission_enabled", false);
+    }
+  }, [employeeId, form]);
 
   // Format currency for display
   const formatCurrency = (amount: number) => {
@@ -812,570 +797,713 @@ export function CommissionsSection({
     }).format(amount);
   };
 
+  // Add debounced search for better performance
+  const [searchInput, setSearchInput] = useState('');
+  
+  // Debounce search input to avoid too many queries
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setServiceSearch(searchInput);
+    }, 300); // 300ms debounce time
+    
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   return (
     <div className={`space-y-6 ${isMobile ? "pb-20" : ""}`}>
       <Card>
-        <CardHeader>
-          <div
-            className={`${
-              isMobile
-                ? "flex flex-col gap-2"
-                : "flex justify-between items-center"
-            }`}
-          >
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Commission Structure</CardTitle>
+              <CardTitle className="text-xl font-semibold">Service Commissions</CardTitle>
               <CardDescription>
-                Set up how the staff member earns commission
+                Configure service-based commission settings
               </CardDescription>
             </div>
+            { <FormField
+              control={form.control}
+              name="service_commission_enabled"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <div className="flex items-center">
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={(checked) => {
+                          field.onChange(checked);
+                
+                        }}
+                      />
+                 
+                    </div>
+                  </FormControl>
+                </FormItem>
+              )}
+            /> }
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className={`flex flex-col gap-4 sm:flex-row sm:items-end`}>
-            <div className="sm:w-64">
+        <CardContent>
+
+          {/* Conditionally render commission settings based on toggle */}
+          {form.watch("service_commission_enabled") ? (
+            <div className="space-y-6">
+              {/* Existing commission type selection and settings */}
               <FormField
                 control={form.control}
                 name="commission_type"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Commission Type</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select commission type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Commission</SelectItem>
-                        <SelectItem value="flat">
-                          Flat Service Commission
-                        </SelectItem>
-                        <SelectItem value="tiered">
-                          Tiered Commission
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                    
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select commission type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="flat">Flat Commission</SelectItem>
+                          <SelectItem value="tiered">Tiered Commission</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
-          </div>
-
-          {form.watch("commission_type") === "tiered" && (
-            <div className="space-y-6">
-              {" "}
-              {/* Tiered commission slabs section */}
-              <div className="border rounded-lg p-4">
-                <div
-                    className={`flex w-full ${
-                        isMobile
-                            ? "flex-row gap-2 items-center mb-2"
-                            : "justify-between items-center mb-4"
-                    }`}
-                >
-                    {/* Search input */}
+              
+              {form.watch("commission_type") === "tiered" && (
+                <div className="space-y-6">
+                  {" "}
+                  {/* Tiered commission slabs section */}
+                  <div className="border rounded-lg p-4">
                     <div
-                        className={
+                        className={`flex w-full ${
                             isMobile
-                                ? "flex-1 min-w-0 relative"
-                                : "flex-1 min-w-0 relative max-w-xs"
-                        }
+                                ? "flex-row gap-2 items-center mb-2"
+                                : "justify-between items-center mb-4"
+                        }`}
                     >
-                        <Input
-                            placeholder="Search templates..."
-                            value={templateSearch}
-                            onChange={(e) => setTemplateSearch(e.target.value)}
-                            className={`pl-8 h-9 ${isMobile ? "w-full" : ""}`}
-                            style={{ minHeight: 36 }}
-                        />
-                        <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                    </div>
-                    {/* Add Slab button */}
-                    <div
-                        className={
-                            isMobile
-                                ? "flex-[0_0_38%] ml-2"
-                                : "ml-4 flex-shrink-0"
-                        }
-                    >
-                        <button
-                            type="button"
-                            onClick={addSlab}
-                            className="w-full h-9 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md text-xs font-medium flex items-center justify-center"
-                            style={{ minHeight: 36 }}
-                        >
-                            Add Slab
-                        </button>
-                    </div>
-                </div>
-                <div className="border rounded-md mb-4">
-                  {!isMobile ? (
-                    // Desktop view - Table layout
-                    <table className="w-full">
-                      <thead>
-                        <tr className="text-left border-b">
-                          <th className="pb-2 pl-2">Revenue Range</th>
-                          <th className="pb-2">Commission</th>
-                          <th className="pb-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {slabs.map((slab, index) => (
-                          <tr
-                            key={index}
-                            className="border-b last:border-0 hover:bg-muted/50"
-                          >
-                            <td className="py-2 pl-2">
-                              <div className="flex items-center space-x-2">
-                                <div className="w-28">
-                                  <Input
-                                    type="number"
-                                    value={slab.min_amount}
-                                    onChange={(e) =>
-                                      updateSlab(
-                                        index,
-                                        "min_amount",
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="h-8 text-xs w-full"
-                                    disabled={index === 0} // First slab should always start from 0
-                                  />
-                                </div>
-                                <span>to</span>
-                                <div className="w-28">
-                                  <Input
-                                    type="number"
-                                    value={slab.max_amount}
-                                    onChange={(e) =>
-                                      updateSlab(
-                                        index,
-                                        "max_amount",
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="h-8 text-xs w-full"
-                                    disabled={index === slabs.length - 1} // Last slab max value is fixed
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-2">
-                              <div className="flex items-center space-x-1 w-24">
-                                <Input
-                                  type="number"
-                                  value={slab.percentage}
-                                  onChange={(e) =>
-                                    updateSlab(
-                                      index,
-                                      "percentage",
-                                      parseFloat(e.target.value) || 0
-                                    )
-                                  }
-                                  className="h-8 text-xs w-16"
-                                />
-                                <span className="text-muted-foreground">%</span>
-                              </div>
-                            </td>
-                            <td className="py-2 text-right pr-2">
-                              <button
-                                type="button"
-                                onClick={() => removeSlab(index)}
-                                className="p-1 hover:bg-destructive/10 text-destructive rounded"
-                                disabled={slabs.length <= 1} // Prevent removing the last slab
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="16"
-                                  height="16"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <path d="M3 6h18"></path>
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
-                                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                                </svg>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    // Mobile view - Card layout
-                    <div className="space-y-4">
-                      {slabs.map((slab, index) => (
+                        {/* Search input */}
                         <div
-                          key={index}
-                          className="border rounded-md p-3 bg-muted/20"
+                            className={
+                                isMobile
+                                    ? "flex-1 min-w-0 relative"
+                                    : "flex-1 min-w-0 relative max-w-xs"
+                            }
                         >
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium">
-                              Slab {index + 1}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => removeSlab(index)}
-                              className="p-1 hover:bg-destructive/10 text-destructive rounded"
-                              disabled={slabs.length <= 1}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M3 6h18"></path>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
-                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                <line x1="14" y1="11" x2="14" y2="17"></line>
-                              </svg>
-                            </button>
-                          </div>
-
-                          <div className="space-y-3">
-                            <div>
-                              <label className="text-xs text-muted-foreground block mb-1">
-                                Revenue Range
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="number"
-                                  value={slab.min_amount}
-                                  onChange={(e) =>
-                                    updateSlab(
-                                      index,
-                                      "min_amount",
-                                      parseInt(e.target.value) || 0
-                                    )
-                                  }
-                                  className="h-9 text-sm"
-                                  disabled={index === 0}
-                                  placeholder="Min"
-                                />
-                                <span>to</span>
-                                <Input
-                                  type="number"
-                                  value={slab.max_amount}
-                                  onChange={(e) =>
-                                    updateSlab(
-                                      index,
-                                      "max_amount",
-                                      parseInt(e.target.value) || 0
-                                    )
-                                  }
-                                  className="h-9 text-sm"
-                                  disabled={index === slabs.length - 1}
-                                  placeholder="Max"
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="text-xs text-muted-foreground block mb-1">
-                                Commission Percentage
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="number"
-                                  value={slab.percentage}
-                                  onChange={(e) =>
-                                    updateSlab(
-                                      index,
-                                      "percentage",
-                                      parseFloat(e.target.value) || 0
-                                    )
-                                  }
-                                  className="h-9 text-sm w-24"
-                                  placeholder="0"
-                                />
-                                <span className="text-muted-foreground">%</span>
-                              </div>
-                            </div>
-                          </div>
+                            <Input
+                                placeholder="Search templates..."
+                                value={templateSearch}
+                                onChange={(e) => setTemplateSearch(e.target.value)}
+                                className={`pl-8 h-9 ${isMobile ? "w-full" : ""}`}
+                                style={{ minHeight: 36 }}
+                            />
+                            <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                         </div>
-                      ))}
+                        {/* Add Slab button */}
+                        <div
+                            className={
+                                isMobile
+                                    ? "flex-[0_0_38%] ml-2"
+                                    : "ml-4 flex-shrink-0"
+                            }
+                        >
+                            <button
+                                type="button"
+                                onClick={addSlab}
+                                className="w-full h-9 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md text-xs font-medium flex items-center justify-center"
+                                style={{ minHeight: 36 }}
+                            >
+                                Add Slab
+                            </button>
+                        </div>
+                    </div>
+                    <div className="border rounded-md mb-4">
+                      {!isMobile ? (
+                        // Desktop view - Table layout
+                        <table className="w-full">
+                          <thead>
+                            <tr className="text-left border-b">
+                              <th className="pb-2 pl-2">Revenue Range</th>
+                              <th className="pb-2">Commission</th>
+                              <th className="pb-2"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {slabs.map((slab, index) => (
+                              <tr
+                                key={index}
+                                className="border-b last:border-0 hover:bg-muted/50"
+                              >
+                                <td className="py-2 pl-2">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-28">
+                                      <Input
+                                        type="number"
+                                        value={slab.min_amount}
+                                        onChange={(e) =>
+                                          updateSlab(
+                                            index,
+                                            "min_amount",
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        className="h-8 text-xs w-full"
+                                        disabled={index === 0} // First slab should always start from 0
+                                      />
+                                    </div>
+                                    <span>to</span>
+                                    <div className="w-28">
+                                      <Input
+                                        type="number"
+                                        value={slab.max_amount}
+                                        onChange={(e) =>
+                                          updateSlab(
+                                            index,
+                                            "max_amount",
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        className="h-8 text-xs w-full"
+                                        disabled={index === slabs.length - 1} // Last slab max value is fixed
+                                      />
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-2">
+                                  <div className="flex items-center space-x-1 w-24">
+                                    <Input
+                                      type="number"
+                                      value={slab.percentage}
+                                      onChange={(e) =>
+                                        updateSlab(
+                                          index,
+                                          "percentage",
+                                          parseFloat(e.target.value) || 0
+                                        )
+                                      }
+                                      className="h-8 text-xs w-16"
+                                    />
+                                    <span className="text-muted-foreground">%</span>
+                                  </div>
+                                </td>
+                                <td className="py-2 text-right pr-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSlab(index)}
+                                    className="p-1 hover:bg-destructive/10 text-destructive rounded"
+                                    disabled={slabs.length <= 1} // Prevent removing the last slab
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M3 6h18"></path>
+                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                      <line x1="10" y1="11" x2="10" y2="17"></line>
+                                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        // Mobile view - Card layout
+                        <div className="space-y-4">
+                          {slabs.map((slab, index) => (
+                            <div
+                              key={index}
+                              className="border rounded-md p-3 bg-muted/20"
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-medium">
+                                  Slab {index + 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeSlab(index)}
+                                  className="p-1 hover:bg-destructive/10 text-destructive rounded"
+                                  disabled={slabs.length <= 1}
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M3 6h18"></path>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                  </svg>
+                                </button>
+                              </div>
+
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="text-xs text-muted-foreground block mb-1">
+                                    Revenue Range
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      value={slab.min_amount}
+                                      onChange={(e) =>
+                                        updateSlab(
+                                          index,
+                                          "min_amount",
+                                          parseInt(e.target.value) || 0
+                                        )
+                                      }
+                                      className="h-9 text-sm"
+                                      disabled={index === 0}
+                                      placeholder="Min"
+                                    />
+                                    <span>to</span>
+                                    <Input
+                                      type="number"
+                                      value={slab.max_amount}
+                                      onChange={(e) =>
+                                        updateSlab(
+                                          index,
+                                          "max_amount",
+                                          parseInt(e.target.value) || 0
+                                        )
+                                      }
+                                      className="h-9 text-sm"
+                                      disabled={index === slabs.length - 1}
+                                      placeholder="Max"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="text-xs text-muted-foreground block mb-1">
+                                    Commission Percentage
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      value={slab.percentage}
+                                      onChange={(e) =>
+                                        updateSlab(
+                                          index,
+                                          "percentage",
+                                          parseFloat(e.target.value) || 0
+                                        )
+                                      }
+                                      className="h-9 text-sm w-24"
+                                      placeholder="0"
+                                    />
+                                    <span className="text-muted-foreground">%</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div
+                      className={`text-xs text-muted-foreground mt-2 ${
+                        isMobile ? "text-sm" : ""
+                      }`}
+                    >
+                      <p>
+                        The tiered commission structure pays different percentages
+                        based on the revenue generated by the staff member.
+                      </p>
+                      <p className={`${isMobile ? "mt-2" : "mt-1"}`}>
+                        {isMobile
+                          ? "Example: For a ₹75,000 revenue with tiers of 5% up to ₹50,000 and 10% for ₹50,001-₹100,000, commission would be ₹5,000."
+                          : "Example: If a staff member generates ₹75,000 in revenue and the slabs are set at 5% for 0-50,000 and 10% for 50,001-100,000, they would earn ₹2,500 (5% of 50,000) + ₹2,500 (10% of 25,000) = ₹5,000 in commission."}
+                      </p>{" "}
+                    </div>{" "}
+                    {/* Commission Templates section */}
+                    <div className="border-t pt-4 mt-4 mb-6">
+
+                      <div className="flex flex-wrap gap-3 items-center">
+                        <div>
+                          <Button
+                            type="button"
+                            onClick={saveSlabs}
+                            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                            disabled={isLoading}
+                          >
+                            {isLoading ? (
+                              <div className="flex items-center justify-center">
+                                <LoaderCircle className="h-4 w-4 animate-spin mr-2" />
+                                <span>Saving...</span>
+                              </div>
+                            ) : (
+                              "Save Commission Structure"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Dialog for saving template */}
+                    <Dialog
+                      open={showSaveTemplateDialog}
+                      onOpenChange={setShowSaveTemplateDialog}
+                    >
+                      <DialogContent
+                        className={`sm:max-w-md ${
+                          isMobile ? "w-[calc(100%-2rem)] p-4" : ""
+                        }`}
+                      >
+                        <DialogHeader>
+                          {" "}
+                          <DialogTitle>Save as Commission Template</DialogTitle>
+                          <DialogDescription>
+                            Save the current commission structure as a template for
+                            future use.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="template-name">Template Name</Label>{" "}
+                            <Input
+                              id="template-name"
+                              value={templateName}
+                              onChange={(e) => setTemplateName(e.target.value)}
+                              placeholder="e.g., Standard Tiered Commission"
+                              className="focus:ring-primary"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="template-description">
+                              Description (Optional)
+                            </Label>
+                            <Textarea
+                              id="template-description"
+                              value={templateDescription}
+                              onChange={(e) =>
+                                setTemplateDescription(e.target.value)
+                              }
+                              placeholder="Briefly describe this commission structure"
+                              rows={3}
+                            />
+                          </div>
+                        </div>{" "}
+                        <DialogFooter
+                          className={isMobile ? "flex-col gap-2" : undefined}
+                        >
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowSaveTemplateDialog(false)}
+                            className={isMobile ? "w-full" : ""}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={saveAsTemplate}
+                            disabled={!templateName.trim() || isLoading}
+                            className={isMobile ? "w-full" : ""}
+                          >
+                            {isLoading ? (
+                              <div className="flex items-center justify-center">
+                                <LoaderCircle className="h-4 w-4 animate-spin mr-2" />
+                                <span>Saving...</span>
+                              </div>
+                            ) : (
+                              "Save Template"
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              )}              {form.watch("commission_type") === "flat" && (
+                <div>
+                  <div className="flex flex-col space-y-4 mb-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-medium">Service-Specific Commissions</h3>                      <div className="relative w-64">                        <Input
+                          placeholder="Search services..."
+                          value={searchInput}
+                          onChange={(e) => setSearchInput(e.target.value)}
+                          className="pl-8"
+                        />
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4 absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-500"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                          />
+                        </svg>                        {searchInput && (
+                          <button 
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            onClick={() => {
+                              setSearchInput('');
+                              setServiceSearch('');
+                            }}
+                          >
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              width="14" 
+                              height="14" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round"
+                            >
+                              <path d="M18 6 6 18"></path>
+                              <path d="m6 6 12 12"></path>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-4">                      {/* Location filter */}
+                      <div className="w-64 relative">                        <Select
+                          value={locationFilter || 'all'}
+                          onValueChange={(value) => setLocationFilter(value === 'all' ? null : value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="All Locations" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Locations</SelectItem>
+                            {locations.map((location) => (
+                              <SelectItem key={location.id} value={location.id}>
+                                {location.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {locationFilter && (
+                          <button 
+                            className="absolute right-9 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            onClick={() => setLocationFilter(null)}
+                          >
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              width="14" 
+                              height="14" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round"
+                            >
+                              <path d="M18 6 6 18"></path>
+                              <path d="m6 6 12 12"></path>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                        {/* Category filter */}
+                      <div className="w-64 relative">                        <Select
+                          value={categoryFilter || 'all'}
+                          onValueChange={(value) => setCategoryFilter(value === 'all' ? null : value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="All Categories" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
+                            {serviceCategories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {categoryFilter && (
+                          <button 
+                            className="absolute right-9 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            onClick={() => setCategoryFilter(null)}
+                          >
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              width="14" 
+                              height="14" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round"
+                            >
+                              <path d="M18 6 6 18"></path>
+                              <path d="m6 6 12 12"></path>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Global percentage setting */}
+                  <div className="mb-6 p-4 border rounded-lg bg-muted/20">
+                    <h4 className="text-sm font-medium mb-2">
+                      Global Commission Percentage
+                    </h4>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        type="number"
+                        placeholder="Set global percentage"
+                        className="w-full max-w-xs"
+                        value={form.watch("global_commission_percentage") || ""}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0;
+                          form.setValue("global_commission_percentage", value);
+                          // Apply to all services
+                          const updatedCommissions = [...serviceCommissions];
+                          serviceCategories.forEach((category) => {
+                            category?.services.forEach((service) => {
+                              const existing = updatedCommissions.findIndex(
+                                (sc) => sc.service_id === service.id
+                              );
+                              if (existing >= 0) {
+                                updatedCommissions[existing].percentage = value;
+                              } else {
+                                updatedCommissions.push({
+                                  service_id: service.id,
+                                  employee_id: employeeId,
+                                  percentage: value,
+                                });
+                              }
+                            });
+                          });
+                          setServiceCommissions(updatedCommissions);
+
+                          // Update form data
+                          const serviceCommissionsMap: { [key: string]: number } =
+                            {};
+                          updatedCommissions.forEach((sc) => {
+                            serviceCommissionsMap[sc.service_id] = sc.percentage;
+                          });
+                          form.setValue(
+                            "service_commissions",
+                            serviceCommissionsMap
+                          );
+                        }}
+                      />
+                      <span className="text-muted-foreground">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This will apply to all services. You can still override
+                      individual service commission percentages below.
+                    </p>
+                  </div>                  {servicesLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                      <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+                      <span className="ml-3 text-muted-foreground">Loading services...</span>
+                    </div>                  ) : serviceData?.length === 0 && !locationFilter && !categoryFilter && !serviceSearch.trim() ? (
+                    <div className="flex justify-center items-center flex-col h-40 text-muted-foreground">
+                      <div className="mb-2">No services available in the system</div>
+                      <Button variant="outline" size="sm" onClick={() => {
+                        // Navigate to services page or open add service dialog would go here
+                        toast.info("You can add services in the Services section");
+                      }}>
+                        Add Services
+                      </Button>
+                    </div>
+                  ) : filteredCategories.length === 0 ? (
+                    <div className="flex justify-center items-center h-40 text-muted-foreground">
+                      No services found matching your criteria
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredCategories.map((category, index) => (
+                        <Accordion
+                          key={category.id}
+                          type="single"
+                          collapsible
+                          defaultValue={index === 0 ? category.id : undefined}
+                        >
+                          <AccordionItem
+                            value={category.id}
+                            className="border border-border rounded-lg mb-2 last:mb-0 overflow-hidden"
+                          >
+                            <AccordionTrigger className="px-4 hover:no-underline">
+                              <h4 className="text-sm font-medium">
+                                {category.name}
+                              </h4>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-4 pb-3 pt-0 border-t">
+                              <div className="space-y-2 pt-2">
+                                {category?.services?.map((service) => (
+                                  <div
+                                    key={service.id}
+                                    className="flex justify-between items-center border rounded-lg p-3 bg-muted/30"
+                                  >
+                                    <div>
+                                      <div className="font-medium">
+                                        {service.name}
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {formatCurrency(service.price)}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <Input
+                                        type="number"
+                                        value={getServiceCommission(service.id)}
+                                        onChange={(e) =>
+                                          handleServiceCommissionChange(
+                                            service.id,
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
+                                        placeholder="0"
+                                        className="w-20 text-right"
+                                      />
+                                      <span className="text-muted-foreground">
+                                        %
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      ))}{" "}
                     </div>
                   )}
                 </div>
-                <div
-                  className={`text-xs text-muted-foreground mt-2 ${
-                    isMobile ? "text-sm" : ""
-                  }`}
-                >
-                  <p>
-                    The tiered commission structure pays different percentages
-                    based on the revenue generated by the staff member.
-                  </p>
-                  <p className={`${isMobile ? "mt-2" : "mt-1"}`}>
-                    {isMobile
-                      ? "Example: For a ₹75,000 revenue with tiers of 5% up to ₹50,000 and 10% for ₹50,001-₹100,000, commission would be ₹5,000."
-                      : "Example: If a staff member generates ₹75,000 in revenue and the slabs are set at 5% for 0-50,000 and 10% for 50,001-100,000, they would earn ₹2,500 (5% of 50,000) + ₹2,500 (10% of 25,000) = ₹5,000 in commission."}
-                  </p>{" "}
-                </div>{" "}
-                {/* Commission Templates section */}
-                <div className="border-t pt-4 mt-4 mb-6">
-                  <h4 className="font-medium mb-3">Commission Templates</h4>
-
-                  <div className="flex flex-wrap gap-3 items-center">
-                    <div>
-                      <Button
-                        type="button"
-                        onClick={saveSlabs}
-                        className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <div className="flex items-center justify-center">
-                            <LoaderCircle className="h-4 w-4 animate-spin mr-2" />
-                            <span>Saving...</span>
-                          </div>
-                        ) : (
-                          "Save Commission Structure"
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                {/* Dialog for saving template */}
-                <Dialog
-                  open={showSaveTemplateDialog}
-                  onOpenChange={setShowSaveTemplateDialog}
-                >
-                  <DialogContent
-                    className={`sm:max-w-md ${
-                      isMobile ? "w-[calc(100%-2rem)] p-4" : ""
-                    }`}
-                  >
-                    <DialogHeader>
-                      {" "}
-                      <DialogTitle>Save as Commission Template</DialogTitle>
-                      <DialogDescription>
-                        Save the current commission structure as a template for
-                        future use.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="template-name">Template Name</Label>{" "}
-                        <Input
-                          id="template-name"
-                          value={templateName}
-                          onChange={(e) => setTemplateName(e.target.value)}
-                          placeholder="e.g., Standard Tiered Commission"
-                          className="focus:ring-primary"
-                          autoFocus
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="template-description">
-                          Description (Optional)
-                        </Label>
-                        <Textarea
-                          id="template-description"
-                          value={templateDescription}
-                          onChange={(e) =>
-                            setTemplateDescription(e.target.value)
-                          }
-                          placeholder="Briefly describe this commission structure"
-                          rows={3}
-                        />
-                      </div>
-                    </div>{" "}
-                    <DialogFooter
-                      className={isMobile ? "flex-col gap-2" : undefined}
-                    >
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowSaveTemplateDialog(false)}
-                        className={isMobile ? "w-full" : ""}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={saveAsTemplate}
-                        disabled={!templateName.trim() || isLoading}
-                        className={isMobile ? "w-full" : ""}
-                      >
-                        {isLoading ? (
-                          <div className="flex items-center justify-center">
-                            <LoaderCircle className="h-4 w-4 animate-spin mr-2" />
-                            <span>Saving...</span>
-                          </div>
-                        ) : (
-                          "Save Template"
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-          )}
-
-          {form.watch("commission_type") === "flat" && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium">Service-Specific Commissions</h3>
-                <div className="relative w-64">
-                  <Input
-                    placeholder="Search services..."
-                    value={serviceSearch}
-                    onChange={(e) => setServiceSearch(e.target.value)}
-                    className="pl-8"
-                  />
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Global percentage setting */}
-              <div className="mb-6 p-4 border rounded-lg bg-muted/20">
-                <h4 className="text-sm font-medium mb-2">
-                  Global Commission Percentage
-                </h4>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    type="number"
-                    placeholder="Set global percentage"
-                    className="w-full max-w-xs"
-                    value={form.watch("global_commission_percentage") || ""}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0;
-                      form.setValue("global_commission_percentage", value);
-                      // Apply to all services
-                      const updatedCommissions = [...serviceCommissions];
-                      serviceCategories.forEach((category) => {
-                        category.services.forEach((service) => {
-                          const existing = updatedCommissions.findIndex(
-                            (sc) => sc.service_id === service.id
-                          );
-                          if (existing >= 0) {
-                            updatedCommissions[existing].percentage = value;
-                          } else {
-                            updatedCommissions.push({
-                              service_id: service.id,
-                              employee_id: employeeId,
-                              percentage: value,
-                            });
-                          }
-                        });
-                      });
-                      setServiceCommissions(updatedCommissions);
-
-                      // Update form data
-                      const serviceCommissionsMap: { [key: string]: number } =
-                        {};
-                      updatedCommissions.forEach((sc) => {
-                        serviceCommissionsMap[sc.service_id] = sc.percentage;
-                      });
-                      form.setValue(
-                        "service_commissions",
-                        serviceCommissionsMap
-                      );
-                    }}
-                  />
-                  <span className="text-muted-foreground">%</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  This will apply to all services. You can still override
-                  individual service commission percentages below.
-                </p>
-              </div>
-
-              {servicesLoading ? (
-                <div className="flex justify-center items-center h-40">
-                  <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredCategories.map((category, index) => (
-                    <Accordion
-                      key={category.id}
-                      type="single"
-                      collapsible
-                      defaultValue={index === 0 ? category.id : undefined}
-                    >
-                      <AccordionItem
-                        value={category.id}
-                        className="border border-border rounded-lg mb-2 last:mb-0 overflow-hidden"
-                      >
-                        <AccordionTrigger className="px-4 hover:no-underline">
-                          <h4 className="text-sm font-medium">
-                            {category.name}
-                          </h4>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-4 pb-3 pt-0 border-t">
-                          <div className="space-y-2 pt-2">
-                            {category.services.map((service) => (
-                              <div
-                                key={service.id}
-                                className="flex justify-between items-center border rounded-lg p-3 bg-muted/30"
-                              >
-                                <div>
-                                  <div className="font-medium">
-                                    {service.name}
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {formatCurrency(service.price)}
-                                  </div>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <Input
-                                    type="number"
-                                    value={getServiceCommission(service.id)}
-                                    onChange={(e) =>
-                                      handleServiceCommissionChange(
-                                        service.id,
-                                        parseFloat(e.target.value) || 0
-                                      )
-                                    }
-                                    placeholder="0"
-                                    className="w-20 text-right"
-                                  />
-                                  <span className="text-muted-foreground">
-                                    %
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  ))}{" "}
-                </div>
               )}
+
+            
             </div>
+          ) : (
+           null
           )}
         </CardContent>
       </Card>

@@ -135,13 +135,14 @@ export function StaffDialog({
           photo_url: data.photo_url,
           status: data.status,
           employment_type_id: data.employment_type_id,
-        };
-
-        // Add commission fields if provided
+        };        // Add commission fields if provided
         if (data.commission_type) {
           employeeUpdatePayload.commission_type = data.commission_type;
           employeeUpdatePayload.commission_template_id = data.commission_template_id || null;
         }
+        
+        // Add service commission toggle state
+        employeeUpdatePayload.service_commission_enabled = !!data.service_commission_enabled;
         
         const { error } = await supabase
           .from("employees")
