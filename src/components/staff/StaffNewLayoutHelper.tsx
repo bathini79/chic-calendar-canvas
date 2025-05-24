@@ -32,7 +32,6 @@ const formSchema = z.object({
   skills: z.array(z.string()).optional().default([]),
   locations: z.array(z.string()).min(1, "At least one location is required"),
   // Commission fields  commission_type: z.enum(["flat", "tiered", "none", "template"]).optional(),
-  commission_template_id: z.string().optional(),
   service_commissions: z.record(z.string(), z.number()).optional(),
   global_commission_percentage: z.number().min(0).max(100).optional(),
 });

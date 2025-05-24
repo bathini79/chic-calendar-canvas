@@ -138,7 +138,6 @@ export function StaffDialog({
         };        // Add commission fields if provided
         if (data.commission_type) {
           employeeUpdatePayload.commission_type = data.commission_type;
-          employeeUpdatePayload.commission_template_id = data.commission_template_id || null;
         }
         
         // Add service commission toggle state
@@ -196,7 +195,7 @@ export function StaffDialog({
         }
 
         // Handle flat commission type with no template
-        if (data.commission_type === 'flat' && !data.commission_template_id && data.service_commissions) {
+        if (data.commission_type === 'flat'  && data.service_commissions) {
           // Delete existing flat commission rules first 
           await supabase.rpc('commission_delete_all_for_employee', { 
             employee_id_param: employeeId 
@@ -219,7 +218,7 @@ export function StaffDialog({
         }
           
         // Handle tiered commission type with no template
-        if (data.commission_type === 'tiered' && !data.commission_template_id && data.commission_slabs) {
+        if (data.commission_type === 'tiered'  && data.commission_slabs) {
           // Delete is already handled by the function above
           
           // Format and save tiered slabs

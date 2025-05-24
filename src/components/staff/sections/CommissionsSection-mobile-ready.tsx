@@ -228,10 +228,6 @@ export function CommissionsSection({
     form.setValue("commission_type", commissionType);
   }, [commissionType, form]);
 
-  // Update form value for template_id
-  useEffect(() => {
-    form.setValue("commission_template_id", selectedTemplateId);
-  }, [selectedTemplateId, form]);
 
   // Update form value for service_commissions
   useEffect(() => {
@@ -691,35 +687,7 @@ export function CommissionsSection({
                       </DialogContent>
                     </Dialog>
                     
-                    <FormField
-                      control={form.control}
-                      name="commission_template_id"
-                      render={({ field }) => (
-                        <FormItem className={isMobile ? "w-full" : "w-60"}>
-                          <Select
-                            onValueChange={(value) => {
-                              handleServiceTemplateChange(value);
-                              field.onChange(value);
-                            }}
-                            defaultValue={field.value || selectedTemplateId || undefined}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Load Template" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {templates.map((template) => (
-                                <SelectItem key={template.id} value={template.id}>
-                                  {template.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  
                   </div>
                 </div>
                 
@@ -799,39 +767,7 @@ export function CommissionsSection({
             {/* Tiered Commission UI */}
             {commissionType === "tiered" && (
               <div className="space-y-6">
-                <div>
-                  <FormField
-                    control={form.control}
-                    name="commission_template_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Commission Template</FormLabel>
-                        <Select
-                          onValueChange={(value) => {
-                            handleTemplateChange(value);
-                            field.onChange(value);
-                          }}
-                          defaultValue={field.value || selectedTemplateId || undefined}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select or create a template" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {templates.map((template) => (
-                              <SelectItem key={template.id} value={template.id}>
-                                {template.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
+               
                 <div className="space-y-4">
                   <div className={`${isMobile ? 'flex flex-col gap-2' : 'flex items-center justify-between'}`}>
                     <h3 className="text-lg font-medium">Commission Slabs</h3>

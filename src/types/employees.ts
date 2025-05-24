@@ -11,7 +11,6 @@ export interface Employee {
   employment_type?: "stylist" | "operations";
   employment_type_id?: string;
   commission_type?: "flat" | "tiered" | "none";
-  commission_template_id?: string | null;
 }
 
 export interface FlatCommissionRule {

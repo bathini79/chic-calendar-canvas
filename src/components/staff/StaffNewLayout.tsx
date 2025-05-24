@@ -34,7 +34,6 @@ const formSchema = z.object({
   // Commission fields
   service_commission_enabled: z.boolean().default(false),
   commission_type: z.enum(["flat", "tiered" , "template"]).optional(),
-  commission_template_id: z.string().optional(),
   service_commissions: z.record(z.string(), z.number()).optional(),
   global_commission_percentage: z.number().min(0).max(100).optional(),
 });
@@ -145,7 +144,6 @@ export function StaffNewLayout({
           initialData.employee_locations?.map((l: any) => l.location_id) || [],
         service_commission_enabled: initialData.service_commission_enabled || false,
         commission_type: initialData.commission_type,
-        commission_template_id: initialData.commission_template_id || null,
       });
 
       // Set the selected country based on the detected country code
@@ -322,7 +320,6 @@ export function StaffNewLayout({
       counts["locations"] = 1; // For array fields, we count it as 1 error
     }    // Commission section errors
     let commissionErrorCount = 0;
-    if (errors.commission_template_id) commissionErrorCount++;
     if (errors.global_commission_percentage) commissionErrorCount++;
     if (errors.service_commissions) commissionErrorCount++;
     

@@ -7,14 +7,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -36,7 +28,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { LoaderCircle, PlusCircle, Search, ToggleLeft, ToggleRight } from "lucide-react";
+import {
+  LoaderCircle,
+  PlusCircle,
+  Search,
+  ToggleLeft,
+  ToggleRight,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -95,7 +93,7 @@ export function CommissionsSection({
   // State for commission slabs management
   const [slabs, setSlabs] = useState<TieredSlab[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Get the current value of service_commission_enabled from form
   const serviceCommissionEnabled = form.watch("service_commission_enabled");
 
@@ -104,7 +102,6 @@ export function CommissionsSection({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     null
   );
-  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
   const [templateName, setTemplateName] = useState<string>("");
   const [templateDescription, setTemplateDescription] = useState<string>("");
   const [templateSearch, setTemplateSearch] = useState<string>("");
@@ -114,91 +111,39 @@ export function CommissionsSection({
   const [serviceCommissions, setServiceCommissions] = useState<
     Array<{ service_id: string; employee_id?: string; percentage: number }>
   >([]);
-  // Fetch commission templates
-  const {
-    data: templateData,
-    isLoading: templatesLoading,
-    refetch: refetchTemplates,
-  } = useQuery({
-    queryKey: ["commission-templates"],
-    queryFn: async () => {
-      // Mock data for templates until backend is ready
-      const mockTemplates: CommissionTemplate[] = [];
-
-      /* When backend is ready:
-      const { data, error } = await supabase
-        .from("commission_templates")
-        .select("*");
-
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      // Fetch slabs for each template
-      const templatesWithSlabs = await Promise.all(
-        data.map(async (template) => {
-          const { data: slabsData, error: slabsError } = await supabase
-            .from("commission_template_slabs")
-            .select("*")
-            .eq("template_id", template.id)
-            .order("order");
-          
-          if (slabsError) {
-            console.error("Error fetching template slabs:", slabsError);
-            return {
-              ...template,
-              slabs: []
-            };
-          }
-          
-          return {
-            ...template,
-            slabs: slabsData || []
-          };
-        })
-      );
-      
-      return templatesWithSlabs;
-      */
-
-      return mockTemplates;
-    },
-  });
-  // Update templates state when data is available
-  useEffect(() => {
-    if (templateData) {
-      setTemplates(templateData);
-    }
-  }, [templateData]);
+  
   // Query to fetch services with categories, supporting pagination and filtering
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
-  
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>(
+    []
+  );
+
   // Query to fetch available locations
   const { data: locations = [] } = useQuery({
-    queryKey: ['locations'],
+    queryKey: ["locations"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('locations')
-        .select('id, name')
-        .order('name');
-      
+        .from("locations")
+        .select("id, name")
+        .order("name");
+
       if (error) {
         console.error("Error fetching locations:", error);
         throw error;
       }
-      
+
       return data || [];
     },
   });
-  
+
   const { data: serviceData, isLoading: servicesLoading } = useQuery({
-    queryKey: ['services', locationFilter, categoryFilter, serviceSearch],
+    queryKey: ["services", locationFilter, categoryFilter, serviceSearch],
     queryFn: async () => {
       let query = supabase
-        .from('services')
-        .select(`
+        .from("services")
+        .select(
+          `
           *,
           services_categories(
             categories (
@@ -206,45 +151,47 @@ export function CommissionsSection({
               name
             )
           )
-        `)
-        .order('name');
-      
+        `
+        )
+        .order("name");
+
       // Apply location filter if selected
       if (locationFilter) {
-        query = query.eq('services_locations.location_id', locationFilter);
+        query = query.eq("services_locations.location_id", locationFilter);
       }
-      
+
       // Apply category filter if selected
       if (categoryFilter) {
-        query = query.eq('services_categories.categories.id', categoryFilter);
+        query = query.eq("services_categories.categories.id", categoryFilter);
       }
-      
+
       // Apply search filter if provided
       if (serviceSearch.trim()) {
-        query = query.ilike('name', `%${serviceSearch.trim()}%`);
+        query = query.ilike("name", `%${serviceSearch.trim()}%`);
       }
-      
+
       const { data, error } = await query;
-      
+
       if (error) {
         console.error("Error fetching services:", error);
         throw error;
       }
-      
-      // Map DB data to the Service interface 
-      const processedServices = data?.map(service => {
-        const category = service.services_categories?.[0]?.categories;
-        return {
-          id: service.id,
-          name: service.name,
-          price: service.selling_price || 0, // Map selling_price to price
-          duration: service.duration || 0,
-          description: service.description || '',
-          category_id: category?.id || 'uncategorized',
-          category_name: category?.name || 'Uncategorized',
-        };
-      }) || [];
-      
+
+      // Map DB data to the Service interface
+      const processedServices =
+        data?.map((service) => {
+          const category = service.services_categories?.[0]?.categories;
+          return {
+            id: service.id,
+            name: service.name,
+            price: service.selling_price || 0, // Map selling_price to price
+            duration: service.duration || 0,
+            description: service.description || "",
+            category_id: category?.id || "uncategorized",
+            category_name: category?.name || "Uncategorized",
+          };
+        }) || [];
+
       return processedServices;
     },
   });
@@ -254,26 +201,26 @@ export function CommissionsSection({
     if (serviceData && serviceData.length > 0) {
       // Group services by category
       const categoriesMap = serviceData.reduce((acc, service) => {
-        const categoryId = service.category_id || 'uncategorized';
-        const categoryName = service.category_name || 'Uncategorized';
-        
+        const categoryId = service.category_id || "uncategorized";
+        const categoryName = service.category_name || "Uncategorized";
+
         if (!acc[categoryId]) {
           acc[categoryId] = {
             id: categoryId,
             name: categoryName,
-            services: []
+            services: [],
           };
         }
-        
+
         acc[categoryId].services.push(service);
         return acc;
       }, {} as Record<string, ServiceCategory>);
-      
+
       // Convert map to array and sort categories by name
-      const categoriesArray = Object.values(categoriesMap).sort((a, b) => 
+      const categoriesArray = Object.values(categoriesMap).sort((a, b) =>
         a.name.localeCompare(b.name)
       );
-      
+
       setServiceCategories(categoriesArray);
     } else {
       setServiceCategories([]);
@@ -323,21 +270,24 @@ export function CommissionsSection({
 
       return updated;
     });
-  };  // Fetch employee's commission data if editing
+  }; // Fetch employee's commission data if editing
   const fetchEmployeeCommissions = async () => {
     if (employeeId) {
       try {
         setIsLoading(true);
-        
+
         // First, fetch the employee's basic commission settings
         const { data: employeeData, error: employeeError } = await supabase
           .from("employees")
-          .select("commission_type, commission_template_id")
+          .select("commission_type")
           .eq("id", employeeId)
           .single();
-          
+
         if (employeeError) {
-          console.error("Error fetching employee commission settings:", employeeError);
+          console.error(
+            "Error fetching employee commission settings:",
+            employeeError
+          );
           // Fall back to default settings
           setSlabs([
             {
@@ -350,43 +300,22 @@ export function CommissionsSection({
           ]);
           return;
         }
-        
+
         // Update the form with the employee's commission type
         if (employeeData.commission_type) {
           form.setValue("commission_type", employeeData.commission_type);
         }
-        
+
         // If using a template, fetch and apply the template
-        if (employeeData.commission_template_id) {
-          form.setValue("commission_template_id", employeeData.commission_template_id);
-          setSelectedTemplateId(employeeData.commission_template_id);
-          
-          // Attempt to find the template in already loaded templates
-          const template = templates.find(t => t.id === employeeData.commission_template_id);
-          if (template && template.slabs) {
-            setSlabs(template.slabs);
-          } else {
-            // Template not loaded yet, use default slabs for now
-            // In a real implementation, you would fetch the template
-            setSlabs([
-              {
-                id: "1",
-                min_amount: 0,
-                max_amount: 999999999,
-                percentage: 10,
-                order: 1,
-              },
-            ]);
-          }
-        } 
+
         // For tiered commission without a template, fetch the employee's slabs
-        else if (employeeData.commission_type === 'tiered') {
+        else if (employeeData.commission_type === "tiered") {
           const { data: slabsData, error: slabsError } = await supabase
             .from("tiered_commission_slabs")
             .select("*")
             .eq("employee_id", employeeId)
             .order("order_index");
-            
+
           if (slabsError) {
             console.error("Error fetching tiered slabs:", slabsError);
             // Fall back to default slab
@@ -401,12 +330,12 @@ export function CommissionsSection({
             ]);
           } else if (slabsData && slabsData.length > 0) {
             // Map database slabs to UI slabs format
-            const uiSlabs = slabsData.map(slab => ({
+            const uiSlabs = slabsData.map((slab) => ({
               id: slab.id,
               min_amount: slab.min_amount,
               max_amount: slab.max_amount,
               percentage: slab.percentage,
-              order: slab.order_index
+              order: slab.order_index,
             }));
             setSlabs(uiSlabs);
           } else {
@@ -423,30 +352,30 @@ export function CommissionsSection({
           }
         }
         // For flat commission, fetch service-specific commissions
-        else if (employeeData.commission_type === 'flat') {
+        else if (employeeData.commission_type === "flat") {
           const { data: rulesData, error: rulesError } = await supabase
             .from("flat_commission_rules")
             .select("*")
             .eq("employee_id", employeeId);
-            
+
           if (rulesError) {
             console.error("Error fetching flat commission rules:", rulesError);
           } else if (rulesData && rulesData.length > 0) {
             // Format for service commissions state
-            const serviceCommissionsArr = rulesData.map(rule => ({
+            const serviceCommissionsArr = rulesData.map((rule) => ({
               service_id: rule.service_id,
               employee_id: employeeId,
-              percentage: rule.percentage
+              percentage: rule.percentage,
             }));
-            
+
             setServiceCommissions(serviceCommissionsArr);
-            
+
             // Also update form data
             const serviceCommissionsMap: { [key: string]: number } = {};
-            serviceCommissionsArr.forEach(sc => {
+            serviceCommissionsArr.forEach((sc) => {
               serviceCommissionsMap[sc.service_id] = sc.percentage;
             });
-            
+
             form.setValue("service_commissions", serviceCommissionsMap);
           }
         }
@@ -468,201 +397,7 @@ export function CommissionsSection({
     }
   };
 
-  // Create new commission template
-  const createTemplate = async () => {
-    if (!templateName.trim()) {
-      toast.error("Template name is required");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Create a new template with current slabs
-      const newTemplate: CommissionTemplate = {
-        id: `temp_${Date.now()}`, // This would be replaced with a real ID from the database
-        name: templateName,
-        description: templateDescription,
-        slabs: [...slabs],
-        created_at: new Date().toISOString(),
-      };
-
-      /* When backend is ready:
-      const { data, error } = await supabase
-        .from("commission_templates")
-        .insert({
-          name: templateName,
-          description: templateDescription,
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Insert slabs for the template
-      const slabsToInsert = slabs.map((slab, index) => ({
-        template_id: data.id,
-        min_amount: slab.min_amount,
-        max_amount: slab.max_amount,
-        percentage: slab.percentage,
-        order: index + 1
-      }));
-      
-      const { error: slabsError } = await supabase
-        .from("commission_template_slabs")
-        .insert(slabsToInsert);
-      
-      if (slabsError) {
-        throw slabsError;
-      }
-      
-      // Refetch templates to update the list
-      refetchTemplates();
-      */
-      // For now, just add to local state
-      setTemplates((prev) => [...prev, newTemplate]);
-
-      setShowSaveTemplateDialog(false);
-      setTemplateName("");
-      setTemplateDescription("");
-      toast.success("Template created successfully");
-    } catch (error) {
-      console.error("Error creating template:", error);
-      toast.error("Failed to create template");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  // Handle selecting a template
-  const handleTemplateChange = (templateId: string) => {
-    setSelectedTemplateId(templateId);
-
-    // Fetch template slabs and apply immediately
-    const template = templates.find((t) => t.id === templateId);
-    if (template && template.slabs) {
-      setSlabs(template.slabs);
-      toast.success(`Applied template: ${template.name}`);
-    }
-  };
-  // Filter templates based on search term
-  const filteredTemplates = useMemo(() => {
-    if (!templateSearch.trim()) {
-      return templates;
-    }
-
-    const searchTerm = templateSearch.toLowerCase();
-    return templates.filter(
-      (template) =>
-        template.name.toLowerCase().includes(searchTerm) ||
-        (template.description &&
-          template.description.toLowerCase().includes(searchTerm))
-    );
-  }, [templates, templateSearch]);
-  // This function is now handled directly in handleTemplateChange
-
-  // Handle saving the current commission structure as a template
-  const saveAsTemplate = async () => {
-    if (!templateName.trim()) {
-      toast.error("Template name is required");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Create a template object
-      const template = {
-        name: templateName,
-        description: templateDescription,
-        type: "tiered",
-        slabs: slabs,
-      };
-
-      /* Backend integration would go here - for now using mock data
-      const { data, error } = await supabase
-        .from("commission_templates")
-        .insert(template)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      */
-
-      // Close dialog and show success message
-      setShowSaveTemplateDialog(false);
-      setTemplateName("");
-      setTemplateDescription("");
-
-      // Update local templates list with the new template
-      // In a real implementation, we would refetch templates from the server
-      const newTemplate = {
-        id: `temp-${Date.now()}`,
-        ...template,
-        created_at: new Date().toISOString(),
-      };
-
-      setTemplates((prev) => [...prev, newTemplate]);
-      toast.success("Template saved successfully");
-    } catch (error) {
-      console.error("Error saving template:", error);
-      toast.error("Failed to save template");
-    } finally {
-      setIsLoading(false);
-    }
-  };  // Save tiered commission slabs to form data
-  // Note: This function updates the form state with the current slabs configuration.
-  // The actual database saving is handled in StaffDialog.tsx when the entire form is submitted.
-  const saveSlabs = async () => {
-    try {
-      setIsLoading(true);
-
-      // Validate slabs using the validation utility
-      if (!validateSlabs(slabs)) {
-        return;
-      }
-
-      // Ensure we have continuous slabs without gaps
-      const sortedSlabs = [...slabs].sort((a, b) => a.min_amount - b.min_amount);
-      
-      // Format slabs for saving - ensure order_index is set correctly
-      const formattedSlabs = sortedSlabs.map((slab, index) => ({
-        min_amount: slab.min_amount,
-        max_amount: slab.max_amount,
-        percentage: slab.percentage,
-        order: index + 1
-      }));
-
-      // Update form data for submission - this is what will be used by StaffDialog.tsx
-      form.setValue("commission_slabs", formattedSlabs);
-      form.setValue("commission_type", "tiered");
-      
-      // If using a template, store the template ID
-      if (selectedTemplateId) {
-        form.setValue("commission_template_id", selectedTemplateId);
-      } else {
-        form.setValue("commission_template_id", null);
-      }
-
-      toast.success("Commission structure updated and ready for saving");
-
-      // Ask if user wants to save as template too
-      toast("Would you like to save this as a template?", {
-        action: {
-          label: "Save as Template",
-          onClick: () => setShowSaveTemplateDialog(true),
-        },
-        duration: 5000,
-      });
-    } catch (error) {
-      console.error("Error preparing commission structure:", error);
-      toast.error("Failed to update commission structure");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+ 
   // Add a new slab
   const addSlab = () => {
     // Find the maximum value in existing slabs
@@ -710,7 +445,7 @@ export function CommissionsSection({
       toast.error("At least one commission slab is required");
       return false;
     }
-    
+
     // Check each slab for valid values
     for (const slab of slabsToValidate) {
       if (
@@ -725,24 +460,28 @@ export function CommissionsSection({
         return false;
       }
     }
-    
+
     // Check for overlapping ranges
-    const sortedSlabs = [...slabsToValidate].sort((a, b) => a.min_amount - b.min_amount);
+    const sortedSlabs = [...slabsToValidate].sort(
+      (a, b) => a.min_amount - b.min_amount
+    );
     for (let i = 0; i < sortedSlabs.length - 1; i++) {
       const current = sortedSlabs[i];
       const next = sortedSlabs[i + 1];
-      
+
       if (current.max_amount >= next.min_amount) {
-        toast.error("Slab ranges cannot overlap. Please adjust the min/max values.");
+        toast.error(
+          "Slab ranges cannot overlap. Please adjust the min/max values."
+        );
         return false;
       }
-      
+
       if (current.max_amount + 1 !== next.min_amount) {
         toast.error("Slab ranges must be continuous without gaps");
         return false;
       }
     }
-    
+
     return true;
   };
 
@@ -763,7 +502,7 @@ export function CommissionsSection({
 
       return updated;
     });
-  };  // Initialize data on component mount
+  }; // Initialize data on component mount
   useEffect(() => {
     // For existing employees, fetch their commission data
     if (employeeId) {
@@ -782,7 +521,10 @@ export function CommissionsSection({
 
   // Set initial service_commission_enabled to true for new employees with no saved state
   useEffect(() => {
-    if (!employeeId && form.getValues("service_commission_enabled") === undefined) {
+    if (
+      !employeeId &&
+      form.getValues("service_commission_enabled") === undefined
+    ) {
       form.setValue("service_commission_enabled", false);
     }
   }, [employeeId, form]);
@@ -798,14 +540,14 @@ export function CommissionsSection({
   };
 
   // Add debounced search for better performance
-  const [searchInput, setSearchInput] = useState('');
-  
+  const [searchInput, setSearchInput] = useState("");
+
   // Debounce search input to avoid too many queries
   useEffect(() => {
     const timer = setTimeout(() => {
       setServiceSearch(searchInput);
     }, 300); // 300ms debounce time
-    
+
     return () => clearTimeout(timer);
   }, [searchInput]);
 
@@ -815,35 +557,36 @@ export function CommissionsSection({
         <CardHeader className="pb-3">
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle className="text-xl font-semibold">Service Commissions</CardTitle>
+              <CardTitle className="text-xl font-semibold">
+                Service Commissions
+              </CardTitle>
               <CardDescription>
                 Configure service-based commission settings
               </CardDescription>
             </div>
-            { <FormField
-              control={form.control}
-              name="service_commission_enabled"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <div className="flex items-center">
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={(checked) => {
-                          field.onChange(checked);
-                
-                        }}
-                      />
-                 
-                    </div>
-                  </FormControl>
-                </FormItem>
-              )}
-            /> }
+            {
+              <FormField
+                control={form.control}
+                name="service_commission_enabled"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <div className="flex items-center">
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            }
           </div>
         </CardHeader>
         <CardContent>
-
           {/* Conditionally render commission settings based on toggle */}
           {form.watch("service_commission_enabled") ? (
             <div className="space-y-6">
@@ -859,7 +602,6 @@ export function CommissionsSection({
                         value={field.value}
                         onValueChange={(value) => {
                           field.onChange(value);
-                    
                         }}
                       >
                         <SelectTrigger>
@@ -867,7 +609,9 @@ export function CommissionsSection({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="flat">Flat Commission</SelectItem>
-                          <SelectItem value="tiered">Tiered Commission</SelectItem>
+                          <SelectItem value="tiered">
+                            Tiered Commission
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </FormControl>
@@ -875,53 +619,43 @@ export function CommissionsSection({
                   </FormItem>
                 )}
               />
-              
               {form.watch("commission_type") === "tiered" && (
                 <div className="space-y-6">
                   {" "}
                   {/* Tiered commission slabs section */}
                   <div className="border rounded-lg p-4">
                     <div
-                        className={`flex w-full ${
-                            isMobile
-                                ? "flex-row gap-2 items-center mb-2"
-                                : "justify-between items-center mb-4"
-                        }`}
+                      className={`flex w-full ${
+                        isMobile
+                          ? "flex-row gap-2 items-center mb-2"
+                          : "justify-between items-center mb-4"
+                      }`}
                     >
-                        {/* Search input */}
-                        <div
-                            className={
-                                isMobile
-                                    ? "flex-1 min-w-0 relative"
-                                    : "flex-1 min-w-0 relative max-w-xs"
-                            }
+                      {/* Search input */}
+                      <div
+                        className={
+                          isMobile
+                            ? "flex-1 min-w-0 relative"
+                            : "flex-1 min-w-0 relative max-w-xs"
+                        }
+                      ></div>
+                      {/* Add Slab button */}
+                      <div
+                        className={
+                          isMobile
+                            ? "flex-[0_0_38%] ml-2"
+                            : "ml-4 flex-shrink-0"
+                        }
+                      >
+                        <button
+                          type="button"
+                          onClick={addSlab}
+                          className="w-full h-9 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md text-xs font-medium flex items-center justify-center"
+                          style={{ minHeight: 36 }}
                         >
-                            <Input
-                                placeholder="Search templates..."
-                                value={templateSearch}
-                                onChange={(e) => setTemplateSearch(e.target.value)}
-                                className={`pl-8 h-9 ${isMobile ? "w-full" : ""}`}
-                                style={{ minHeight: 36 }}
-                            />
-                            <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                        </div>
-                        {/* Add Slab button */}
-                        <div
-                            className={
-                                isMobile
-                                    ? "flex-[0_0_38%] ml-2"
-                                    : "ml-4 flex-shrink-0"
-                            }
-                        >
-                            <button
-                                type="button"
-                                onClick={addSlab}
-                                className="w-full h-9 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md text-xs font-medium flex items-center justify-center"
-                                style={{ minHeight: 36 }}
-                            >
-                                Add Slab
-                            </button>
-                        </div>
+                          Add Slab
+                        </button>
+                      </div>
                     </div>
                     <div className="border rounded-md mb-4">
                       {!isMobile ? (
@@ -989,7 +723,9 @@ export function CommissionsSection({
                                       }
                                       className="h-8 text-xs w-16"
                                     />
-                                    <span className="text-muted-foreground">%</span>
+                                    <span className="text-muted-foreground">
+                                      %
+                                    </span>
                                   </div>
                                 </td>
                                 <td className="py-2 text-right pr-2">
@@ -1013,8 +749,18 @@ export function CommissionsSection({
                                       <path d="M3 6h18"></path>
                                       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
                                       <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                      <line x1="10" y1="11" x2="10" y2="17"></line>
-                                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                                      <line
+                                        x1="10"
+                                        y1="11"
+                                        x2="10"
+                                        y2="17"
+                                      ></line>
+                                      <line
+                                        x1="14"
+                                        y1="11"
+                                        x2="14"
+                                        y2="17"
+                                      ></line>
                                     </svg>
                                   </button>
                                 </td>
@@ -1054,8 +800,18 @@ export function CommissionsSection({
                                     <path d="M3 6h18"></path>
                                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
                                     <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    <line
+                                      x1="10"
+                                      y1="11"
+                                      x2="10"
+                                      y2="17"
+                                    ></line>
+                                    <line
+                                      x1="14"
+                                      y1="11"
+                                      x2="14"
+                                      y2="17"
+                                    ></line>
                                   </svg>
                                 </button>
                               </div>
@@ -1116,7 +872,9 @@ export function CommissionsSection({
                                       className="h-9 text-sm w-24"
                                       placeholder="0"
                                     />
-                                    <span className="text-muted-foreground">%</span>
+                                    <span className="text-muted-foreground">
+                                      %
+                                    </span>
                                   </div>
                                 </div>
                               </div>
@@ -1131,8 +889,9 @@ export function CommissionsSection({
                       }`}
                     >
                       <p>
-                        The tiered commission structure pays different percentages
-                        based on the revenue generated by the staff member.
+                        The tiered commission structure pays different
+                        percentages based on the revenue generated by the staff
+                        member.
                       </p>
                       <p className={`${isMobile ? "mt-2" : "mt-1"}`}>
                         {isMobile
@@ -1140,108 +899,20 @@ export function CommissionsSection({
                           : "Example: If a staff member generates ₹75,000 in revenue and the slabs are set at 5% for 0-50,000 and 10% for 50,001-100,000, they would earn ₹2,500 (5% of 50,000) + ₹2,500 (10% of 25,000) = ₹5,000 in commission."}
                       </p>{" "}
                     </div>{" "}
-                    {/* Commission Templates section */}
-                    <div className="border-t pt-4 mt-4 mb-6">
-
-                      <div className="flex flex-wrap gap-3 items-center">
-                        <div>
-                          <Button
-                            type="button"
-                            onClick={saveSlabs}
-                            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                            disabled={isLoading}
-                          >
-                            {isLoading ? (
-                              <div className="flex items-center justify-center">
-                                <LoaderCircle className="h-4 w-4 animate-spin mr-2" />
-                                <span>Saving...</span>
-                              </div>
-                            ) : (
-                              "Save Commission Structure"
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Dialog for saving template */}
-                    <Dialog
-                      open={showSaveTemplateDialog}
-                      onOpenChange={setShowSaveTemplateDialog}
-                    >
-                      <DialogContent
-                        className={`sm:max-w-md ${
-                          isMobile ? "w-[calc(100%-2rem)] p-4" : ""
-                        }`}
-                      >
-                        <DialogHeader>
-                          {" "}
-                          <DialogTitle>Save as Commission Template</DialogTitle>
-                          <DialogDescription>
-                            Save the current commission structure as a template for
-                            future use.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="template-name">Template Name</Label>{" "}
-                            <Input
-                              id="template-name"
-                              value={templateName}
-                              onChange={(e) => setTemplateName(e.target.value)}
-                              placeholder="e.g., Standard Tiered Commission"
-                              className="focus:ring-primary"
-                              autoFocus
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="template-description">
-                              Description (Optional)
-                            </Label>
-                            <Textarea
-                              id="template-description"
-                              value={templateDescription}
-                              onChange={(e) =>
-                                setTemplateDescription(e.target.value)
-                              }
-                              placeholder="Briefly describe this commission structure"
-                              rows={3}
-                            />
-                          </div>
-                        </div>{" "}
-                        <DialogFooter
-                          className={isMobile ? "flex-col gap-2" : undefined}
-                        >
-                          <Button
-                            variant="outline"
-                            onClick={() => setShowSaveTemplateDialog(false)}
-                            className={isMobile ? "w-full" : ""}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            onClick={saveAsTemplate}
-                            disabled={!templateName.trim() || isLoading}
-                            className={isMobile ? "w-full" : ""}
-                          >
-                            {isLoading ? (
-                              <div className="flex items-center justify-center">
-                                <LoaderCircle className="h-4 w-4 animate-spin mr-2" />
-                                <span>Saving...</span>
-                              </div>
-                            ) : (
-                              "Save Template"
-                            )}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                  
                   </div>
                 </div>
-              )}              {form.watch("commission_type") === "flat" && (
+              )}{" "}
+              {form.watch("commission_type") === "flat" && (
                 <div>
                   <div className="flex flex-col space-y-4 mb-4">
                     <div className="flex justify-between items-center">
-                      <h3 className="font-medium">Service-Specific Commissions</h3>                      <div className="relative w-64">                        <Input
+                      <h3 className="font-medium">
+                        Service-Specific Commissions
+                      </h3>{" "}
+                      <div className="relative w-64">
+                        {" "}
+                        <Input
                           placeholder="Search services..."
                           value={searchInput}
                           onChange={(e) => setSearchInput(e.target.value)}
@@ -1260,23 +931,24 @@ export function CommissionsSection({
                             strokeWidth={2}
                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                           />
-                        </svg>                        {searchInput && (
-                          <button 
+                        </svg>{" "}
+                        {searchInput && (
+                          <button
                             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                             onClick={() => {
-                              setSearchInput('');
-                              setServiceSearch('');
+                              setSearchInput("");
+                              setServiceSearch("");
                             }}
                           >
-                            <svg 
-                              xmlns="http://www.w3.org/2000/svg" 
-                              width="14" 
-                              height="14" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="2" 
-                              strokeLinecap="round" 
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
                               strokeLinejoin="round"
                             >
                               <path d="M18 6 6 18"></path>
@@ -1286,88 +958,9 @@ export function CommissionsSection({
                         )}
                       </div>
                     </div>
-                    
-                    <div className="flex flex-wrap gap-4">                      {/* Location filter */}
-                      <div className="w-64 relative">                        <Select
-                          value={locationFilter || 'all'}
-                          onValueChange={(value) => setLocationFilter(value === 'all' ? null : value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="All Locations" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Locations</SelectItem>
-                            {locations.map((location) => (
-                              <SelectItem key={location.id} value={location.id}>
-                                {location.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {locationFilter && (
-                          <button 
-                            className="absolute right-9 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            onClick={() => setLocationFilter(null)}
-                          >
-                            <svg 
-                              xmlns="http://www.w3.org/2000/svg" 
-                              width="14" 
-                              height="14" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="2" 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round"
-                            >
-                              <path d="M18 6 6 18"></path>
-                              <path d="m6 6 12 12"></path>
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                        {/* Category filter */}
-                      <div className="w-64 relative">                        <Select
-                          value={categoryFilter || 'all'}
-                          onValueChange={(value) => setCategoryFilter(value === 'all' ? null : value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="All Categories" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Categories</SelectItem>
-                            {serviceCategories.map((category) => (
-                              <SelectItem key={category.id} value={category.id}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {categoryFilter && (
-                          <button 
-                            className="absolute right-9 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            onClick={() => setCategoryFilter(null)}
-                          >
-                            <svg 
-                              xmlns="http://www.w3.org/2000/svg" 
-                              width="14" 
-                              height="14" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="2" 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round"
-                            >
-                              <path d="M18 6 6 18"></path>
-                              <path d="m6 6 12 12"></path>
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
 
+                    
+                  </div>
                   {/* Global percentage setting */}
                   <div className="mb-6 p-4 border rounded-lg bg-muted/20">
                     <h4 className="text-sm font-medium mb-2">
@@ -1403,10 +996,12 @@ export function CommissionsSection({
                           setServiceCommissions(updatedCommissions);
 
                           // Update form data
-                          const serviceCommissionsMap: { [key: string]: number } =
-                            {};
+                          const serviceCommissionsMap: {
+                            [key: string]: number;
+                          } = {};
                           updatedCommissions.forEach((sc) => {
-                            serviceCommissionsMap[sc.service_id] = sc.percentage;
+                            serviceCommissionsMap[sc.service_id] =
+                              sc.percentage;
                           });
                           form.setValue(
                             "service_commissions",
@@ -1420,17 +1015,32 @@ export function CommissionsSection({
                       This will apply to all services. You can still override
                       individual service commission percentages below.
                     </p>
-                  </div>                  {servicesLoading ? (
+                  </div>{" "}
+                  {servicesLoading ? (
                     <div className="flex justify-center items-center h-40">
                       <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
-                      <span className="ml-3 text-muted-foreground">Loading services...</span>
-                    </div>                  ) : serviceData?.length === 0 && !locationFilter && !categoryFilter && !serviceSearch.trim() ? (
+                      <span className="ml-3 text-muted-foreground">
+                        Loading services...
+                      </span>
+                    </div>
+                  ) : serviceData?.length === 0 &&
+                    !locationFilter &&
+                    !categoryFilter &&
+                    !serviceSearch.trim() ? (
                     <div className="flex justify-center items-center flex-col h-40 text-muted-foreground">
-                      <div className="mb-2">No services available in the system</div>
-                      <Button variant="outline" size="sm" onClick={() => {
-                        // Navigate to services page or open add service dialog would go here
-                        toast.info("You can add services in the Services section");
-                      }}>
+                      <div className="mb-2">
+                        No services available in the system
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Navigate to services page or open add service dialog would go here
+                          toast.info(
+                            "You can add services in the Services section"
+                          );
+                        }}
+                      >
                         Add Services
                       </Button>
                     </div>
@@ -1499,12 +1109,8 @@ export function CommissionsSection({
                   )}
                 </div>
               )}
-
-            
             </div>
-          ) : (
-           null
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </div>
