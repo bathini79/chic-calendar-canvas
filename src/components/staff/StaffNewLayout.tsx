@@ -67,6 +67,9 @@ export function StaffNewLayout({
   const [sectionsWithErrors, setSectionsWithErrors] = useState<string[]>([]);
   const [errorCounts, setErrorCounts] = useState<Record<string, number>>({});
   const [isServicesRequired, setIsServicesRequired] = useState(false);
+  // Add initialization state to prevent auto-submission
+  const [isFormInitializing, setIsFormInitializing] = useState(true);
+  const [userTriggeredSubmit, setUserTriggeredSubmit] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<{
     name: string;
     code: string;
@@ -126,6 +129,8 @@ export function StaffNewLayout({
 
   useEffect(() => {
     if (initialData) {
+      setIsFormInitializing(true);
+      
       // Parse the phone number to get country code and local number separately
       const phoneWithPlus = initialData.phone?.startsWith("+")
         ? initialData.phone
@@ -340,104 +345,28 @@ export function StaffNewLayout({
 
     return errorSections;
   };
-  const handleFormSubmit = async (data: StaffFormData) => {
-    // Clear any previous error sections
-    setSectionsWithErrors([]);
-
-    // Apply conditional validation before checking form validity
-    const employmentTypeId = form.getValues("employment_type_id");
-    const hasPerformServices = checkPerformServicesPermission(employmentTypeId);
-
-    // Check if Services should be required
-    if (hasPerformServices && (!data.skills || data.skills.length === 0)) {
-      form.setError("skills", {
-        type: "manual",
-        message: "At least one service is required",
-      });
-
-      // Determine which sections have errors, including the manual services error
-      const errorSections = checkSectionsWithErrors();
-      setSectionsWithErrors(errorSections);
-
-      // Navigate to services section if that's where the error is
-      if (errorSections.includes("services")) {
-        setActiveSection("services");
-      } else if (
-        errorSections.length > 0 &&
-        !errorSections.includes(activeSection)
-      ) {
-        setActiveSection(errorSections[0]);
-      }
-
-      // Show a toast notification
-      toast.error("Please select at least one service");
+  // Handle form submission
+  const handleFormSubmit = (data: StaffFormData) => {
+    // Prevent form submission during initialization or section changes
+    // Only process submission if user explicitly clicked the submit button
+    if (isFormInitializing && !userTriggeredSubmit) {
+      console.log("Preventing auto-submission during initialization or section change");
       return;
     }
-    console.log("form", form); // Check if the form has other errors
-    if (!form.formState.isValid) {
-      // Log detailed error information to help debug
-      console.log("Form validation state:", form.formState);
-      console.log("Form errors:", form.formState.errors);
-      console.log("Form values:", form.getValues());
-      console.log("Selected locations:", selectedLocations);
-
-      // Fix for locations issue - if locations are selected but form validation fails
-      if (selectedLocations.length > 0 && form.formState.errors.locations) {
-        // Force update the locations value to ensure it's properly registered
-        form.setValue("locations", selectedLocations, { shouldValidate: true });
-
-        // If locations is the only remaining error, and we have selected locations,
-        // we should bypass this validation error
-        if (
-          Object.keys(form.formState.errors).length === 1 &&
-          form.formState.errors.locations
-        ) {
-          // Continue to submission
-          const updatedData = {
-            ...form.getValues(),
-            photo_url: images[0] || null,
-            // Remove + from country code when submitting
-            phone: `${selectedCountry.code.replace("+", "")}${
-              form.getValues().phone
-            }`,
-          };
-
-          onSubmit(updatedData);
-          return;
-        }
-      }
-
-      // Determine which sections have errors
-      const errorSections = checkSectionsWithErrors();
-      console.log("Error sections:", errorSections);
-      setSectionsWithErrors(errorSections);
-
-      // If there are errors but we're not on an error section, navigate to the first error section
-      if (errorSections.length > 0 && !errorSections.includes(activeSection)) {
-        setActiveSection(errorSections[0]);
-      }
-
-      // Show a toast notification
-      toast.error("Please fill in all required fields before continuing");
-      return;
-    }
-
-    const phoneExists = await checkPhoneExists(data.phone);
-    if (phoneExists) {
-      // Set the error section to profile since phone is in that section
-      setSectionsWithErrors(["profile"]);
-      setActiveSection("profile");
-      return;
-    }
-
-    const updatedData = {
+    
+    setUserTriggeredSubmit(false); // Reset for next submission
+    
+    // Add the selected country code to the phone number
+    const phoneWithCountryCode = selectedCountry.code + data.phone.replace(/^\+/, "");
+    
+    // Prepare the final data
+    const finalData = {
       ...data,
-      photo_url: images[0] || null,
-      // Remove + from country code when submitting
-      phone: `${selectedCountry.code.replace("+", "")}${data.phone}`,
+      phone: phoneWithCountryCode.replace(/^\+/, ""), // Remove the plus sign as needed
     };
-
-    onSubmit(updatedData);
+    
+    // Pass the data to the parent component
+    onSubmit(finalData);
   };
   const handleLocationChange = (locationId: string) => {
     setSelectedLocations((prev) => {
@@ -616,6 +545,9 @@ export function StaffNewLayout({
 
   // This function handles section changes with controlled scrolling
   const handleSectionChange = (sectionId: string) => {
+    // Mark as navigating between sections to prevent auto-submission
+    setIsFormInitializing(true);
+    
     // First update the active section state
     setActiveSection(sectionId);
 
@@ -628,7 +560,18 @@ export function StaffNewLayout({
         }
       });
     }
+    
+    // After a short delay, allow form submission again
+    setTimeout(() => {
+      setIsFormInitializing(false);
+    }, 300);
   };
+
+  // Add this function
+  const handleButtonSubmit = (e: React.MouseEvent) => {
+    setUserTriggeredSubmit(true);
+  };
+
   return (
     <Form {...form}>
       <form

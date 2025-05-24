@@ -21,7 +21,7 @@ export function StaffSideNav({
   activeSection, 
   onSectionChange,
   sectionsWithErrors = [],
-}: StaffSideNavProps) {  // No need for custom styling since we use Tailwind classes directly
+}: StaffSideNavProps) {
   const navItems: NavItem[] = [
     {
       title: "Personal",
@@ -43,7 +43,7 @@ export function StaffSideNav({
       ],
     },
   ];
-  
+
   return (
     <div className="w-[280px] border border-gray-200 h-full overflow-y-auto flex-shrink-0 relative">
       {navItems.map((item) => (
@@ -66,7 +66,9 @@ export function StaffSideNav({
                       ? "bg-gray-100 text-gray-800 font-medium"
                       : "text-gray-700 hover:bg-gray-50"
                   }`}
-                  onClick={() => onSectionChange(section.id)}
+                  onClick={() => {
+                    onSectionChange(section.id);
+                  }}
                 >
                   <div className="flex items-center justify-between w-full h-6">
                     <span>{section.name}</span>

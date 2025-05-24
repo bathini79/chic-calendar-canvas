@@ -241,75 +241,80 @@ export function CommissionsSection({
       : form.watch("global_commission_percentage") || 0;
   };
 
-  // Handle changing commission for a service
-  const handleServiceCommissionChange = (
-    serviceId: string,
-    percentage: number
-  ) => {
-    // Update service commissions
-    setServiceCommissions((prev) => {
-      const existing = prev.findIndex((sc) => sc.service_id === serviceId);
-      const updated = [...prev];
+  // Track if initial data load is in progress to prevent auto-update
+  const [isInitializing, setIsInitializing] = useState(true);
+  // Track if form is considered "dirty" (user has made changes)
+  const [isDirty, setIsDirty] = useState(false);
 
-      if (existing >= 0) {
-        updated[existing] = { ...updated[existing], percentage };
-      } else {
-        updated.push({
-          service_id: serviceId,
-          employee_id: employeeId,
-          percentage,
-        });
-      }
-
-      // Update form data
-      const serviceCommissionsMap: { [key: string]: number } = {};
-      updated.forEach((sc) => {
-        serviceCommissionsMap[sc.service_id] = sc.percentage;
-      });
-      form.setValue("service_commissions", serviceCommissionsMap);
-
-      return updated;
-    });
-  }; // Fetch employee's commission data if editing
+  // Prevent auto-submission after initialization
+  useEffect(() => {
+    if (isInitializing) return;
+    
+    // Mark all setValue operations as programmatic when in initial load
+    form.control._formState.isSubmitted = false;
+    
+    // Example: If you have a useEffect that triggers update on form value change, add this guard:
+    // if (isInitializing) return;
+    // ...update logic here...
+  }, [isInitializing]);
+  
+  // Fetch employee's commission data if editing
   const fetchEmployeeCommissions = async () => {
     if (employeeId) {
       try {
         setIsLoading(true);
+        setIsInitializing(true); // Mark as initializing
 
-        // First, fetch the employee's basic commission settings
-        const { data: employeeData, error: employeeError } = await supabase
+        // 1. Fetch service_commission_enabled from employees table
+        const { data: employeeRow, error: employeeRowError } = await supabase
           .from("employees")
-          .select("commission_type")
+          .select("service_commission_enabled")
           .eq("id", employeeId)
           .single();
-
-        if (employeeError) {
-          console.error(
-            "Error fetching employee commission settings:",
-            employeeError
-          );
-          // Fall back to default settings
-          setSlabs([
-            {
-              id: "1",
-              min_amount: 0,
-              max_amount: 999999999,
-              percentage: 10,
-              order: 1,
-            },
-          ]);
-          return;
+        if (employeeRowError) {
+          console.error("Error fetching employee row:", employeeRowError);
+        } else if (employeeRow) {
+          // Use silent mode to prevent triggering validation/submission
+          form.setValue("service_commission_enabled", employeeRow.service_commission_enabled ?? false, { 
+            shouldDirty: false,
+            shouldTouch: false,
+            shouldValidate: false,
+          });
         }
 
-        // Update the form with the employee's commission type
-        if (employeeData.commission_type) {
-          form.setValue("commission_type", employeeData.commission_type);
+        // 2. Fetch commission_type and global_commission_percentage from employee_commission_settings
+        let commissionType = undefined;
+        let globalCommissionPercentage = undefined;
+        try {
+          const { data: settings, error: settingsError } = await supabase
+            .from("employee_commission_settings")
+            .select("commission_type, global_commission_percentage")
+            .eq("employee_id", employeeId)
+            .single();
+          if (settingsError) {
+            console.error("Error fetching employee commission settings:", settingsError);
+          } else if (settings) {
+            commissionType = settings.commission_type;
+            globalCommissionPercentage = settings.global_commission_percentage;
+            if (commissionType) form.setValue("commission_type", commissionType, { 
+              shouldDirty: false,
+              shouldTouch: false,
+              shouldValidate: false,
+            });
+            if (globalCommissionPercentage !== undefined && globalCommissionPercentage !== null) {
+              form.setValue("global_commission_percentage", globalCommissionPercentage, { 
+                shouldDirty: false,
+                shouldTouch: false,
+                shouldValidate: false,
+              });
+            }
+          }
+        } catch (err) {
+          console.error("employee_commission_settings table not available or error in query", err);
         }
 
-        // If using a template, fetch and apply the template
-
-        // For tiered commission without a template, fetch the employee's slabs
-        else if (employeeData.commission_type === "tiered") {
+        // 3. Fetch commission rules based on commission_type
+        if (commissionType === "tiered") {
           const { data: slabsData, error: slabsError } = await supabase
             .from("tiered_commission_slabs")
             .select("*")
@@ -323,7 +328,7 @@ export function CommissionsSection({
               {
                 id: "1",
                 min_amount: 0,
-                max_amount: 999999999,
+                max_amount: 5000,
                 percentage: 10,
                 order: 1,
               },
@@ -344,15 +349,13 @@ export function CommissionsSection({
               {
                 id: "1",
                 min_amount: 0,
-                max_amount: 999999999,
+                max_amount: 5000,
                 percentage: 10,
                 order: 1,
               },
             ]);
           }
-        }
-        // For flat commission, fetch service-specific commissions
-        else if (employeeData.commission_type === "flat") {
+        } else if (commissionType === "flat") {
           const { data: rulesData, error: rulesError } = await supabase
             .from("flat_commission_rules")
             .select("*")
@@ -376,7 +379,11 @@ export function CommissionsSection({
               serviceCommissionsMap[sc.service_id] = sc.percentage;
             });
 
-            form.setValue("service_commissions", serviceCommissionsMap);
+            form.setValue("service_commissions", serviceCommissionsMap, {
+              shouldDirty: false,
+              shouldTouch: false,
+              shouldValidate: false,
+            });
           }
         }
       } catch (error) {
@@ -386,13 +393,14 @@ export function CommissionsSection({
           {
             id: "1",
             min_amount: 0,
-            max_amount: 999999999,
+            max_amount: 5000,
             percentage: 10,
             order: 1,
           },
         ]);
       } finally {
         setIsLoading(false);
+        setIsInitializing(false); // Done initializing
       }
     }
   };
@@ -510,12 +518,17 @@ export function CommissionsSection({
     } else {
       // Default slabs for new employee - starting with a single basic slab
       setSlabs([
-        { min_amount: 0, max_amount: 999999999, percentage: 10, order: 1 },
+        { min_amount: 0, max_amount: 5000, percentage: 10, order: 1 },
       ]);
+      setIsInitializing(false);
     }
 
     if (!form.getValues("commission_type")) {
-      form.setValue("commission_type", "tiered");
+      form.setValue("commission_type", "tiered", {
+        shouldDirty: false,
+        shouldTouch: false,
+        shouldValidate: false,
+      });
     }
   }, [employeeId]);
 

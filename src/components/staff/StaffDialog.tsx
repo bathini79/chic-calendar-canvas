@@ -7,7 +7,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import React,{ useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { LoaderCircle, ArrowLeft, AlertCircle, X } from "lucide-react";
 import {
@@ -38,7 +38,9 @@ export function StaffDialog({
   const [tempEmployeeData, setTempEmployeeData] = useState<any>(null);
   const [canResendOtp, setCanResendOtp] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(30);
+  const [activeSection, setActiveSection] = useState("profile");
   const queryClient = useQueryClient();
+  const navClickRef = useRef(false);
   
   // Auto-submit when verification code is completely filled
   useEffect(() => {
@@ -136,19 +138,29 @@ export function StaffDialog({
           status: data.status,
           employment_type_id: data.employment_type_id,
         };        // Add commission fields if provided
-        if (data.commission_type) {
-          employeeUpdatePayload.commission_type = data.commission_type;
-        }
-        
+        // (commission_type and global_commission_percentage now handled in employee_commission_settings)
         // Add service commission toggle state
         employeeUpdatePayload.service_commission_enabled = !!data.service_commission_enabled;
-        
+        // Remove commission_type from employeeUpdatePayload (handled in settings)
+        // Update employee row
         const { error } = await supabase
           .from("employees")
           .update(employeeUpdatePayload)
           .eq("id", employeeId);
 
         if (error) throw error;
+
+        // Upsert commission settings (new table)
+        if (data.commission_type || data.global_commission_percentage !== undefined) {
+          const { error: commissionSettingsError } = await supabase
+            .from("employee_commission_settings")
+            .upsert({
+              employee_id: employeeId,
+              commission_type: data.commission_type,
+              global_commission_percentage: data.global_commission_percentage,
+            }, { onConflict: ["employee_id"] });
+          if (commissionSettingsError) throw commissionSettingsError;
+        }
 
         // Delete existing skills
         const { error: skillsDeleteError } = await supabase
@@ -486,6 +498,11 @@ export function StaffDialog({
     }
   }, [open]);
   
+  // Only keep the section change handler without the effect
+  const handleSectionChange = (sectionId) => {
+    setActiveSection(sectionId);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -720,6 +737,8 @@ export function StaffDialog({
               isSubmitting={isLoading}
               use2FactorVerification={!employeeId}
               isMobile={isMobile}
+              activeSection={activeSection}
+              onSectionChange={handleSectionChange}
             />
           </div>
         )}
