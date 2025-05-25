@@ -7,7 +7,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import React,{ useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { LoaderCircle, ArrowLeft, AlertCircle, X } from "lucide-react";
 import {
@@ -28,23 +28,34 @@ export function StaffDialog({
   open,
   onOpenChange,
   employeeId,
+  onButtonSubmit,
 }: StaffDialogProps) {
   const isMobile = useIsMobile();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [verificationError, setVerificationError] = useState<string | null>(null);
-  const [verificationStep, setVerificationStep] = useState<"form" | "otp" | "done">("form");
+  const [verificationError, setVerificationError] = useState<string | null>(
+    null
+  );
+  const formRef = useRef<any>(null);
+  const [verificationStep, setVerificationStep] = useState<
+    "form" | "otp" | "done"
+  >("form");
   const [verificationCode, setVerificationCode] = useState("");
   const [tempEmployeeData, setTempEmployeeData] = useState<any>(null);
   const [canResendOtp, setCanResendOtp] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(30);
-  const [activeSection, setActiveSection] = useState("profile");
   const queryClient = useQueryClient();
-  const navClickRef = useRef(false);
-  
+
+  const [lastSubmitTimestamp, setLastSubmitTimestamp] = useState(0);
+  const SUBMIT_DEBOUNCE_MS = 1000; // 1 second debounce
+
   // Auto-submit when verification code is completely filled
   useEffect(() => {
-    if (verificationCode.length === 6 && verificationStep === "otp" && !isLoading) {
+    if (
+      verificationCode.length === 6 &&
+      verificationStep === "otp" &&
+      !isLoading
+    ) {
       // Small delay to allow user to see the full code before submitting
       const timer = setTimeout(handleVerifyOTP, 300);
       return () => clearTimeout(timer);
@@ -61,6 +72,24 @@ export function StaffDialog({
       setTempEmployeeData(null);
       setCanResendOtp(false);
       setResendCountdown(0);
+    }
+  }, [open]);
+
+  // Reset form state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      if (formRef.current) {
+        formRef.current.reset();
+      }
+      setIsLoading(false);
+      setError(null);
+      setVerificationError(null);
+      setVerificationStep("form");
+      setVerificationCode("");
+      setTempEmployeeData(null);
+      setCanResendOtp(false);
+      setResendCountdown(0);
+      setLastSubmitTimestamp(0);
     }
   }, [open]);
 
@@ -101,11 +130,13 @@ export function StaffDialog({
         if (!employeeId) return null;
         const { data, error } = await supabase
           .from("employees")
-          .select(`
+          .select(
+            `
             *,
             employee_skills(service_id),
             employee_locations(location_id)
-          `)
+          `
+          )
           .eq("id", employeeId)
           .single();
 
@@ -119,153 +150,166 @@ export function StaffDialog({
     },
     enabled: !!employeeId && open,
   });
-
   const handleFormSubmit = async (data: any) => {
+    // Add debouncing to prevent rapid re-submissions
+    const now = Date.now();
+    if (now - lastSubmitTimestamp < SUBMIT_DEBOUNCE_MS) {
+      console.log("Form submission prevented - too soon after last submission");
+      return;
+    }
+
+    // Prevent multiple submissions
+    if (isLoading) {
+      console.log("Form submission prevented - already submitting");
+      return;
+    }
+
+    console.log("Submitting staff form with data:", data);
+
     try {
+      setLastSubmitTimestamp(now);
       setIsLoading(true);
+      setError(null);
 
       // If editing existing employee
       if (employeeId) {
         // Make sure phone doesn't contain + prefix
         const phone = data.phone.replace(/^\+/, "");
 
-        // Create the employee update payload
-        const employeeUpdatePayload: any = {
-          name: data.name,
-          email: data.email || `${phone.replace(/\D/g, "")}@staff.internal`, // Ensure email is never null
-          phone: phone,
-          photo_url: data.photo_url,
-          status: data.status,
-          employment_type_id: data.employment_type_id,
-        };        // Add commission fields if provided
-        // (commission_type and global_commission_percentage now handled in employee_commission_settings)
-        // Add service commission toggle state
-        employeeUpdatePayload.service_commission_enabled = !!data.service_commission_enabled;
-        // Remove commission_type from employeeUpdatePayload (handled in settings)
-        // Update employee row
-        const { error } = await supabase
+        // Update employee base data
+        const { error: updateError } = await supabase
           .from("employees")
-          .update(employeeUpdatePayload)
+          .update({
+            name: data.name,
+            email: data.email || `${phone.replace(/\D/g, "")}@staff.internal`,
+            phone: phone,
+            photo_url: data.photo_url,
+            status: data.status,
+            employment_type_id: data.employment_type_id,
+            service_commission_enabled: !!data.service_commission_enabled,
+          })
           .eq("id", employeeId);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
 
-        // Upsert commission settings (new table)
-        if (data.commission_type || data.global_commission_percentage !== undefined) {
-          const { error: commissionSettingsError } = await supabase
-            .from("employee_commission_settings")
-            .upsert({
-              employee_id: employeeId,
-              commission_type: data.commission_type,
-              global_commission_percentage: data.global_commission_percentage,
-            }, { onConflict: ["employee_id"] });
-          if (commissionSettingsError) throw commissionSettingsError;
-        }
+        // Clear existing relations
+        await Promise.all([
+          supabase
+            .from("employee_skills")
+            .delete()
+            .eq("employee_id", employeeId),
+          supabase
+            .from("employee_locations")
+            .delete()
+            .eq("employee_id", employeeId),
+        ]);
 
-        // Delete existing skills
-        const { error: skillsDeleteError } = await supabase
-          .from("employee_skills")
-          .delete()
-          .eq("employee_id", employeeId);
-
-        if (skillsDeleteError) throw skillsDeleteError;
-
-        // Delete existing location assignments
-        const { error: locationsDeleteError } = await supabase
-          .from("employee_locations")
-          .delete()
-          .eq("employee_id", employeeId);
-
-        if (locationsDeleteError) throw locationsDeleteError;
-
-        // Insert skills
-        if (data.skills.length > 0) {
-          const skillsToInsert = data.skills.map((skillId: string) => ({
+        if (data.skills?.length > 0) {
+          const skillsToInsert = data.skills.map((serviceId: string) => ({
             employee_id: employeeId,
-            service_id: skillId,
+            service_id: serviceId,
           }));
 
-          const { error: skillsInsertError } = await supabase
+          const { error: skillsError } = await supabase
             .from("employee_skills")
             .insert(skillsToInsert);
 
-          if (skillsInsertError) throw skillsInsertError;
+          if (skillsError) throw skillsError;
         }
 
-        // Insert location assignments
-        if (data.locations.length > 0) {
+        if (data.locations?.length > 0) {
           const locationsToInsert = data.locations.map((locationId: string) => ({
             employee_id: employeeId,
             location_id: locationId,
           }));
 
-          const { error: locationsInsertError } = await supabase
+          const { error: locationsError } = await supabase
             .from("employee_locations")
             .insert(locationsToInsert);
+
+          if (locationsError) throw locationsError;
+        }        // Handle compensation data
+        if (data.compensation) {
+          // First delete any existing compensation records
+          const { error: deleteCompError } = await supabase
+            .from('employee_compensation_settings')
+            .delete()
+            .eq('employee_id', employeeId);
             
-          if (locationsInsertError) throw locationsInsertError;
-        }
+          if (deleteCompError) throw deleteCompError;
 
-        // Handle flat commission type with no template
-        if (data.commission_type === 'flat'  && data.service_commissions) {
-          // Delete existing flat commission rules first 
-          await supabase.rpc('commission_delete_all_for_employee', { 
-            employee_id_param: employeeId 
-          });
-          
-          // Format and save flat commission rules
-          if (Object.keys(data.service_commissions).length > 0) {
-            const flatRules = Object.entries(data.service_commissions).map(([serviceId, percentage]) => ({
-              service_id: serviceId,
-              percentage: percentage
-            }));
-
-            const { error: flatError } = await supabase.rpc('commission_save_flat_rules', { 
-              employee_id_param: employeeId,
-              rules_json: flatRules
+          // Insert new compensation record
+          const { error: compError } = await supabase
+            .from('employee_compensation_settings')
+            .insert({
+              employee_id: employeeId,
+              base_amount: data.compensation.monthly_salary,
+              effective_from: data.compensation.effective_from,
+              effective_to: null // No end date for now
             });
 
-            if (flatError) throw flatError;
-          }
+          if (compError) throw compError;
         }
-          
-        // Handle tiered commission type with no template
-        if (data.commission_type === 'tiered'  && data.commission_slabs) {
-          // Delete is already handled by the function above
-          
-          // Format and save tiered slabs
-          if (data.commission_slabs && data.commission_slabs.length > 0) {
-            const tieredSlabs = data.commission_slabs.map((slab: any, index: number) => ({
-              min_amount: slab.min_amount,
-              max_amount: slab.max_amount,
-              percentage: slab.percentage,
-              order_index: index + 1
-            }));
-              
-            const { error: tieredError } = await supabase.rpc('commission_save_tiered_slabs', { 
-              employee_id_param: employeeId,
-              slabs_json: tieredSlabs
-            });
-                  
-            if (tieredError) throw tieredError;
+
+        // Handle commission data
+        if (data.service_commission_enabled) {
+          if (data.commission_type === "flat" && data.service_commissions) {
+            // For flat commission rules, use commission service functions
+            const { data: saveData, error: saveError } =
+              await supabase.functions.invoke("save-commission-rules", {
+                body: {
+                  employeeId,
+                  rules: Object.entries(data.service_commissions).map(
+                    ([serviceId, percentage]) => ({
+                      service_id: serviceId,
+                      percentage: percentage,
+                    })
+                  ),
+                },
+              });
+
+            if (saveError) throw saveError;
+            if (!saveData?.success)
+              throw new Error("Failed to save commission rules");
+          } else if (
+            data.commission_type === "tiered" &&
+            data.commission_slabs
+          ) {
+            // For tiered commission slabs, use commission service functions
+            const { data: saveData, error: saveError } =
+              await supabase.functions.invoke("save-commission-slabs", {
+                body: {
+                  employeeId,
+                  slabs: data.commission_slabs.map(
+                    (slab: any, index: number) => ({
+                      min_amount: slab.min_amount,
+                      max_amount: slab.max_amount,
+                      percentage: slab.percentage,
+                      order_index: index + 1,
+                    })
+                  ),
+                },
+              });
+
+            if (saveError) throw saveError;
+            if (!saveData?.success)
+              throw new Error("Failed to save commission slabs");
           }
         }
 
         toast.success("Staff member updated successfully");
-        // Invalidate all queries related to employees to ensure complete refresh
         queryClient.invalidateQueries({
           queryKey: ["employees-with-locations"],
         });
         queryClient.invalidateQueries({ queryKey: ["employees"] });
         queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
 
-        // Allow some time for data to update before closing the dialog
+        // Close dialog after a short delay
         setTimeout(() => {
           onOpenChange(false);
-        }, 300);
-      }
-      // Creating new employee - first create temporary record and send OTP
-      else {
+        }, 500);
+      } else {
+        // Creating new employee - first create temporary record and send OTP
         // Get the current window location to create the verification link
         const baseUrl = window.location.origin;
 
@@ -476,7 +520,7 @@ export function StaffDialog({
   if (error && open) {
     toast.error(`There was an error: ${error.message}`);
   }
-  
+
   // Use effect to prevent scrolling of background content when dialog is open
   useEffect(() => {
     if (open) {
@@ -497,57 +541,76 @@ export function StaffDialog({
       };
     }
   }, [open]);
-  
-  // Only keep the section change handler without the effect
-  const handleSectionChange = (sectionId) => {
-    setActiveSection(sectionId);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        // Only allow closing if we're not in a loading state and not in middle of verification
+        if (!isLoading && verificationStep !== "otp") {
+          // Reset form when dialog is closed
+          if (!isOpen) {
+            setVerificationStep("form");
+            setVerificationCode("");
+            setError(null);
+            setTempEmployeeData(null);
+          }
+          onOpenChange(isOpen);
+        }
+      }}
+    >
       <DialogContent
         className={`!top-auto !bottom-0 left-1/2 translate-x-[-50%] !translate-y-0 w-[98vw] max-w-none border shadow-xl rounded-t-2xl !rounded-b-none overflow-hidden flex flex-col
-          ${isMobile 
-            ? 'h-[95vh] pt-[0.5%] px-[1.5%]' 
-            : 'h-[98vh] pt-[3%] pl-[10%] pr-[10%]'
+          ${
+            isMobile
+              ? "h-[95vh] pt-[0.5%] px-[1.5%]"
+              : "h-[98vh] pt-[3%] pl-[10%] pr-[10%]"
           }`}
       >
         {verificationStep === "form" && (
           <div className="flex justify-end mt-0 mb-0 mr-0 gap-3 absolute top-2 right-2 z-10">
+            {" "}
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
-              className={`whitespace-nowrap ${isMobile ? 'p-1.5 h-auto w-auto border-none shadow-none bg-transparent hover:bg-transparent' : ''}`}
-              form="staff-form"
+              className={`whitespace-nowrap ${
+                isMobile
+                  ? "p-1.5 h-auto w-auto border-none shadow-none bg-transparent hover:bg-transparent"
+                  : ""
+              }`}
             >
-              {isMobile ? <X size={20} strokeWidth={2.5} className="text-gray-600" /> : "Close"}
-            </Button>
-            {!isMobile && (
-              <Button
-                type="submit"
-                disabled={isLoading}
+              {isMobile ? (
+                <X size={20} strokeWidth={2.5} className="text-gray-600" />
+              ) : (
+                "Close"
+              )}
+            </Button>{" "}
+            {!isMobile && (              <Button 
+                disabled={isLoading} 
+                onClick={() => formRef.current?.submit()}
                 className="whitespace-nowrap"
-                form="staff-form"
               >
-                {isLoading && (
-                  <LoaderCircle
-                    className="animate-spin mr-2"
-                    size={16}
-                    strokeWidth={2}
-                    aria-hidden="true"
-                  />
-                )}
+                {isLoading ? (
+                  <LoaderCircle className="mr-2 size={16}" strokeWidth={2} />
+                ) : null}
                 {employeeId ? "Update" : "Add"}
               </Button>
             )}
           </div>
         )}
-        
-        <DialogHeader className={`flex justify-between items-start ${isMobile ? 'text-left mt-3' : ''}`}>
-          <div className={isMobile ? 'w-full text-left' : ''}>
-            <DialogTitle className={`!text-[1.75rem] font-semibold ${isMobile ? 'text-left' : ''}`}>
+
+        <DialogHeader
+          className={`flex justify-between items-start ${
+            isMobile ? "text-left mt-3" : ""
+          }`}
+        >
+          <div className={isMobile ? "w-full text-left" : ""}>
+            <DialogTitle
+              className={`!text-[1.75rem] font-semibold ${
+                isMobile ? "text-left" : ""
+              }`}
+            >
               {employeeId
                 ? "Edit Staff Member"
                 : verificationStep === "otp"
@@ -558,15 +621,13 @@ export function StaffDialog({
             </DialogTitle>
           </div>
         </DialogHeader>
-        
+
         {/* Sticky footer for mobile */}
         {isMobile && verificationStep === "form" && (
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-50 flex justify-end gap-3">
-            <Button
-              type="submit"
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-50 flex justify-end gap-3">            <Button
+              onClick={() => formRef.current?.submit()}
               disabled={isLoading}
               className="whitespace-nowrap px-6 flex-1"
-              form="staff-form"
             >
               {isLoading && (
                 <LoaderCircle
@@ -580,7 +641,7 @@ export function StaffDialog({
             </Button>
           </div>
         )}
-        
+
         {error ? (
           <div className="py-4 text-center">
             <p className="text-destructive">Error: {error.message}</p>
@@ -728,7 +789,8 @@ export function StaffDialog({
             </p>
           </div>
         ) : (
-          <div className={`flex-1 overflow-hidden ${isMobile ? 'pb-20' : ''}`}>
+          <div className={`flex-1 overflow-hidden ${isMobile ? "pb-20" : ""}`}>
+            {" "}
             <StaffNewLayout
               onSubmit={handleFormSubmit}
               onCancel={() => onOpenChange(false)}
@@ -737,8 +799,7 @@ export function StaffDialog({
               isSubmitting={isLoading}
               use2FactorVerification={!employeeId}
               isMobile={isMobile}
-              activeSection={activeSection}
-              onSectionChange={handleSectionChange}
+              formRef={formRef}
             />
           </div>
         )}

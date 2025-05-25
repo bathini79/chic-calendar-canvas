@@ -4,6 +4,7 @@ import { ProfileSection } from "./sections/ProfileSection";
 import { LocationsSection } from "./sections/LocationsSection";
 import { ServicesSection } from "./sections/ServicesSection";
 import { CommissionsSection } from "./sections/CommissionsSection";
+import { CompensationSettings } from "./pay/CompensationSettings";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -14,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { countryCodes, parsePhoneNumber } from "@/lib/country-codes";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 // Define the form schema
 const formSchema = z.object({
@@ -29,16 +31,29 @@ const formSchema = z.object({
   status: z.enum(["active", "inactive"]).default("active"),
   employment_type_id: z.string().min(1, "Employment type is required"),
   // Skills is conditionally required based on employment_type having perform_services permission
-  skills: z.array(z.string()).optional().default([]),  locations: z.array(z.string()).min(1, "At least one location is required"),  
-  
+  skills: z.array(z.string()).optional().default([]),
+  locations: z.array(z.string()).min(1, "At least one location is required"),
   // Commission fields
   service_commission_enabled: z.boolean().default(false),
-  commission_type: z.enum(["flat", "tiered" , "template"]).optional(),
+  commission_type: z.enum(["flat", "tiered", "template"]).optional(),
   service_commissions: z.record(z.string(), z.number()).optional(),
   global_commission_percentage: z.number().min(0).max(100).optional(),
+
+  // Compensation fields
+  compensation: z
+    .object({
+      monthly_salary: z.number().min(0, "Salary must be greater than 0"),
+      effective_from: z.date(),
+    })
+    .optional(),
 });
 
 type StaffFormData = z.infer<typeof formSchema>;
+
+interface FormRef {
+  submit: () => Promise<void>;
+  // Add any other form methods that might be needed
+}
 
 interface StaffNewLayoutProps {
   initialData?: any;
@@ -48,6 +63,7 @@ interface StaffNewLayoutProps {
   isSubmitting?: boolean;
   use2FactorVerification?: boolean;
   isMobile?: boolean;
+  formRef?: React.MutableRefObject<FormRef>;
 }
 
 export function StaffNewLayout({
@@ -58,7 +74,8 @@ export function StaffNewLayout({
   isSubmitting = false,
   use2FactorVerification = false,
   isMobile = false,
-}: StaffNewLayoutProps) {
+  formRef,
+}: StaffNewLayoutProps & { formRef?: React.MutableRefObject<any> }) {
   const [activeSection, setActiveSection] = useState("profile");
   const [images, setImages] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
@@ -67,18 +84,17 @@ export function StaffNewLayout({
   const [sectionsWithErrors, setSectionsWithErrors] = useState<string[]>([]);
   const [errorCounts, setErrorCounts] = useState<Record<string, number>>({});
   const [isServicesRequired, setIsServicesRequired] = useState(false);
-  // Add initialization state to prevent auto-submission
-  const [isFormInitializing, setIsFormInitializing] = useState(true);
-  const [userTriggeredSubmit, setUserTriggeredSubmit] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<{
     name: string;
     code: string;
-    flag: string;  }>({
+    flag: string;
+  }>({
     name: "India",
     code: "+91",
     flag: "🇮🇳",
   });
-  
+  const [isFormSubmitting, setIsFormSubmitting] = useState(false);
+
   const form = useForm<StaffFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -92,6 +108,13 @@ export function StaffNewLayout({
       locations: [],
     },
   });
+
+  // Expose form methods through ref
+  React.useEffect(() => {
+    if (formRef) {
+      formRef.current = form;
+    }
+  }, [formRef, form]);
 
   const { data: locations } = useQuery({
     queryKey: ["locations"],
@@ -126,17 +149,14 @@ export function StaffNewLayout({
       }
     },
   });
-
   useEffect(() => {
     if (initialData) {
-      setIsFormInitializing(true);
-      
       // Parse the phone number to get country code and local number separately
       const phoneWithPlus = initialData.phone?.startsWith("+")
         ? initialData.phone
         : "+" + initialData.phone;
       const { countryCode, phoneNumber } = parsePhoneNumber(phoneWithPlus);
-        form.reset({
+      form.reset({
         name: initialData.name || "",
         email: initialData.email || "",
         phone: phoneNumber, // Just the local part without country code
@@ -147,7 +167,8 @@ export function StaffNewLayout({
           initialData.employee_skills?.map((s: any) => s.service_id) || [],
         locations:
           initialData.employee_locations?.map((l: any) => l.location_id) || [],
-        service_commission_enabled: initialData.service_commission_enabled || false,
+        service_commission_enabled:
+          initialData.service_commission_enabled || false,
         commission_type: initialData.commission_type,
       });
 
@@ -181,7 +202,9 @@ export function StaffNewLayout({
     }
   }, [selectedLocations, form]);
   useEffect(() => {
-    form.setValue("skills", selectedSkills);
+    if (!form.formState.isSubmitting) {
+      form.setValue("skills", selectedSkills, { shouldTouch: false });
+    }
   }, [selectedSkills, form]);
 
   // Update the sections with errors whenever form state changes
@@ -292,12 +315,13 @@ export function StaffNewLayout({
       return false;
     } catch (error) {
       console.error("Error checking phone existence:", error);
-      return false;    } finally {
+      return false;
+    } finally {
       setIsPhoneCheckLoading(false);
     }
-  }; 
-  
-  // Helper function to check which sections have validation errors and count them  
+  };
+
+  // Helper function to check which sections have validation errors and count them
   const checkSectionsWithErrors = () => {
     const errors = form.formState.errors;
     const errorSections: string[] = [];
@@ -323,11 +347,11 @@ export function StaffNewLayout({
     if (errors.locations) {
       errorSections.push("locations");
       counts["locations"] = 1; // For array fields, we count it as 1 error
-    }    // Commission section errors
+    } // Commission section errors
     let commissionErrorCount = 0;
     if (errors.global_commission_percentage) commissionErrorCount++;
     if (errors.service_commissions) commissionErrorCount++;
-    
+
     if (commissionErrorCount > 0) {
       errorSections.push("commissions");
       counts["commissions"] = commissionErrorCount;
@@ -344,70 +368,74 @@ export function StaffNewLayout({
     setErrorCounts(counts);
 
     return errorSections;
-  };
-  // Handle form submission
-  const handleFormSubmit = (data: StaffFormData) => {
-    // Prevent form submission during initialization or section changes
-    // Only process submission if user explicitly clicked the submit button
-    if (isFormInitializing && !userTriggeredSubmit) {
-      console.log("Preventing auto-submission during initialization or section change");
-      return;
-    }
-    
-    setUserTriggeredSubmit(false); // Reset for next submission
-    
-    // Add the selected country code to the phone number
-    const phoneWithCountryCode = selectedCountry.code + data.phone.replace(/^\+/, "");
-    
-    // Prepare the final data
-    const finalData = {
-      ...data,
-      phone: phoneWithCountryCode.replace(/^\+/, ""), // Remove the plus sign as needed
-    };
-    
-    // Pass the data to the parent component
-    onSubmit(finalData);
-  };
-  const handleLocationChange = (locationId: string) => {
-    setSelectedLocations((prev) => {
-      const newLocations = prev.includes(locationId)
-        ? prev.filter((id) => id !== locationId)
-        : [...prev, locationId];
-
-      // Update form state and trigger validation
-      form.setValue("locations", newLocations, { shouldValidate: true });
-
-      // If locations are selected, clear any location errors directly
-      if (newLocations.length > 0) {
-        form.clearErrors("locations");
-
-        // Clear locations section from sections with errors if it's there
-        setSectionsWithErrors((prev) =>
-          prev.filter((section) => section !== "locations")
-        );
+  }; // Handle form submission
+  const handleFormSubmit = React.useCallback(
+    async (data: StaffFormData) => {
+      if (isSubmitting || form.formState.isSubmitting) {
+        console.log("Form submission prevented - already submitting");
+        return;
       }
 
-      return newLocations;
-    });
-  };
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "");
-    form.setValue("phone", value);
+      try {
+        form.formState.isSubmitting = true;
 
-    // Clear error indicator when user starts typing
-    if (value.length >= 10 && sectionsWithErrors.includes("profile")) {
-      setSectionsWithErrors((prev) => prev.filter((s) => s !== "profile"));
+        // Format the phone number with country code, removing any leading + sign
+        const phoneWithCountryCode =
+          selectedCountry.code + data.phone.replace(/^\+/, "");
+
+        // Prepare the final data with formatted phone
+        const finalData = {
+          ...data,
+          phone: phoneWithCountryCode.replace(/^\+/, ""),
+        };
+
+        // Pass the data to the parent component
+        onSubmit(finalData);
+      } catch (error) {
+        console.error("Error in handleFormSubmit:", error);
+      }
+    },
+    [isSubmitting, form, onSubmit, selectedCountry]
+  );
+
+  const handleLocationChange = (locationId: string) => {
+    const newLocations = selectedLocations.includes(locationId)
+      ? selectedLocations.filter((id) => id !== locationId)
+      : [...selectedLocations, locationId];
+
+    // Batch all state updates together
+    const hasLocations = newLocations.length > 0;
+    setSelectedLocations(newLocations);
+
+    // Update form state
+    form.setValue("locations", newLocations, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+
+    if (hasLocations) {
+      form.clearErrors("locations");
+      setSectionsWithErrors((prev) =>
+        prev.filter((section) => section !== "locations")
+      );
     }
   };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Only keep digits
+    const value = e.target.value.replace(/\D/g, "");
+    form.setValue("phone", value);
+  };
+
   // Helper function to remove a section from the error sections list
   const clearSectionError = (sectionId: string) => {
     setSectionsWithErrors((prev) => prev.filter((s) => s !== sectionId));
     setErrorCounts((prev) => {
-      const newCounts = { ...prev };      delete newCounts[sectionId];
+      const newCounts = { ...prev };
+      delete newCounts[sectionId];
       return newCounts;
     });
   };
-  
   const renderActiveSection = () => {
     switch (activeSection) {
       case "profile":
@@ -421,7 +449,17 @@ export function StaffNewLayout({
             handlePhoneChange={handlePhoneChange}
             employmentTypes={employmentTypes || []}
             clearSectionError={clearSectionError}
-            isMobile={isMobile}          />
+            isMobile={isMobile}
+          />
+        );
+      case "compensation":
+        return (
+          <CompensationSettings
+            employeeId={employeeId || ""}
+            onCompensationChange={(data) => {
+              form.setValue("compensation", data);
+            }}
+          />
         );
       case "commissions":
         return (
@@ -466,7 +504,7 @@ export function StaffNewLayout({
           />
         );
     }
-  };  // Function to check if employment type has perform_services permission
+  }; // Function to check if employment type has perform_services permission
   const checkPerformServicesPermission = (employmentTypeId: string) => {
     if (!employmentTypeId || !employmentTypes) return false;
 
@@ -475,7 +513,9 @@ export function StaffNewLayout({
     );
     // Use optional chaining and type assertion to avoid TypeScript errors
     const permissions = (selectedType as any)?.permissions;
-    const hasPermission = permissions ? permissions.includes("perform_services") : false;
+    const hasPermission = permissions
+      ? permissions.includes("perform_services")
+      : false;
 
     console.log("Employment Type:", (selectedType as any)?.name);
     console.log("Permissions:", permissions);
@@ -529,9 +569,10 @@ export function StaffNewLayout({
       } else {
         form.clearErrors("skills");
       }
-    });    return () => subscription.unsubscribe();
+    });
+    return () => subscription.unsubscribe();
   }, [isServicesRequired]);
-  
+
   // Create refs for all section content elements so we can control them separately
   const contentRef = React.useRef<HTMLDivElement>(null);
   const sectionRefs = {
@@ -541,62 +582,129 @@ export function StaffNewLayout({
     locations: React.useRef<HTMLDivElement>(null),
     commissions: React.useRef<HTMLDivElement>(null),
     settings: React.useRef<HTMLDivElement>(null),
-  };
-
-  // This function handles section changes with controlled scrolling
+  }; // This function handles section changes with controlled scrolling
   const handleSectionChange = (sectionId: string) => {
-    // Mark as navigating between sections to prevent auto-submission
-    setIsFormInitializing(true);
-    
-    // First update the active section state
+    // Update the active section state
     setActiveSection(sectionId);
 
-    // Then ensure the scroll position is reset
+    // Reset scroll position
     if (contentRef.current) {
-      // Force immediate scroll to top
       window.requestAnimationFrame(() => {
         if (contentRef.current) {
           contentRef.current.scrollTop = 0;
         }
       });
     }
+  };
+
+  const handleSubmit = async (data: StaffFormData) => {
+    if (isSubmitting || isFormSubmitting) {
+      console.log("Form submission prevented - already submitting");
+      return;
+    }
+
+    setIsFormSubmitting(true);
+    try {
+      const phoneWithCountryCode =
+        selectedCountry.code + data.phone.replace(/^\+/, "");
+
+      const finalData = {
+        ...data,
+        phone: phoneWithCountryCode.replace(/^\+/, ""),
+      };
+
+      await onSubmit(finalData);
+    } catch (error) {
+      console.error("Form submission error:", error);
+      throw error;
+    } finally {
+      setIsFormSubmitting(false);
+    }
+  };
+  const handleButtonClick = async () => {
+    // Get form data without submitting the form
+    const data = form.getValues();
+    const isValid = await form.trigger(); // Validate all fields
     
-    // After a short delay, allow form submission again
-    setTimeout(() => {
-      setIsFormInitializing(false);
-    }, 300);
+    if (!isValid) {
+      // Show validation errors
+      const errorSections = checkSectionsWithErrors();
+      setSectionsWithErrors(errorSections);
+      return;
+    }
+
+    if (isSubmitting || isFormSubmitting) {
+      console.log('Form submission prevented - already submitting');
+      return;
+    }
+
+    setIsFormSubmitting(true);
+    try {
+      const phoneWithCountryCode = selectedCountry.code + data.phone.replace(/^\+/, "");
+      
+      const finalData = {
+        ...data,
+        phone: phoneWithCountryCode.replace(/^\+/, ""),
+      };
+
+      await onSubmit(finalData);
+    } catch (error) {
+      console.error('Form submission error:', error);
+      throw error;
+    } finally {
+      setIsFormSubmitting(false);
+    }
   };
 
-  // Add this function
-  const handleButtonSubmit = (e: React.MouseEvent) => {
-    setUserTriggeredSubmit(true);
-  };
-
+  // Store the handler in a ref so StaffDialog can access it
+  React.useEffect(() => {
+    if (formRef) {
+      formRef.current = {
+        ...form,
+        submit: handleButtonClick
+      };
+    }
+  }, [formRef, form, handleButtonClick]);
   return (
     <Form {...form}>
-      <form
+      <div
         id="staff-form"
-        onSubmit={form.handleSubmit(handleFormSubmit)}
-        className="h-full flex flex-col"
+        className={cn("space-y-6 h-full flex flex-col", {
+          "pb-20": isMobile,
+        })}
       >
-        <div className={`flex flex-1 overflow-hidden ${isMobile ? 'flex-col' : 'flex-row'}`}>
+        <div
+          className={`flex flex-1 overflow-hidden ${
+            isMobile ? "flex-col" : "flex-row"
+          }`}
+        >
           {isMobile ? (
             <div className="border-b border-gray-200 mb-4 overflow-x-auto">
               <div className="flex py-2 px-4 space-x-4">
-                {['profile', 'services', 'locations', 'commissions'].map((section) => (
+                {[
+                  "profile",
+                  "services",
+                  "locations",
+                  "commissions",
+                  "compensation",
+                ].map((section) => (
                   <button
                     key={section}
                     className={`px-3 py-2 text-sm whitespace-nowrap transition-colors rounded ${
                       activeSection === section
                         ? "bg-gray-100 text-gray-800 font-medium"
                         : "text-gray-700 hover:bg-gray-50"
-                    } ${sectionsWithErrors.includes(section) && !isMobile ? "border-red-500 border" : ""}`}
+                    } ${
+                      sectionsWithErrors.includes(section) && !isMobile
+                        ? "border-red-500 border"
+                        : ""
+                    }`}
                     onClick={() => handleSectionChange(section)}
                   >
                     {section.charAt(0).toUpperCase() + section.slice(1)}
-                    {sectionsWithErrors.includes(section) && 
+                    {sectionsWithErrors.includes(section) && (
                       <span className="ml-1 text-red-500">•</span>
-                    }
+                    )}
                   </button>
                 ))}
               </div>
@@ -605,25 +713,33 @@ export function StaffNewLayout({
             <StaffSideNav
               activeSection={activeSection}
               onSectionChange={handleSectionChange}
-              sectionsWithErrors={sectionsWithErrors}              errorCounts={errorCounts}
+              sectionsWithErrors={sectionsWithErrors}
+              errorCounts={errorCounts}
             />
           )}
           <div
             ref={contentRef}
             className="flex-1 overflow-y-auto h-full"
-            style={{ overflowAnchor: "none" }} /* Prevent browser auto-scrolling */
+            style={{
+              overflowAnchor: "none",
+            }} /* Prevent browser auto-scrolling */
           >
-            {renderActiveSection()}
-          </div>
+            {renderActiveSection()}          </div>
         </div>
-      </form>
+      </div>
     </Form>
   );
 }
 
+// Export FormRef type for parent component usage
+export type { FormRef };
+
 // Helper function to check if the selected employment type has perform_services permission
-function hasPerformServicesPermission(employmentTypeId: string, types: any[]): boolean {
+function hasPerformServicesPermission(
+  employmentTypeId: string,
+  types: any[]
+): boolean {
   if (!employmentTypeId || !types || types.length === 0) return false;
-  const employmentType = types.find(type => type.id === employmentTypeId);
+  const employmentType = types.find((type) => type.id === employmentTypeId);
   return employmentType?.permissions?.includes("perform_services") || false;
 }

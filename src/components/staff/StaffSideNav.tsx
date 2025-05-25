@@ -35,11 +35,11 @@ export function StaffSideNav({
         { id: "services", name: "Services" },
         { id: "locations", name: "Locations" },
       ],
-    },
-    {      
+    },    {      
       title: "Pay",
       sections: [
         { id: "commissions", name: "Commissions" },
+        { id: "compensation", name: "Compensation" },
       ],
     },
   ];
