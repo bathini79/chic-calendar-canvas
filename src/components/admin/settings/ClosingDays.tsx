@@ -406,17 +406,18 @@ export default function ClosingDays() {
                   </p>
                 </div>
               </div>
-            ) : (          <div className="divide-y divide-border rounded-md border">
-            {closedPeriods.map((period) => (
-              <div
-                key={period.id}
-                className="flex items-center justify-between p-4 lg:p-6"
-              >
-                <div className="space-y-1">
-                  <h3 className="font-medium">
-                    {period.description}
-                  </h3>
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:gap-4">
+            ) : (
+              <div className="divide-y divide-border rounded-md border">
+                {closedPeriods.map((period) => (
+                  <div
+                    key={period.id}
+                    className="flex items-center justify-between p-4 lg:p-6"
+                  >
+                    <div className="space-y-1">
+                      <h3 className="font-medium">
+                        {period.description}
+                      </h3>
+                      <div className="flex flex-col lg:flex-row lg:items-center lg:gap-4">
                     <p className="text-sm text-muted-foreground">
                       {format(parseISO(period.start_date), "MMM d, yyyy")} –{" "}
                       {format(parseISO(period.end_date), "MMM d, yyyy")}
@@ -438,15 +439,16 @@ export default function ClosingDays() {
                   aria-label={`Delete closed period: ${period.description}`}
                 >
                   {isDeleting === period.id ? (
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    <LoaderCircle className="h-4 w-4 animate-spin text-red-300" />
                   ) : (
-                    <Trash className="h-4 w-4" />
+                    <Trash className="h-4 w-4 text-red-300" />
                   )}
                 </Button>
               </div>
             ))}
-          </div>
-        )}
+          </div>)}
+        </div>
+        </div>
       </div>
 
       <Dialog
@@ -491,5 +493,5 @@ export default function ClosingDays() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }
