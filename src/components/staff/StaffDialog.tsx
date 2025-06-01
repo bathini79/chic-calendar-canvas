@@ -218,85 +218,136 @@ export function StaffDialog({
         }
 
         if (data.locations?.length > 0) {
-          const locationsToInsert = data.locations.map((locationId: string) => ({
-            employee_id: employeeId,
-            location_id: locationId,
-          }));
+          const locationsToInsert = data.locations.map(
+            (locationId: string) => ({
+              employee_id: employeeId,
+              location_id: locationId,
+            })
+          );
 
           const { error: locationsError } = await supabase
             .from("employee_locations")
             .insert(locationsToInsert);
 
           if (locationsError) throw locationsError;
-        }        // Handle compensation data
+        } // Handle compensation data
         if (data.compensation) {
           // First delete any existing compensation records
           const { error: deleteCompError } = await supabase
-            .from('employee_compensation_settings')
+            .from("employee_compensation_settings")
             .delete()
-            .eq('employee_id', employeeId);
-            
+            .eq("employee_id", employeeId);
+
           if (deleteCompError) throw deleteCompError;
 
           // Insert new compensation record
           const { error: compError } = await supabase
-            .from('employee_compensation_settings')
+            .from("employee_compensation_settings")
             .insert({
               employee_id: employeeId,
               base_amount: data.compensation.monthly_salary,
               effective_from: data.compensation.effective_from,
-              effective_to: null // No end date for now
+              effective_to: null, // No end date for now
             });
 
           if (compError) throw compError;
-        }
-
-        // Handle commission data
+        } // Update or create employee_commission_settings record first
         if (data.service_commission_enabled) {
+          // First check if a record already exists
+          const { data: existingSettings, error: settingsQueryError } =
+            await supabase
+              .from("employee_commission_settings")
+              .select("id")
+              .eq("employee_id", employeeId)
+              .maybeSingle();
+
+          if (settingsQueryError) throw settingsQueryError;
+
+          // Prepare settings data
+          const commissionSettingsData = {
+            employee_id: employeeId,
+            commission_type: data.commission_type,
+            global_commission_percentage:
+              data.global_commission_percentage || 0,
+          };
+
+          let settingsError;
+
+          if (existingSettings?.id) {
+            // Update existing settings
+            const { error } = await supabase
+              .from("employee_commission_settings")
+              .update(commissionSettingsData)
+              .eq("id", existingSettings.id);
+
+            settingsError = error;
+          } else {
+            // Create new settings
+            const { error } = await supabase
+              .from("employee_commission_settings")
+              .insert(commissionSettingsData);
+
+            settingsError = error;
+          }
+
+          if (settingsError) throw settingsError;
+
+          // Handle flat commission type with no template
           if (data.commission_type === "flat" && data.service_commissions) {
-            // For flat commission rules, use commission service functions
-            const { data: saveData, error: saveError } =
-              await supabase.functions.invoke("save-commission-rules", {
-                body: {
-                  employeeId,
-                  rules: Object.entries(data.service_commissions).map(
-                    ([serviceId, percentage]) => ({
-                      service_id: serviceId,
-                      percentage: percentage,
-                    })
-                  ),
-                },
-              });
+            // Delete existing flat commission rules first
+            await supabase.rpc("commission_delete_all_for_employee", {
+              employee_id_param: employeeId,
+            });
 
-            if (saveError) throw saveError;
-            if (!saveData?.success)
-              throw new Error("Failed to save commission rules");
-          } else if (
-            data.commission_type === "tiered" &&
-            data.commission_slabs
-          ) {
-            // For tiered commission slabs, use commission service functions
-            const { data: saveData, error: saveError } =
-              await supabase.functions.invoke("save-commission-slabs", {
-                body: {
-                  employeeId,
-                  slabs: data.commission_slabs.map(
-                    (slab: any, index: number) => ({
-                      min_amount: slab.min_amount,
-                      max_amount: slab.max_amount,
-                      percentage: slab.percentage,
-                      order_index: index + 1,
-                    })
-                  ),
-                },
-              });
+            // Format and save flat commission rules
+            if (Object.keys(data.service_commissions).length > 0) {
+              const flatRules = Object.entries(data.service_commissions).map(
+                ([serviceId, percentage]) => ({
+                  service_id: serviceId,
+                  percentage: percentage,
+                })
+              );
 
-            if (saveError) throw saveError;
-            if (!saveData?.success)
-              throw new Error("Failed to save commission slabs");
+              const { error: flatError } = await supabase.rpc(
+                "commission_save_flat_rules",
+                {
+                  employee_id_param: employeeId,
+                  rules_json: flatRules,
+                }
+              );
+
+              if (flatError) throw flatError;
+            }
+          }
+          // Handle tiered commission type with no template
+          if (data.commission_type === "tiered" && data.commission_slabs) {
+            // Delete is already handled by the function above
+            await supabase.rpc("commission_delete_all_for_employee", {
+              employee_id_param: employeeId,
+            });
+            // Format and save tiered slabs
+            if (data.commission_slabs && data.commission_slabs.length > 0) {
+              const tieredSlabs = data.commission_slabs.map(
+                (slab: any, index: number) => ({
+                  min_amount: slab.min_amount,
+                  max_amount: slab.max_amount,
+                  percentage: slab.percentage,
+                  order_index: index + 1,
+                })
+              );
+
+              const { error: tieredError } = await supabase.rpc(
+                "commission_save_tiered_slabs",
+                {
+                  employee_id_param: employeeId,
+                  slabs_json: tieredSlabs,
+                }
+              );
+
+              if (tieredError) throw tieredError;
+            }
           }
         }
-
         toast.success("Staff member updated successfully");
         queryClient.invalidateQueries({
           queryKey: ["employees-with-locations"],
@@ -586,13 +637,13 @@ export function StaffDialog({
                 "Close"
               )}
             </Button>{" "}
-            {!isMobile && (              <Button 
-                disabled={isLoading} 
+            {!isMobile && (
+              <Button
+                disabled={isLoading}
                 onClick={() => formRef.current?.submit()}
                 className="whitespace-nowrap"
-              >
-                {isLoading ? (
-                  <LoaderCircle className="mr-2 size={16}" strokeWidth={2} />
+              >                {isLoading ? (
+                  <LoaderCircle className="mr-2 h-4 w-4 animate-spin" size={16} strokeWidth={2} />
                 ) : null}
                 {employeeId ? "Update" : "Add"}
               </Button>
@@ -624,14 +675,15 @@ export function StaffDialog({
 
         {/* Sticky footer for mobile */}
         {isMobile && verificationStep === "form" && (
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-50 flex justify-end gap-3">            <Button
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-50 flex justify-end gap-3">
+            {" "}
+            <Button
               onClick={() => formRef.current?.submit()}
               disabled={isLoading}
               className="whitespace-nowrap px-6 flex-1"
-            >
-              {isLoading && (
+            >              {isLoading && (
                 <LoaderCircle
-                  className="animate-spin mr-2"
+                  className="animate-spin mr-2 h-4 w-4"
                   size={16}
                   strokeWidth={2}
                   aria-hidden="true"

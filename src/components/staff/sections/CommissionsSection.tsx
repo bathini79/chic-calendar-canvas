@@ -111,7 +111,7 @@ export function CommissionsSection({
   const [serviceCommissions, setServiceCommissions] = useState<
     Array<{ service_id: string; employee_id?: string; percentage: number }>
   >([]);
-  
+
   // Query to fetch services with categories, supporting pagination and filtering
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -241,6 +241,41 @@ export function CommissionsSection({
       : form.watch("global_commission_percentage") || 0;
   };
 
+  // Handle service commission percentage change
+  const handleServiceCommissionChange = (
+    serviceId: string,
+    percentage: number
+  ) => {
+    // Update local state first
+    const updatedCommissions = [...serviceCommissions];
+    const existingIndex = updatedCommissions.findIndex(
+      (sc) => sc.service_id === serviceId
+    );
+
+    if (existingIndex >= 0) {
+      updatedCommissions[existingIndex].percentage = percentage;
+    } else {
+      updatedCommissions.push({
+        service_id: serviceId,
+        employee_id: employeeId,
+        percentage: percentage,
+      });
+    }
+
+    setServiceCommissions(updatedCommissions);
+
+    // Then update form data
+    const serviceCommissionsMap: { [key: string]: number } = {};
+    updatedCommissions.forEach((sc) => {
+      serviceCommissionsMap[sc.service_id] = sc.percentage;
+    });
+
+    form.setValue("service_commissions", serviceCommissionsMap, {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
+  };
+
   // Track if initial data load is in progress to prevent auto-update
   const [isInitializing, setIsInitializing] = useState(true);
   // Track if form is considered "dirty" (user has made changes)
@@ -249,15 +284,15 @@ export function CommissionsSection({
   // Prevent auto-submission after initialization
   useEffect(() => {
     if (isInitializing) return;
-    
+
     // Mark all setValue operations as programmatic when in initial load
     form.control._formState.isSubmitted = false;
-    
+
     // Example: If you have a useEffect that triggers update on form value change, add this guard:
     // if (isInitializing) return;
     // ...update logic here...
   }, [isInitializing]);
-  
+
   // Fetch employee's commission data if editing
   const fetchEmployeeCommissions = async () => {
     if (employeeId) {
@@ -275,11 +310,15 @@ export function CommissionsSection({
           console.error("Error fetching employee row:", employeeRowError);
         } else if (employeeRow) {
           // Use silent mode to prevent triggering validation/submission
-          form.setValue("service_commission_enabled", employeeRow.service_commission_enabled ?? false, { 
-            shouldDirty: false,
-            shouldTouch: false,
-            shouldValidate: false,
-          });
+          form.setValue(
+            "service_commission_enabled",
+            employeeRow.service_commission_enabled ?? false,
+            {
+              shouldDirty: false,
+              shouldTouch: false,
+              shouldValidate: false,
+            }
+          );
         }
 
         // 2. Fetch commission_type and global_commission_percentage from employee_commission_settings
@@ -292,25 +331,39 @@ export function CommissionsSection({
             .eq("employee_id", employeeId)
             .single();
           if (settingsError) {
-            console.error("Error fetching employee commission settings:", settingsError);
+            console.error(
+              "Error fetching employee commission settings:",
+              settingsError
+            );
           } else if (settings) {
             commissionType = settings.commission_type;
             globalCommissionPercentage = settings.global_commission_percentage;
-            if (commissionType) form.setValue("commission_type", commissionType, { 
-              shouldDirty: false,
-              shouldTouch: false,
-              shouldValidate: false,
-            });
-            if (globalCommissionPercentage !== undefined && globalCommissionPercentage !== null) {
-              form.setValue("global_commission_percentage", globalCommissionPercentage, { 
+            if (commissionType)
+              form.setValue("commission_type", commissionType, {
                 shouldDirty: false,
                 shouldTouch: false,
                 shouldValidate: false,
               });
+            if (
+              globalCommissionPercentage !== undefined &&
+              globalCommissionPercentage !== null
+            ) {
+              form.setValue(
+                "global_commission_percentage",
+                globalCommissionPercentage,
+                {
+                  shouldDirty: false,
+                  shouldTouch: false,
+                  shouldValidate: false,
+                }
+              );
             }
           }
         } catch (err) {
-          console.error("employee_commission_settings table not available or error in query", err);
+          console.error(
+            "employee_commission_settings table not available or error in query",
+            err
+          );
         }
 
         // 3. Fetch commission rules based on commission_type
@@ -320,10 +373,8 @@ export function CommissionsSection({
             .select("*")
             .eq("employee_id", employeeId)
             .order("order_index");
-
           if (slabsError) {
-            console.error("Error fetching tiered slabs:", slabsError);
-            // Fall back to default slab
+            console.error("Error fetching tiered slabs:", slabsError); // Fall back to default slabs with "Max" as the last slab
             setSlabs([
               {
                 id: "1",
@@ -331,6 +382,20 @@ export function CommissionsSection({
                 max_amount: 5000,
                 percentage: 10,
                 order: 1,
+              },
+              {
+                id: "2",
+                min_amount: 5001,
+                max_amount: 10000,
+                percentage: 15,
+                order: 2,
+              },
+              {
+                id: "3",
+                min_amount: 10001,
+                max_amount: 999999999,
+                percentage: 15,
+                order: 3,
               },
             ]);
           } else if (slabsData && slabsData.length > 0) {
@@ -344,7 +409,7 @@ export function CommissionsSection({
             }));
             setSlabs(uiSlabs);
           } else {
-            // No slabs found, use default
+            // No slabs found, use default with three slabs and "Max" as the last
             setSlabs([
               {
                 id: "1",
@@ -352,6 +417,20 @@ export function CommissionsSection({
                 max_amount: 5000,
                 percentage: 10,
                 order: 1,
+              },
+              {
+                id: "2",
+                min_amount: 5001,
+                max_amount: 10000,
+                percentage: 15,
+                order: 2,
+              },
+              {
+                id: "3",
+                min_amount: 10001,
+                max_amount: 999999999,
+                percentage: 15,
+                order: 3,
               },
             ]);
           }
@@ -387,8 +466,7 @@ export function CommissionsSection({
           }
         }
       } catch (error) {
-        console.error("Error in fetchEmployeeCommissions:", error);
-        // Use default settings as a fallback
+        console.error("Error in fetchEmployeeCommissions:", error); // Use default settings as a fallback with three slabs
         setSlabs([
           {
             id: "1",
@@ -397,30 +475,73 @@ export function CommissionsSection({
             percentage: 10,
             order: 1,
           },
+          {
+            id: "2",
+            min_amount: 5001,
+            max_amount: 10000,
+            percentage: 15,
+            order: 2,
+          },
+          {
+            id: "3",
+            min_amount: 10001,
+            max_amount: 999999999,
+            percentage: 15,
+            order: 3,
+          },
         ]);
       } finally {
         setIsLoading(false);
         setIsInitializing(false); // Done initializing
       }
     }
-  };
-
- 
-  // Add a new slab
+  }; // Add a new slab
   const addSlab = () => {
-    // Find the maximum value in existing slabs
-    const maxValue = Math.max(...slabs.map((slab) => slab.max_amount));
+    // Find the maximum value in existing slabs, excluding the last one if it exists
+    const slabsToConsider = slabs.length > 1 ? slabs.slice(0, -1) : slabs;
+    let maxValue = 5000; // Default value
+
+    // If we have slabs to consider, find the max value
+    if (slabsToConsider.length > 0) {
+      maxValue = Math.max(...slabsToConsider.map((slab) => slab.max_amount));
+    }
+
+    // Remove the very high value if it exists (from Max representation)
+    if (maxValue > 100000000) maxValue = 10000;
 
     // Add a new slab with incremented range
-    setSlabs((prev) => [
-      ...prev,
-      {
-        min_amount: maxValue + 1,
-        max_amount: maxValue + 100000,
-        percentage: 15,
-        order: prev.length + 1,
-      },
-    ]);
+    setSlabs((prev) => {
+      const newSlabs = [...prev];
+
+      // If we had slabs before, set a proper numeric max_amount for the previously last slab
+      if (newSlabs.length > 0) {
+        const prevLastIndex = newSlabs.length - 1;
+        // Set a reasonable max_amount if it was previously displaying "Max"
+        if (
+          newSlabs[prevLastIndex].max_amount > 100000000 ||
+          !newSlabs[prevLastIndex].max_amount ||
+          newSlabs[prevLastIndex].max_amount <=
+            newSlabs[prevLastIndex].min_amount
+        ) {
+          newSlabs[prevLastIndex].max_amount =
+            newSlabs[prevLastIndex].min_amount + 5000;
+        }
+      }
+
+      // Add the new slab with "Max" representation
+      return [
+        ...newSlabs,
+        {
+          min_amount:
+            newSlabs.length > 0
+              ? newSlabs[newSlabs.length - 1].max_amount + 1
+              : maxValue + 1,
+          max_amount: 999999999, // Very high number to represent "Max"
+          percentage: 15,
+          order: prev.length + 1,
+        },
+      ];
+    });
   };
 
   // Remove a slab by index
@@ -491,9 +612,7 @@ export function CommissionsSection({
     }
 
     return true;
-  };
-
-  // Update a slab's details
+  }; // Update a slab's details
   const updateSlab = (
     index: number,
     field: "min_amount" | "max_amount" | "percentage",
@@ -501,6 +620,15 @@ export function CommissionsSection({
   ) => {
     setSlabs((prev) => {
       const updated = [...prev];
+
+      // Don't update max_amount for last slab since it's displayed as "Max"
+      if (field === "max_amount" && index === updated.length - 1) {
+        // Skip updating max amount for the last slab
+        // We set a very high number to represent "Max" in the data
+        updated[index] = { ...updated[index], max_amount: 999999999 };
+        return updated;
+      }
+
       updated[index] = { ...updated[index], [field]: value };
 
       // If updating max_amount, update the next slab's min_amount if it exists
@@ -516,9 +644,11 @@ export function CommissionsSection({
     if (employeeId) {
       fetchEmployeeCommissions();
     } else {
-      // Default slabs for new employee - starting with a single basic slab
+      // Default slabs for new employee - set up two slabs with the last one having "Max" as max_amount
       setSlabs([
         { min_amount: 0, max_amount: 5000, percentage: 10, order: 1 },
+        { min_amount: 5001, max_amount: 10000, percentage: 15, order: 2 },
+        { min_amount: 10001, max_amount: 999999999, percentage: 15, order: 3 },
       ]);
       setIsInitializing(false);
     }
@@ -532,7 +662,19 @@ export function CommissionsSection({
     }
   }, [employeeId]);
 
-  // Set initial service_commission_enabled to true for new employees with no saved state
+  // Update the form data with slabs when they change
+  useEffect(() => {
+    // Don't update during initialization to prevent unwanted form submissions
+    if (isInitializing) return;
+
+    // Update the form's commission_slabs field with the current slabs state
+    form.setValue("commission_slabs", slabs, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: false,
+    });
+  }, [slabs, form, isInitializing]);
+  // Set initial service_commission_enabled for new employees with no saved state
   useEffect(() => {
     if (
       !employeeId &&
@@ -540,7 +682,26 @@ export function CommissionsSection({
     ) {
       form.setValue("service_commission_enabled", false);
     }
-  }, [employeeId, form]);
+  }, [employeeId, form]); // Initialize default slabs when service commissions are first enabled for an existing employee
+  useEffect(() => {
+    if (serviceCommissionEnabled && slabs.length === 0 && !isLoading) {
+      // Set default tiered slabs when service commissions are enabled but no slabs exist
+      setSlabs([
+        { min_amount: 0, max_amount: 5000, percentage: 10, order: 1 },
+        { min_amount: 5001, max_amount: 10000, percentage: 15, order: 2 },
+        { min_amount: 10001, max_amount: 999999999, percentage: 15, order: 3 },
+      ]);
+
+      // If commission_type is not set, default to tiered
+      if (!form.getValues("commission_type")) {
+        form.setValue("commission_type", "tiered", {
+          shouldDirty: true,
+          shouldTouch: false,
+          shouldValidate: false,
+        });
+      }
+    }
+  }, [serviceCommissionEnabled, slabs.length, isLoading, form]);
 
   // Format currency for display
   const formatCurrency = (amount: number) => {
@@ -703,22 +864,27 @@ export function CommissionsSection({
                                         className="h-8 text-xs w-full"
                                         disabled={index === 0} // First slab should always start from 0
                                       />
-                                    </div>
-                                    <span>to</span>
+                                    </div>{" "}
+                                    <span>to</span>{" "}
                                     <div className="w-28">
-                                      <Input
-                                        type="number"
-                                        value={slab.max_amount}
-                                        onChange={(e) =>
-                                          updateSlab(
-                                            index,
-                                            "max_amount",
-                                            parseInt(e.target.value) || 0
-                                          )
-                                        }
-                                        className="h-8 text-xs w-full"
-                                        disabled={index === slabs.length - 1} // Last slab max value is fixed
-                                      />
+                                      {index === slabs.length - 1 ? (
+                                        <span className="h-8 text-xs inline-flex w-full items-center justify-center">
+                                          Max
+                                        </span>
+                                      ) : (
+                                        <Input
+                                          type="number"
+                                          value={slab.max_amount}
+                                          onChange={(e) =>
+                                            updateSlab(
+                                              index,
+                                              "max_amount",
+                                              parseInt(e.target.value) || 0
+                                            )
+                                          }
+                                          className="h-8 text-xs w-full"
+                                        />
+                                      )}
                                     </div>
                                   </div>
                                 </td>
@@ -833,7 +999,7 @@ export function CommissionsSection({
                                 <div>
                                   <label className="text-xs text-muted-foreground block mb-1">
                                     Revenue Range
-                                  </label>
+                                  </label>{" "}
                                   <div className="flex items-center gap-2">
                                     <Input
                                       type="number"
@@ -848,22 +1014,28 @@ export function CommissionsSection({
                                       className="h-9 text-sm"
                                       disabled={index === 0}
                                       placeholder="Min"
-                                    />
-                                    <span>to</span>
-                                    <Input
-                                      type="number"
-                                      value={slab.max_amount}
-                                      onChange={(e) =>
-                                        updateSlab(
-                                          index,
-                                          "max_amount",
-                                          parseInt(e.target.value) || 0
-                                        )
-                                      }
-                                      className="h-9 text-sm"
-                                      disabled={index === slabs.length - 1}
-                                      placeholder="Max"
-                                    />
+                                    />{" "}
+                                    <span>to</span>{" "}
+                                    {/* Force last slab to always display Max text */}{" "}
+                                    {index === slabs.length - 1 ? (
+                                      <span className="h-9 text-sm inline-flex w-28 items-center justify-center px-3 border border-input bg-muted/30 text-foreground rounded-md font-medium">
+                                        Max
+                                      </span>
+                                    ) : (
+                                      <Input
+                                        type="number"
+                                        value={slab.max_amount}
+                                        onChange={(e) =>
+                                          updateSlab(
+                                            index,
+                                            "max_amount",
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        className="h-9 text-sm"
+                                        placeholder="Max"
+                                      />
+                                    )}
                                   </div>
                                 </div>
 
@@ -912,7 +1084,6 @@ export function CommissionsSection({
                           : "Example: If a staff member generates ₹75,000 in revenue and the slabs are set at 5% for 0-50,000 and 10% for 50,001-100,000, they would earn ₹2,500 (5% of 50,000) + ₹2,500 (10% of 25,000) = ₹5,000 in commission."}
                       </p>{" "}
                     </div>{" "}
-                  
                   </div>
                 </div>
               )}{" "}
@@ -971,8 +1142,6 @@ export function CommissionsSection({
                         )}
                       </div>
                     </div>
-
-                    
                   </div>
                   {/* Global percentage setting */}
                   <div className="mb-6 p-4 border rounded-lg bg-muted/20">
