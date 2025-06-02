@@ -15,9 +15,11 @@ import { usePayroll } from "@/hooks/use-payroll";
 import { PayPeriod, PayRun } from "@/types/payroll-db";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { PayTeamWizard } from "./PayTeamWizard";
 import { ProcessPaymentsDialog } from "./ProcessPaymentsDialog";
 import { PayRunEmployeeList } from "./PayRunEmployeeList";
+import { SelectEmployeesDialog } from "./SelectEmployeesDialog";
 
 export function PayRuns() {
   /**
@@ -29,17 +31,18 @@ export function PayRuns() {
    * 3. Employee listing - shows all employees with payments or zero values when no pay run exists
    * 4. Pay team functionality - allows processing payments for employees
    */
-
   // Access the query client for manual cache invalidation
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // State for filters
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] =
+  const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);  const [isPaymentDialogOpen, setIsPaymentDialogOpen] =
+    useState<boolean>(false);  const [isEmployeeSelectDialogOpen, setIsEmployeeSelectDialogOpen] =
     useState<boolean>(false);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [hasPaidPayRuns, setHasPaidPayRuns] = useState<boolean>(false);
   const [isCreatingSupplementaryRun, setIsCreatingSupplementaryRun] =
     useState<boolean>(false);
@@ -400,8 +403,7 @@ export function PayRuns() {
     // This will be called after the wizard successfully creates a pay run
     // Force a refresh of the pay runs data
     refetchPayRuns();
-  };
-  // Open the process payments dialog
+  };  // Open the employee selection dialog first
   const handleProcessPayments = () => {
     if (!selectedPayRun) return;
 
@@ -411,32 +413,106 @@ export function PayRuns() {
       selectedPayRun.is_supplementary
     );
 
+    // Open the employee selection dialog first
+    setIsEmployeeSelectDialogOpen(true);
+  }; 
+    // Handle employee selection completion
+  const handleEmployeeSelection = (employeeIds: string[]) => {
+    if (employeeIds.length === 0) {
+      // No employees selected, show warning and keep dialog open
+      toast({
+        title: "No team members selected",
+        description: "Please select at least one team member to proceed with payments.",
+        variant: "warning"
+      });
+      return; // Don't close the dialog
+    }
+    
+    setSelectedEmployeeIds(employeeIds);
+    setIsEmployeeSelectDialogOpen(false);
+    
+    // Now open the payment confirmation dialog
     setIsPaymentDialogOpen(true);
-  }; // Process the payments after confirmation
+  };
+  // Process the payments after confirmation
   const confirmProcessPayments = async () => {
     if (!selectedPayRun) return;
 
     try {
       console.log("Processing payments for pay run:", selectedPayRun.id);
       console.log("Current toPay value:", payRunSummary?.toPay);
+      console.log("Selected employee IDs:", selectedEmployeeIds);
 
-      // Get unpaid items
-      const { data: payRunItems, error: fetchError } = await supabase
-        .from("pay_run_items" as any)
-        .select("employee_id")
-        .eq("pay_run_id", selectedPayRun.id)
-        .eq("is_paid", false);
+      // Use the selected employee IDs if they exist, otherwise get all unpaid items
+      let employeeIds = selectedEmployeeIds;
+      
+      // Only query for unpaid items if no specific employees were selected
+      if (!employeeIds.length) {
+        console.log("No specific employees selected, fetching all unpaid items");
+        const { data: payRunItems, error: fetchError } = await supabase
+          .from("pay_run_items" as any)
+          .select("employee_id")
+          .eq("pay_run_id", selectedPayRun.id)
+          .eq("is_paid", false);
 
-      if (fetchError) throw fetchError;
-      if (!payRunItems?.length) {
-        console.log("No unpaid items found");
+        if (fetchError) {
+          toast({
+            title: "Error fetching unpaid items",
+            description: fetchError.message || "Failed to fetch unpaid payment items",
+            variant: "destructive"
+          });
+          throw fetchError;
+        }
+        
+        if (!payRunItems?.length) {
+          toast({
+            title: "Nothing to process",
+            description: "No unpaid items were found for this pay run",
+            variant: "warning"
+          });
+          setIsPaymentDialogOpen(false);
+          return;
+        }
+
+        employeeIds = [...new Set(payRunItems.map((item) => item.employee_id))];
+        console.log("Found unpaid items for employees:", employeeIds);
+      } else {
+        // For selected employees, verify they have unpaid items
+        console.log("Verifying unpaid items for selected employees:", employeeIds);
+        const { data: verifyItems, error: verifyError } = await supabase
+          .from("pay_run_items" as any)
+          .select("employee_id, count")
+          .eq("pay_run_id", selectedPayRun.id)
+          .eq("is_paid", false)
+          .in("employee_id", employeeIds);
+        
+        if (verifyError) {
+          console.error("Error verifying unpaid items:", verifyError);
+          // Continue with selected employees despite error
+        } else if (!verifyItems?.length) {
+          toast({
+            title: "No unpaid items",
+            description: "The selected team members have no unpaid items to process",
+            variant: "warning"
+          });
+          setIsPaymentDialogOpen(false);
+          return;
+        }
+      }
+      
+      console.log("Processing payments for employees:", employeeIds);
+      
+      // Validation: verify we have employees to process
+      if (employeeIds.length === 0) {
+        toast({
+          title: "No team members to process",
+          description: "Please select at least one team member with unpaid items",
+          variant: "warning"
+        });
         return;
       }
-
-      const employeeIds = [
-        ...new Set(payRunItems.map((item) => item.employee_id)),
-      ];
-      console.log("Processing payments for employees:", employeeIds); // Generate a unique payment reference
+      
+      // Generate a unique payment reference
       const paymentReference = `PAY-${selectedPayRun.id}-${format(
         new Date(),
         "yyyyMMdd-HHmmss"
@@ -452,7 +528,14 @@ export function PayRuns() {
         }
       );
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        toast({
+          title: "Error updating payment status",
+          description: updateError.message || "Failed to update payment status",
+          variant: "destructive"
+        });
+        throw updateError;
+      }
 
       // Process payments through the payment service
       await processPayments.mutateAsync({
@@ -461,8 +544,15 @@ export function PayRuns() {
       });
 
       console.log("Payments processed successfully, refreshing data...");
-
-      // Force refresh all relevant data
+      
+      // Show success message with more detailed information
+      toast({
+        title: "Payments processed successfully",
+        description: selectedEmployeeIds.length 
+          ? `Processed payments for ${employeeIds.length} selected team member${employeeIds.length !== 1 ? 's' : ''}`
+          : `Processed payments for all ${employeeIds.length} team member${employeeIds.length !== 1 ? 's' : ''}`,
+        variant: "success"
+      });      // Force refresh all relevant data
       queryClient.invalidateQueries({ queryKey: ["pay-runs"] });
       queryClient.invalidateQueries({
         queryKey: ["pay-run-details", selectedPayRun.id],
@@ -470,13 +560,23 @@ export function PayRuns() {
       queryClient.invalidateQueries({
         queryKey: ["pay-run-summary", selectedPayRun.id],
       });
+      // Explicitly invalidate the employee summaries to update the "To Pay" amounts
+      queryClient.invalidateQueries({
+        queryKey: ["pay-run-employee-summaries", selectedPayRun.id],
+      });
       refetchPayRuns();
 
-      // Close the payment dialog
+      // Reset selected employee IDs and close the payment dialog
+      setSelectedEmployeeIds([]);
       setIsPaymentDialogOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing payments:", error);
-      throw error;
+      toast({
+        title: "Payment processing failed",
+        description: error.message || "There was an error processing payments",
+        variant: "destructive"
+      });
+      // We've handled the error here, no need to re-throw
     }
   };
   // Function to format currency
@@ -510,8 +610,7 @@ export function PayRuns() {
     !isLoadingPeriods &&
     payPeriod &&
     !selectedPayRun &&
-    (isLoadingPayRuns || isCreatingPayRun);
-  // Function to force refresh all data
+    (isLoadingPayRuns || isCreatingPayRun);  // Function to force refresh all data
   const refreshData = () => {
     console.log("Force refreshing all data...");
     refetchPayPeriods();
@@ -524,6 +623,10 @@ export function PayRuns() {
       });
       queryClient.invalidateQueries({
         queryKey: ["pay-run-details", selectedPayRun.id],
+      });
+      // Also invalidate employee summaries to update "To Pay" amounts
+      queryClient.invalidateQueries({
+        queryKey: ["pay-run-employee-summaries", selectedPayRun.id],
       });
     }
   };
@@ -883,23 +986,34 @@ export function PayRuns() {
             className="pl-7 py-1 h-8 text-xs w-full"
           />
         </div>
-      </div>
-      {/* Pay Team Wizard */}{" "}
+      </div>      {/* Pay Team Wizard */}{" "}
       <PayTeamWizard
         open={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
         payPeriod={payPeriod}
         onPayRunCreated={handlePayRunCreated}
       />
-      {/* Process Payments Dialog */}
+      
+      {/* Employee Selection Dialog */}
+      {selectedPayRun && (
+        <SelectEmployeesDialog
+          open={isEmployeeSelectDialogOpen}
+          onClose={() => setIsEmployeeSelectDialogOpen(false)}
+          onConfirm={handleEmployeeSelection}
+          locationId={selectedLocation === "all" ? undefined : selectedLocation}
+        />
+      )}
+        {/* Process Payments Dialog */}
       {selectedPayRun && payRunSummary && (
         <ProcessPaymentsDialog
           open={isPaymentDialogOpen}
           onClose={() => setIsPaymentDialogOpen(false)}
           onConfirm={confirmProcessPayments}
           totalAmount={payRunSummary.toPay}
-          employeeCount={payRunSummary.total_employees || 0}
+          employeeCount={selectedEmployeeIds.length || payRunSummary.total_employees || 0}
           isSupplementary={selectedPayRun.is_supplementary || false}
+          selectedEmployeeIds={selectedEmployeeIds}
+          payRunId={selectedPayRun.id}
         />
       )}
       {/* Employee List */}

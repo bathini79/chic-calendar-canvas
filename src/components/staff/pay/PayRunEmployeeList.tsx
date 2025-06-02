@@ -37,12 +37,19 @@ export function PayRunEmployeeList({ payRunId, searchQuery, locationId }: PayRun
   const [isLoading, setIsLoading] = useState(true);
   const [adjustmentEmployee, setAdjustmentEmployee] = useState<Employee | null>(null);
   const [breakdownEmployeeId, setBreakdownEmployeeId] = useState<string | null>(null);
-  
-  // Custom hooks
+    // Custom hooks
   const { usePayRunEmployeeSummaries } = usePayroll();
   
   // Get employee pay data directly from SQL function
   const { data: employeeSummaries, isLoading: isLoadingSummaries } = usePayRunEmployeeSummaries(payRunId);
+  
+  // Debug log when employeeSummaries change
+  useEffect(() => {
+    if (employeeSummaries) {
+      console.log(`Employee summaries updated for pay run ${payRunId}:`, 
+        Object.keys(employeeSummaries).length, 'employees');
+    }
+  }, [employeeSummaries, payRunId]);
   
   // Load employees
   useEffect(() => {
