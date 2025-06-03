@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Users, Calendar, Clock, DollarSign } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, Calendar, Clock, DollarSign, IndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export type TeamSection = "team-members" | "scheduled-shifts" | "timesheets" | "pay-runs";
@@ -61,7 +61,7 @@ export function TeamSidebar({
     { 
       label: "Pay runs", 
       value: "pay-runs" as TeamSection,
-      icon: <DollarSign size={16} />
+      icon: <IndianRupee size={16} />
     }
   ];
 

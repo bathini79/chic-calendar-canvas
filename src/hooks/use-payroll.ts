@@ -308,7 +308,6 @@ export function usePayroll() {
       queryClient.invalidateQueries({ queryKey: ['pay-run-summary', data.id] });
     }
   });
-
   const addAdjustment = useMutation({
     mutationFn: async ({
       payRunId,
@@ -320,20 +319,27 @@ export function usePayroll() {
       return payRunService.addAdjustment(payRunId, adjustment);
     },
     onSuccess: (data) => {
+      // Invalidate all relevant queries to ensure UI consistency
       queryClient.invalidateQueries({ queryKey: ['pay-run-details', data.pay_run_id] });
       queryClient.invalidateQueries({ queryKey: ['pay-run-summary', data.pay_run_id] });
+      queryClient.invalidateQueries({ queryKey: ['pay-run-employee-summaries', data.pay_run_id] });
+      // Force refetch to ensure immediate UI update
+      queryClient.refetchQueries({ queryKey: ['pay-run-employee-summaries', data.pay_run_id] });
     }
   });
-
   const deleteAdjustment = useMutation({
     mutationFn: async (adjustmentId: string) => {
       return payRunService.deleteAdjustment(adjustmentId);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Now we can properly invalidate with the specific pay run ID
+      queryClient.invalidateQueries({ queryKey: ['pay-run-details', data.pay_run_id] });
+      queryClient.invalidateQueries({ queryKey: ['pay-run-summary', data.pay_run_id] });
+      // Also invalidate the broader queries just in case
       queryClient.invalidateQueries({ queryKey: ['pay-run-details'] });
       queryClient.invalidateQueries({ queryKey: ['pay-run-summary'] });
     }
-  });  const processPayments = useMutation({
+  });const processPayments = useMutation({
     mutationFn: async ({
       payRunId,
       employeeIds

@@ -174,9 +174,7 @@ class PayRunService {
     }
     
     return data as PayRunItem[];
-  }
-
-  /**
+  }  /**
    * Add an adjustment to a pay run for an employee
    */
   async addAdjustment(payRunId: string, adjustment: AdjustmentData) {
@@ -184,41 +182,91 @@ class PayRunService {
       ? Math.abs(adjustment.amount) 
       : -Math.abs(adjustment.amount);
     
-    const { data, error } = await supabase
-      .from(this.payRunItemsTable)
-      .insert({
-        pay_run_id: payRunId,
-        employee_id: adjustment.employeeId,
-        compensation_type: adjustment.compensationType,
-        amount,
-        description: adjustment.description,
-        source_type: 'manual'
-      })
-      .select()
-      .single();
+    // Map frontend compensation types to database-compatible types
+    const mapCompensationType = (frontendType: string): string => {
+      const typeMap: Record<string, string> = {
+        'wages': 'salary',     // Map 'wages' to 'salary'
+        'commission': 'commission', // Keep 'commission' as is
+        'tips': 'tip',        // Map 'tips' to 'tip'
+        'other': 'adjustment' // Map 'other' to 'adjustment'
+      };
+      
+      return typeMap[frontendType] || 'adjustment';
+    };
+    
+    const dbCompensationType = mapCompensationType(adjustment.compensationType);
+    
+    console.log('Adding adjustment:', {
+      pay_run_id: payRunId,
+      employee_id: adjustment.employeeId,
+      compensation_type: dbCompensationType,
+      amount,
+      description: adjustment.description,
+      source_type: 'manual'
+    });
+    
+    // Use the custom database function that temporarily disables the trigger
+    // This prevents the adjustment from being automatically marked as paid
+    const { data, error } = await supabase.rpc(
+      'add_adjustment_to_pay_run',
+      {
+        pay_run_id_param: payRunId,
+        employee_id_param: adjustment.employeeId,
+        compensation_type_param: dbCompensationType,
+        amount_param: amount,
+        description_param: adjustment.description,
+        source_type_param: 'manual'
+      }
+    );
     
     if (error) {
+      console.error('Error adding adjustment:', error);
       throw error;
     }
     
+    console.log('Adjustment added successfully:', data);
     return data as PayRunItem;
-  }
-
-  /**
+  }/**
    * Delete an adjustment from a pay run
    */
   async deleteAdjustment(adjustmentId: string) {
+    console.log('Deleting adjustment with ID:', adjustmentId);
+    
+    // First get the pay run ID so we can return it
+    const { data: item, error: fetchError } = await supabase
+      .from(this.payRunItemsTable)
+      .select('pay_run_id, compensation_type, source_type')
+      .eq('id', adjustmentId)
+      .single();
+    
+    if (fetchError) {
+      console.error('Error fetching adjustment before deletion:', fetchError);
+      throw fetchError;
+    }
+    
+    const pay_run_id = item.pay_run_id;
+    
+    // Verify this is a manual adjustment that can be deleted
+    if (item.source_type !== 'manual') {
+      console.warn(`Attempted to delete non-manual adjustment (${item.source_type}) with ID: ${adjustmentId}`);
+    }
+    
+    console.log('Found adjustment with pay_run_id:', pay_run_id, 'Type:', item.compensation_type);
+    
+    // Then delete the item
     const { error } = await supabase
       .from(this.payRunItemsTable)
       .delete()
       .eq('id', adjustmentId);
     
     if (error) {
+      console.error('Error deleting adjustment:', error);
       throw error;
     }
     
-    return true;
-  }  /**
+    console.log('Adjustment deleted successfully');
+    return { success: true, pay_run_id };
+  }/**
    * Calculate the summary totals for a pay run
    */
   async getPayRunSummary(payRunId: string): Promise<PayRunSummary> {
@@ -315,13 +363,12 @@ class PayRunService {
       toPay: 0,
       total_employees: 0
     };
-    
-    // Calculate totals with paid/unpaid split
+      // Calculate totals with paid/unpaid split
     items.forEach(item => {
       const amount = item.amount || 0;
       
       // Add to the appropriate category
-      if (['salary', 'wages', 'commission', 'tips'].includes(item.compensation_type)) {
+      if (['salary', 'commission', 'tip'].includes(item.compensation_type)) {
         summary.earnings += amount;
       } else {
         summary.other += amount;

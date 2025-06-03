@@ -18,9 +18,10 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { LoaderCircle, Search } from "lucide-react";
+import { LoaderCircle, Search, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Employee {
   id: string;
@@ -55,6 +56,7 @@ export function SelectEmployeesDialog({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   // Load locations
   useEffect(() => {
@@ -222,16 +224,58 @@ export function SelectEmployeesDialog({
   // Check if all employees are selected
   const allSelected = employees.length > 0 && employees.every(emp => emp.isSelected);
   const someSelected = employees.some(emp => emp.isSelected);
-  const selectedCount = employees.filter(emp => emp.isSelected).length;
-
-  return (
+  const selectedCount = employees.filter(emp => emp.isSelected).length;  return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[650px] max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Select Team Members</DialogTitle>
-          <DialogDescription>
-            Choose which team members to include in this payment run.
-          </DialogDescription>
+      <DialogContent className={`
+          !top-auto !bottom-0 left-1/2 translate-x-[-50%] !translate-y-0 w-[98vw] max-w-none border shadow-xl rounded-t-2xl !rounded-b-none overflow-hidden flex flex-col
+          ${
+            isMobile
+              ? "h-[95vh] pt-[0.5%] px-[1.5%]"
+              : "h-[98vh] pt-[3%] pl-[10%] pr-[10%]"
+          }`}
+      >        <div className="flex justify-end mt-0 mb-0 mr-0 gap-3 absolute top-2 right-2 z-10">
+          {isMobile ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="p-1.5 h-auto w-auto border-none shadow-none bg-transparent hover:bg-transparent"
+            >
+              <X size={20} strokeWidth={2.5} className="text-gray-600" />
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={onClose}
+                className="whitespace-nowrap"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={handleConfirm}
+                disabled={!someSelected}
+                className="bg-black hover:bg-gray-800 text-white whitespace-nowrap px-6"
+              >
+                Next
+              </Button>
+            </>
+          )}
+        </div>
+        
+        <DialogHeader className={`flex justify-between items-start ${
+          isMobile ? "text-left mt-3" : ""
+        }`}>
+          <div className={isMobile ? "w-full text-left" : ""}>
+            <DialogTitle className={`!text-[1.75rem] font-semibold ${
+              isMobile ? "text-left" : ""
+            }`}>
+              Select Team Members
+            </DialogTitle>
+            <DialogDescription>
+              Choose which team members to include in this payment run.
+            </DialogDescription>
+          </div>
         </DialogHeader>
         
         <div className="space-y-4">
@@ -283,9 +327,8 @@ export function SelectEmployeesDialog({
               <div className="ml-auto text-sm text-muted-foreground">
                 {selectedCount} of {employees.length} selected
               </div>
-            </div>
-              {/* Scrollable employee list */}
-            <div className="max-h-[40vh] overflow-y-auto">
+            </div>            {/* Scrollable employee list */}
+            <div className={`overflow-y-auto ${isMobile ? "max-h-[55vh]" : "max-h-[60vh]"}`}>
               {isLoading ? (
                 <div className="flex flex-col justify-center items-center py-8">
                   <LoaderCircle className="h-5 w-5 animate-spin text-muted-foreground mb-2" />
@@ -334,25 +377,21 @@ export function SelectEmployeesDialog({
                   </div>
                 ))
               )}
-            </div>
-          </div>
+            </div>          </div>
         </div>
         
-        <DialogFooter className="mt-4">
-          <Button
-            variant="outline"
-            onClick={onClose}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={!someSelected}
-            className="bg-black hover:bg-gray-800 text-white"
-          >
-            Next
-          </Button>
-        </DialogFooter>
+        {/* Sticky footer for mobile */}
+        {isMobile && (
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-50 flex justify-end gap-3">
+            <Button
+              onClick={handleConfirm}
+              disabled={!someSelected}
+              className="whitespace-nowrap px-6 flex-1 bg-black hover:bg-gray-800 text-white"
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -31,7 +31,7 @@ export function AdjustmentModal({
   onSuccess
 }: AdjustmentModalProps) {
   // State
-  const [activeTab, setActiveTab] = useState<'wages' | 'commissions' | 'tips' | 'other'>('wages');
+  const [activeTab, setActiveTab] = useState<'wages' | 'commission' | 'tips' | 'other'>('wages');
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [isAddition, setIsAddition] = useState<boolean>(true);
@@ -51,8 +51,7 @@ export function AdjustmentModal({
     resetForm();
     onClose();
   };
-  
-  // Handle submit
+    // Handle submit
   const handleSubmit = async () => {
     if (!amount || isNaN(parseFloat(amount))) {
       return;
@@ -65,19 +64,24 @@ export function AdjustmentModal({
       description: note || `${isAddition ? 'Added' : 'Deducted'} ${activeTab} adjustment`,
       isAddition
     };
-    
-    try {
-      await addAdjustment.mutateAsync({
+      try {
+      const result = await addAdjustment.mutateAsync({
         payRunId,
         adjustment: adjustmentData
       });
       
+      // The mutation's onSuccess handler will invalidate relevant queries
+      console.log("Adjustment added successfully:", result);
+      
       resetForm();
       if (onSuccess) {
+        // Calling onSuccess to notify parent component
         onSuccess();
       }
     } catch (error) {
       console.error("Error adding adjustment:", error);
+      // Display an error message to the user
+      alert("Failed to add adjustment. Please check the console for more details.");
     }
   };
   
@@ -85,9 +89,8 @@ export function AdjustmentModal({
   const getTabDescription = () => {
     switch (activeTab) {
       case 'wages':
-        return "Pay out hourly pay and overtime earned";
-      case 'commissions':
-        return "Pay out commissions earned on services, products, gift cards, and memberships";
+        return "Pay out hourly pay and overtime earned";      case 'commission':
+        return "Pay out commission earned on services, products, gift cards, and memberships";
       case 'tips':
         return "Pay out tips given by clients";
       case 'other':
@@ -107,8 +110,8 @@ export function AdjustmentModal({
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)}>
           <TabsList className="grid grid-cols-4">
             <TabsTrigger value="wages">Wages</TabsTrigger>
-            <TabsTrigger value="commissions">Commissions</TabsTrigger>
-            <TabsTrigger value="tips">Tips</TabsTrigger>
+            <TabsTrigger value="commission">Commission</TabsTrigger>
+            <TabsTrigger value="tips">Tip</TabsTrigger>
             <TabsTrigger value="other">Other</TabsTrigger>
           </TabsList>
           

@@ -51,8 +51,12 @@ export interface CompensationHistoryEntry {
 
 // Pay run summary statistics
 export interface PayRunSummary {
+  earnings: number;
+  other: number;
+  total: number;
+  paid: number;
+  toPay: number;
   total_employees: number;
-  total_amount: number;
-  total_paid_leave_days: number;
-  total_unpaid_leave_days: number;
+  total_paid_leave_days?: number;
+  total_unpaid_leave_days?: number;
 }

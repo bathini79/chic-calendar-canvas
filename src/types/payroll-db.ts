@@ -39,12 +39,17 @@ export interface PayRunItem {
   id: string;
   pay_run_id: string;
   employee_id: string;
-  base_amount: number;
-  adjustments: number;
-  final_amount: number;
-  notes: string;
+  compensation_type: 'commission' | 'salary' | 'tip' | 'adjustment'; // Aligns with database constraint
+  amount: number;
+  description?: string;
+  source_id?: string;
+  source_type?: string;
   created_at: string;
   updated_at: string;
+  status?: string;
+  is_paid?: boolean;
+  paid_date?: string;
+  payment_reference?: string;
 }
 
 // Augmented time off request type with leave_type field
