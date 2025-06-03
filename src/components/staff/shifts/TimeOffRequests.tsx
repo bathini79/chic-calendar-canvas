@@ -101,7 +101,6 @@ export function TimeOffRequests({ locations, employees, searchQuery }: TimeOffRe
       setIsLoading(false);
     }
   };
-
   const getStatusBadge = (status: string) => {
     let badgeClass = '';
     
@@ -109,7 +108,7 @@ export function TimeOffRequests({ locations, employees, searchQuery }: TimeOffRe
       case 'approved':
         badgeClass = 'bg-green-100 text-green-800';
         break;
-      case 'denied':
+      case 'declined':
         badgeClass = 'bg-red-100 text-red-800';
         break;
       case 'pending':
@@ -124,12 +123,11 @@ export function TimeOffRequests({ locations, employees, searchQuery }: TimeOffRe
       </span>
     );
   };
-
   const handleApprove = async (id: string) => {
     try {
       const { error } = await supabase
         .from('time_off_requests')
-        .update({ status: 'approved' })
+        .update({ status: 'approved' as 'approved' | 'pending' | 'declined' })
         .eq('id', id);
         
       if (error) throw error;
@@ -149,12 +147,11 @@ export function TimeOffRequests({ locations, employees, searchQuery }: TimeOffRe
       });
     }
   };
-
   const handleDeny = async (id: string) => {
     try {
       const { error } = await supabase
         .from('time_off_requests')
-        .update({ status: 'denied' })
+        .update({ status: 'declined' })
         .eq('id', id);
         
       if (error) throw error;
@@ -217,11 +214,11 @@ export function TimeOffRequests({ locations, employees, searchQuery }: TimeOffRe
           </Button>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
+        <Table>          <TableHeader>
             <TableRow>
               <TableHead>Employee</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Leave Type</TableHead>
               <TableHead>Start Date</TableHead>
               <TableHead>End Date</TableHead>
               <TableHead>Status</TableHead>
@@ -233,13 +230,13 @@ export function TimeOffRequests({ locations, employees, searchQuery }: TimeOffRe
               <TableRow key={request.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <div className="bg-purple-100 rounded-full h-8 w-8 flex items-center justify-center">
+                    <div className="bg-black-100 rounded-full h-8 w-8 flex items-center justify-center">
                       {request.employees?.name?.split(' ').map((n: string) => n[0]).join('') || '??'}
                     </div>
                     <span>{request.employees?.name || 'Unknown Employee'}</span>
                   </div>
-                </TableCell>
-                <TableCell>{request.reason || 'Not specified'}</TableCell>
+                </TableCell>                <TableCell>{request.reason || 'Not specified'}</TableCell>
+                <TableCell>{request.leave_type ? (request.leave_type === 'paid' ? 'Paid' : 'Unpaid') : 'Not specified'}</TableCell>
                 <TableCell>{format(new Date(request.start_date), 'MMM d, yyyy')}</TableCell>
                 <TableCell>{format(new Date(request.end_date), 'MMM d, yyyy')}</TableCell>
                 <TableCell>{getStatusBadge(request.status)}</TableCell>

@@ -194,12 +194,6 @@ export function BusinessDetailsForm() {
         <CardHeader className="flex flex-row items-start justify-between">
           <div>
             <CardTitle>Business details</CardTitle>
-            <CardDescription>
-              Set your business name, tax and language preferences, and manage external links.
-              <div className="mt-1">
-                <a href="#" className="text-primary">Learn more.</a>
-              </div>
-            </CardDescription>
           </div>
         </CardHeader>
       </Card>

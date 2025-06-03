@@ -69,6 +69,7 @@ export function StaffForm({
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [isPhoneCheckLoading, setIsPhoneCheckLoading] = useState(false);
+  const [highlightMandatoryFields, setHighlightMandatoryFields] = useState<boolean>(false);
   const [selectedCountry, setSelectedCountry] = useState<{
     name: string;
     code: string;
@@ -232,8 +233,10 @@ export function StaffForm({
       setIsPhoneCheckLoading(false);
     }
   };
-
   const handleFormSubmit = async (data: StaffFormData) => {
+    // Turn off highlighting while performing validation
+    setHighlightMandatoryFields(false);
+    
     const phoneExists = await checkPhoneExists(data.phone);
     if (phoneExists) {
       return;
@@ -244,7 +247,27 @@ export function StaffForm({
       photo_url: images[0] || null,
       // Remove + from country code when submitting
       phone: `${selectedCountry.code.replace('+', '')}${data.phone}`,
-    };
+    };    if (use2FactorVerification) {
+      // For "Next: Verify Phone" button, check if form is valid
+      // If valid, submit the form, otherwise highlight mandatory fields
+      const isFormValid = form.formState.isValid;
+      if (!isFormValid) {
+        setHighlightMandatoryFields(true);
+        
+        // Show toast message for required fields
+        toast.error("Please fill in all required fields");
+        
+        // Find and scroll to the first error
+        setTimeout(() => {
+          const firstErrorElement = document.querySelector('.mandatory-field-error');
+          if (firstErrorElement) {
+            firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+        
+        return;
+      }
+    }
 
     onSubmit(updatedData);
   };
@@ -263,23 +286,97 @@ export function StaffForm({
     const value = e.target.value.replace(/\D/g, "");
     form.setValue("phone", value);
   };
+  // Add CSS for highlighting mandatory fields
+  useEffect(() => {
+    const styleId = 'staff-form-mandatory-styles';
+    
+    // Only add the styles if they don't already exist
+    if (!document.getElementById(styleId)) {
+      const styleElement = document.createElement('style');
+      styleElement.id = styleId;
+      styleElement.innerHTML = `
+        .mandatory-field-highlight input,
+        .mandatory-field-highlight select,
+        .mandatory-field-highlight .border {
+          border-color: #ef4444 !important; /* red-500 */
+          box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3);
+        }
+        .mandatory-field-highlight .form-label::after {
+          content: ' *';
+          color: #ef4444;
+          font-weight: bold;
+        }
+        .mandatory-field-error {
+          color: #ef4444;
+          font-size: 14px;
+          margin-top: 4px;
+          display: block;
+        }
+      `;
+      document.head.appendChild(styleElement);
+    }
+    
+    // Clean up on unmount
+    return () => {
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    };
+  }, []);
+  // Function to handle focus/input that resets highlighting when user starts fixing fields
+  const handleInputFocus = () => {
+    if (highlightMandatoryFields) {
+      setHighlightMandatoryFields(false);
+    }
+  };
+
+  // Add event listener for all form inputs
+  useEffect(() => {
+    if (highlightMandatoryFields) {
+      const formInputs = document.querySelectorAll('input, select, [role="combobox"]');
+      formInputs.forEach(input => {
+        input.addEventListener('focus', handleInputFocus);
+        input.addEventListener('input', handleInputFocus);
+      });
+      
+      return () => {
+        formInputs.forEach(input => {
+          input.removeEventListener('focus', handleInputFocus);
+          input.removeEventListener('input', handleInputFocus);
+        });
+      };
+    }
+  }, [highlightMandatoryFields]);
 
   return (
     <Form {...form}>
+      {highlightMandatoryFields && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+          <div className="flex items-center text-red-600 text-sm font-medium">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            Please complete all required fields highlighted in red
+          </div>
+        </div>
+      )}
       <form
         onSubmit={form.handleSubmit(handleFormSubmit)}
         className="space-y-4"
-      >
-        <FormField
+      ><FormField
           control={form.control}
           name="name"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name *</FormLabel>
+            <FormItem className={highlightMandatoryFields && (!field.value || field.value.length === 0) ? 'mandatory-field-highlight' : ''}>
+              <FormLabel className="form-label">Name</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
               <FormMessage />
+              {highlightMandatoryFields && (!field.value || field.value.length === 0) && 
+                <span className="mandatory-field-error">Name is required</span>
+              }
             </FormItem>
           )}
         />
@@ -296,14 +393,12 @@ export function StaffForm({
               <FormMessage />
             </FormItem>
           )}
-        />
-
-        <FormField
+        />        <FormField
           control={form.control}
           name="phone"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Phone *</FormLabel>
+            <FormItem className={highlightMandatoryFields && (!field.value || field.value.length < 10) ? 'mandatory-field-highlight' : ''}>
+              <FormLabel className="form-label">Phone</FormLabel>
               <FormControl>
                 <div className="flex">
                   <CountryCodeDropdown
@@ -321,6 +416,9 @@ export function StaffForm({
                 </div>
               </FormControl>
               <FormMessage />
+              {highlightMandatoryFields && (!field.value || field.value.length < 10) && 
+                <span className="mandatory-field-error">Phone number with minimum 10 digits is required</span>
+              }
             </FormItem>
           )}
         />
@@ -347,14 +445,12 @@ export function StaffForm({
               <FormMessage />
             </FormItem>
           )}
-        />
-
-        <FormField
+        />        <FormField
           control={form.control}
           name="employment_type_id"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Employment Type</FormLabel>
+            <FormItem className={highlightMandatoryFields && (!field.value || field.value.length === 0) ? 'mandatory-field-highlight' : ''}>
+              <FormLabel className="form-label">Employment Type</FormLabel>
               <Select 
                 onValueChange={field.onChange} 
                 value={field.value}
@@ -383,18 +479,19 @@ export function StaffForm({
                 </SelectContent>
               </Select>
               <FormMessage />
+              {highlightMandatoryFields && (!field.value || field.value.length === 0) && 
+                <span className="mandatory-field-error">Employment type is required</span>
+              }
             </FormItem>
           )}
-        />
-
-        <FormField
+        />        <FormField
           control={form.control}
           name="locations"
-          render={() => (
-            <FormItem>
-              <FormLabel>Locations *</FormLabel>
+          render={({ field }) => (
+            <FormItem className={highlightMandatoryFields && (!selectedLocations || selectedLocations.length === 0) ? 'mandatory-field-highlight' : ''}>
+              <FormLabel className="form-label">Locations</FormLabel>
               <FormControl>
-                <div className="border border-input rounded-md p-4 space-y-2">
+                <div className={`border border-input rounded-md p-4 space-y-2 ${highlightMandatoryFields && selectedLocations.length === 0 ? 'border-red-500' : ''}`}>
                   {locations?.length ? (
                     locations.map((location) => (
                       <div
@@ -424,78 +521,87 @@ export function StaffForm({
                 </div>
               </FormControl>
               <FormMessage />
+              {highlightMandatoryFields && selectedLocations.length === 0 && 
+                <span className="mandatory-field-error">At least one location is required</span>
+              }
             </FormItem>
           )}
-        />
-
-        <FormField
+        />        <FormField
           control={form.control}
           name="skills"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Skills *</FormLabel>
+            <FormItem className={highlightMandatoryFields && (!field.value || field.value.length === 0) ? 'mandatory-field-highlight' : ''}>
+              <FormLabel className="form-label">Skills</FormLabel>
               <FormControl>
-                <ServiceMultiSelect
-                  selectedServices={field.value}
-                  onServiceSelect={(serviceId) => {
-                    // Special handling for "all" services
-                    if (serviceId === 'all') {
-                      console.log("ALL SERVICES selected");
-                      // Get all services from the database and select them
-                      supabase
-                        .from('services')
-                        .select('id')
-                        .then(({ data, error }) => {
-                          if (!error && data) {
-                            console.log("Got services data:", data.length, "services");
-                            const allServiceIds = data.map(s => s.id);
-                            setSelectedSkills(allServiceIds);
-                            form.setValue("skills", allServiceIds);
-                          } else {
-                            console.error("Error fetching services:", error);
-                          }
-                        });
-                    } else {
-                      console.log("Single service selected:", serviceId);
-                      // Normal single service selection
-                      setSelectedSkills([...field.value, serviceId]);
-                    }
-                  }}
-                  onServiceRemove={(serviceId) => {
-                    setSelectedSkills(
-                      field.value.filter((id) => id !== serviceId)
-                    );
-                  }}
-                />
+                <div className={highlightMandatoryFields && (!field.value || field.value.length === 0) ? 'border border-red-500 rounded-md p-1' : ''}>
+                  <ServiceMultiSelect
+                    selectedServices={field.value}
+                    onServiceSelect={(serviceId) => {
+                      // Special handling for "all" services
+                      if (serviceId === 'all') {
+                        console.log("ALL SERVICES selected");
+                        // Get all services from the database and select them
+                        supabase
+                          .from('services')
+                          .select('id')
+                          .then(({ data, error }) => {
+                            if (!error && data) {
+                              console.log("Got services data:", data.length, "services");
+                              const allServiceIds = data.map(s => s.id);
+                              setSelectedSkills(allServiceIds);
+                              form.setValue("skills", allServiceIds);
+                            } else {
+                              console.error("Error fetching services:", error);
+                            }
+                          });
+                      } else {
+                        console.log("Single service selected:", serviceId);
+                        // Normal single service selection
+                        setSelectedSkills([...field.value, serviceId]);
+                      }
+                    }}
+                    onServiceRemove={(serviceId) => {
+                      setSelectedSkills(
+                        field.value.filter((id) => id !== serviceId)
+                      );
+                    }}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
+              {highlightMandatoryFields && (!field.value || field.value.length === 0) && 
+                <span className="mandatory-field-error">At least one skill is required</span>
+              }
             </FormItem>
           )}
-        />
-
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isPhoneCheckLoading || isSubmitting}>
-            {(isPhoneCheckLoading || isSubmitting) ? (
-              <LoaderCircle
-                className="animate-spin mr-2"
-                size={16}
-                strokeWidth={2}
-                aria-hidden="true"
-              />
-            ) : null}
-            {employeeId ? "Update Staff Member" : 
-             use2FactorVerification ? "Next: Verify Phone" : "Create Staff Member"}
-          </Button>
-        </div>
-
-        {use2FactorVerification && !employeeId && (
-          <div className="text-sm text-muted-foreground px-2 py-1 bg-muted/50 rounded-md">
-            A verification code will be sent to the staff member's phone number after submission.
+        />        <div className="flex flex-col justify-end gap-2">
+          {highlightMandatoryFields && (
+            <div className="flex items-center justify-end mb-2 text-red-500 text-sm">
+              <span>Please complete all required fields</span>
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+              Close
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isPhoneCheckLoading || isSubmitting}
+              className={highlightMandatoryFields ? "border-red-500 shadow-sm shadow-red-200" : ""}
+            >
+              {(isPhoneCheckLoading || isSubmitting) ? (
+                <LoaderCircle
+                  className="animate-spin mr-2"
+                  size={16}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+              ) : null}
+              {employeeId ? "Update Staff Member" : 
+               "Create Staff Member"}
+            </Button>
           </div>
-        )}
+        </div>
       </form>
     </Form>
   );

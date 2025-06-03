@@ -767,7 +767,9 @@ export function LocationDialog({ isOpen, onClose, locationId, onSuccess, mode = 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[98vw] max-w-4xl h-[95vh] overflow-hidden p-0 mt-[5vh] rounded-xl">
+      <DialogContent
+        className="!top-auto !bottom-0 left-1/2 translate-x-[-50%] !translate-y-0 w-[98vw] h-[95vh] max-w-none border p-6 shadow-xl rounded-t-2xl !rounded-b-none"
+      >
         <div className="flex flex-col h-full">
           <div className="p-4 md:p-6 border-b flex items-center justify-between sticky top-0 bg-background z-10">
             <div className="flex items-center gap-3">

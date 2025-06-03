@@ -126,7 +126,7 @@ export const TopTeamMembers = ({ locations, topStylistsLocationId, setTopStylist
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Top Team Members</CardTitle>
+        <CardTitle className="text-lg">Top Staff members</CardTitle>
         <LocationSelector 
           value={topStylistsLocationId} 
           onChange={setTopStylistsLocationId} 

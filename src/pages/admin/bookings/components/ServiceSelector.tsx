@@ -175,15 +175,21 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       return data;
     },
   });
+
+  type ServicePage = {
+    data: any[];
+    nextPage: number | null;
+  };
+
   const {
     data: servicesData,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     isLoading: isLoadingServices,
-  } = useInfiniteQuery({
+  } = useInfiniteQuery<ServicePage, Error>({
     queryKey: ["services", locationId, selectedCategory, searchQuery],
-    queryFn: async ({ pageParam = 0 }) => {
+    queryFn: async ({ pageParam = 0 }: { pageParam?: number }) => {
       let query = supabase
         .from("services")
         .select(
@@ -196,7 +202,10 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         )
         .eq("status", "active")
         .order("name")
-        .range(pageParam * pageSize, pageParam * pageSize + pageSize - 1);
+        .range(
+          (pageParam as number) * pageSize,
+          (pageParam as number) * pageSize + pageSize - 1
+        );
 
       // Apply search filter if query exists
       if (searchQuery) {
@@ -250,10 +259,11 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
       return {
         data: data || [],
-        nextPage: hasMore ? pageParam + 1 : null,
+        nextPage: hasMore ? ((pageParam as number) + 1) : null,
       };
     },
-    getNextPageParam: (lastPage) => lastPage.nextPage,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: ServicePage) => lastPage.nextPage,
   });
 
   // Flatten the pages into a single services array
@@ -888,4 +898,4 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       )}
     </div>
   );
-};
+}

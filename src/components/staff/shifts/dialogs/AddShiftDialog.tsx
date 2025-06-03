@@ -266,10 +266,13 @@ export function AddShiftDialog({
         <div className="mt-6 flex justify-end space-x-2">
           <Button variant="outline" onClick={() => onClose()}>
             Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : existingShift ? 'Update' : 'Save'}
-          </Button>
+          </Button>            <Button 
+              type="button"
+              onClick={handleSave} 
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : existingShift ? 'Update' : 'Save'}
+            </Button>
         </div>
       </DialogContent>
     </Dialog>

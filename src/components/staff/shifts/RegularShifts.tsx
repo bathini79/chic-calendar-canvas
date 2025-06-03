@@ -209,7 +209,7 @@ export function RegularShifts({
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
             <Input
               type="text"
-              placeholder="Search team members..."
+              placeholder="Search Staff members..."
               value={searchQuery}
               onChange={onSearchChange}
               className="pl-9 h-10 w-[200px] lg:w-[250px]"

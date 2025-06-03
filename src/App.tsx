@@ -22,6 +22,7 @@ import BusinessSetup from "./pages/admin/settings/BusinessSetup";
 import Sales from "./pages/admin/settings/Sales";
 import ThirdParty from "./pages/admin/settings/ThirdParty";
 import Team from "./pages/admin/settings/Team";
+import Scheduling from "./pages/admin/settings/Scheduling";
 import Reports from "./pages/admin/Reports";
 import VerifyEmployeePage from "./pages/verify";
 import { Toaster } from "@/components/ui/sonner"; // Import the Sonner Toaster
@@ -91,11 +92,11 @@ export default function App() {
             <Route path="settings/business-setup" element={<BusinessSetup />} />
             <Route path="settings/business-setup/*" element={<BusinessSetup />} />
             <Route path="settings/sales" element={<Sales />} />
-            <Route path="settings/sales/*" element={<Sales />} />
-            <Route path="settings/third-party" element={<ThirdParty />} />
+            <Route path="settings/sales/*" element={<Sales />} />            <Route path="settings/third-party" element={<ThirdParty />} />
             <Route path="settings/third-party/*" element={<ThirdParty />} />
             <Route path="settings/team" element={<Team />} />
             <Route path="settings/team/*" element={<Team />} />
+            <Route path="settings/scheduling" element={<Scheduling />} />
           </Route>
         </Routes>
       </DndProvider>
