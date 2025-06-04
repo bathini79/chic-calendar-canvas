@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -17,6 +18,9 @@ import {
   Award,
   LoaderCircle,
   Info,
+  Users,
+  Search,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Service, Package, Customer } from "../types";
@@ -35,14 +39,16 @@ import {
 } from "../utils/bookingUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { SelectedItem } from './SelectedItem';
+import { SelectedItem } from "./SelectedItem";
 import LoyaltyPointsSection from "./LoyaltyPointsSection";
 import { useLoyaltyInCheckout } from "../hooks/useLoyaltyInCheckout";
 import { useMembershipInCheckout } from "../hooks/useMembershipInCheckout";
 import { useCouponsInCheckout } from "../hooks/useCouponsInCheckout";
 import { useTaxesInCheckout } from "../hooks/useTaxesInCheckout";
-import { useSelectedItemsInCheckout } from '../hooks/useSelectedItemsInCheckout';
-import { usePaymentHandler } from '../hooks/usePaymentHandler';
+import { useSelectedItemsInCheckout } from "../hooks/useSelectedItemsInCheckout";
+import { usePaymentHandler } from "../hooks/usePaymentHandler";
+import { useReferralInCheckout } from "../hooks/useReferralInCheckout";
+import { useReferralWalletInCheckout } from "../hooks/useReferralWalletInCheckout";
 import { formatPrice } from "@/lib/utils";
 
 interface CheckoutSectionProps {
@@ -101,6 +107,57 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   loadingPayment = false,
   employees,
 }) => {
+  // Check if this is a new customer (no previous appointments)
+  const [isNewCustomer, setIsNewCustomer] = useState<boolean>(false);
+
+  // Referral dropdown state
+  const [showReferralDropdown, setShowReferralDropdown] =
+    useState<boolean>(false);
+  const referralSearchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkNewCustomer = async () => {
+      if (!selectedCustomer?.id) return;
+
+      try {
+        // Check if customer has any previous completed appointments
+        const { count, error } = await supabase
+          .from("appointments")
+          .select("id", { count: "exact" })
+          .eq("customer_id", selectedCustomer.id)
+          .eq("status", "completed");
+
+        if (error) {
+          console.error("Error checking customer appointments:", error);
+          return;
+        }
+
+        // Customer is new if they have no completed appointments
+        setIsNewCustomer(count === 0);
+      } catch (error) {
+        console.error("Error checking customer status:", error);
+      }
+    };
+    checkNewCustomer();
+  }, [selectedCustomer?.id]);
+
+  // Handle click outside to close referral dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        referralSearchRef.current &&
+        !referralSearchRef.current.contains(event.target as Node)
+      ) {
+        setShowReferralDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const membership = useMembershipInCheckout({
     selectedCustomer,
     selectedServices,
@@ -137,6 +194,25 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     [selectedServices, selectedPackages, services, packages, customizedServices]
   );
 
+  // Calculate service, membership, and product totals for referral program
+  const serviceTotal = useMemo(() => {
+    return selectedServices.reduce((total, serviceId) => {
+      const service = services.find((s) => s.id === serviceId);
+      if (!service) return total;
+      return total + (service.selling_price || 0);
+    }, 0);
+  }, [selectedServices, services]);
+
+  const membershipTotal = useMemo(() => {
+    // If there's a membership discount, use that as the membership total
+    return membership.membershipDiscount || 0;
+  }, [membership.membershipDiscount]);
+
+  const productTotal = useMemo(() => {
+    // We're not handling products in this checkout flow currently
+    return 0;
+  }, []);
+
   const coupons = useCouponsInCheckout({
     subtotal,
   });
@@ -170,12 +246,85 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     services: services || [],
     packages: packages || [],
     subtotal,
-    discountedSubtotal
+    discountedSubtotal,
+  });  // Track active discounts - needs to be defined before the hook is called
+  const activeDiscounts = useMemo(() => {
+    const discounts: string[] = [];
+    
+    // Track manual discounts
+    if (discountType !== "none") {
+      discounts.push("discount");
+    }
+    
+    // Track membership discounts
+    if (membership.membershipDiscount > 0) {
+      discounts.push("membership");
+    }
+    
+    // Track coupon discounts
+    if (coupons.selectedCoupon) {
+      discounts.push("coupon");
+    }
+    
+    // Track loyalty point redemptions
+    if (loyalty.usePoints && loyalty.pointsDiscountAmount > 0) {
+      discounts.push("loyalty_points");
+    }
+    
+    return discounts;
+  }, [
+    discountType, 
+    membership.membershipDiscount, 
+    coupons.selectedCoupon, 
+    loyalty.usePoints, 
+    loyalty.pointsDiscountAmount
+  ]);
+  // Initialize the referral wallet hook with active discounts
+  const referralWallet = useReferralWalletInCheckout({
+    customerId: selectedCustomer?.id,
+    discountedSubtotal: discountedSubtotal - loyalty.pointsDiscountAmount, // Apply after loyalty points
+    locationId,
+    activeDiscounts
   });
+  // Create extended active discounts that includes referral wallet when being used
+  // This is used for logging and potential future validation needs
+  const activeDiscountsWithReferral = useMemo(() => {
+    const allDiscounts = [...activeDiscounts];
+    
+    // Add referral discount if it's being used
+    if (referralWallet.useReferralWallet && referralWallet.referralWalletDiscountAmount > 0) {
+      allDiscounts.push("referral");
+    }
+    
+    console.log("CheckoutSection - Active discounts:", {
+      base: activeDiscounts,
+      withReferral: allDiscounts,
+      referralWalletUsed: referralWallet.useReferralWallet,
+      referralWalletAmount: referralWallet.referralWalletDiscountAmount,
+      referralWalletEnabled: referralWallet.isReferralWalletEnabled
+    });
+    
+    return allDiscounts;
+  }, [
+    activeDiscounts, 
+    referralWallet.useReferralWallet, 
+    referralWallet.referralWalletDiscountAmount,
+    referralWallet.isReferralWalletEnabled
+  ]);
 
   const taxes = useTaxesInCheckout({
     locationId,
-    discountedSubtotal
+    discountedSubtotal,
+  });
+
+  // Initialize the referral program hook
+  const referral = useReferralInCheckout({
+    customerId: selectedCustomer?.id,
+    subtotal,
+    serviceTotal,
+    membershipTotal,
+    productTotal,
+    isNewCustomer,
   });
 
   const getStylistName = (stylistId: string) => {
@@ -183,10 +332,39 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     const stylist = employees.find((emp) => emp.id === stylistId);
     return stylist ? stylist.name : null;
   };
-
   const total = useMemo(
-    () => Math.max(0, discountedSubtotal + taxes.taxAmount - loyalty.pointsDiscountAmount),
-    [discountedSubtotal, taxes.taxAmount, loyalty.pointsDiscountAmount]
+    () => {
+      let calculatedTotal = discountedSubtotal;
+      
+      // Apply tax
+      calculatedTotal += taxes.taxAmount;
+      
+      // Subtract loyalty points discount if applicable
+      if (loyalty.usePoints && loyalty.pointsDiscountAmount > 0) {
+        calculatedTotal = Math.max(0, calculatedTotal - loyalty.pointsDiscountAmount);
+      }
+      
+      // Subtract referral wallet only if:
+      // 1. The feature is enabled (all validation checks passed)
+      // 2. The user has checked the box
+      // 3. There's an amount to redeem
+      if (referralWallet.isReferralWalletEnabled && 
+          referralWallet.useReferralWallet && 
+          referralWallet.referralWalletDiscountAmount > 0) {
+        calculatedTotal = Math.max(0, calculatedTotal - referralWallet.referralWalletDiscountAmount);
+      }
+      
+      return Math.max(0, calculatedTotal);
+    },
+    [
+      discountedSubtotal, 
+      taxes.taxAmount, 
+      loyalty.usePoints, 
+      loyalty.pointsDiscountAmount,
+      referralWallet.isReferralWalletEnabled,
+      referralWallet.useReferralWallet,
+      referralWallet.referralWalletDiscountAmount
+    ]
   );
 
   const roundedTotal = useMemo(() => {
@@ -219,7 +397,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     discountType,
     discountValue,
     membership.membershipDiscount,
-    coupons.couponDiscount
+    coupons.couponDiscount,
   ]);
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -248,7 +426,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     getStylistName,
     formatDuration,
   });
-
   const { handlePayment } = usePaymentHandler({
     selectedCustomer,
     paymentMethod,
@@ -266,13 +443,21 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       membershipId: membership.membershipId,
       membershipName: membership.membershipName,
       membershipDiscount: membership.membershipDiscount,
-    },
+    },    
     loyalty: {
       adjustedServicePrices: loyalty.adjustedServicePrices,
       pointsToEarn: loyalty.pointsToEarn,
       pointsToRedeem: loyalty.pointsToRedeem,
       pointsDiscountAmount: loyalty.pointsDiscountAmount,
     },
+    referralWallet: {
+      referralWalletToRedeem: referralWallet.referralWalletToRedeem,
+      referralWalletDiscountAmount: referralWallet.referralWalletDiscountAmount,
+    },
+    referrerId: referral.selectedReferrerId,
+    referralCashback: referral.potentialCashback,
+    customerCashback: referral.customerCashback,
+    isReferralApplicable: referral.isReferralApplicable,
     total,
     adjustedPrices,
     onSaveAppointment,
@@ -286,25 +471,38 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       scrollContainerRef.current.scrollTop =
         scrollContainerRef.current.scrollHeight;
     }
-  }, [selectedItems, subtotal, total]);
+  }, [selectedItems, subtotal, total]);  // Update referral wallet validation when active discounts change
+  useEffect(() => {
+    console.log("Active discounts changed:", activeDiscounts);
+    
+    // We don't need to force re-evaluation by toggling the amount anymore
+    // The hook will automatically re-evaluate based on activeDiscounts changes
+    // This just adds additional logging for debugging
+    
+    if (referralWallet.useReferralWallet && !referralWallet.isReferralWalletEnabled) {
+      console.log("Referral wallet is checked but validation failed - will be automatically unchecked");
+    }
+  }, [activeDiscounts, referralWallet.useReferralWallet, referralWallet.isReferralWalletEnabled]);
 
   return (
     <div className="h-full w-full bg-gray-50">
       <Card className="h-[calc(100vh-100px)] overflow-hidden flex flex-col">
         <CardContent className="p-6 h-full flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Checkout Summary</h2>
-            <Button
-              variant="outline"
-              onClick={onBackToServices}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add Service
-            </Button>
+          {" "}
+          <div className="flex flex-col mb-4 gap-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Checkout Summary</h2>
+              <Button
+                variant="outline"
+                onClick={onBackToServices}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Service
+              </Button>
+            </div>
           </div>
-
-           {/* Main scrollable content area - all items and discount details */}
+          {/* Main scrollable content area - all items and discount details */}
           <div className="flex-1 overflow-y-auto pr-2 min-h-0 mb-4">
             {selectedItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full space-y-4">
@@ -343,28 +541,31 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>₹{subtotal}</span>
                   </div>
-
-                  {membership.membershipDiscount > 0 && membership.membershipName && (
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span className="flex items-center">
-                        <Award className="mr-2 h-4 w-4" />
-                        Membership ({membership.membershipName})
-                      </span>
-                      <span>-₹{membership.membershipDiscount.toFixed(2)}</span>
-                    </div>
-                  )}
-
+                  {membership.membershipDiscount > 0 &&
+                    membership.membershipName && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span className="flex items-center">
+                          <Award className="mr-2 h-4 w-4" />
+                          Membership ({membership.membershipName})
+                        </span>
+                        <span>
+                          -₹{membership.membershipDiscount.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                   {/* Show minimum billing amount warning */}
-                  {selectedCustomer && membership.customerMemberships?.length > 0 && subtotal > 0 && !membership.membershipDiscount && (
-                    <div className="flex justify-between text-sm text-yellow-600">
-                      <span className="flex items-center">
-                        <Info className="mr-2 h-4 w-4" />
-                        Minimum bill amount not met for membership discount
-                      </span>
-                      <span></span>
-                    </div>
-                  )}
-
+                  {selectedCustomer &&
+                    membership.customerMemberships?.length > 0 &&
+                    subtotal > 0 &&
+                    !membership.membershipDiscount && (
+                      <div className="flex justify-between text-sm text-yellow-600">
+                        <span className="flex items-center">
+                          <Info className="mr-2 h-4 w-4" />
+                          Minimum bill amount not met for membership discount
+                        </span>
+                        <span></span>
+                      </div>
+                    )}
                   {coupons.selectedCoupon && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span className="flex items-center">
@@ -374,13 +575,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       <span>-₹{coupons.couponDiscount.toFixed(2)}</span>
                     </div>
                   )}
-
                   {discountType !== "none" && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span className="flex items-center">
                         <Percent className="mr-2 h-4 w-4" />
                         Discount
-                        {discountType === "percentage" && ` (${discountValue}%)`}
+                        {discountType === "percentage" &&
+                          ` (${discountValue}%)`}
                       </span>
                       <span>
                         -₹
@@ -391,7 +592,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       </span>
                     </div>
                   )}
-
                   {taxes.taxAmount > 0 && taxes.appliedTaxName && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span className="flex items-center">
@@ -400,22 +600,26 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       </span>
                       <span>₹{taxes.taxAmount.toFixed(2)}</span>
                     </div>
-                  )}
-
-                  {loyalty.isLoyaltyEnabled && (
+                  )}{" "}                  {loyalty.isLoyaltyEnabled && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm items-center">
                         <span className="flex items-center gap-2 text-muted-foreground">
-                          <Award className="h-4 w-4 text-yellow-500" /> Points Earning
+                          <Award className="h-4 w-4 text-yellow-500" /> Points
+                          Earning
                         </span>
-                        <span className="font-semibold text-yellow-600">{loyalty.pointsToEarn} pts</span>
+                        <span className="font-semibold text-yellow-600">
+                          {loyalty.pointsToEarn} pts
+                        </span>
                       </div>
                       <div className="flex justify-between text-sm items-center">
                         <span className="flex items-center gap-2 text-muted-foreground">
-                          <Award className="h-4 w-4 text-blue-500" /> Available Points
+                          <Award className="h-4 w-4 text-blue-500" /> Available
+                          Points
                         </span>
-                        <span className="font-semibold text-blue-600">{loyalty.walletBalance} pts</span>
-                      </div>
+                        <span className="font-semibold text-blue-600">
+                          {loyalty.walletBalance} pts
+                        </span>
+                      </div>{" "}
                       {/* Always show the redeem points option when customer has points */}
                       {loyalty.walletBalance > 0 && (
                         <div className="flex justify-between items-center text-sm">
@@ -423,21 +627,134 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                             htmlFor="use-loyalty-points"
                             className="flex items-center gap-2 text-muted-foreground"
                           >
-                            <Award className="h-4 w-4 text-green-500" /> Redeem Points
+                            <Award className="h-4 w-4 text-green-500" /> Redeem
+                            Points
                           </label>
                           <input
                             id="use-loyalty-points"
                             type="checkbox"
                             checked={loyalty.usePoints}
-                            onChange={(e) => loyalty.setUsePoints(e.target.checked)}
+                            onChange={(e) =>
+                              loyalty.setUsePoints(e.target.checked)
+                            }
                             className="h-4 w-4 text-green-500 focus:ring-green-500"
                           />
                         </div>
                       )}
                     </div>
+                  )}                  {/* Referral Wallet Section */}
+                  {/* Always show balance if customer has any, even if it's disabled by config */}
+                  {selectedCustomer && referralWallet.referralWalletBalance > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm items-center">
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          <Users className="h-4 w-4 text-purple-500" /> Referral
+                          Wallet Balance
+                        </span>
+                        <span className="font-semibold text-purple-600">
+                          ₹{referralWallet.referralWalletBalance.toFixed(2)}
+                        </span>
+                      </div>
+                      
+                      {/* Show relevant status messages based on configuration */}
+                      {!referralWallet.referralConfig.isEnabled && (
+                        <div className="text-sm text-amber-600 flex items-center gap-2">
+                          <Info className="h-4 w-4" /> Referral program is not active
+                        </div>
+                      )}
+                      {!referralWallet.referralConfig.referralEnabledInConfig && (
+                        <div className="text-sm text-amber-600 flex items-center gap-2">
+                          <Info className="h-4 w-4" /> Referrals are disabled for this location
+                        </div>
+                      )}
+                      {referralWallet.referralConfig.maxRewardsReached && (
+                        <div className="text-sm text-amber-600 flex items-center gap-2">
+                          <Info className="h-4 w-4" /> Maximum discounts reached for this booking
+                        </div>
+                      )}
+                      {!referralWallet.referralConfig.allowedByStrategy && 
+                       !referralWallet.referralConfig.maxRewardsReached && (
+                        <div className="text-sm text-amber-600 flex items-center gap-2">
+                          <Info className="h-4 w-4" /> This discount combination is not allowed
+                        </div>
+                      )}
+                      
+                      {referralWallet.disabledReason && !referralWallet.isReferralWalletEnabled && (
+                        <div className="text-sm text-amber-600 flex items-center gap-2">
+                          <Info className="h-4 w-4" /> {referralWallet.disabledReason}
+                        </div>
+                      )}
+                        {/* Only show input controls if the wallet is enabled */}
+                      {referralWallet.isReferralWalletEnabled && (
+                        <div className="space-y-2">
+                          {/* First add a checkbox to use the wallet */}
+                          <div className="flex justify-between items-center text-sm">
+                            <label
+                              htmlFor="use-referral-wallet"
+                              className="flex items-center gap-2 text-muted-foreground"
+                            >
+                              <Users className="h-4 w-4 text-purple-500" /> Use
+                              Referral Wallet
+                            </label>
+                            <input
+                              id="use-referral-wallet"
+                              type="checkbox"
+                              checked={referralWallet.useReferralWallet}
+                              onChange={(e) =>
+                                referralWallet.setUseReferralWallet(e.target.checked)
+                              }
+                              className="h-4 w-4 text-purple-500 focus:ring-purple-500"
+                            />
+                          </div>
+                          
+                          {/* Show amount input only if checkbox is checked */}
+                          {referralWallet.useReferralWallet && (
+                            <div className="flex justify-between items-center text-sm">
+                              <label
+                                htmlFor="referral-wallet-amount"
+                                className="flex items-center gap-2 text-muted-foreground"
+                              >
+                                <Users className="h-4 w-4 text-purple-500" /> Amount
+                                to Use
+                              </label>
+                              <div className="flex items-center">
+                                <span className="mr-1 text-muted-foreground">₹</span>
+                                <Input
+                                  id="referral-wallet-amount"
+                                  type="number"
+                                  min="0"
+                                  max={referralWallet.referralWalletBalance}
+                                  step="0.01"
+                                  value={referralWallet.referralWalletAmount}
+                                  onChange={(e) => {
+                                    const amount = parseFloat(e.target.value);
+                                    if (!isNaN(amount)) {
+                                      referralWallet.setReferralWalletAmount(amount);
+                                    } else {
+                                      referralWallet.setReferralWalletAmount(0);
+                                    }
+                                  }}
+                                  className="h-7 w-24 py-1 px-2 text-xs"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
-
-                  {loyalty.pointsDiscountAmount > 0 && (
+                  {/* Referral information is now shown in the popover */}
+                  {isNewCustomer &&
+                    referral.isReferralEnabled &&
+                    referral.selectedReferrerId && (
+                      <div className="flex justify-between text-sm text-blue-600">
+                        <span className="flex items-center">
+                          <Users className="mr-2 h-4 w-4" />
+                          Referral Program Active
+                        </span>
+                        <span>Both get cashback</span>
+                      </div>
+                    )}                  {loyalty.pointsDiscountAmount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span className="flex items-center">
                         <Award className="mr-2 h-4 w-4" />
@@ -446,16 +763,40 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       <span>-₹{loyalty.pointsDiscountAmount.toFixed(2)}</span>
                     </div>
                   )}
-
-                  {roundOffDifference>0 ? <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Round Off</span>
-                    <span>{roundOffDifference > 0 ? `+₹${formatPrice(roundOffDifference)}` : `₹${formatPrice(roundOffDifference)}`}</span>
-                  </div> : null}
+                  {referralWallet.referralWalletDiscountAmount > 0 && (
+                    <div className="flex justify-between text-sm text-purple-600">
+                      <span className="flex items-center">
+                        <Users className="mr-2 h-4 w-4" />
+                        Referral Wallet Discount
+                      </span>
+                      <span>-₹{referralWallet.referralWalletDiscountAmount.toFixed(2)}</span>
+                    </div>
+                  )}{" "}
+                  {/* Temporarily disabled until referralDiscount is implemented
+                  {referral.referralDiscount > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span className="flex items-center">
+                        <Users className="mr-2 h-4 w-4" />
+                        Referral Discount
+                      </span>
+                      <span>-₹{referral.referralDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  */}
+                  {roundOffDifference > 0 ? (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Round Off</span>
+                      <span>
+                        {roundOffDifference > 0
+                          ? `+₹${formatPrice(roundOffDifference)}`
+                          : `₹${formatPrice(roundOffDifference)}`}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}
           </div>
-
           {/* Fixed bottom section with shadow and background - only payment and total */}
           <div className="sticky bottom-0 border-t bg-white pt-3 space-y-4 flex-shrink-0">
             <div className="flex justify-between text-lg font-bold">
@@ -475,13 +816,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>
-                    {paymentMethods.length > 0 ? (
-                      paymentMethods.map((method) => (
-                        <SelectItem key={method.id} value={method.name}>
-                          {method.name}
-                        </SelectItem>
-                      ))
-                    ):  null}
+                    {paymentMethods.length > 0
+                      ? paymentMethods.map((method) => (
+                          <SelectItem key={method.id} value={method.name}>
+                            {method.name}
+                          </SelectItem>
+                        ))
+                      : null}
                   </SelectContent>
                 </Select>
               </div>
@@ -530,7 +871,9 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">No Discount</SelectItem>
-                            <SelectItem value="percentage">Percentage</SelectItem>
+                            <SelectItem value="percentage">
+                              Percentage
+                            </SelectItem>
                             <SelectItem value="fixed">Fixed Amount</SelectItem>
                           </SelectContent>
                         </Select>
@@ -550,6 +893,142 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                           />
                         )}
                       </div>
+
+                      {/* Referral Program Section */}
+                      {isNewCustomer && referral.isReferralEnabled && (
+                        <>
+                          <h3 className="font-semibold flex items-center gap-2">
+                            <Users className="h-4 w-4" /> Referral Program
+                          </h3>
+                          <div className="space-y-3">
+                            {" "}
+                            {!referral.selectedReferrerId ? (
+                              <div className="w-full">
+                                <div className="mb-2">
+                                  <p className="text-sm text-muted-foreground">
+                                    Select who referred this customer:
+                                  </p>
+                                </div>{" "}
+                                <div
+                                  className="relative"
+                                  ref={referralSearchRef}
+                                >
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Search by name or phone..."
+                                      value={referral.searchTerm}
+                                      onChange={(e) =>
+                                        referral.setSearchTerm(e.target.value)
+                                      }
+                                      onFocus={() =>
+                                        setShowReferralDropdown(true)
+                                      }
+                                      className="pl-10 pr-10"
+                                    />
+                                    {referral.isLoadingReferrers && (
+                                      <LoaderCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin" />
+                                    )}
+                                  </div>
+                                  {/* Dropdown - Show when focused or when there are customers to display */}
+                                  {showReferralDropdown && (
+                                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                      {referral.referrers.length > 0 ? (
+                                        referral.referrers.map((ref) => (
+                                          <div
+                                            key={ref.id}
+                                            className="flex items-center p-2 hover:bg-gray-50 cursor-pointer"
+                                            onClick={() => {
+                                              referral.setSelectedReferrerId(
+                                                ref.id
+                                              );
+                                              referral.setSearchTerm("");
+                                              setShowReferralDropdown(false);
+                                            }}
+                                          >
+                                            <div>
+                                              <p className="text-sm font-medium">
+                                                {ref.full_name}
+                                              </p>
+                                              <p className="text-xs text-muted-foreground">
+                                                {ref.phone_number}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="p-2 text-center text-sm text-muted-foreground">
+                                          {referral.searchTerm.length > 0
+                                            ? referral.searchTerm.length < 2
+                                              ? "Type at least 2 characters to search"
+                                              : "No customers found"
+                                            : "No customers available"}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between bg-blue-50 p-2 rounded">
+                                <div className="flex items-center">
+                                  {/* Find the selected referrer from all customers */}
+                                  {(() => {
+                                    const selectedReferrer =
+                                      referral.allCustomers.find(
+                                        (c) =>
+                                          c.id === referral.selectedReferrerId
+                                      );
+                                    return (
+                                      <>
+                                        {/* <Avatar className="h-6 w-6 mr-2">
+                                          {selectedReferrer?.full_name?.charAt(
+                                            0
+                                          ) || "C"}
+                                        </Avatar> */}
+                                        <div>
+                                          <p className="text-sm font-medium">
+                                            {selectedReferrer?.full_name}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {selectedReferrer?.phone_number}
+                                          </p>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    referral.setSelectedReferrerId(null)
+                                  }
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}{" "}
+                            {referral.selectedReferrerId && (
+                              <div className="text-xs bg-green-50 p-2 rounded">
+                                <p className="font-medium text-green-700">
+                                  Referral Benefits:
+                                </p>
+                                <p className="text-green-600 mt-1">
+                                  • Referrer gets ₹
+                                  {referral.potentialCashback.toFixed(2)}{" "}
+                                  cashback
+                                </p>
+                                <p className="text-green-600">
+                                  • Customer gets ₹
+                                  {referral.customerCashback.toFixed(2)}{" "}
+                                  cashback
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
 
                       <h3 className="font-semibold">Coupons</h3>
                       <div className="flex gap-4">
@@ -579,7 +1058,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       {coupons.selectedCoupon && (
                         <div className="text-xs text-green-600">
                           <span>
-                            {coupons.selectedCoupon.discount_type === "percentage"
+                            {coupons.selectedCoupon.discount_type ===
+                            "percentage"
                               ? `${coupons.selectedCoupon.discount_value}% off`
                               : `Fixed ₹${coupons.selectedCoupon.discount_value} off`}
                           </span>
