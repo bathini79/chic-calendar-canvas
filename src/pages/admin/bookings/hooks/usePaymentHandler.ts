@@ -25,6 +25,14 @@ interface UsePaymentHandlerProps {
     pointsToRedeem: number;
     pointsDiscountAmount: number;
   };
+  referralWallet: {
+    referralWalletToRedeem: number;
+    referralWalletDiscountAmount: number;
+  };
+  referrerId?: string | null;
+  referralCashback?: number;
+  customerCashback?: number;
+  isReferralApplicable?: boolean;
   total: number;
   adjustedPrices: Record<string, number>;
   onSaveAppointment: (params?: any) => Promise<string | null>;
@@ -34,11 +42,14 @@ interface UsePaymentHandlerProps {
 export const usePaymentHandler = ({
   selectedCustomer,
   paymentMethod,
-  appointmentId,
-  taxes,
+  appointmentId,  taxes,
   coupons,
-  membership,
-  loyalty,
+  membership,  loyalty,
+  referralWallet,
+  referrerId,
+  referralCashback,
+  customerCashback,
+  isReferralApplicable,
   total,
   adjustedPrices,
   onSaveAppointment,
@@ -57,9 +68,7 @@ export const usePaymentHandler = ({
       }
 
       const roundedTotal = Math.round(total);
-      const roundOffDifference = roundedTotal - total;
-
-      const saveAppointmentParams = {
+      const roundOffDifference = roundedTotal - total;      const saveAppointmentParams = {
         appointmentId,
         appliedTaxId: taxes.appliedTaxId,
         taxAmount: taxes.taxAmount,
@@ -77,7 +86,13 @@ export const usePaymentHandler = ({
         paymentMethod,
         pointsEarned: loyalty.pointsToEarn,
         pointsRedeemed: loyalty.pointsToRedeem,
-        pointsDiscountAmount: loyalty.pointsDiscountAmount
+        pointsDiscountAmount: loyalty.pointsDiscountAmount,
+        referralWalletRedeemed: referralWallet.referralWalletToRedeem,
+        referralWalletDiscountAmount: referralWallet.referralWalletDiscountAmount,
+        // Add referral information if applicable
+        referrerId: isReferralApplicable ? referrerId : null,
+        referralCashback: isReferralApplicable && referrerId ? referralCashback : 0,
+        customerCashback: isReferralApplicable && referrerId ? customerCashback : 0
       };
 
       const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);

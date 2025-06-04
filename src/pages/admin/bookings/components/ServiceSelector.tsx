@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryFilter } from "@/components/customer/services/CategoryFilter";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useServicesQuery, usePackagesQuery } from "@/hooks/use-services-query";
 import { useStaffAvailability } from "../hooks/useStaffAvailability";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -86,9 +87,16 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   const [expandedPackages, setExpandedPackages] = useState<string[]>([]);
   const [bookedStylistWarnings, setBookedStylistWarnings] = useState<
     Record<string, { message: string; status: string }>
-  >({});
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  >({});  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
   const pageSize = 10; // Number of items per page
+  const observerRef = React.useRef<IntersectionObserver | null>(null);
+  const loaderRef = React.useRef<HTMLDivElement | null>(null);
+  
+  // Add a ref to track if a fetch is in progress to prevent duplicate calls
+  const isFetchingRef = React.useRef<boolean>(false);
+  // Track the last time we triggered a fetch to implement a cooldown period
+  const lastFetchTimeRef = React.useRef<number>(0);
 
   // Get staff availability when appointment time is selected
   const {
@@ -101,6 +109,25 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     locationId,
     appointmentId, // Pass the appointmentId to useStaffAvailability
   });
+  
+  // Clean up the observer when component unmounts
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+    };
+  }, []);
+  
+  // Debounce search query to prevent excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Query to fetch employee skills (which service each stylist can perform)
   const { data: employeeSkills } = useQuery({
@@ -174,137 +201,92 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       if (error) throw error;
       return data;
     },
-  });
-
-  type ServicePage = {
-    data: any[];
-    nextPage: number | null;
-  };
-
+  });  // Use our optimized hooks for services and packages queries
   const {
     data: servicesData,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     isLoading: isLoadingServices,
-  } = useInfiniteQuery<ServicePage, Error>({
-    queryKey: ["services", locationId, selectedCategory, searchQuery],
-    queryFn: async ({ pageParam = 0 }: { pageParam?: number }) => {
-      let query = supabase
-        .from("services")
-        .select(
-          `
-          *,
-          services_categories!inner(
-            categories(id, name)
-          )
-        `
-        )
-        .eq("status", "active")
-        .order("name")
-        .range(
-          (pageParam as number) * pageSize,
-          (pageParam as number) * pageSize + pageSize - 1
-        );
-
-      // Apply search filter if query exists
-      if (searchQuery) {
-        query = query.ilike("name", `%${searchQuery}%`);
-      }
-
-      // Apply category filter if selected
-      if (selectedCategory) {
-        const { data: categoryServices, error: categoryError } = await supabase
-          .from("services_categories")
-          .select("service_id")
-          .eq("category_id", selectedCategory);
-
-        if (categoryError) throw categoryError;
-
-        if (categoryServices && categoryServices.length > 0) {
-          const serviceIds = categoryServices.map((cs) => cs.service_id);
-          query = query.in("id", serviceIds);
-        } else {
-          // If no services in this category, return empty array
-          return {
-            data: [],
-            nextPage: null,
-          };
-        }
-      }
-
-      if (locationId) {
-        // Get services associated with this location
-        const { data: serviceLocations, error: serviceLocationsError } =
-          await supabase
-            .from("service_locations")
-            .select("service_id")
-            .eq("location_id", locationId);
-
-        if (serviceLocationsError) throw serviceLocationsError;
-
-        // If we have service locations, filter by them
-        if (serviceLocations && serviceLocations.length > 0) {
-          const serviceIds = serviceLocations.map((sl) => sl.service_id);
-          query = query.in("id", serviceIds);
-        }
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Calculate if there's a next page
-      const hasMore = data.length === pageSize;
-
-      return {
-        data: data || [],
-        nextPage: hasMore ? ((pageParam as number) + 1) : null,
-      };
-    },
-    initialPageParam: 0,
-    getNextPageParam: (lastPage: ServicePage) => lastPage.nextPage,
+  } = useServicesQuery({
+    locationId,
+    selectedCategory,
+    searchQuery: debouncedSearchQuery,
+    pageSize,
   });
+
+  // Setup a new IntersectionObserver
+  const setupObserver = React.useCallback(() => {
+    if (!loaderRef.current || observerRef.current) return;
+    
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const now = Date.now();
+        const timeSinceLastFetch = now - lastFetchTimeRef.current;
+        const minTimeBetweenFetches = 1000; // 1 second cooldown between fetches
+        
+        if (
+          entries[0].isIntersecting && 
+          !isFetchingRef.current && 
+          hasNextPage &&
+          timeSinceLastFetch > minTimeBetweenFetches
+        ) {
+          console.log("Loading next page of services (debounced)");
+          isFetchingRef.current = true;
+          lastFetchTimeRef.current = now;
+          fetchNextPage()
+            .finally(() => {
+              // Reset the fetching flag after the request completes
+              setTimeout(() => {
+                isFetchingRef.current = false;
+              }, 300);
+            });
+        }
+      },
+      { threshold: 0.1, rootMargin: "300px" }
+    );
+    
+    observerRef.current.observe(loaderRef.current);
+  }, [fetchNextPage, hasNextPage]);
+  
+  // Reset the observer when query parameters change
+  useEffect(() => {
+    // Clear the observer so it gets recreated with new parameters
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+    
+    // Reset the fetching state when query parameters change
+    isFetchingRef.current = false;
+    lastFetchTimeRef.current = 0;
+    
+    // Give the DOM time to update before setting up a new observer
+    const timeoutId = setTimeout(() => {
+      if (loaderRef.current && hasNextPage) {
+        setupObserver();
+      }
+    }, 200);
+    
+    return () => clearTimeout(timeoutId);
+  }, [locationId, selectedCategory, debouncedSearchQuery, setupObserver, hasNextPage]);
 
   // Flatten the pages into a single services array
-  const services = servicesData?.pages.flatMap((page) => page.data) || [];
-
-  const { data: packages } = useQuery({
-    queryKey: ["packages", locationId, searchQuery],
-    queryFn: async () => {
-      let query = supabase
-        .from("packages")
-        .select(
-          `
-          *,
-          package_services(
-            service:services(*),
-            package_selling_price
-          )
-        `
-        )
-        .eq("status", "active");
-
-      if (searchQuery) {
-        query = query.ilike("name", `%${searchQuery}%`);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data;
-    },
+  const services = servicesData?.pages.flatMap(page => page.data) || [];
+    // Use the packages query hook
+  const { data: packages = [] } = usePackagesQuery({
+    locationId,
+    searchQuery: debouncedSearchQuery,
   });
-
-  const filteredServices = selectedCategory
+  const filteredServices = React.useMemo(() => selectedCategory
     ? services?.filter((service) =>
         service.services_categories.some(
           (sc) => sc.categories.id === selectedCategory
         )
       )
-    : services;
+    : services, [services, selectedCategory]);
 
-  const filteredPackages = selectedCategory
+  const filteredPackages = React.useMemo(() => selectedCategory
     ? packages?.filter((pkg) =>
         pkg.package_services.some((ps) =>
           services
@@ -314,9 +296,9 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
             )
         )
       )
-    : packages;
+    : packages, [packages, services, selectedCategory]);
 
-  const allItems = [
+  const allItems = React.useMemo(() => [
     ...(filteredPackages || []).map((pkg) => ({
       type: "package" as const,
       ...pkg,
@@ -325,7 +307,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       type: "service" as const,
       ...service,
     })),
-  ];
+  ], [filteredPackages, filteredServices]);
 
   const calculatePackagePrice = (pkg: any) => {
     const basePrice = pkg.price || 0;
@@ -342,7 +324,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     if (!availableStylistsInfo) return availableStylists.includes(stylistId);
 
     const stylistInfo = availableStylistsInfo.find((s) => s.id === stylistId);
-    
+
     // First, check if the stylist is working (scheduled) at this time
     // isAvailable will be false if stylist is not scheduled to work
     if (!stylistInfo?.isAvailable && !stylistInfo?.bookingInfo) {
@@ -360,7 +342,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       ) {
         return true; // Booking exists but is not active, so stylist is available
       }
-      
+
       // Has active booking conflict
       return false;
     }
@@ -425,36 +407,36 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
 
     // Get stylist name
     const stylistName =
-      stylists.find((s) => s.id === stylistId)?.name || "Stylist";    // Format times for the warning message with proper date handling
+      stylists.find((s) => s.id === stylistId)?.name || "Stylist"; // Format times for the warning message with proper date handling
     const startTime = bookingInfo?.startTime
       ? new Date(bookingInfo.startTime).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
-          hour12: true // Explicitly use 12-hour format with AM/PM
+          hour12: true, // Explicitly use 12-hour format with AM/PM
         })
       : "";
     const endTime = bookingInfo?.endTime
       ? new Date(bookingInfo.endTime).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
-          hour12: true // Explicitly use 12-hour format with AM/PM
+          hour12: true, // Explicitly use 12-hour format with AM/PM
         })
       : "";
-      
+
     // Also get the date of the conflicting appointment
     const conflictDate = bookingInfo?.startTime
       ? new Date(bookingInfo.startTime).toLocaleDateString([], {
           month: "short",
           day: "numeric",
         })
-      : "";    // Create warning message with booking details including date
+      : ""; // Create warning message with booking details including date
     setBookedStylistWarnings((prev) => ({
       ...prev,
       [itemId]: {
         message: `${stylistName} has a conflicting appointment on ${conflictDate} from ${startTime} to ${endTime}.`,
         status: bookingInfo?.status || "booked",
       },
-    }));// Still allow selection but show a toast warning with clearer message
+    })); // Still allow selection but show a toast warning with clearer message
     toast.warning(
       `${stylistName} has a conflicting appointment on ${conflictDate} at ${startTime}.`
     );
@@ -571,22 +553,30 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                       >
                         <span className="flex items-center gap-2">
                           {stylist.name}
-                {!available && colorIndicator && (
-                            getStylistBookingInfo(stylist.id) ? (
-                              <AlertCircle className="h-4 w-4 text-yellow-500" title="Conflicting appointment" />
+                          {!available &&
+                            colorIndicator &&
+                            (getStylistBookingInfo(stylist.id) ? (                              <AlertCircle
+                                className="h-4 w-4 text-yellow-500"
+                                aria-label="Conflicting appointment"
+                              />
                             ) : (
-                              <Clock className="h-4 w-4 text-gray-500" title="Not scheduled to work" />
-                            )
-                          )}
+                              <Clock
+                                className="h-4 w-4 text-gray-500"
+                                aria-label="Not scheduled to work"
+                              />
+                            ))}
                         </span>
                       </SelectItem>
                     </div>
-                  </TooltipTrigger>                {!available && (
+                  </TooltipTrigger>{" "}
+                  {!available && (
                     <TooltipContent side="right" align="start" className="z-50">
                       {getStylistBookingInfo(stylist.id) ? (
                         <p>This stylist has a conflicting appointment</p>
                       ) : (
-                        <p>This stylist is not scheduled to work at this time</p>
+                        <p>
+                          This stylist is not scheduled to work at this time
+                        </p>
                       )}
                     </TooltipContent>
                   )}
@@ -606,271 +596,266 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           selectedCategory={selectedCategory}
           onCategorySelect={setSelectedCategory}
         />
-        <div className="mb-1"> 
-        <Input
-          type="text"
-          placeholder="Search services or packages"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <div className="mb-1">
+          <Input
+            type="text"
+            placeholder="Search services or packages"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
       </div>
 
       <div className="border overflow-auto flex-1 w-full">
         <Table className="w-full">
           <TableHeader className="sticky top-0 z-10 bg-white shadow-sm">
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Duration</TableHead>
-          <TableHead>Gender</TableHead>
-          <TableHead>Price</TableHead>
-          <TableHead className="w-[200px]">Stylist</TableHead>
-          <TableHead className="w-[100px]"></TableHead>
-        </TableRow>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Gender</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead className="w-[200px]">Stylist</TableHead>
+              <TableHead className="w-[100px]"></TableHead>
+            </TableRow>
           </TableHeader>
           <TableBody>
-        {isLoadingServices && (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center py-6">
-          <div className="flex justify-center items-center gap-2">
-            <div className="animate-spin h-5 w-5 border-2 border-primary rounded-full border-t-transparent"></div>
-            <span className="text-sm text-muted-foreground">
-              Loading services...
-            </span>
-          </div>
-            </TableCell>
-          </TableRow>
-        )}
-
-        {!isLoadingServices && allItems.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center py-6">
-          <span className="text-sm text-muted-foreground">
-            No services found
-          </span>
-            </TableCell>
-          </TableRow>
-        )}
-
-        {allItems.map((item) => {
-          const isService = item.type === "service";
-          const isPackage = item.type === "package";
-          const isExpanded =
-            isPackage &&
-            (selectedPackages.includes(item.id) ||
-          expandedPackages.includes(item.id));
-          const isSelected = isService
-            ? selectedServices.includes(item.id)
-            : isExpanded;
-
-          // Format gender display text
-          const genderDisplay = isService
-            ? item.gender === "male"
-          ? "Male"
-          : item.gender === "female"
-          ? "Female"
-          : "All"
-            : "All";
-
-          return (
-            <React.Fragment key={`${item.type}-${item.id}`}>
-          <TableRow
-            className={cn(
-              "transition-colors",
-              isSelected && "bg-red-50 hover:bg-red-100"
-            )}
-          >
-            <TableCell>
-              <div className="flex items-center gap-2">
-            {isPackage && (
-              <div className="flex items-center gap-1">
-                <PackageIcon className="h-4 w-4" />
-                <Badge variant="default">Package</Badge>
-              </div>
-            )}
-            <span className="font-medium">{item.name}</span>
-              </div>
-            </TableCell>
-            <TableCell>
-              {isService
-            ? item.duration
-            : item.package_services?.reduce(
-                (sum: number, ps: any) =>
-              sum + (ps.service?.duration || 0),
-                0
-              )}{" "}
-              min
-            </TableCell>
-            <TableCell>{genderDisplay}</TableCell>
-            <TableCell>
-              ₹
-              {isService
-            ? item.selling_price
-            : calculatePackagePrice(item)}
-            </TableCell>
-            <TableCell>
-              {isService &&
-            isSelected &&
-            renderStylistDropdown(
-              item.id,
-              selectedStylists[item.id] || "",
-              true
-            )}
-            </TableCell>
-            <TableCell>
-              <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (isPackage) {
-                handlePackageSelect(item);
-              } else {
-                onServiceSelect(item.id);
-              }
-            }}
-              >
-            {isSelected ? (
-              <Minus className="h-4 w-4 text-destructive" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-              </Button>
-            </TableCell>
-          </TableRow>
-          {isPackage && isExpanded && (
-            <TableRow>
-              <TableCell colSpan={6} className="bg-slate-50">
-            <div className="pl-8 pr-4 py-2 space-y-2">
-              {item.package_services?.map((ps: any) => (
-                <div
-              key={ps.service.id}
-              className="flex items-center justify-between py-2 border-b last:border-0"
-                >
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium">
-                  {ps.service.name}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  ({ps.service.duration} min)
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {ps.service.gender === "male"
-                ? "(Male)"
-                : ps.service.gender === "female"
-                ? "(Female)"
-                : "(All)"}
-                </span>
-              </div>              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium">
-                  ₹
-                  {ps.package_selling_price !== null &&
-                  ps.package_selling_price !== undefined
-                ? ps.package_selling_price
-                : ps.service.selling_price}
-                </span>
-                {renderStylistDropdown(
-                  ps.service.id,
-                  selectedStylists[ps.service.id] || "",
-                  true // Add color indicator here too
-                )}
-              </div>
-                </div>
-              ))}
-              {item.is_customizable && (
-                <div className="pt-4 space-y-4">
-              <h4 className="font-medium text-sm">
-                Additional Services
-              </h4>
-              {services
-                ?.filter((service) =>
-                  item.customizable_services?.includes(
-                service.id
-                  )
-                )
-                .map((service) => (
-                  <div
-                key={service.id}
-                className="flex items-center justify-between py-2"
-                  >
-                <div className="flex items-center gap-4">
-                  <Checkbox
-                    checked={customizedServices[
-                  item.id
-                    ]?.includes(service.id)}
-                    onCheckedChange={() =>
-                  onCustomPackage &&
-                  onCustomPackage(item.id, service.id)
-                    }
-                  />
-                  <span className="text-sm font-medium">
-                    {service.name}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    ({service.duration} min)
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium">
-                    +₹{service.selling_price}
-                  </span>
-                  {customizedServices[item.id]?.includes(
-                    service.id
-                  ) &&
-                    renderStylistDropdown(
-                  service.id,
-                  selectedStylists[service.id] || ""
-                    )}
-                </div>
+            {isLoadingServices && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-6">
+                  <div className="flex justify-center items-center gap-2">
+                    <div className="animate-spin h-5 w-5 border-2 border-primary rounded-full border-t-transparent"></div>
+                    <span className="text-sm text-muted-foreground">
+                      Loading services...
+                    </span>
                   </div>
-                ))}
-                </div>
-              )}
-            </div>
-              </TableCell>
-            </TableRow>
-          )}
+                </TableCell>
+              </TableRow>
+            )}            {!isLoadingServices && allItems.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-6">
+                  <span className="text-sm text-muted-foreground">
+                    No services found
+                  </span>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {/* Add a key based on category, search terms and location to reset rows when these change */}
+            <React.Fragment key={`${selectedCategory}-${debouncedSearchQuery}-${locationId}`}>
+              {allItems.map((item) => {
+              const isService = item.type === "service";
+              const isPackage = item.type === "package";
+              const isExpanded =
+                isPackage &&
+                (selectedPackages.includes(item.id) ||
+                  expandedPackages.includes(item.id));
+              const isSelected = isService
+                ? selectedServices.includes(item.id)
+                : isExpanded;
+
+              // Format gender display text
+              const genderDisplay = isService
+                ? item.gender === "male"
+                  ? "Male"
+                  : item.gender === "female"
+                  ? "Female"
+                  : "All"
+                : "All";
+
+              return (
+                <React.Fragment key={`${item.type}-${item.id}`}>
+                  <TableRow
+                    className={cn(
+                      "transition-colors",
+                      isSelected && "bg-red-50 hover:bg-red-100"
+                    )}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {isPackage && (
+                          <div className="flex items-center gap-1">
+                            <PackageIcon className="h-4 w-4" />
+                            <Badge variant="default">Package</Badge>
+                          </div>
+                        )}
+                        <span className="font-medium">{item.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {isService
+                        ? item.duration
+                        : item.package_services?.reduce(
+                            (sum: number, ps: any) =>
+                              sum + (ps.service?.duration || 0),
+                            0
+                          )}{" "}
+                      min
+                    </TableCell>
+                    <TableCell>{genderDisplay}</TableCell>
+                    <TableCell>
+                      ₹
+                      {isService
+                        ? item.selling_price
+                        : calculatePackagePrice(item)}
+                    </TableCell>
+                    <TableCell>
+                      {isService &&
+                        isSelected &&
+                        renderStylistDropdown(
+                          item.id,
+                          selectedStylists[item.id] || "",
+                          true
+                        )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (isPackage) {
+                            handlePackageSelect(item);
+                          } else {
+                            onServiceSelect(item.id);
+                          }
+                        }}
+                      >
+                        {isSelected ? (
+                          <Minus className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Plus className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {isPackage && isExpanded && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="bg-slate-50">
+                        <div className="pl-8 pr-4 py-2 space-y-2">
+                          {item.package_services?.map((ps: any) => (
+                            <div
+                              key={ps.service.id}
+                              className="flex items-center justify-between py-2 border-b last:border-0"
+                            >
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm font-medium">
+                                  {ps.service.name}
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                  ({ps.service.duration} min)
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                  {ps.service.gender === "male"
+                                    ? "(Male)"
+                                    : ps.service.gender === "female"
+                                    ? "(Female)"
+                                    : "(All)"}
+                                </span>
+                              </div>{" "}
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm font-medium">
+                                  ₹
+                                  {ps.package_selling_price !== null &&
+                                  ps.package_selling_price !== undefined
+                                    ? ps.package_selling_price
+                                    : ps.service.selling_price}
+                                </span>
+                                {renderStylistDropdown(
+                                  ps.service.id,
+                                  selectedStylists[ps.service.id] || "",
+                                  true // Add color indicator here too
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          {item.is_customizable && (
+                            <div className="pt-4 space-y-4">
+                              <h4 className="font-medium text-sm">
+                                Additional Services
+                              </h4>
+                              {services
+                                ?.filter((service) =>
+                                  item.customizable_services?.includes(
+                                    service.id
+                                  )
+                                )
+                                .map((service) => (
+                                  <div
+                                    key={service.id}
+                                    className="flex items-center justify-between py-2"
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <Checkbox
+                                        checked={customizedServices[
+                                          item.id
+                                        ]?.includes(service.id)}
+                                        onCheckedChange={() =>
+                                          onCustomPackage &&
+                                          onCustomPackage(item.id, service.id)
+                                        }
+                                      />
+                                      <span className="text-sm font-medium">
+                                        {service.name}
+                                      </span>
+                                      <span className="text-sm text-muted-foreground">
+                                        ({service.duration} min)
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                      <span className="text-sm font-medium">
+                                        +₹{service.selling_price}
+                                      </span>
+                                      {customizedServices[item.id]?.includes(
+                                        service.id
+                                      ) &&
+                                        renderStylistDropdown(
+                                          service.id,
+                                          selectedStylists[service.id] || ""
+                                        )}
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}                </React.Fragment>
+              );
+            })}
             </React.Fragment>
-          );
-        })}
           </TableBody>
-        </Table>
-        {/* Infinite scroll loader */}
+        </Table>        {/* Infinite scroll loader */}
         {hasNextPage && (
           <div
-        className="py-4 text-center"
-        ref={(el) => {
-          if (!el) return;
-
-          const observer = new IntersectionObserver(
-            (entries) => {
-          if (
-            entries[0].isIntersecting &&
-            !isFetchingNextPage &&
-            hasNextPage
-          ) {
-            fetchNextPage();
-          }
-            },
-            { threshold: 0.5 }
-          );
-
-          observer.observe(el);
-
-          return () => observer.disconnect();
-        }}
+            className="py-4 text-center"
+            ref={(el) => {
+              if (!el) {
+                loaderRef.current = null;
+                return;
+              }
+              
+              // Store the loader ref and set up observer
+              loaderRef.current = el;
+              
+              // Set up the observer if it doesn't exist
+              // The actual observer setup happens in the setupObserver callback
+              if (!observerRef.current && !isFetchingRef.current) {
+                setupObserver();
+              }
+            }}
           >
-        {isFetchingNextPage ? (
-          <div className="flex justify-center items-center gap-2">
-            <div className="animate-spin h-4 w-4 border-2 border-primary rounded-full border-t-transparent"></div>
-            <span className="text-sm text-muted-foreground">
-          Loading more...
-            </span>
-          </div>
-        ) : (
-          <span className="text-sm text-muted-foreground">
-            Scroll for more
-          </span>
-        )}{" "}
+            {isFetchingNextPage ? (
+              <div className="flex justify-center items-center gap-2">
+                <div className="animate-spin h-4 w-4 border-2 border-primary rounded-full border-t-transparent"></div>
+                <span className="text-sm text-muted-foreground">
+                  Loading more...
+                </span>
+              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                Scroll for more
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -898,4 +883,4 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       )}
     </div>
   );
-}
+};

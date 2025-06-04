@@ -53,10 +53,12 @@ import {
   Plus,
   Pencil,
   Save,
+  Settings,
   Star,
   Trash,
   X,
   ChevronLeft,
+  Users,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -69,6 +71,7 @@ import {
   usePaymentMethods,
   type PaymentMethod,
 } from "@/hooks/use-payment-methods";
+import { useReferralProgram } from "@/hooks/use-referral-program";
 import {
   Tooltip,
   TooltipContent,
@@ -79,6 +82,7 @@ import { Link } from "react-router-dom";
 // Components for different sections
 import LoyaltyProgram from "./LoyaltyProgram";
 import Memberships from "./Memberships";
+import DiscountRewardUsage from "./DiscountRewardUsage";
 
 const taxRateFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -100,6 +104,107 @@ const couponFormSchema = z.object({
   apply_to_all: z.boolean().default(true),
 });
 
+// Referral Program schema
+const referralProgramFormSchema = z
+  .object({
+    is_enabled: z.boolean().default(false),
+
+    // Service rewards
+    service_reward_type: z.enum(["percentage", "fixed"]).default("percentage"),
+    service_percentage: z.coerce
+      .number()
+      .min(0, "Percentage must be a positive number")
+      .max(100, "Percentage must not exceed 100")
+      .optional(),
+    service_fixed_amount: z.coerce
+      .number()
+      .min(0, "Amount must be a positive number")
+      .optional(),
+
+    // Membership rewards
+    membership_reward_type: z
+      .enum(["percentage", "fixed"])
+      .default("percentage"),
+    membership_percentage: z.coerce
+      .number()
+      .min(0, "Percentage must be a positive number")
+      .max(100, "Percentage must not exceed 100")
+      .optional(),
+    membership_fixed_amount: z.coerce
+      .number()
+      .min(0, "Amount must be a positive number")
+      .optional(),
+
+    // Product rewards
+    product_reward_type: z.enum(["percentage", "fixed"]).default("percentage"),
+    product_percentage: z.coerce
+      .number()
+      .min(0, "Percentage must be a positive number")
+      .max(100, "Percentage must not exceed 100")
+      .optional(),
+    product_fixed_amount: z.coerce
+      .number()
+      .min(0, "Amount must be a positive number")
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.service_reward_type === "percentage") {
+        return (
+          data.service_percentage !== undefined &&
+          data.service_percentage !== null
+        );
+      } else {
+        return (
+          data.service_fixed_amount !== undefined &&
+          data.service_fixed_amount !== null
+        );
+      }
+    },
+    {
+      message: "Please provide a value for the selected service reward type",
+      path: ["service_reward_type"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.membership_reward_type === "percentage") {
+        return (
+          data.membership_percentage !== undefined &&
+          data.membership_percentage !== null
+        );
+      } else {
+        return (
+          data.membership_fixed_amount !== undefined &&
+          data.membership_fixed_amount !== null
+        );
+      }
+    },
+    {
+      message: "Please provide a value for the selected membership reward type",
+      path: ["membership_reward_type"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.product_reward_type === "percentage") {
+        return (
+          data.product_percentage !== undefined &&
+          data.product_percentage !== null
+        );
+      } else {
+        return (
+          data.product_fixed_amount !== undefined &&
+          data.product_fixed_amount !== null
+        );
+      }
+    },
+    {
+      message: "Please provide a value for the selected product reward type",
+      path: ["product_reward_type"],
+    }
+  );
+
 // Gift Cards placeholder component
 const GiftCards = () => (
   <div className="container py-6">
@@ -118,6 +223,582 @@ const GiftCards = () => (
     </Card>
   </div>
 );
+
+// Referral Program component
+const ReferralProgram = () => {
+  const {
+    referralProgram,
+    isLoading,
+    fetchReferralProgram,
+    updateReferralProgram,
+  } = useReferralProgram();
+
+  const form = useForm<z.infer<typeof referralProgramFormSchema>>({
+    resolver: zodResolver(referralProgramFormSchema),
+    defaultValues: {
+      is_enabled: false,
+
+      // Default values for services
+      service_reward_type: "percentage",
+      service_percentage: 5,
+      service_fixed_amount: 100,
+
+      // Default values for memberships
+      membership_reward_type: "percentage",
+      membership_percentage: 10,
+      membership_fixed_amount: 200,
+
+      // Default values for products
+      product_reward_type: "percentage",
+      product_percentage: 3,
+      product_fixed_amount: 50,
+    },
+  });
+
+  useEffect(() => {
+    if (referralProgram) {
+      form.reset({
+        is_enabled: referralProgram.is_enabled,
+
+        // Services
+        service_reward_type:
+          referralProgram.service_reward_type || "percentage",
+        service_percentage: referralProgram.service_percentage || 5,
+        service_fixed_amount: referralProgram.service_fixed_amount || 100,
+
+        // Memberships
+        membership_reward_type:
+          referralProgram.membership_reward_type || "percentage",
+        membership_percentage: referralProgram.membership_percentage || 10,
+        membership_fixed_amount: referralProgram.membership_fixed_amount || 200,
+
+        // Products
+        product_reward_type:
+          referralProgram.product_reward_type || "percentage",
+        product_percentage: referralProgram.product_percentage || 3,
+        product_fixed_amount: referralProgram.product_fixed_amount || 50,
+      });
+    }
+  }, [referralProgram, form]);
+
+  const onSubmit = async (
+    values: z.infer<typeof referralProgramFormSchema>
+  ) => {
+    await updateReferralProgram({
+      is_enabled: values.is_enabled,
+
+      // Services rewards
+      service_reward_type: values.service_reward_type,
+      service_percentage:
+        values.service_reward_type === "percentage"
+          ? values.service_percentage
+          : undefined,
+      service_fixed_amount:
+        values.service_reward_type === "fixed"
+          ? values.service_fixed_amount
+          : undefined,
+
+      // Membership rewards
+      membership_reward_type: values.membership_reward_type,
+      membership_percentage:
+        values.membership_reward_type === "percentage"
+          ? values.membership_percentage
+          : undefined,
+      membership_fixed_amount:
+        values.membership_reward_type === "fixed"
+          ? values.membership_fixed_amount
+          : undefined,
+
+      // Product rewards
+      product_reward_type: values.product_reward_type,
+      product_percentage:
+        values.product_reward_type === "percentage"
+          ? values.product_percentage
+          : undefined,
+      product_fixed_amount:
+        values.product_reward_type === "fixed"
+          ? values.product_fixed_amount
+          : undefined,
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-2xl font-bold tracking-tight">Referral Program</h2>
+      <Card>
+        <CardContent className="pt-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="is_enabled"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">
+                          Enable Referral Program
+                        </FormLabel>
+                        <FormDescription>
+                          Turn on to allow customers to earn rewards for
+                          referring new customers
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                {/* Services Reward Section */}
+                <div className="bg-gray-50 p-4 rounded-md mt-6">
+                  <h3 className="text-lg font-medium mb-4">
+                    Service Referral Rewards
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex flex-row items-end gap-4">
+                      <FormField
+                        control={form.control}
+                        name="service_reward_type"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <div className="flex items-center gap-1">
+                              <FormLabel>Service Reward Type</FormLabel>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p>
+                                      Choose whether to reward referrers with a
+                                      percentage of the service bill or a fixed
+                                      amount.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            <Select
+                              disabled={isLoading}
+                              onValueChange={field.onChange}
+                              value={field.value}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select reward type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="percentage">
+                                  Percentage of Bill
+                                </SelectItem>
+                                <SelectItem value="fixed">
+                                  Fixed Amount
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {form.watch("service_reward_type") === "percentage" && (
+                        <FormField
+                          control={form.control}
+                          name="service_percentage"
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <div className="flex items-center gap-1">
+                                <FormLabel>Percentage</FormLabel>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p>
+                                        The percentage of the service bill
+                                        amount that will be given as reward to
+                                        the referrer.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <FormControl>
+                                <div className="flex items-center">
+                                  <Input
+                                    type="number"
+                                    disabled={isLoading}
+                                    {...field}
+                                    className="w-24"
+                                  />
+                                  <span className="ml-2">%</span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {form.watch("service_reward_type") === "fixed" && (
+                        <FormField
+                          control={form.control}
+                          name="service_fixed_amount"
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <div className="flex items-center gap-1">
+                                <FormLabel>Fixed Amount</FormLabel>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p>
+                                        The fixed amount that will be given as
+                                        reward to the referrer for service
+                                        purchases.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <FormControl>
+                                <div className="flex items-center">
+                                  <Input
+                                    type="number"
+                                    disabled={isLoading}
+                                    {...field}
+                                    className="w-24"
+                                  />
+                                  <span className="ml-2">₹</span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {/* Membership Reward Section */}
+                <div className="bg-gray-50 p-4 rounded-md mt-6">
+                  <h3 className="text-lg font-medium mb-4">
+                    Membership Referral Rewards
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex flex-row items-end gap-4">
+                      <FormField
+                        control={form.control}
+                        name="membership_reward_type"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <div className="flex items-center gap-1">
+                              <FormLabel>Membership Reward Type</FormLabel>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p>
+                                      Choose whether to reward referrers with a
+                                      percentage of the membership cost or a
+                                      fixed amount.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            <Select
+                              disabled={isLoading}
+                              onValueChange={field.onChange}
+                              value={field.value}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select reward type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="percentage">
+                                  Percentage of Cost
+                                </SelectItem>
+                                <SelectItem value="fixed">
+                                  Fixed Amount
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {form.watch("membership_reward_type") ===
+                        "percentage" && (
+                        <FormField
+                          control={form.control}
+                          name="membership_percentage"
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <div className="flex items-center gap-1">
+                                <FormLabel>Percentage</FormLabel>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p>
+                                        The percentage of the membership cost
+                                        that will be given as reward to the
+                                        referrer.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <FormControl>
+                                <div className="flex items-center">
+                                  <Input
+                                    type="number"
+                                    disabled={isLoading}
+                                    {...field}
+                                    className="w-24"
+                                  />
+                                  <span className="ml-2">%</span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {form.watch("membership_reward_type") === "fixed" && (
+                        <FormField
+                          control={form.control}
+                          name="membership_fixed_amount"
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <div className="flex items-center gap-1">
+                                <FormLabel>Fixed Amount</FormLabel>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p>
+                                        The fixed amount that will be given as
+                                        reward to the referrer for membership
+                                        purchases.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <FormControl>
+                                <div className="flex items-center">
+                                  <Input
+                                    type="number"
+                                    disabled={isLoading}
+                                    {...field}
+                                    className="w-24"
+                                  />
+                                  <span className="ml-2">₹</span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {/* Product Reward Section */}
+                <div className="bg-gray-50 p-4 rounded-md mt-6">
+                  <h3 className="text-lg font-medium mb-4">
+                    Product Referral Rewards
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex flex-row items-end gap-4">
+                      <FormField
+                        control={form.control}
+                        name="product_reward_type"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <div className="flex items-center gap-1">
+                              <FormLabel>Product Reward Type</FormLabel>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p>
+                                      Choose whether to reward referrers with a
+                                      percentage of the product price or a fixed
+                                      amount.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            <Select
+                              disabled={isLoading}
+                              onValueChange={field.onChange}
+                              value={field.value}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select reward type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="percentage">
+                                  Percentage of Price
+                                </SelectItem>
+                                <SelectItem value="fixed">
+                                  Fixed Amount
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {form.watch("product_reward_type") === "percentage" && (
+                        <FormField
+                          control={form.control}
+                          name="product_percentage"
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <div className="flex items-center gap-1">
+                                <FormLabel>Percentage</FormLabel>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p>
+                                        The percentage of the product price that
+                                        will be given as reward to the referrer.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <FormControl>
+                                <div className="flex items-center">
+                                  <Input
+                                    type="number"
+                                    disabled={isLoading}
+                                    {...field}
+                                    className="w-24"
+                                  />
+                                  <span className="ml-2">%</span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {form.watch("product_reward_type") === "fixed" && (
+                        <FormField
+                          control={form.control}
+                          name="product_fixed_amount"
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <div className="flex items-center gap-1">
+                                <FormLabel>Fixed Amount</FormLabel>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p>
+                                        The fixed amount that will be given as
+                                        reward to the referrer for product
+                                        purchases.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                              <FormControl>
+                                <div className="flex items-center">
+                                  <Input
+                                    type="number"
+                                    disabled={isLoading}
+                                    {...field}
+                                    className="w-24"
+                                  />
+                                  <span className="ml-2">₹</span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Button type="submit" disabled={isLoading} className="w-32 mt-6">
+                {isLoading ? (
+                  <>
+                    <span className="animate-spin mr-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                      </svg>
+                    </span>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save
+                  </>
+                )}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 export default function Sales() {
   const {
@@ -972,9 +1653,13 @@ export default function Sales() {
 
       case "loyalty-program":
         return <LoyaltyProgram />;
-
       case "gift-cards":
         return <GiftCards />;
+      case "referral-program":
+        return <ReferralProgram />;
+
+      case "discount-reward-usage":
+        return <DiscountRewardUsage />;
 
       default:
         return null;
@@ -984,20 +1669,19 @@ export default function Sales() {
   return (
     <TooltipProvider>
       <div className="container py-6">
-      <div className="flex items-center mb-6">
-            {" "}
-            <Button variant="ghost" size="sm" asChild className="mr-2">
-              <Link to="/admin/settings">
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Back
-              </Link>
-            </Button>
-            <div className="text-sm text-muted-foreground">
-              Workspace settings • Sales
-            </div>
+        <div className="flex items-center mb-6">
+          {" "}
+          <Button variant="ghost" size="sm" asChild className="mr-2">
+            <Link to="/admin/settings">
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back
+            </Link>
+          </Button>
+          <div className="text-sm text-muted-foreground">
+            Workspace settings • Sales
           </div>
+        </div>
         <div className="flex space-x-6">
-          
           {/* Sidebar */}
           <div className="w-64 bg-gray-50 rounded-lg p-4">
             <h2 className="text-xl font-semibold mb-4">Sales Settings</h2>
@@ -1041,7 +1725,7 @@ export default function Sales() {
               >
                 <Star className="mr-2 h-4 w-4" />
                 Loyalty Program
-              </Button>
+              </Button>{" "}
               <Button
                 variant={activeTab === "gift-cards" ? "default" : "ghost"}
                 className="w-full justify-start"
@@ -1049,6 +1733,24 @@ export default function Sales() {
               >
                 <Gift className="mr-2 h-4 w-4" />
                 Gift Cards
+              </Button>{" "}
+              <Button
+                variant={activeTab === "referral-program" ? "default" : "ghost"}
+                className="w-full justify-start"
+                onClick={() => setActiveTab("referral-program")}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Referral Program
+              </Button>
+              <Button
+                variant={
+                  activeTab === "discount-reward-usage" ? "default" : "ghost"
+                }
+                className="w-full justify-start"
+                onClick={() => setActiveTab("discount-reward-usage")}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Discount & Reward Usage
               </Button>
             </nav>
           </div>

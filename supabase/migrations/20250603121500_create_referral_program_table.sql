@@ -2,7 +2,9 @@
 create table if not exists public.referral_program (
   id uuid primary key default gen_random_uuid(),
   is_enabled boolean not null default false,
-  percentage float not null,
+  reward_type text not null default 'percentage', -- 'percentage' or 'fixed'
+  percentage float,
+  fixed_amount float,
   created_at timestamp with time zone default now() not null,
   updated_at timestamp with time zone default now() not null
 );
