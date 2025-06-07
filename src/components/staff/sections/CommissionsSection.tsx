@@ -745,11 +745,19 @@ export function CommissionsSection({
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <div className="flex items-center">
-                        <Switch
+                      <div className="flex items-center">                        <Switch
                           checked={field.value}
                           onCheckedChange={(checked) => {
                             field.onChange(checked);
+                            // Clear commission_type when disabling commissions
+                            if (!checked) {
+                              form.setValue("commission_type", undefined, {
+                                shouldValidate: false, // Don't validate when clearing
+                                shouldDirty: true,
+                              });
+                              // Also clear errors for commission_type
+                              form.clearErrors("commission_type");
+                            }
                           }}
                         />
                       </div>

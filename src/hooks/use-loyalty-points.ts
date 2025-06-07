@@ -1,8 +1,8 @@
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { LoyaltyProgramSettings } from "@/pages/admin/bookings/types";
-import { toast } from "sonner";
 
 interface CustomerPoints {
   walletBalance: number;
@@ -10,89 +10,168 @@ interface CustomerPoints {
 }
 
 export function useLoyaltyPoints(customerId?: string) {
-  const [settings, setSettings] = useState<LoyaltyProgramSettings | null>(null);
-  const [customerPoints, setCustomerPoints] = useState<CustomerPoints | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetchSettings = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('loyalty_program_settings')
-        .select('*')
-        .single();
-      
-      if (error) {
-        console.error('Error fetching loyalty settings:', error);
-        return;
-      }
-      
-      if (data) {
-        setSettings(data as LoyaltyProgramSettings);
-      }
-    } catch (error) {
-      console.error('Unexpected error fetching loyalty settings:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const fetchCustomerPoints = useCallback(async () => {
-    if (!customerId) {
-      setCustomerPoints(null);
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('wallet_balance, last_used')
-        .eq('id', customerId)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching customer points:', error);
-        return;
-      }
-      
-      if (data) {
-        let walletBalance = Number(data.wallet_balance) || 0;
-        const lastUsed = data.last_used ? new Date(data.last_used) : null;
+  // Fetch loyalty program settings with React Query
+  const {
+    data: settings,
+    isLoading: settingsLoading,
+    error: settingsError
+  } = useQuery({
+    queryKey: ['loyalty-program-settings'],
+    queryFn: async (): Promise<LoyaltyProgramSettings | null> => {
+      try {
+        const { data, error } = await supabase
+          .from('loyalty_program_settings')
+          .select('*')
+          .single();
         
-        if (lastUsed && settings?.points_validity_days) {
-          const expiryDate = new Date(lastUsed);
-          expiryDate.setDate(expiryDate.getDate() + settings.points_validity_days);
-          
-          if (expiryDate < new Date()) {
-            walletBalance = 0;
-          }
+        if (error) {
+          console.error('Error fetching loyalty settings:', error);
+          // Return default disabled settings
+          return {
+            id: 'default',
+            enabled: false,
+            points_per_spend: 1,
+            point_value: 1,
+            min_redemption_points: 100,
+            min_billing_amount: null,
+            apply_to_all: true,
+            applicable_services: [],
+            applicable_packages: [],
+            points_validity_days: null,
+            cashback_validity_days: null,
+            max_redemption_type: null,
+            max_redemption_points: null,
+            max_redemption_percentage: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as LoyaltyProgramSettings;
         }
         
-        setCustomerPoints({
-          walletBalance,
-          lastUsed
-        });
+        if (data) {
+          return {
+            ...data,
+            point_value: (data as any).point_value || 1,
+            cashback_validity_days: (data as any).cashback_validity_days || null
+          } as LoyaltyProgramSettings;
+        }
+        
+        return null;
+      } catch (error) {
+        console.error('Unexpected error fetching loyalty settings:', error);
+        // Return safe defaults
+        return {
+          id: 'default',
+          enabled: false,
+          points_per_spend: 1,
+          point_value: 1,
+          min_redemption_points: 100,
+          min_billing_amount: null,
+          apply_to_all: true,
+          applicable_services: [],
+          applicable_packages: [],
+          points_validity_days: null,
+          cashback_validity_days: null,
+          max_redemption_type: null,
+          max_redemption_points: null,
+          max_redemption_percentage: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as LoyaltyProgramSettings;
       }
-    } catch (error) {
-      console.error('Unexpected error fetching customer points:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [customerId, settings?.points_validity_days]);
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    placeholderData: {
+      id: 'placeholder',
+      enabled: false,
+      points_per_spend: 1,
+      point_value: 1,
+      min_redemption_points: 100,
+      min_billing_amount: null,
+      apply_to_all: true,
+      applicable_services: [],
+      applicable_packages: [],
+      points_validity_days: null,
+      cashback_validity_days: null,
+      max_redemption_type: null,
+      max_redemption_points: null,
+      max_redemption_percentage: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    } as LoyaltyProgramSettings
+  });
 
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+  // Fetch customer points with React Query
+  const {
+    data: customerPoints,
+    isLoading: pointsLoading,
+    error: pointsError
+  } = useQuery({
+    queryKey: ['customer-points', customerId],
+    queryFn: async (): Promise<CustomerPoints | null> => {
+      if (!customerId) {
+        return null;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('wallet_balance, last_used')
+          .eq('id', customerId)
+          .single();
+        
+        if (error) {
+          console.error('Error fetching customer points:', error);
+          return {
+            walletBalance: 0,
+            lastUsed: null
+          };
+        }
+        
+        if (data) {
+          let walletBalance = Number(data.wallet_balance) || 0;
+          const lastUsed = data.last_used ? new Date(data.last_used) : null;
+          
+          // Check if points have expired
+          if (lastUsed && settings?.points_validity_days) {
+            const expiryDate = new Date(lastUsed);
+            expiryDate.setDate(expiryDate.getDate() + settings.points_validity_days);
+            
+            if (expiryDate < new Date()) {
+              walletBalance = 0;
+            }
+          }
+          
+          return {
+            walletBalance,
+            lastUsed
+          };
+        }
+        
+        return {
+          walletBalance: 0,
+          lastUsed: null
+        };
+      } catch (error) {
+        console.error('Unexpected error fetching customer points:', error);
+        return {
+          walletBalance: 0,
+          lastUsed: null
+        };
+      }
+    },
+    enabled: !!customerId, // Only run if customerId is provided
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false
+  });
 
-  useEffect(() => {
-    if (customerId) {
-      fetchCustomerPoints();
-    } else {
-      setCustomerPoints(null);
-    }
-  }, [customerId, fetchCustomerPoints]);
+  const isLoading = settingsLoading || pointsLoading;
 
   const isEligibleItem = useCallback((itemId: string, type: 'service' | 'package') => {
     if (!settings || !settings.enabled) return false;

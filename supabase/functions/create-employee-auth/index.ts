@@ -56,22 +56,79 @@ serve(async (req) => {
       console.error('Error creating auth user:', authError)
       throw new Error(`Failed to create user: ${authError.message}`)
     }
+      const userId = authUser.user.id
     
-    const userId = authUser.user.id
+    console.log("Employee auth user created with ID:", userId);
     
-    // Update profile with employee data
-    const { error: profileError } = await supabaseAdmin
+    // Create/update profile with employee data
+    // Wait a short time for auth triggers to run
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Check if profile already exists (created by database trigger)
+    const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
       .from('profiles')
-      .update({
-        full_name: name,
-        phone_number: phone,
-        role: 'employee'
-      })
+      .select('*')
       .eq('id', userId)
+      .single();
     
-    if (profileError) {
-      console.error('Error updating profile:', profileError)
-      throw new Error(`Failed to update profile: ${profileError.message}`)
+    if (existingProfile) {
+      console.log('Profile already exists, updating with employee information:', userId);
+      
+      // Update the existing profile with employee fields
+      const { error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          full_name: name,
+          phone_number: phone,
+          phone_verified: true,
+          role: 'employee',
+          last_used: new Date().toISOString()
+        })
+        .eq('id', userId);
+        
+      if (updateError) {
+        console.error('Error updating profile with employee information:', updateError);
+        throw new Error(`Failed to update profile: ${updateError.message}`);
+      } else {
+        console.log('Successfully updated profile with employee information');
+      }
+    } else {
+      // Try to create a new profile if none exists
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          id: userId,
+          user_id: userId,
+          full_name: name,
+          phone_number: phone,
+          phone_verified: true,
+          role: 'employee',
+          wallet_balance: 0,
+          last_used: new Date().toISOString()
+        });
+        
+      if (profileError) {
+        console.log('Profile insert error, trying again with update:', profileError);
+        
+        // If insert fails, try updating as a last resort
+        const { error: updateError } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            full_name: name,
+            phone_number: phone,
+            phone_verified: true,
+            role: 'employee',
+            last_used: new Date().toISOString()
+          })
+          .eq('id', userId);
+          
+        if (updateError) {
+          console.error('All profile creation/update attempts failed:', updateError);
+          throw new Error(`Failed to create/update profile: ${updateError.message}`);
+        }
+      } else {
+        console.log('Successfully created new employee profile');
+      }
     }
     
     return new Response(

@@ -146,7 +146,6 @@ export const useAppointmentActions = () => {
       setIsLoading(false);
     }
   };
-
   const processRefund = async (
     appointmentId: string,
     bookingIds: string[],
@@ -157,7 +156,7 @@ export const useAppointmentActions = () => {
 
       const { data: originalAppointment, error: appointmentError } = await supabase
         .from('appointments')
-        .select('*, tax:tax_rates(*)')
+        .select('*, tax:tax_rates(*), customer:customer_id(*)')
         .eq('id', appointmentId)
         .single();
 
@@ -182,8 +181,7 @@ export const useAppointmentActions = () => {
         .select('id, status, price_paid, appointment_id')
         .eq('appointment_id', appointmentId);
 
-      if (bookingsError) throw bookingsError;
-
+      if (bookingsError) throw bookingsError;      // Get all bookings and their original prices
       const refundAmount = allBookings
         ?.filter(booking => bookingIds.includes(booking.id))
         .reduce((total, booking) => total + (booking.price_paid || 0), 0) || 0;
@@ -191,14 +189,23 @@ export const useAppointmentActions = () => {
       const totalBookingsAmount = allBookings?.reduce((total, booking) => 
         total + (booking.price_paid || 0), 0) || 0;
       
+      // Calculate the proportion of the total being refunded based on booking prices
       const refundProportion = totalBookingsAmount > 0 ? refundAmount / totalBookingsAmount : 0;
+      
+      // Calculate what percentage of the total price this refund represents
+      const originalTotalPrice = Math.abs(originalAppointment.total_price || 0);
+      // Calculate the discounted refund amount based on the proportion of the total price
+      const discountedRefundAmount = originalTotalPrice * refundProportion;
       
       const taxAmount = originalAppointment.tax_amount || 0;
       const taxToRefund = taxAmount * refundProportion;
       
-      const totalRefundAmount = refundAmount + taxToRefund;
-
-      const { data: refundAppointment, error: refundError } = await supabase
+      // Calculate referral wallet amount to refund
+      const referralWalletAmount = originalAppointment.referral_wallet_discount_amount || 0;
+      const referralWalletToRefund = referralWalletAmount * refundProportion;
+      
+      // Use the discounted refund amount instead of the raw refund amount
+      const totalRefundAmount = discountedRefundAmount + taxToRefund;      const { data: refundAppointment, error: refundError } = await supabase
         .from('appointments')
         .insert({
           customer_id: originalAppointment.customer_id,
@@ -221,7 +228,8 @@ export const useAppointmentActions = () => {
           membership_name: originalAppointment.membership_name,
           coupon_id: originalAppointment.coupon_id,
           coupon_name: originalAppointment.coupon_name,
-          coupon_amount: originalAppointment.coupon_amount,
+          coupon_amount: originalAppointment.coupon_amount,          // Store the referral wallet amount in the refund record
+          referral_wallet_redeemed: originalAppointment.referral_wallet_redeemed ? -originalAppointment.referral_wallet_redeemed : undefined,
           location: originalAppointment.location
         })
         .select()
@@ -240,11 +248,44 @@ export const useAppointmentActions = () => {
         })
         .in('id', bookingIds);
 
-      if (bookingUpdateError) throw bookingUpdateError;
-
-      const isFullRefund = allBookings?.every(booking => 
+      if (bookingUpdateError) throw bookingUpdateError;      const isFullRefund = allBookings?.every(booking => 
         booking.status === 'refunded' || bookingIds.includes(booking.id)
-      );
+      );      // Process referral wallet credit restoration if needed
+      // This is the ONLY place where referral wallet credits should be restored during a refund
+      if (referralWalletToRefund > 0) {
+        try {
+          // Get the current referral wallet balance
+          const profileResponse = await supabase
+            .from('profiles')
+            .select('id, referral_wallet')
+            .eq('id', originalAppointment.customer_id)
+            .single();
+            
+          if (profileResponse.error) {
+            console.error("Error fetching profile:", profileResponse.error);
+          } else if (profileResponse.data) {
+            // Calculate the new balance
+            const currentBalance = profileResponse.data.referral_wallet || 0;
+            const newBalance = currentBalance + referralWalletToRefund;
+            
+            // Update the wallet balance
+            const updateResponse = await supabase
+              .from('profiles')
+              .update({ referral_wallet: newBalance })
+              .eq('id', originalAppointment.customer_id);
+              
+            if (updateResponse.error) {
+              console.error("Error updating referral wallet:", updateResponse.error);
+            } else {
+              console.log(`Restored ${referralWalletToRefund} to customer ${originalAppointment.customer_id} referral wallet`);
+              console.log(`Referral Wallet: ${currentBalance} -> ${newBalance}`);
+            }
+          }
+        } catch (error) {
+          console.error("Error processing referral wallet refund:", error);
+          // Don't block the refund process if wallet update fails
+        }
+      }
 
       for (const bookingId of bookingIds) {
         const originalBooking = allBookings?.find(b => b.id === bookingId);
@@ -255,16 +296,23 @@ export const useAppointmentActions = () => {
             .eq('id', bookingId)
             .single();
             
-          if (detailsError) throw detailsError;
+          if (detailsError) throw detailsError;            // Apply the same discount proportion to the individual booking price
+            const bookingRefundProportion = refundProportion;
             
-          await supabase
+            // Calculate what proportion of the total this booking represents
+            const bookingPriceProportion = bookingDetails.price_paid / totalBookingsAmount;
+            
+            // Apply that same proportion to the actual total price (which includes all discounts)
+            const discountedBookingPrice = originalTotalPrice * bookingPriceProportion;
+            
+            await supabase
             .from('bookings')
             .insert({
               appointment_id: refundAppointment.id,
               service_id: bookingDetails.service_id,
               package_id: bookingDetails.package_id,
               employee_id: bookingDetails.employee_id,
-              price_paid: -bookingDetails.price_paid,
+              price_paid: -discountedBookingPrice,
               original_price: bookingDetails.original_price,
               status: 'refunded',
               start_time: bookingDetails.start_time,

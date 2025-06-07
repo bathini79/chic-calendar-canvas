@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useTaxRates } from '@/hooks/use-tax-rates';
+import { useState, useEffect, useRef } from 'react';
+import { useTaxRatesOptimized } from '@/hooks/use-tax-rates-optimized';
 import { useLocationTaxSettings } from '@/hooks/use-location-tax-settings';
 
 interface UseTaxesInCheckoutProps {
@@ -11,27 +11,36 @@ export const useTaxesInCheckout = ({
   locationId,
   discountedSubtotal 
 }: UseTaxesInCheckoutProps) => {
-  const { taxRates, fetchTaxRates, isLoading: taxRatesLoading } = useTaxRates();
+  const { taxRates, isLoading: taxRatesLoading } = useTaxRatesOptimized();
   const { fetchLocationTaxSettings } = useLocationTaxSettings();
   const [appliedTaxId, setAppliedTaxId] = useState<string | null>(null);
   const [appliedTaxRate, setAppliedTaxRate] = useState<number>(0);
   const [appliedTaxName, setAppliedTaxName] = useState<string>("");
-
+  const initializedRef = useRef(false);
+  const locationIdRef = useRef<string | undefined>(undefined);
+  // Only fetch location tax settings when locationId changes
   useEffect(() => {
-    const loadTaxData = async () => {
-      await fetchTaxRates();
+    // Skip if already initialized for this location
+    if (initializedRef.current && locationIdRef.current === locationId) {
+      return;
+    }
 
-      if (locationId) {
+    const loadLocationTaxSettings = async () => {
+      if (locationId && locationId !== locationIdRef.current) {
         const settings = await fetchLocationTaxSettings(locationId);
-
         if (settings && settings.service_tax_id) {
           setAppliedTaxId(settings.service_tax_id);
+        } else {
+          setAppliedTaxId(null);
         }
+        locationIdRef.current = locationId;
       }
+      
+      initializedRef.current = true;
     };
 
-    loadTaxData();
-  }, [locationId, fetchTaxRates, fetchLocationTaxSettings]);
+    loadLocationTaxSettings();
+  }, [locationId, fetchLocationTaxSettings]);
 
   useEffect(() => {
     if (appliedTaxId === null || appliedTaxId === "none") {

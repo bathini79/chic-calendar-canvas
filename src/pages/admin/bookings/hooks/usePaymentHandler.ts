@@ -33,29 +33,34 @@ interface UsePaymentHandlerProps {
   referralCashback?: number;
   customerCashback?: number;
   isReferralApplicable?: boolean;
+  subtotal?: number;
   total: number;
   adjustedPrices: Record<string, number>;
   onSaveAppointment: (params?: any) => Promise<string | null>;
   onPaymentComplete: (appointmentId?: string) => void;
+  setLoading?: (loading: boolean) => void;
 }
 
 export const usePaymentHandler = ({
   selectedCustomer,
   paymentMethod,
-  appointmentId,  taxes,
+  appointmentId,  
+  taxes,
   coupons,
-  membership,  loyalty,
+  membership,  
+  loyalty,
   referralWallet,
   referrerId,
   referralCashback,
   customerCashback,
   isReferralApplicable,
+  subtotal,
   total,
   adjustedPrices,
   onSaveAppointment,
   onPaymentComplete,
-}: UsePaymentHandlerProps) => {
-  const handlePayment = async () => {
+  setLoading,
+}: UsePaymentHandlerProps) => {const handlePayment = async () => {
     try {
       if (!selectedCustomer) {
         toast.error("Please select a customer");
@@ -66,8 +71,11 @@ export const usePaymentHandler = ({
         toast.error("Please select a payment method");
         return;
       }
-
-      const roundedTotal = Math.round(total);
+      
+      // Set loading state to true at the start of payment processing
+      if (setLoading) {
+        setLoading(true);
+      }const roundedTotal = Math.round(total);
       const roundOffDifference = roundedTotal - total;      const saveAppointmentParams = {
         appointmentId,
         appliedTaxId: taxes.appliedTaxId,
@@ -80,6 +88,7 @@ export const usePaymentHandler = ({
         membershipId: membership.membershipId,
         membershipName: membership.membershipName,
         membershipDiscount: membership.membershipDiscount,
+        subtotal: subtotal, // Add the subtotal for proper referral wallet handling
         total: roundedTotal, // Save the rounded total
         roundOffDifference, // Save the round-off difference
         adjustedPrices, // Don't merge with loyalty.adjustedServicePrices

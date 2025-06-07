@@ -8,6 +8,8 @@ interface UseReferralWalletInCheckoutProps {
   discountedSubtotal: number;
   locationId?: string;
   activeDiscounts?: string[]; // Track which discount types are active
+  initialUseReferralWallet?: boolean; // For restoring existing appointment state
+  initialReferralWalletAmount?: number; // For restoring existing appointment amount
 }
 
 interface UseReferralWalletInCheckoutResult {
@@ -32,16 +34,25 @@ export function useReferralWalletInCheckout({
   customerId,
   discountedSubtotal,
   locationId,
-  activeDiscounts = []
+  activeDiscounts = [],
+  initialUseReferralWallet = false,
+  initialReferralWalletAmount = 0
 }: UseReferralWalletInCheckoutProps): UseReferralWalletInCheckoutResult {
+  console.log("🔄 Initializing useReferralWalletInCheckout with:", {
+    customerId,
+    initialUseReferralWallet,
+    initialReferralWalletAmount,
+    activeDiscounts
+  });
+
   const [referralWalletBalance, setReferralWalletBalance] = useState<number>(0);
-  const [referralWalletAmount, setReferralWalletAmount] = useState<number>(0);
-  const [useReferralWallet, setUseReferralWallet] = useState<boolean>(false); // Default to false - user must explicitly check box
+  const [referralWalletAmount, setReferralWalletAmount] = useState<number>(initialReferralWalletAmount);
+  const [useReferralWallet, setUseReferralWallet] = useState<boolean>(initialUseReferralWallet);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
   const { referralProgram } = useReferralProgram();
   const { config: discountConfig } = useDiscountRewardUsageConfig(locationId);
-  
-  // Fetch the customer's referral wallet balance
+    // Fetch the customer's referral wallet balance
   useEffect(() => {
     const fetchReferralWalletBalance = async () => {
       if (!customerId) {
@@ -64,8 +75,10 @@ export function useReferralWalletInCheckout({
         } else {
           const balance = data?.referral_wallet ?? 0;
           setReferralWalletBalance(balance);
-          // Set the amount to the full wallet balance by default
-          setReferralWalletAmount(balance);
+          // Only set the amount to full balance if there's no initial amount from existing appointment
+          if (initialReferralWalletAmount === 0) {
+            setReferralWalletAmount(balance);
+          }
         }
       } catch (error) {
         console.error("Error in referral wallet fetch:", error);
@@ -76,9 +89,8 @@ export function useReferralWalletInCheckout({
     };
     
     fetchReferralWalletBalance();
-  }, [customerId]);
-  
-  // Determine if the referral wallet feature is enabled based on config and active discounts
+  }, [customerId, initialReferralWalletAmount]);
+    // Determine if the referral wallet feature is enabled based on config and active discounts
   const isEnabled = useMemo(() => {
     // Only enable the wallet if:
     // 1. The referral program is enabled
@@ -91,8 +103,20 @@ export function useReferralWalletInCheckout({
     
     // Check discount config rules
     const referralEnabledInConfig = discountConfig?.referral_enabled !== false; // Default to true if config is not available
+      // If this is an existing appointment with referral wallet usage, preserve it regardless of current strategy
+    // This ensures that previously valid configurations remain valid when editing
+    const isExistingReferralUsage = initialUseReferralWallet && initialReferralWalletAmount > 0;
     
-    // Check for conflicts with reward strategy
+    if (isExistingReferralUsage) {
+      console.log("Preserving existing referral wallet usage for appointment edit");
+      // For existing usage, only check if program is enabled and referral is enabled in config
+      // Don't check balance since the appointment may have been created when balance was available
+      const result = programEnabled && referralEnabledInConfig;
+      console.log("Referral wallet enabled (existing usage):", result);
+      return result;
+    }
+    
+    // Check for conflicts with reward strategy for new referral wallet usage
     let allowedByStrategy = true;
     if (discountConfig) {
       // Log the validation state for debugging
@@ -169,15 +193,22 @@ export function useReferralWalletInCheckout({
     console.log("Referral wallet enabled:", result);
     return result;
   }, [referralProgram, referralWalletBalance, discountConfig, activeDiscounts]);
-    // Calculate how much can be redeemed from the wallet
+  // Calculate how much can be redeemed from the wallet
   const referralWalletToRedeem = useMemo(() => {
     if (referralWalletAmount <= 0 || !useReferralWallet || !isEnabled) {
       return 0;
     }
     
-    // Use the lesser of specified amount, wallet balance, or remaining subtotal
+    // For existing appointments, preserve the original redeemed amount regardless of current balance
+    const isExistingReferralUsage = initialUseReferralWallet && initialReferralWalletAmount > 0;
+    if (isExistingReferralUsage && referralWalletAmount === initialReferralWalletAmount) {
+      // Use the existing amount directly for previously created appointments
+      return Math.min(referralWalletAmount, discountedSubtotal);
+    }
+    
+    // Use the lesser of specified amount, wallet balance, or remaining subtotal for new usage
     return Math.min(referralWalletAmount, referralWalletBalance, discountedSubtotal);
-  }, [referralWalletAmount, referralWalletBalance, discountedSubtotal, useReferralWallet, isEnabled]);
+  }, [referralWalletAmount, referralWalletBalance, discountedSubtotal, useReferralWallet, isEnabled, initialUseReferralWallet, initialReferralWalletAmount]);
   
   // The actual amount to be deducted from the total
   const referralWalletDiscountAmount = useMemo(() => {
@@ -186,20 +217,27 @@ export function useReferralWalletInCheckout({
     // 2. The user has explicitly checked the box to use the wallet
     // 3. There is an amount to redeem
     return isEnabled && useReferralWallet && referralWalletToRedeem > 0 ? referralWalletToRedeem : 0;
-  }, [referralWalletToRedeem, isEnabled, useReferralWallet]);
-    // When user checks the checkbox, set the amount to max available by default
+  }, [referralWalletToRedeem, isEnabled, useReferralWallet]);    // When user checks the checkbox, set the amount to max available by default
   useEffect(() => {
     if (useReferralWallet) {
-      // Set to maximum available balance when enabled
-      setReferralWalletAmount(referralWalletBalance);
+      // For existing appointments, preserve the initial amount if it's valid
+      if (initialReferralWalletAmount > 0 && initialUseReferralWallet) {
+        // Keep the initial amount from the existing appointment
+        setReferralWalletAmount(Math.min(initialReferralWalletAmount, referralWalletBalance));
+      } else {
+        // For new appointments or when manually checking, set to maximum available balance
+        setReferralWalletAmount(referralWalletBalance);
+      }
     } else {
       // Reset the amount when disabled
       setReferralWalletAmount(0);
-    }
-  }, [useReferralWallet, referralWalletBalance]);
-    // Disable the wallet usage if validation fails
+    }  }, [useReferralWallet, referralWalletBalance, initialReferralWalletAmount, initialUseReferralWallet]);    // Disable the wallet usage if validation fails (but only after the initial load)
   useEffect(() => {
-    if (!isEnabled && useReferralWallet) {
+    // Don't auto-uncheck during initial load or when balance is still loading
+    // Also don't auto-uncheck if this is an existing appointment with referral wallet usage
+    const isExistingReferralUsage = initialUseReferralWallet && initialReferralWalletAmount > 0;
+    
+    if (!isEnabled && useReferralWallet && !isLoading && referralWalletBalance >= 0 && !isExistingReferralUsage) {
       console.log("Automatically unchecking referral wallet checkbox due to validation failure");
       console.log("Validation status:", {
         programEnabled: referralProgram?.is_enabled,
@@ -207,11 +245,12 @@ export function useReferralWalletInCheckout({
         referralEnabledInConfig: discountConfig?.referral_enabled !== false,
         strategy: discountConfig?.reward_strategy,
         activeDiscounts,
+        isLoading,
+        isExistingReferralUsage,
       });
-      
-      setUseReferralWallet(false);
+        setUseReferralWallet(false);
     }
-  }, [isEnabled, useReferralWallet, referralProgram?.is_enabled, referralWalletBalance, discountConfig, activeDiscounts]);
+  }, [isEnabled, useReferralWallet, referralProgram?.is_enabled, referralWalletBalance, discountConfig, activeDiscounts, isLoading, initialUseReferralWallet, initialReferralWalletAmount]);
 
   // Handler for setting the wallet amount with validation
   const setValidatedReferralWalletAmount = (amount: number) => {

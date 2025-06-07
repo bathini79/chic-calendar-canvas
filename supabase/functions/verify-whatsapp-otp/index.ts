@@ -163,22 +163,88 @@ serve(async (req) => {
         });
         
         if (authError) throw authError;
-        
-        userId = authData.user.id;
+          userId = authData.user.id;
         credentials = { email: tempEmail, password: tempPassword };
         
-        // Update the profiles table with the user data
-        // The RLS triggers should handle this, but we'll do it explicitly to be sure
-        await supabaseAdmin
+        console.log("User created with ID:", userId);
+        
+        // Create profile for the new user
+        // Wait a short time for auth triggers to run
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if profile already exists (created by database trigger)
+        const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
           .from('profiles')
-          .update({
-            full_name: userName,
-            role: 'customer',
-            lead_source: userLeadSource,
-            communication_consent: true,
-            communication_channel: provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp'
-          })
-          .eq('id', userId);
+          .select('*')
+          .eq('id', userId)
+          .single();
+        
+        if (existingProfile) {
+          console.log('Profile already exists, updating with complete information:', userId);
+          
+          // Update the existing profile with all necessary fields
+          const { error: updateError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+              phone_number: normalizedPhone,
+              phone_verified: true,
+              full_name: userName,
+              lead_source: userLeadSource,
+              role: 'customer',
+              communication_consent: true,
+              communication_channel: provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp',
+              last_used: new Date().toISOString()
+            })
+            .eq('id', userId);
+            
+          if (updateError) {
+            console.error('Error updating complete profile information:', updateError);
+          } else {
+            console.log('Successfully updated profile with complete information');
+          }
+        } else {
+          // Try to create a new profile if none exists
+          const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .insert({
+              id: userId,
+              user_id: userId,
+              phone_number: normalizedPhone,
+              phone_verified: true,
+              full_name: userName,
+              lead_source: userLeadSource,
+              role: 'customer',
+              wallet_balance: 0,
+              communication_consent: true,
+              communication_channel: provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp',
+              last_used: new Date().toISOString()
+            });
+            
+          if (profileError) {
+            console.log('Profile insert error, trying again with update:', profileError);
+            
+            // If insert fails, try updating as a last resort
+            const { error: updateError } = await supabaseAdmin
+              .from('profiles')
+              .update({
+                phone_number: normalizedPhone,
+                phone_verified: true,
+                full_name: userName,
+                lead_source: userLeadSource,
+                role: 'customer',
+                communication_consent: true,
+                communication_channel: provider === 'twofactor' || provider === 'sms' ? 'sms' : 'whatsapp',
+                last_used: new Date().toISOString()
+              })
+              .eq('id', userId);
+              
+            if (updateError) {
+              console.error('All profile creation/update attempts failed:', updateError);
+            }
+          } else {
+            console.log('Successfully created new profile');
+          }
+        }
           
         console.log("New customer registered with ID:", userId, "via provider:", provider);
         

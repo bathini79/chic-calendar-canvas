@@ -1,6 +1,7 @@
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { format, addMinutes } from "date-fns";
 import {
@@ -13,11 +14,12 @@ import {
   Tag,
   Search,
   X,
-  Check,
-  Award,
+  Check,  Award,
   Coins,
   ChevronDown,
   ChevronUp,
+  Users,
+  Info,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -45,8 +47,9 @@ import { Switch } from "@/components/ui/switch";
 import { useMembershipInCheckout } from "@/pages/admin/bookings/hooks/useMembershipInCheckout";
 import { useCouponsInCheckout } from "@/pages/admin/bookings/hooks/useCouponsInCheckout";
 import { useTaxesInCheckout } from "@/pages/admin/bookings/hooks/useTaxesInCheckout";
-import { useSelectedItemsInCheckout } from '@/pages/admin/bookings/hooks/useSelectedItemsInCheckout';
-import { usePaymentHandler } from '@/pages/admin/bookings/hooks/usePaymentHandler';
+import { useSelectedItemsInCheckout } from "@/pages/admin/bookings/hooks/useSelectedItemsInCheckout";
+import { usePaymentHandler } from "@/pages/admin/bookings/hooks/usePaymentHandler";
+import { useReferralWalletInCheckout } from "@/pages/admin/bookings/hooks/useReferralWalletInCheckout";
 import { useAppointmentNotifications } from "@/hooks/use-appointment-notifications";
 import { getAdjustedServicePrices } from "@/pages/admin/bookings/utils/bookingUtils";
 import { PackageServiceItem } from "./PackageServiceItem";
@@ -61,9 +64,12 @@ import {
 // Add utility functions at the top level
 const sendConfirmation = async (appointmentId: string, bookings?: any[]) => {
   try {
-    const { data: notificationResult } = await supabase.functions.invoke('send-appointment-notification', {
-      body: { appointmentId, type: 'booking_confirmation', bookings }
-    });
+    const { data: notificationResult } = await supabase.functions.invoke(
+      "send-appointment-notification",
+      {
+        body: { appointmentId, type: "booking_confirmation", bookings },
+      }
+    );
     return notificationResult;
   } catch (error) {
     console.error("Error sending confirmation:", error);
@@ -78,28 +84,30 @@ const sendBill = async (appointmentId: string) => {
     // Get appointment details to create the bill message
     const { data: appointment, error: appointmentError } = await supabase
       .from("appointments")
-      .select(`
+      .select(
+        `
         id,
         total_price,
         start_time,
         created_at,
         customer:profiles(*),
         location
-      `)
+      `
+      )
       .eq("id", appointmentId)
       .single();
-    
+
     if (appointmentError) {
       console.error("Error fetching appointment details:", appointmentError);
       return null;
     }
-    
+
     // Get business details for the message
     const { data: businessDetails } = await supabase
       .from("business_details")
       .select("name")
       .single();
-    
+
     // Get location details if available
     let locationName = "our salon";
     if (appointment.location) {
@@ -108,32 +116,35 @@ const sendBill = async (appointmentId: string) => {
         .select("name")
         .eq("id", appointment.location)
         .single();
-      
+
       if (locationData) {
         locationName = locationData.name;
       }
     }
-    
+
     const businessName = businessDetails?.name || "Chic Calendar Canvas";
     const billNumber = appointment.id.slice(0, 8).toUpperCase();
-    const formattedDate = new Date(appointment.created_at || appointment.start_time).toLocaleDateString();
-    
+    const formattedDate = new Date(
+      appointment.created_at || appointment.start_time
+    ).toLocaleDateString();
+
     // Generate a message with bill information
-    const message = `Thank you for your visit to ${locationName}! Here is your bill receipt:\n\n` +
-                   `Receipt #: ${billNumber}\n` +
-                   `Date: ${formattedDate}\n` +
-                   `Amount: ₹${appointment.total_price.toFixed(2)}\n\n` +
-                   `You can view your full invoice at any time in your customer portal. Thank you for choosing ${businessName}!`;
-    
+    const message =
+      `Thank you for your visit to ${locationName}! Here is your bill receipt:\n\n` +
+      `Receipt #: ${billNumber}\n` +
+      `Date: ${formattedDate}\n` +
+      `Amount: ₹${appointment.total_price.toFixed(2)}\n\n` +
+      `You can view your full invoice at any time in your customer portal. Thank you for choosing ${businessName}!`;
+
     // Call the Supabase Edge Function to send the WhatsApp message
-    const { data: billResult } = await supabase.functions.invoke('send-bill', {
-      body: { 
-        appointmentId, 
+    const { data: billResult } = await supabase.functions.invoke("send-bill", {
+      body: {
+        appointmentId,
         message,
-        notificationType: 'bill_receipt'
-      }
+        notificationType: "bill_receipt",
+      },
     });
-    
+
     return billResult;
   } catch (error) {
     console.error("Error sending bill:", error);
@@ -141,7 +152,10 @@ const sendBill = async (appointmentId: string) => {
   }
 };
 
-const clearCartItems = async (items: any[], removeFromCart: (id: string) => Promise<void>) => {
+const clearCartItems = async (
+  items: any[],
+  removeFromCart: (id: string) => Promise<void>
+) => {
   if (!items) return;
   for (const item of items) {
     await removeFromCart(item.id);
@@ -177,27 +191,36 @@ export default function BookingConfirmation() {
   const [couponSearchValue, setCouponSearchValue] = useState("");
   const [filteredCoupons, setFilteredCoupons] = useState<any[]>([]);
 
-  const {
-    settings: loyaltySettings,
-    walletBalance,
-  } = useLoyaltyPoints(customerId);
+  const { settings: loyaltySettings, walletBalance } =
+    useLoyaltyPoints(customerId);
 
   const subtotal = items && items.length > 0 ? getTotalPrice() : 0;
-  const selectedServicesIds = items?.filter((item) => item.type === "service" && item.service_id)
-    .map((item) => item.service_id as string) || [];
-  const selectedPackagesIds = items?.filter((item) => item.type === "package" && item.package_id)
-    .map((item) => item.package_id as string) || [];
-  const allServices = items?.filter((item) => item.type === "service")
-    .map((item) => item.service) || [];
-  const allPackages = items?.filter((item) => item.type === "package")
-    .map((item) => item.package) || [];
+  const selectedServicesIds =
+    items
+      ?.filter((item) => item.type === "service" && item.service_id)
+      .map((item) => item.service_id as string) || [];
+  const selectedPackagesIds =
+    items
+      ?.filter((item) => item.type === "package" && item.package_id)
+      .map((item) => item.package_id as string) || [];
+  const allServices =
+    items
+      ?.filter((item) => item.type === "service")
+      .map((item) => item.service) || [];
+  const allPackages =
+    items
+      ?.filter((item) => item.type === "package")
+      .map((item) => item.package) || [];
 
-  const customerData = useMemo(() => ({
-    id: customerId,
-    full_name: '', // Required by Customer interface
-    email: '',     // Required by Customer interface
-    phone: '',     // Required by Customer interface
-  }), [customerId]);
+  const customerData = useMemo(
+    () => ({
+      id: customerId,
+      full_name: "", // Required by Customer interface
+      email: "", // Required by Customer interface
+      phone: "", // Required by Customer interface
+    }),
+    [customerId]
+  );
 
   const membership = useMembershipInCheckout({
     selectedCustomer: customerData,
@@ -207,9 +230,7 @@ export default function BookingConfirmation() {
     packages: allPackages,
     customizedServices: {},
   });
-
   const initialDiscountedSubtotal = subtotal - membership.membershipDiscount;
-
   const loyalty = useLoyaltyInCheckout({
     customerId,
     selectedServices: selectedServicesIds,
@@ -221,7 +242,41 @@ export default function BookingConfirmation() {
   });
 
   const coupons = useCouponsInCheckout({
-    subtotal: subtotal - membership.membershipDiscount
+    subtotal: subtotal - membership.membershipDiscount,
+  });
+
+  // Track active discounts - needs to be defined before the referral wallet hook is called
+  const activeDiscounts = useMemo(() => {
+    const discounts: string[] = [];
+
+    // Track membership discounts
+    if (membership.membershipDiscount > 0) {
+      discounts.push("membership");
+    }
+
+    // Track coupon discounts
+    if (coupons.selectedCoupon) {
+      discounts.push("coupon");
+    }
+
+    // Track loyalty point redemptions
+    if (loyalty.usePoints && loyalty.pointsDiscountAmount > 0) {
+      discounts.push("loyalty_points");
+    }
+
+    return discounts;
+  }, [
+    membership.membershipDiscount,
+    coupons.selectedCoupon,
+    loyalty.usePoints,
+    loyalty.pointsDiscountAmount,
+  ]);
+  // Initialize the referral wallet hook with active discounts
+  const referralWallet = useReferralWalletInCheckout({
+    customerId,
+    discountedSubtotal: initialDiscountedSubtotal - loyalty.pointsDiscountAmount, // Apply after loyalty points
+    locationId: selectedLocation,
+    activeDiscounts,
   });
 
   const handleCouponSelect = (couponId: string) => {
@@ -246,7 +301,8 @@ export default function BookingConfirmation() {
   const taxes = useTaxesInCheckout({
     locationId: selectedLocation,
     // Calculate tax on amount after membership and coupon discounts, but before loyalty points
-    discountedSubtotal: subtotal - membership.membershipDiscount - coupons.couponDiscount
+    discountedSubtotal:
+      subtotal - membership.membershipDiscount - coupons.couponDiscount,
   });
 
   const { selectedItems } = useSelectedItemsInCheckout({
@@ -258,7 +314,7 @@ export default function BookingConfirmation() {
     selectedTimeSlots,
     customizedServices: {},
     getServiceDisplayPrice: (serviceId) => {
-      const service = allServices.find(s => s.id === serviceId);
+      const service = allServices.find((s) => s.id === serviceId);
       return service?.selling_price || 0;
     },
     getStylistName: (stylistId) => stylistId,
@@ -268,7 +324,7 @@ export default function BookingConfirmation() {
       return hours > 0
         ? `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ""}`
         : `${remainingMinutes}m`;
-    }
+    },
   });
 
   // Calculate adjusted prices based on discounts
@@ -280,7 +336,7 @@ export default function BookingConfirmation() {
       allPackages,
       {}, // No customized services
       "none", // No manual discount type
-      0,      // No manual discount value
+      0, // No manual discount value
       membership.membershipDiscount,
       coupons.couponDiscount,
       0 // Don't include loyalty points in individual price adjustments
@@ -291,16 +347,39 @@ export default function BookingConfirmation() {
     allServices,
     allPackages,
     membership.membershipDiscount,
-    coupons.couponDiscount
+    coupons.couponDiscount,
   ]);
-
   const finalPrice = useMemo(() => {
-    const discountedSubtotal = subtotal - membership.membershipDiscount - coupons.couponDiscount;
+    const discountedSubtotal =
+      subtotal - membership.membershipDiscount - coupons.couponDiscount;
     // Add tax before subtracting loyalty points discount
     const afterTax = discountedSubtotal + taxes.taxAmount;
-    // Subtract loyalty points discount last
-    return Math.max(0, afterTax - loyalty.pointsDiscountAmount);
-  }, [subtotal, membership.membershipDiscount, coupons.couponDiscount, taxes.taxAmount, loyalty.pointsDiscountAmount]);
+    // Subtract loyalty points discount
+    let afterLoyalty = Math.max(0, afterTax - loyalty.pointsDiscountAmount);
+    
+    // Subtract referral wallet only if:
+    // 1. The feature is enabled (all validation checks passed)
+    // 2. The user has checked the box
+    // 3. There's an amount to redeem
+    if (
+      referralWallet.isReferralWalletEnabled &&
+      referralWallet.useReferralWallet &&
+      referralWallet.referralWalletDiscountAmount > 0
+    ) {
+      afterLoyalty = Math.max(0, afterLoyalty - referralWallet.referralWalletDiscountAmount);
+    }
+    
+    return afterLoyalty;
+  }, [
+    subtotal,
+    membership.membershipDiscount,
+    coupons.couponDiscount,
+    taxes.taxAmount,
+    loyalty.pointsDiscountAmount,
+    referralWallet.isReferralWalletEnabled,
+    referralWallet.useReferralWallet,
+    referralWallet.referralWalletDiscountAmount,
+  ]);
 
   // Add roundedTotal calculation
   const roundedTotal = useMemo(() => {
@@ -313,7 +392,7 @@ export default function BookingConfirmation() {
   }, [roundedTotal, finalPrice]);
 
   const { handlePayment } = usePaymentHandler({
-    selectedCustomer: customerData,  // Use the same customerData with all required fields
+    selectedCustomer: customerData, // Use the same customerData with all required fields
     paymentMethod: "cash",
     appointmentId: null,
     taxes: {
@@ -329,12 +408,15 @@ export default function BookingConfirmation() {
       membershipId: membership.membershipId,
       membershipName: membership.membershipName,
       membershipDiscount: membership.membershipDiscount,
-    },
-    loyalty: {
+    },    loyalty: {
       adjustedServicePrices: loyalty.adjustedServicePrices,
       pointsToEarn: loyalty.pointsToEarn,
       pointsToRedeem: loyalty.pointsToRedeem,
       pointsDiscountAmount: loyalty.pointsDiscountAmount,
+    },
+    referralWallet: {
+      referralWalletToRedeem: referralWallet.referralWalletToRedeem,
+      referralWalletDiscountAmount: referralWallet.referralWalletDiscountAmount,
     },
     total: finalPrice,
     adjustedPrices: {},
@@ -358,20 +440,24 @@ export default function BookingConfirmation() {
       // Get the bookings for the appointment to pass to sendConfirmation
       const { data: bookingsData } = await supabase
         .from("bookings")
-        .select("*, services(*), packages(*), employees!bookings_employee_id_fkey(*)")
+        .select(
+          "*, services(*), packages(*), employees!bookings_employee_id_fkey(*)"
+        )
         .eq("appointment_id", appointmentId);
 
       try {
         // Send confirmation WhatsApp message
         await sendConfirmation(appointmentId, bookingsData);
-        
+
         // No longer automatically send bill from booking confirmation
         // Bill generation should happen elsewhere in the workflow
-        
+
         toast.success("Booking confirmed successfully!");
       } catch (notificationError) {
         console.error("Error sending notifications:", notificationError);
-        toast.error("Booking confirmed but there was an issue sending notifications");
+        toast.error(
+          "Booking confirmed but there was an issue sending notifications"
+        );
       }
 
       setBookingSuccess(true);
@@ -383,20 +469,23 @@ export default function BookingConfirmation() {
         if (!selectedDate) {
           throw new Error("No date selected for booking");
         }
-        
+
         // Find a valid time to use - try various sources in order of priority
         let timeToUse: string | undefined;
-        
+
         // 1. If there's a selectedTime in params, use it
-        if (params?.selectedTime && typeof params.selectedTime === 'string') {
+        if (params?.selectedTime && typeof params.selectedTime === "string") {
           timeToUse = params.selectedTime;
-        } 
+        }
         // 2. Otherwise, try to use the first time slot from selectedTimeSlots
         else if (Object.values(selectedTimeSlots).length > 0) {
           timeToUse = Object.values(selectedTimeSlots)[0];
         }
         // 3. If we still don't have a time, check if we have a time in sorted items
-        else if (sortedItems.length > 0 && selectedTimeSlots[sortedItems[0]?.id]) {
+        else if (
+          sortedItems.length > 0 &&
+          selectedTimeSlots[sortedItems[0]?.id]
+        ) {
           timeToUse = selectedTimeSlots[sortedItems[0]?.id];
         }
         // 4. Last resort - use a default time if everything else fails
@@ -405,75 +494,92 @@ export default function BookingConfirmation() {
           timeToUse = "09:00";
           console.warn("Using default time 09:00 as no time slot was found");
         }
-        
+
         // Validate time format before creating date
-        if (typeof timeToUse !== 'string') {
-          
+        if (typeof timeToUse !== "string") {
           throw new Error(`Invalid time format: ${JSON.stringify(timeToUse)}`);
         }
 
         const startDateTime = new Date(
           `${format(selectedDate, "yyyy-MM-dd")} ${timeToUse}`
         );
-        
+
         // Check if date is valid before proceeding
         if (isNaN(startDateTime.getTime())) {
-          throw new Error(`Invalid date created from: ${format(selectedDate, "yyyy-MM-dd")} ${timeToUse}`);
+          throw new Error(
+            `Invalid date created from: ${format(
+              selectedDate,
+              "yyyy-MM-dd"
+            )} ${timeToUse}`
+          );
         }
-        
+
         const endDateTime = addMinutes(startDateTime, totalDuration);
 
-        const { data: appointmentData, error: appointmentError } = await supabase
-          .from("appointments")
-          .insert({
-            customer_id: customerId,
-            start_time: startDateTime.toISOString(),
-            end_time: endDateTime.toISOString(),
-            notes: notes,
-            status: "booked",
-            number_of_bookings: items.length,
-            total_price: roundedTotal,
-            round_off_difference: roundOffDifference,
-            total_duration: totalDuration,
-            tax_amount: taxes.taxAmount,
-            tax_id: taxes.appliedTaxId,
-            coupon_id: coupons.selectedCouponId,
-            discount_type: coupons.selectedCoupon?.discount_type || null,
-            discount_value: coupons.selectedCoupon?.discount_value || 0,
-            location: selectedLocation,
-            membership_id: membership.membershipId || null,
-            membership_name: membership.membershipName || null,
-            membership_discount: membership.membershipDiscount || 0,
-            points_earned: loyalty.pointsToEarn,
-            points_redeemed: loyalty.pointsToRedeem,
-            points_discount_amount: loyalty.pointsDiscountAmount,
-          })
-          .select();
+        const { data: appointmentData, error: appointmentError } =
+          await supabase
+            .from("appointments")
+            .insert({
+              customer_id: customerId,
+              start_time: startDateTime.toISOString(),
+              end_time: endDateTime.toISOString(),
+              notes: notes,
+              status: "booked",
+              number_of_bookings: items.length,
+              total_price: roundedTotal,
+              round_off_difference: roundOffDifference,
+              total_duration: totalDuration,
+              tax_amount: taxes.taxAmount,
+              tax_id: taxes.appliedTaxId,
+              coupon_id: coupons.selectedCouponId,
+              discount_type: coupons.selectedCoupon?.discount_type || null,
+              discount_value: coupons.selectedCoupon?.discount_value || 0,
+              location: selectedLocation,
+              membership_id: membership.membershipId || null,
+              membership_name: membership.membershipName || null,              membership_discount: membership.membershipDiscount || 0,
+              points_earned: loyalty.pointsToEarn,
+              points_redeemed: loyalty.pointsToRedeem,
+              points_discount_amount: loyalty.pointsDiscountAmount,
+              referral_wallet_redeemed: referralWallet.referralWalletToRedeem || 0,
+              referral_wallet_discount_amount: referralWallet.referralWalletDiscountAmount || 0,
+            })
+            .select();
 
         if (appointmentError) throw appointmentError;
 
         const appointmentId = appointmentData[0].id;
         const bookingPromises = [];
-        
+
         // Debugging helper function to validate time
         const validateTime = (timeString) => {
-          return typeof timeString === 'string' && /^\d{1,2}:\d{2}$/.test(timeString);
+          return (
+            typeof timeString === "string" && /^\d{1,2}:\d{2}$/.test(timeString)
+          );
         };
-        
+
         const createBookingTimeObject = (timeString) => {
           if (!validateTime(timeString)) {
             console.log("ll");
 
-            console.warn(`Invalid time format: ${timeString}, using fallback time`);
+            console.warn(
+              `Invalid time format: ${timeString}, using fallback time`
+            );
             return null;
           }
-          
-          const dateTimeObj = new Date(`${format(selectedDate, "yyyy-MM-dd")} ${timeString}`);
+
+          const dateTimeObj = new Date(
+            `${format(selectedDate, "yyyy-MM-dd")} ${timeString}`
+          );
           if (isNaN(dateTimeObj.getTime())) {
-            console.warn(`Invalid date created from: ${format(selectedDate, "yyyy-MM-dd")} ${timeString}`);
+            console.warn(
+              `Invalid date created from: ${format(
+                selectedDate,
+                "yyyy-MM-dd"
+              )} ${timeString}`
+            );
             return null;
           }
-          
+
           return dateTimeObj;
         };
 
@@ -482,52 +588,61 @@ export default function BookingConfirmation() {
             // Make sure we have a valid time slot before creating booking
             let timeSlot = null;
             let startTimeObj = null;
-            
+
             // First try to get time slot by item.id (cart item ID)
             if (validateTime(selectedTimeSlots[item.id])) {
               timeSlot = selectedTimeSlots[item.id];
-            } 
+            }
             // Then try service_id if available
-            else if (item.service_id && validateTime(selectedTimeSlots[item.service_id])) {
+            else if (
+              item.service_id &&
+              validateTime(selectedTimeSlots[item.service_id])
+            ) {
               timeSlot = selectedTimeSlots[item.service_id];
-            } 
+            }
             // Fallback to first available time slot
             else if (firstStartTime) {
               timeSlot = firstStartTime;
             }
-            
+
             if (timeSlot) {
               startTimeObj = createBookingTimeObject(timeSlot);
             }
-            
+
             if (startTimeObj) {
               const endTimeObj = addMinutes(startTimeObj, item.duration);
-              
+
               bookingPromises.push(
                 supabase.from("bookings").insert({
                   appointment_id: appointmentId,
                   service_id: item.id,
                   // Convert "any" to null for employee_id
-                  employee_id: selectedStylists[item.id] === "any" ? null : selectedStylists[item.id],
+                  employee_id:
+                    selectedStylists[item.id] === "any"
+                      ? null
+                      : selectedStylists[item.id],
                   status: "booked",
                   // Use the correctly calculated adjusted price from adjustedPrices
-                  price_paid: adjustedPrices[item.id] !== undefined 
-                    ? adjustedPrices[item.id] 
-                    : (item.selling_price || item.price || 0),
+                  price_paid:
+                    adjustedPrices[item.id] !== undefined
+                      ? adjustedPrices[item.id]
+                      : item.selling_price || item.price || 0,
                   original_price: item.selling_price || item.price || 0,
                   start_time: startTimeObj.toISOString(),
                   end_time: endTimeObj.toISOString(),
                 })
               );
             } else {
-              console.error(`Could not create valid booking time for service ${item.id}`);
+              console.error(
+                `Could not create valid booking time for service ${item.id}`
+              );
             }
           } else if (item.type === "package") {
             for (const service of item.services) {
               // Make sure we have a valid time slot for the service before creating booking
               let timeSlot = null;
               let startTimeObj = null;
-              
+
               // Try each possible time slot source in order of preference
               if (validateTime(selectedTimeSlots[service.id])) {
                 timeSlot = selectedTimeSlots[service.id];
@@ -538,36 +653,53 @@ export default function BookingConfirmation() {
               } else if (validateTime(firstStartTime)) {
                 timeSlot = firstStartTime;
               }
-              
+
               // Create the date object if we have a valid time
               if (timeSlot) {
                 startTimeObj = createBookingTimeObject(timeSlot);
               }
-              
+
               if (startTimeObj) {
-                const endTimeObj = addMinutes(startTimeObj, service.duration || 0);
-                
+                const endTimeObj = addMinutes(
+                  startTimeObj,
+                  service.duration || 0
+                );
+
                 bookingPromises.push(
                   supabase.from("bookings").insert({
                     appointment_id: appointmentId,
                     service_id: service.id,
                     package_id: item.id,
-                    employee_id: selectedStylists[service.id] === "any" ? null : 
-                               (selectedStylists[service.id] || 
-                               (selectedStylists[item.id] === "any" ? null : selectedStylists[item.id]) || 
-                               null),
+                    employee_id:
+                      selectedStylists[service.id] === "any"
+                        ? null
+                        : selectedStylists[service.id] ||
+                          (selectedStylists[item.id] === "any"
+                            ? null
+                            : selectedStylists[item.id]) ||
+                          null,
                     status: "booked",
                     // Use the properly calculated adjusted price for package services
-                    price_paid: adjustedPrices[service.id] !== undefined 
-                      ? adjustedPrices[service.id] 
-                      : (service.package_selling_price || service.selling_price || service.price || 0),
-                    original_price: service.package_selling_price || service.selling_price || service.price || 0,
+                    price_paid:
+                      adjustedPrices[service.id] !== undefined
+                        ? adjustedPrices[service.id]
+                        : service.package_selling_price ||
+                          service.selling_price ||
+                          service.price ||
+                          0,
+                    original_price:
+                      service.package_selling_price ||
+                      service.selling_price ||
+                      service.price ||
+                      0,
                     start_time: startTimeObj.toISOString(),
                     end_time: endTimeObj.toISOString(),
                   })
                 );
               } else {
-                console.error(`Could not create valid booking time for package service ${service.id} in package ${item.id}`);
+                console.error(
+                  `Could not create valid booking time for package service ${service.id} in package ${item.id}`
+                );
               }
             }
           }
@@ -580,9 +712,8 @@ export default function BookingConfirmation() {
         toast.error(error.message || "Failed to save appointment");
         return null;
       }
-    }
+    },
   });
-
   useEffect(() => {
     const getCurrentUser = async () => {
       const {
@@ -595,6 +726,24 @@ export default function BookingConfirmation() {
 
     getCurrentUser();
   }, []);
+
+  // Update referral wallet validation when active discounts change
+  useEffect(() => {
+    console.log("Active discounts changed:", activeDiscounts);
+
+    if (
+      referralWallet.useReferralWallet &&
+      !referralWallet.isReferralWalletEnabled
+    ) {
+      console.log(
+        "Referral wallet is checked but validation failed - will be automatically unchecked"
+      );
+    }
+  }, [
+    activeDiscounts,
+    referralWallet.useReferralWallet,
+    referralWallet.isReferralWalletEnabled,
+  ]);
 
   useEffect(() => {
     if (bookingSuccess) {
@@ -771,24 +920,24 @@ export default function BookingConfirmation() {
                   ? `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`
                   : `${minutes}m`;
 
-              const serviceId = item.service_id || (item.service?.id || "");
-              const packageId = item.package_id || (item.package?.id || "");
-              
+              const serviceId = item.service_id || item.service?.id || "";
+              const packageId = item.package_id || item.package?.id || "";
+
               const originalPrice =
                 item.selling_price ||
                 item.service?.selling_price ||
                 item.package?.price ||
                 0;
-              
+
               // Get the adjusted price based on discounts
-              let discountedPrice = serviceId 
-                ? adjustedPrices[serviceId] || originalPrice 
+              let discountedPrice = serviceId
+                ? adjustedPrices[serviceId] || originalPrice
                 : packageId
                 ? adjustedPrices[packageId] || originalPrice
                 : originalPrice;
-              
+
               let hasDiscount = discountedPrice < originalPrice;
-              
+
               // For packages, we need to collect the included services
               let packageServices = [];
               if (item.type === "package" || item.package) {
@@ -796,11 +945,13 @@ export default function BookingConfirmation() {
                 const packageData = item.package || {};
                 if (packageData.package_services) {
                   // Handle standard package structure with package_services array
-                  packageServices = packageData.package_services.map(ps => {
-                    const basePrice = ps.package_selling_price !== null && ps.package_selling_price !== undefined
-                      ? ps.package_selling_price
-                      : ps.service.selling_price;
-                    
+                  packageServices = packageData.package_services.map((ps) => {
+                    const basePrice =
+                      ps.package_selling_price !== null &&
+                      ps.package_selling_price !== undefined
+                        ? ps.package_selling_price
+                        : ps.service.selling_price;
+
                     return {
                       id: ps.service.id,
                       name: ps.service.name,
@@ -813,11 +964,12 @@ export default function BookingConfirmation() {
                   });
                 } else if (packageData.services) {
                   // Package has inline services
-                  packageServices = packageData.services.map(svc => ({
+                  packageServices = packageData.services.map((svc) => ({
                     id: svc.id,
                     name: svc.name,
                     price: svc.selling_price || 0,
-                    adjustedPrice: adjustedPrices[svc.id] || svc.selling_price || 0,
+                    adjustedPrice:
+                      adjustedPrices[svc.id] || svc.selling_price || 0,
                     duration: svc.duration || 0,
                     stylistName: selectedStylists[svc.id] || null,
                     time: selectedTimeSlots[svc.id] || null,
@@ -825,46 +977,46 @@ export default function BookingConfirmation() {
                 } else if (allServices.length > 0 && packageId) {
                   // Find services that belong to this package
                   const packageServiceIds = allServices
-                    .filter(s => s.package_id === packageId)
-                    .map(s => s.id);
-                    
+                    .filter((s) => s.package_id === packageId)
+                    .map((s) => s.id);
+
                   // For each service ID, find the corresponding service
-                  packageServices = packageServiceIds.map(svcId => {
-                    const svc = allServices.find(s => s.id === svcId);
-                    if (!svc) return null;
-                    return {
-                      id: svc.id,
-                      name: svc.name,
-                      price: svc.selling_price || 0,
-                      adjustedPrice: adjustedPrices[svc.id] || svc.selling_price || 0,
-                      duration: svc.duration || 0,
-                      stylistName: selectedStylists[svc.id] || null,
-                      time: selectedTimeSlots[svc.id] || null,
-                    };
-                  }).filter(Boolean);
+                  packageServices = packageServiceIds
+                    .map((svcId) => {
+                      const svc = allServices.find((s) => s.id === svcId);
+                      if (!svc) return null;
+                      return {
+                        id: svc.id,
+                        name: svc.name,
+                        price: svc.selling_price || 0,
+                        adjustedPrice:
+                          adjustedPrices[svc.id] || svc.selling_price || 0,
+                        duration: svc.duration || 0,
+                        stylistName: selectedStylists[svc.id] || null,
+                        time: selectedTimeSlots[svc.id] || null,
+                      };
+                    })
+                    .filter(Boolean);
                 }
-                
-                // If this is a package, we need to recalculate the discountedPrice 
+
+                // If this is a package, we need to recalculate the discountedPrice
                 // as the sum of the adjusted prices of its services
                 if (packageId) {
                   discountedPrice = packageServices.reduce((sum, service) => {
                     return sum + (service.adjustedPrice || service.price);
                   }, 0);
-                  
+
                   // If there are additional customized services, we need to include them too
                   // (not implemented in this version, but would follow a similar pattern)
-                  
+
                   hasDiscount = discountedPrice < originalPrice;
                 }
               }
-              
+
               const isPackage = item.type === "package" || item.package;
 
               return (
-                <div
-                  key={item.id}
-                  className="flex flex-col py-4 border-b"
-                >
+                <div key={item.id} className="flex flex-col py-4 border-b">
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
                       <h3 className="text-sm font-medium">
@@ -911,15 +1063,18 @@ export default function BookingConfirmation() {
                   {/* Display package services in an accordion if this is a package */}
                   {isPackage && packageServices.length > 0 && (
                     <Accordion type="single" collapsible className="mt-2">
-                      <AccordionItem value="package-details" className="border-none">
+                      <AccordionItem
+                        value="package-details"
+                        className="border-none"
+                      >
                         <AccordionTrigger className="text-sm font-medium text-muted-foreground hover:text-primary py-2 px-0">
                           View Package Details
                         </AccordionTrigger>
                         <AccordionContent className="mt-2 space-y-4 bg-gray-50 rounded-md p-4 border border-gray-200">
                           {packageServices.map((service) => (
-                            <PackageServiceItem 
-                              key={service.id} 
-                              service={service} 
+                            <PackageServiceItem
+                              key={service.id}
+                              service={service}
                             />
                           ))}
                         </AccordionContent>
@@ -942,15 +1097,16 @@ export default function BookingConfirmation() {
                   <span>₹{subtotal.toFixed(2)}</span>
                 </div>
 
-                {membership.membershipDiscount > 0 && membership.membershipName && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span className="flex items-center gap-1">
-                      <Award className="h-4 w-4" />
-                      Membership ({membership.membershipName})
-                    </span>
-                    <span>-₹{membership.membershipDiscount.toFixed(2)}</span>
-                  </div>
-                )}
+                {membership.membershipDiscount > 0 &&
+                  membership.membershipName && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span className="flex items-center gap-1">
+                        <Award className="h-4 w-4" />
+                        Membership ({membership.membershipName})
+                      </span>
+                      <span>-₹{membership.membershipDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
 
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
@@ -1012,7 +1168,9 @@ export default function BookingConfirmation() {
                                         <CommandItem
                                           key={c.id}
                                           value={c.code}
-                                          onSelect={() => handleCouponSelect(c.id)}
+                                          onSelect={() =>
+                                            handleCouponSelect(c.id)
+                                          }
                                           className="flex justify-between"
                                         >
                                           <div className="flex items-center">
@@ -1066,41 +1224,169 @@ export default function BookingConfirmation() {
                       <span className="flex items-center gap-2 text-muted-foreground">
                         <Coins className="h-4 w-4" /> Points You'll Earn
                       </span>
-                      <span className="font-semibold text-yellow-600">{loyalty.pointsToEarn}</span>
+                      <span className="font-semibold text-yellow-600">
+                        {loyalty.pointsToEarn}
+                      </span>
                     </div>
-                    {loyalty.walletBalance > 0 && loyalty.maxPointsToRedeem > 0 && (
-                      <div className="flex justify-between items-center text-sm">
-                        <label
-                          htmlFor="use-loyalty-points"
-                          className="flex items-center gap-2 text-muted-foreground"
-                        >
-                          <Award className="h-4 w-4 text-green-500" /> Use Points
-                        </label>
-                        <input
-                          id="use-loyalty-points"
-                          type="checkbox"
-                          checked={loyalty.usePoints}
-                          onChange={(e) => loyalty.setUsePoints(e.target.checked)}
-                          className="h-4 w-4 text-green-500 focus:ring-green-500"
-                        />
-                      </div>
-                    )}
+                    {loyalty.walletBalance > 0 &&
+                      loyalty.maxPointsToRedeem > 0 && (
+                        <div className="flex justify-between items-center text-sm">
+                          <label
+                            htmlFor="use-loyalty-points"
+                            className="flex items-center gap-2 text-muted-foreground"
+                          >
+                            <Award className="h-4 w-4 text-green-500" /> Use
+                            Points
+                          </label>
+                          <input
+                            id="use-loyalty-points"
+                            type="checkbox"
+                            checked={loyalty.usePoints}
+                            onChange={(e) =>
+                              loyalty.setUsePoints(e.target.checked)
+                            }
+                            className="h-4 w-4 text-green-500 focus:ring-green-500"
+                          />
+                        </div>
+                      )}
                   </div>
-                )}
-
-                {loyalty.pointsDiscountAmount > 0 && (
+                )}                {loyalty.pointsDiscountAmount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span className="flex items-center gap-1">
                       <Award className="h-4 w-4" />
                       Loyalty Points Discount
                     </span>
-                    <span className="text-green-600">-₹{loyalty.pointsDiscountAmount.toFixed(2)}</span>
+                    <span className="text-green-600">
+                      -₹{loyalty.pointsDiscountAmount.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Referral Wallet Section */}
+                {customerId && referralWallet.referralWalletBalance > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm items-center">
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <Users className="h-4 w-4 text-purple-500" />
+                        Referral Wallet Balance
+                      </span>
+                      <span className="font-semibold text-purple-600">
+                        ₹{referralWallet.referralWalletBalance.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Show relevant status messages based on configuration */}
+                    {!referralWallet.referralConfig.isEnabled && (
+                      <div className="text-sm text-amber-600 flex items-center gap-2">
+                        <Info className="h-4 w-4" />
+                        Referral program is not active
+                      </div>
+                    )}
+                    {!referralWallet.referralConfig.referralEnabledInConfig && (
+                      <div className="text-sm text-amber-600 flex items-center gap-2">
+                        <Info className="h-4 w-4" />
+                        Referrals are disabled for this location
+                      </div>
+                    )}
+                    {referralWallet.referralConfig.maxRewardsReached && (
+                      <div className="text-sm text-amber-600 flex items-center gap-2">
+                        <Info className="h-4 w-4" />
+                        Maximum discounts reached for this booking
+                      </div>
+                    )}
+                    {!referralWallet.referralConfig.allowedByStrategy &&
+                      !referralWallet.referralConfig.maxRewardsReached && (
+                        <div className="text-sm text-amber-600 flex items-center gap-2">
+                          <Info className="h-4 w-4" />
+                          This discount combination is not allowed
+                        </div>
+                      )}
+
+                    {referralWallet.disabledReason &&
+                      !referralWallet.isReferralWalletEnabled && (
+                        <div className="text-sm text-amber-600 flex items-center gap-2">
+                          <Info className="h-4 w-4" />
+                          {referralWallet.disabledReason}
+                        </div>
+                      )}
+
+                    {/* Only show input controls if the wallet is enabled */}
+                    {referralWallet.isReferralWalletEnabled && (
+                      <div className="space-y-2">
+                        {/* Checkbox to use the wallet */}
+                        <div className="flex justify-between items-center text-sm">
+                          <label
+                            htmlFor="use-referral-wallet"
+                            className="flex items-center gap-2 text-muted-foreground"
+                          >
+                            <Users className="h-4 w-4 text-purple-500" />
+                            Use Referral Wallet
+                          </label>
+                          <input
+                            id="use-referral-wallet"
+                            type="checkbox"
+                            checked={referralWallet.useReferralWallet}
+                            onChange={(e) =>
+                              referralWallet.setUseReferralWallet(e.target.checked)
+                            }
+                            className="h-4 w-4 text-purple-500 focus:ring-purple-500"
+                          />
+                        </div>
+
+                        {/* Show amount input only if checkbox is checked */}
+                        {referralWallet.useReferralWallet && (
+                          <div className="flex justify-between items-center text-sm">
+                            <label
+                              htmlFor="referral-wallet-amount"
+                              className="flex items-center gap-2 text-muted-foreground"
+                            >
+                              <Users className="h-4 w-4 text-purple-500" />
+                              Amount to Use
+                            </label>
+                            <div className="flex items-center">
+                              <span className="mr-1 text-muted-foreground">₹</span>
+                              <input
+                                id="referral-wallet-amount"
+                                type="number"
+                                min="0"
+                                max={referralWallet.referralWalletBalance}
+                                step="0.01"
+                                value={referralWallet.referralWalletAmount}
+                                onChange={(e) => {
+                                  const amount = parseFloat(e.target.value);
+                                  if (!isNaN(amount)) {
+                                    referralWallet.setReferralWalletAmount(amount);
+                                  } else {
+                                    referralWallet.setReferralWalletAmount(0);
+                                  }
+                                }}
+                                className="h-7 w-24 py-1 px-2 text-xs border rounded"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {referralWallet.referralWalletDiscountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-purple-600">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      Referral Wallet Discount
+                    </span>
+                    <span>-₹{referralWallet.referralWalletDiscountAmount.toFixed(2)}</span>
                   </div>
                 )}
 
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Round Off</span>
-                  <span>{roundOffDifference > 0 ? `+₹${roundOffDifference.toFixed(2)}` : `₹${roundOffDifference.toFixed(2)}`}</span>
+                  <span>
+                    {roundOffDifference > 0
+                      ? `+₹${roundOffDifference.toFixed(2)}`
+                      : `₹${roundOffDifference.toFixed(2)}`}
+                  </span>
                 </div>
 
                 <div className="flex justify-between text-base font-medium pt-1 border-t">

@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 
 interface EmploymentTypeValidatorProps {
   form: UseFormReturn<any>;
-  setSectionsWithErrors: (sections: string[]) => void;
-  setErrorCounts: (counts: Record<string, number>) => void;
+  setSectionsWithErrors: React.Dispatch<React.SetStateAction<string[]>>;
+  setErrorCounts: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   employmentTypes: any[];
 }
 
