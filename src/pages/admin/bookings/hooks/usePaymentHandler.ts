@@ -33,6 +33,7 @@ interface UsePaymentHandlerProps {
   referralCashback?: number;
   customerCashback?: number;
   isReferralApplicable?: boolean;
+  subtotal?: number;
   total: number;
   adjustedPrices: Record<string, number>;
   onSaveAppointment: (params?: any) => Promise<string | null>;
@@ -50,6 +51,7 @@ export const usePaymentHandler = ({
   referralCashback,
   customerCashback,
   isReferralApplicable,
+  subtotal,
   total,
   adjustedPrices,
   onSaveAppointment,
@@ -65,9 +67,7 @@ export const usePaymentHandler = ({
       if (!paymentMethod) {
         toast.error("Please select a payment method");
         return;
-      }
-
-      const roundedTotal = Math.round(total);
+      }      const roundedTotal = Math.round(total);
       const roundOffDifference = roundedTotal - total;      const saveAppointmentParams = {
         appointmentId,
         appliedTaxId: taxes.appliedTaxId,
@@ -80,6 +80,7 @@ export const usePaymentHandler = ({
         membershipId: membership.membershipId,
         membershipName: membership.membershipName,
         membershipDiscount: membership.membershipDiscount,
+        subtotal: subtotal, // Add the subtotal for proper referral wallet handling
         total: roundedTotal, // Save the rounded total
         roundOffDifference, // Save the round-off difference
         adjustedPrices, // Don't merge with loyalty.adjustedServicePrices

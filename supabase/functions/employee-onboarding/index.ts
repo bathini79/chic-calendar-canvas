@@ -203,11 +203,72 @@ serve(async (req) => {
         console.error('Unexpected error during auth user creation process:', error);
         throw new Error(`Failed to create auth user: ${error.message}`);
       }
-      
-      // Link auth user to employee record
+        // Link auth user to employee record
       if (authUserId) {
-        console.log(`Updating employee ${employeeId} with auth_id ${authUserId}`);
+        console.log(`Creating profile for auth user ${authUserId} before linking to employee`);
         
+        // First, ensure a profile exists for this auth user
+        // Wait for the auth trigger to potentially create the profile
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if profile exists, if not create it
+        const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('user_id', authUserId)
+          .maybeSingle();
+        
+        if (!existingProfile) {
+          console.log('Profile does not exist, creating it manually');
+          
+          // Create profile manually
+          const { error: profileCreateError } = await supabaseAdmin
+            .from('profiles')
+            .insert({
+              id: authUserId, // Profile id should match auth user id
+              user_id: authUserId, // Foreign key to auth.users
+              full_name: employeeData.name,
+              phone_number: normalizedPhone,
+              role: 'employee',
+              phone_verified: true,
+              communication_consent: true,
+              communication_channel: 'whatsapp',
+              wallet_balance: 0,
+              last_used: new Date().toISOString()
+            });
+            
+          if (profileCreateError) {
+            console.error('Error creating profile for employee:', profileCreateError);
+            throw new Error(`Failed to create profile for employee: ${profileCreateError.message}`);
+          }
+          
+          console.log('Successfully created profile for employee');
+        } else {
+          console.log('Profile already exists, updating with employee information');
+          
+          // Update existing profile with employee information
+          const { error: profileUpdateError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+              full_name: employeeData.name,
+              phone_number: normalizedPhone,
+              role: 'employee',
+              phone_verified: true,
+              communication_consent: true,
+              communication_channel: 'whatsapp',
+              last_used: new Date().toISOString()
+            })
+            .eq('user_id', authUserId);
+            
+          if (profileUpdateError) {
+            console.error('Error updating profile with employee information:', profileUpdateError);
+            // Don't throw here, just log the error as the profile exists
+          }
+        }
+        
+        console.log(`Now updating employee ${employeeId} with auth_id ${authUserId}`);
+        
+        // Now update the employee record with the auth_id (which references profiles.user_id)
         const { data: updatedEmployeeWithAuth, error: updateEmployeeError } = await supabaseAdmin
           .from("employees")
           .update({ auth_id: authUserId })
@@ -218,58 +279,9 @@ serve(async (req) => {
         if (updateEmployeeError) {
           console.error('Error updating employee with auth_id:', updateEmployeeError);
           throw new Error(`Failed to update employee with auth ID: ${updateEmployeeError.message}`);
-        }
-        
+        }        
         console.log(`Successfully updated employee with auth_id. Updated employee:`, updatedEmployeeWithAuth);
         newEmployee = updatedEmployeeWithAuth;
-        
-        // Wait for the database trigger to create the profile automatically
-        // Instead of manually creating it, we'll update it after a short delay
-        console.log('Not creating profile manually - waiting for database trigger to create it');
-        
-        // After a short delay, update the profile with additional information
-        setTimeout(async () => {
-          try {
-            console.log('Checking for profile created by database trigger for user ID:', authUserId);
-            const { data: triggerCreatedProfile, error: profileCheckError } = await supabaseAdmin
-              .from('profiles')
-              .select('id, user_id')
-              .eq('user_id', authUserId)
-              .maybeSingle();
-            
-            if (profileCheckError) {
-              console.error('Error checking for trigger-created profile:', profileCheckError);
-              return;
-            }
-            
-            if (triggerCreatedProfile) {
-              console.log(`Profile was auto-created by trigger for auth user ${authUserId}, updating with employee details`);
-              
-              const { error: updateProfileError } = await supabaseAdmin
-                .from('profiles')
-                .update({
-                  full_name: employeeData.name,
-                  phone_number: normalizedPhone,
-                  role: 'employee',
-                  phone_verified: true,
-                  communication_consent: true,
-                  communication_channel: 'whatsapp',
-                  last_used: new Date().toISOString()
-                })
-                .eq('user_id', authUserId);
-                
-              if (updateProfileError) {
-                console.error('Failed to update trigger-created profile:', updateProfileError);
-              } else {
-                console.log('Successfully updated trigger-created profile with employee details');
-              }
-            } else {
-              console.log(`No trigger-created profile found for auth user ${authUserId} after delay`);
-            }
-          } catch (profileUpdateError) {
-            console.error('Error updating trigger-created profile:', profileUpdateError);
-          }
-        }, 2000); // 2-second delay to allow the trigger to run
       } else {
         console.error('No authUserId available to link to employee');
       }

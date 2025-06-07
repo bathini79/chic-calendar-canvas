@@ -19,10 +19,11 @@ export type Appointment = {
   coupon_amount: number;
   membership_discount: number;
   membership_id: string | null;
-  membership_name: string | null;
-  points_earned: number;
+  membership_name: string | null;  points_earned: number;
   points_redeemed: number;
   points_discount_amount: number;
+  referral_wallet_discount_amount?: number;
+  referral_wallet_redeemed?: number;
   bookings?: Booking[];
   customer?: Customer;
 };

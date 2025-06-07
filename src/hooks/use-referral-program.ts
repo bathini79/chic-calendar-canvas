@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useCallback, useEffect, useState } from "react";
 
 export type ReferralProgram = {
   id?: string;
@@ -31,44 +32,69 @@ export type ReferralProgram = {
 };
 
 export function useReferralProgram() {
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
-  const [referralProgram, setReferralProgram] = useState<ReferralProgram | null>(null);
 
-  const fetchReferralProgram = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("referral_program")
-        .select("*")
-        .order("created_at", { ascending: false }) // Get the most recent configuration
-        .limit(1)
-        .single();
+  const {
+    data: referralProgram,
+    isLoading: isQueryLoading,
+    error,
+    refetch: fetchReferralProgram
+  } = useQuery({
+    queryKey: ['referral-program'],
+    queryFn: async (): Promise<ReferralProgram | null> => {
+      try {
+        const { data, error } = await supabase
+          .from("referral_program")
+          .select("*")
+          .order("created_at", { ascending: false }) // Get the most recent configuration
+          .limit(1)
+          .single();
 
-      if (error) {
-        // If no record found, it's not technically an error for our use case
-        if (error.code === "PGRST116") {
-          setReferralProgram(null);
-          return null;
+        if (error) {
+          // If no record found, it's not technically an error for our use case
+          if (error.code === "PGRST116") {
+            console.log("No referral program configuration found, using defaults");
+            return {
+              is_enabled: false,
+              service_reward_type: 'percentage',
+              membership_reward_type: 'percentage', 
+              product_reward_type: 'percentage'
+            } as ReferralProgram;
+          }
+          throw error;
         }
-        throw error;
-      }
 
-      setReferralProgram(data as ReferralProgram);
-      return data;
-    } catch (error: any) {
-      console.error("Error fetching referral program settings:", error);
-      toast.error("Failed to load referral program settings");
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+        return data as ReferralProgram;
+      } catch (error: any) {
+        console.error("Error fetching referral program settings:", error);
+        // Return default disabled state instead of throwing
+        return {
+          is_enabled: false,
+          service_reward_type: 'percentage',
+          membership_reward_type: 'percentage',
+          product_reward_type: 'percentage'
+        } as ReferralProgram;
+      }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes 
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    // Always provide a fallback value
+    placeholderData: {
+      is_enabled: false,
+      service_reward_type: 'percentage',
+      membership_reward_type: 'percentage',
+      product_reward_type: 'percentage'
+    } as ReferralProgram
+  });
 
   // Load referral program settings when hook is first used
   useEffect(() => {
     fetchReferralProgram();
   }, [fetchReferralProgram]);
-
   const updateReferralProgram = useCallback(async (settings: Partial<ReferralProgram>) => {
     setIsLoading(true);
     try {
@@ -97,7 +123,8 @@ export function useReferralProgram() {
         data = newData;
       }
       
-      setReferralProgram(data as ReferralProgram);
+      // Update the React Query cache instead of using a local state setter
+      queryClient.setQueryData(['referral-program'], data);
       toast.success("Referral program settings updated successfully");
       return data;
     } catch (error: any) {
@@ -107,11 +134,10 @@ export function useReferralProgram() {
     } finally {
       setIsLoading(false);
     }
-  }, [referralProgram]);
-
+  }, [referralProgram, queryClient]);
   return {
     referralProgram,
-    isLoading,
+    isLoading: isLoading || isQueryLoading,
     fetchReferralProgram,
     updateReferralProgram
   };

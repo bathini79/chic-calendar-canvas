@@ -40,7 +40,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SelectedItem } from "./SelectedItem";
-import LoyaltyPointsSection from "./LoyaltyPointsSection";
 import { useLoyaltyInCheckout } from "../hooks/useLoyaltyInCheckout";
 import { useMembershipInCheckout } from "../hooks/useMembershipInCheckout";
 import { useCouponsInCheckout } from "../hooks/useCouponsInCheckout";
@@ -72,12 +71,12 @@ interface CheckoutSectionProps {
   onSaveAppointment: (params?: any) => Promise<string | null>;
   onRemoveService: (serviceId: string) => void;
   onRemovePackage: (packageId: string) => void;
-  onBackToServices: () => void;
-  isExistingAppointment?: boolean;
+  onBackToServices: () => void;  isExistingAppointment?: boolean;
   customizedServices?: Record<string, string[]>;
   locationId?: string;
   loadingPayment?: boolean;
   employees: any[];
+  existingAppointment?: any; // For restoring referral wallet state
 }
 
 export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
@@ -106,6 +105,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   locationId,
   loadingPayment = false,
   employees,
+  existingAppointment,
 }) => {
   // Check if this is a new customer (no previous appointments)
   const [isNewCustomer, setIsNewCustomer] = useState<boolean>(false);
@@ -166,7 +166,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     packages,
     customizedServices,
   });
-
   const { data: paymentMethods = [], isLoading: paymentMethodsLoading } =
     useQuery({
       queryKey: ["payment-methods"],
@@ -180,6 +179,11 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         if (error) throw error;
         return data;
       },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
     });
 
   const subtotal = useMemo(
@@ -247,70 +251,47 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     packages: packages || [],
     subtotal,
     discountedSubtotal,
-  });  // Track active discounts - needs to be defined before the hook is called
+  }); // Track active discounts - needs to be defined before the hook is called
   const activeDiscounts = useMemo(() => {
     const discounts: string[] = [];
-    
+
     // Track manual discounts
     if (discountType !== "none") {
       discounts.push("discount");
     }
-    
+
     // Track membership discounts
     if (membership.membershipDiscount > 0) {
       discounts.push("membership");
     }
-    
+
     // Track coupon discounts
     if (coupons.selectedCoupon) {
       discounts.push("coupon");
     }
-    
+
     // Track loyalty point redemptions
     if (loyalty.usePoints && loyalty.pointsDiscountAmount > 0) {
       discounts.push("loyalty_points");
     }
-    
+
     return discounts;
   }, [
-    discountType, 
-    membership.membershipDiscount, 
-    coupons.selectedCoupon, 
-    loyalty.usePoints, 
-    loyalty.pointsDiscountAmount
-  ]);
-  // Initialize the referral wallet hook with active discounts
+    discountType,
+    membership.membershipDiscount,
+    coupons.selectedCoupon,
+    loyalty.usePoints,
+    loyalty.pointsDiscountAmount,  ]);  // Initialize the referral wallet hook with active discounts and initial values from existing appointment
+
   const referralWallet = useReferralWalletInCheckout({
     customerId: selectedCustomer?.id,
     discountedSubtotal: discountedSubtotal - loyalty.pointsDiscountAmount, // Apply after loyalty points
     locationId,
-    activeDiscounts
+    activeDiscounts,
+    initialUseReferralWallet: existingAppointment?.referral_wallet_discount_amount > 0,
+    initialReferralWalletAmount: existingAppointment?.referral_wallet_redeemed || 0,
   });
-  // Create extended active discounts that includes referral wallet when being used
-  // This is used for logging and potential future validation needs
-  const activeDiscountsWithReferral = useMemo(() => {
-    const allDiscounts = [...activeDiscounts];
-    
-    // Add referral discount if it's being used
-    if (referralWallet.useReferralWallet && referralWallet.referralWalletDiscountAmount > 0) {
-      allDiscounts.push("referral");
-    }
-    
-    console.log("CheckoutSection - Active discounts:", {
-      base: activeDiscounts,
-      withReferral: allDiscounts,
-      referralWalletUsed: referralWallet.useReferralWallet,
-      referralWalletAmount: referralWallet.referralWalletDiscountAmount,
-      referralWalletEnabled: referralWallet.isReferralWalletEnabled
-    });
-    
-    return allDiscounts;
-  }, [
-    activeDiscounts, 
-    referralWallet.useReferralWallet, 
-    referralWallet.referralWalletDiscountAmount,
-    referralWallet.isReferralWalletEnabled
-  ]);
+ 
 
   const taxes = useTaxesInCheckout({
     locationId,
@@ -332,40 +313,45 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     const stylist = employees.find((emp) => emp.id === stylistId);
     return stylist ? stylist.name : null;
   };
-  const total = useMemo(
-    () => {
-      let calculatedTotal = discountedSubtotal;
-      
-      // Apply tax
-      calculatedTotal += taxes.taxAmount;
-      
-      // Subtract loyalty points discount if applicable
-      if (loyalty.usePoints && loyalty.pointsDiscountAmount > 0) {
-        calculatedTotal = Math.max(0, calculatedTotal - loyalty.pointsDiscountAmount);
-      }
-      
-      // Subtract referral wallet only if:
-      // 1. The feature is enabled (all validation checks passed)
-      // 2. The user has checked the box
-      // 3. There's an amount to redeem
-      if (referralWallet.isReferralWalletEnabled && 
-          referralWallet.useReferralWallet && 
-          referralWallet.referralWalletDiscountAmount > 0) {
-        calculatedTotal = Math.max(0, calculatedTotal - referralWallet.referralWalletDiscountAmount);
-      }
-      
-      return Math.max(0, calculatedTotal);
-    },
-    [
-      discountedSubtotal, 
-      taxes.taxAmount, 
-      loyalty.usePoints, 
-      loyalty.pointsDiscountAmount,
-      referralWallet.isReferralWalletEnabled,
-      referralWallet.useReferralWallet,
-      referralWallet.referralWalletDiscountAmount
-    ]
-  );
+  const total = useMemo(() => {
+    let calculatedTotal = discountedSubtotal;
+
+    // Apply tax
+    calculatedTotal += taxes.taxAmount;
+
+    // Subtract loyalty points discount if applicable
+    if (loyalty.usePoints && loyalty.pointsDiscountAmount > 0) {
+      calculatedTotal = Math.max(
+        0,
+        calculatedTotal - loyalty.pointsDiscountAmount
+      );
+    }
+
+    // Subtract referral wallet only if:
+    // 1. The feature is enabled (all validation checks passed)
+    // 2. The user has checked the box
+    // 3. There's an amount to redeem
+    if (
+      referralWallet.isReferralWalletEnabled &&
+      referralWallet.useReferralWallet &&
+      referralWallet.referralWalletDiscountAmount > 0
+    ) {
+      calculatedTotal = Math.max(
+        0,
+        calculatedTotal - referralWallet.referralWalletDiscountAmount
+      );
+    }
+
+    return Math.max(0, calculatedTotal);
+  }, [
+    discountedSubtotal,
+    taxes.taxAmount,
+    loyalty.usePoints,
+    loyalty.pointsDiscountAmount,
+    referralWallet.isReferralWalletEnabled,
+    referralWallet.useReferralWallet,
+    referralWallet.referralWalletDiscountAmount,
+  ]);
 
   const roundedTotal = useMemo(() => {
     return Math.round(total);
@@ -425,8 +411,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     getServiceDisplayPrice,
     getStylistName,
     formatDuration,
-  });
-  const { handlePayment } = usePaymentHandler({
+  });  const { handlePayment } = usePaymentHandler({
     selectedCustomer,
     paymentMethod,
     appointmentId,
@@ -443,7 +428,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       membershipId: membership.membershipId,
       membershipName: membership.membershipName,
       membershipDiscount: membership.membershipDiscount,
-    },    
+    },
     loyalty: {
       adjustedServicePrices: loyalty.adjustedServicePrices,
       pointsToEarn: loyalty.pointsToEarn,
@@ -458,6 +443,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     referralCashback: referral.potentialCashback,
     customerCashback: referral.customerCashback,
     isReferralApplicable: referral.isReferralApplicable,
+    subtotal, // Pass the subtotal to ensure it's sent to the backend
     total,
     adjustedPrices,
     onSaveAppointment,
@@ -471,18 +457,27 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
       scrollContainerRef.current.scrollTop =
         scrollContainerRef.current.scrollHeight;
     }
-  }, [selectedItems, subtotal, total]);  // Update referral wallet validation when active discounts change
+  }, [selectedItems, subtotal, total]); // Update referral wallet validation when active discounts change
   useEffect(() => {
     console.log("Active discounts changed:", activeDiscounts);
-    
+
     // We don't need to force re-evaluation by toggling the amount anymore
     // The hook will automatically re-evaluate based on activeDiscounts changes
     // This just adds additional logging for debugging
-    
-    if (referralWallet.useReferralWallet && !referralWallet.isReferralWalletEnabled) {
-      console.log("Referral wallet is checked but validation failed - will be automatically unchecked");
+
+    if (
+      referralWallet.useReferralWallet &&
+      !referralWallet.isReferralWalletEnabled
+    ) {
+      console.log(
+        "Referral wallet is checked but validation failed - will be automatically unchecked"
+      );
     }
-  }, [activeDiscounts, referralWallet.useReferralWallet, referralWallet.isReferralWalletEnabled]);
+  }, [
+    activeDiscounts,
+    referralWallet.useReferralWallet,
+    referralWallet.isReferralWalletEnabled,
+  ]);
 
   return (
     <div className="h-full w-full bg-gray-50">
@@ -600,7 +595,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       </span>
                       <span>₹{taxes.taxAmount.toFixed(2)}</span>
                     </div>
-                  )}{" "}                  {loyalty.isLoyaltyEnabled && (
+                  )}{" "}
+                  {loyalty.isLoyaltyEnabled && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm items-center">
                         <span className="flex items-center gap-2 text-muted-foreground">
@@ -642,107 +638,124 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                         </div>
                       )}
                     </div>
-                  )}                  {/* Referral Wallet Section */}
+                  )}{" "}
+                  {/* Referral Wallet Section */}
                   {/* Always show balance if customer has any, even if it's disabled by config */}
-                  {selectedCustomer && referralWallet.referralWalletBalance > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm items-center">
-                        <span className="flex items-center gap-2 text-muted-foreground">
-                          <Users className="h-4 w-4 text-purple-500" /> Referral
-                          Wallet Balance
-                        </span>
-                        <span className="font-semibold text-purple-600">
-                          ₹{referralWallet.referralWalletBalance.toFixed(2)}
-                        </span>
-                      </div>
-                      
-                      {/* Show relevant status messages based on configuration */}
-                      {!referralWallet.referralConfig.isEnabled && (
-                        <div className="text-sm text-amber-600 flex items-center gap-2">
-                          <Info className="h-4 w-4" /> Referral program is not active
+                  {selectedCustomer &&
+                    referralWallet.referralWalletBalance > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm items-center">
+                          <span className="flex items-center gap-2 text-muted-foreground">
+                            <Users className="h-4 w-4 text-purple-500" />{" "}
+                            Referral Wallet Balance
+                          </span>
+                          <span className="font-semibold text-purple-600">
+                            ₹{referralWallet.referralWalletBalance.toFixed(2)}
+                          </span>
                         </div>
-                      )}
-                      {!referralWallet.referralConfig.referralEnabledInConfig && (
-                        <div className="text-sm text-amber-600 flex items-center gap-2">
-                          <Info className="h-4 w-4" /> Referrals are disabled for this location
-                        </div>
-                      )}
-                      {referralWallet.referralConfig.maxRewardsReached && (
-                        <div className="text-sm text-amber-600 flex items-center gap-2">
-                          <Info className="h-4 w-4" /> Maximum discounts reached for this booking
-                        </div>
-                      )}
-                      {!referralWallet.referralConfig.allowedByStrategy && 
-                       !referralWallet.referralConfig.maxRewardsReached && (
-                        <div className="text-sm text-amber-600 flex items-center gap-2">
-                          <Info className="h-4 w-4" /> This discount combination is not allowed
-                        </div>
-                      )}
-                      
-                      {referralWallet.disabledReason && !referralWallet.isReferralWalletEnabled && (
-                        <div className="text-sm text-amber-600 flex items-center gap-2">
-                          <Info className="h-4 w-4" /> {referralWallet.disabledReason}
-                        </div>
-                      )}
-                        {/* Only show input controls if the wallet is enabled */}
-                      {referralWallet.isReferralWalletEnabled && (
-                        <div className="space-y-2">
-                          {/* First add a checkbox to use the wallet */}
-                          <div className="flex justify-between items-center text-sm">
-                            <label
-                              htmlFor="use-referral-wallet"
-                              className="flex items-center gap-2 text-muted-foreground"
-                            >
-                              <Users className="h-4 w-4 text-purple-500" /> Use
-                              Referral Wallet
-                            </label>
-                            <input
-                              id="use-referral-wallet"
-                              type="checkbox"
-                              checked={referralWallet.useReferralWallet}
-                              onChange={(e) =>
-                                referralWallet.setUseReferralWallet(e.target.checked)
-                              }
-                              className="h-4 w-4 text-purple-500 focus:ring-purple-500"
-                            />
+
+                        {/* Show relevant status messages based on configuration */}
+                        {!referralWallet.referralConfig.isEnabled && (
+                          <div className="text-sm text-amber-600 flex items-center gap-2">
+                            <Info className="h-4 w-4" /> Referral program is not
+                            active
                           </div>
-                          
-                          {/* Show amount input only if checkbox is checked */}
-                          {referralWallet.useReferralWallet && (
-                            <div className="flex justify-between items-center text-sm">
-                              <label
-                                htmlFor="referral-wallet-amount"
-                                className="flex items-center gap-2 text-muted-foreground"
-                              >
-                                <Users className="h-4 w-4 text-purple-500" /> Amount
-                                to Use
-                              </label>
-                              <div className="flex items-center">
-                                <span className="mr-1 text-muted-foreground">₹</span>
-                                <Input
-                                  id="referral-wallet-amount"
-                                  type="number"
-                                  min="0"
-                                  max={referralWallet.referralWalletBalance}
-                                  step="0.01"
-                                  value={referralWallet.referralWalletAmount}
-                                  onChange={(e) => {
-                                    const amount = parseFloat(e.target.value);
-                                    if (!isNaN(amount)) {
-                                      referralWallet.setReferralWalletAmount(amount);
-                                    } else {
-                                      referralWallet.setReferralWalletAmount(0);
-                                    }
-                                  }}
-                                  className="h-7 w-24 py-1 px-2 text-xs"
-                                />
-                              </div>
+                        )}
+                        {!referralWallet.referralConfig
+                          .referralEnabledInConfig && (
+                          <div className="text-sm text-amber-600 flex items-center gap-2">
+                            <Info className="h-4 w-4" /> Referrals are disabled
+                            for this location
+                          </div>
+                        )}
+                        {referralWallet.referralConfig.maxRewardsReached && (
+                          <div className="text-sm text-amber-600 flex items-center gap-2">
+                            <Info className="h-4 w-4" /> Maximum discounts
+                            reached for this booking
+                          </div>
+                        )}
+                        {!referralWallet.referralConfig.allowedByStrategy &&
+                          !referralWallet.referralConfig.maxRewardsReached && (
+                            <div className="text-sm text-amber-600 flex items-center gap-2">
+                              <Info className="h-4 w-4" /> This discount
+                              combination is not allowed
                             </div>
                           )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+
+                        {referralWallet.disabledReason &&
+                          !referralWallet.isReferralWalletEnabled && (
+                            <div className="text-sm text-amber-600 flex items-center gap-2">
+                              <Info className="h-4 w-4" />{" "}
+                              {referralWallet.disabledReason}
+                            </div>
+                          )}
+                        {/* Only show input controls if the wallet is enabled */}
+                        {referralWallet.isReferralWalletEnabled && (
+                          <div className="space-y-2">
+                            {/* First add a checkbox to use the wallet */}
+                            <div className="flex justify-between items-center text-sm">
+                              <label
+                                htmlFor="use-referral-wallet"
+                                className="flex items-center gap-2 text-muted-foreground"
+                              >
+                                <Users className="h-4 w-4 text-purple-500" />{" "}
+                                Use Referral Wallet
+                              </label>
+                              <input
+                                id="use-referral-wallet"
+                                type="checkbox"
+                                checked={referralWallet.useReferralWallet}
+                                onChange={(e) =>
+                                  referralWallet.setUseReferralWallet(
+                                    e.target.checked
+                                  )
+                                }
+                                className="h-4 w-4 text-purple-500 focus:ring-purple-500"
+                              />
+                            </div>
+
+                            {/* Show amount input only if checkbox is checked */}
+                            {referralWallet.useReferralWallet && (
+                              <div className="flex justify-between items-center text-sm">
+                                <label
+                                  htmlFor="referral-wallet-amount"
+                                  className="flex items-center gap-2 text-muted-foreground"
+                                >
+                                  <Users className="h-4 w-4 text-purple-500" />{" "}
+                                  Amount to Use
+                                </label>
+                                <div className="flex items-center">
+                                  <span className="mr-1 text-muted-foreground">
+                                    ₹
+                                  </span>
+                                  <Input
+                                    id="referral-wallet-amount"
+                                    type="number"
+                                    min="0"
+                                    max={referralWallet.referralWalletBalance}
+                                    step="0.01"
+                                    value={referralWallet.referralWalletAmount}
+                                    onChange={(e) => {
+                                      const amount = parseFloat(e.target.value);
+                                      if (!isNaN(amount)) {
+                                        referralWallet.setReferralWalletAmount(
+                                          amount
+                                        );
+                                      } else {
+                                        referralWallet.setReferralWalletAmount(
+                                          0
+                                        );
+                                      }
+                                    }}
+                                    className="h-7 w-24 py-1 px-2 text-xs"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   {/* Referral information is now shown in the popover */}
                   {isNewCustomer &&
                     referral.isReferralEnabled &&
@@ -754,7 +767,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                         </span>
                         <span>Both get cashback</span>
                       </div>
-                    )}                  {loyalty.pointsDiscountAmount > 0 && (
+                    )}{" "}
+                  {loyalty.pointsDiscountAmount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span className="flex items-center">
                         <Award className="mr-2 h-4 w-4" />
@@ -769,7 +783,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                         <Users className="mr-2 h-4 w-4" />
                         Referral Wallet Discount
                       </span>
-                      <span>-₹{referralWallet.referralWalletDiscountAmount.toFixed(2)}</span>
+                      <span>
+                        -₹
+                        {referralWallet.referralWalletDiscountAmount.toFixed(2)}
+                      </span>
                     </div>
                   )}{" "}
                   {/* Temporarily disabled until referralDiscount is implemented

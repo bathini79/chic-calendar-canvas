@@ -606,7 +606,8 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                       selectedStylists={selectedStylists}
                       stylists={employees}
                       onCustomPackage={handleCustomServiceToggle}
-                      customizedServices={customizedServices}                      locationId={locationId}
+                      customizedServices={customizedServices}
+                      locationId={locationId}
                       selectedDate={stateSelectedDate}
                       selectedTime={stateSelectedTime}
                       existingAppointment={!!existingAppointment}
@@ -635,8 +636,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                     </div>
                   </div>
                 </>
-              )}
-
+              )}{" "}
               {currentScreen === SCREEN.CHECKOUT && (
                 <CheckoutSection
                   appointmentId={
@@ -668,6 +668,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   customizedServices={customizedServices}
                   isExistingAppointment={!!existingAppointment}
                   locationId={locationId}
+                  existingAppointment={existingAppointment}
                   onMarkAsNoShow={
                     existingAppointment
                       ? () => handleMarkAs("noshow")
@@ -683,7 +684,6 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   employees={employees}
                 />
               )}
-
               {currentScreen === SCREEN.SUMMARY && newAppointmentId && (
                 <div className="p-6 w-full">
                   <h3 className="text-xl font-semibold mb-6">

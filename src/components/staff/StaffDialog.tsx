@@ -149,8 +149,10 @@ export function StaffDialog({
       }
     },
     enabled: !!employeeId && open,
-  });
-  const handleFormSubmit = async (data: any) => {
+  });  const handleFormSubmit = async (data: any) => {
+    console.log("=== StaffDialog handleFormSubmit called ===");
+    console.log("Received data:", data);
+    
     // Add debouncing to prevent rapid re-submissions
     const now = Date.now();
     if (now - lastSubmitTimestamp < SUBMIT_DEBOUNCE_MS) {
@@ -166,17 +168,25 @@ export function StaffDialog({
 
     console.log("Submitting staff form with data:", data);
 
+    // Set a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.error("Form submission timed out after 30 seconds");
+      setIsLoading(false);
+      toast.error("Update timed out. Please try again.");
+    }, 30000);
+
     try {
       setLastSubmitTimestamp(now);
       setIsLoading(true);
-      setError(null);
-
-      // If editing existing employee
+      setError(null);      // If editing existing employee
       if (employeeId) {
+        console.log("Updating existing employee:", employeeId);
+        
         // Make sure phone doesn't contain + prefix
         const phone = data.phone.replace(/^\+/, "");
 
         // Update employee base data
+        console.log("Updating employee with employment_type_id:", data.employment_type_id);
         const { error: updateError } = await supabase
           .from("employees")
           .update({
@@ -190,9 +200,14 @@ export function StaffDialog({
           })
           .eq("id", employeeId);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error("Error updating employee:", updateError);
+          throw new Error(`Failed to update employee: ${updateError.message}`);
+        }
+          console.log("Employee base data updated successfully");
 
         // Clear existing relations
+        console.log("Clearing existing employee relations...");
         await Promise.all([
           supabase
             .from("employee_skills")
@@ -203,8 +218,11 @@ export function StaffDialog({
             .delete()
             .eq("employee_id", employeeId),
         ]);
+        
+        console.log("Existing relations cleared");
 
         if (data.skills?.length > 0) {
+          console.log("Inserting employee skills...");
           const skillsToInsert = data.skills.map((serviceId: string) => ({
             employee_id: employeeId,
             service_id: serviceId,
@@ -214,10 +232,15 @@ export function StaffDialog({
             .from("employee_skills")
             .insert(skillsToInsert);
 
-          if (skillsError) throw skillsError;
+          if (skillsError) {
+            console.error("Error inserting skills:", skillsError);
+            throw skillsError;
+          }
+          console.log("Employee skills inserted successfully");
         }
 
         if (data.locations?.length > 0) {
+          console.log("Inserting employee locations...");
           const locationsToInsert = data.locations.map(
             (locationId: string) => ({
               employee_id: employeeId,
@@ -229,8 +252,12 @@ export function StaffDialog({
             .from("employee_locations")
             .insert(locationsToInsert);
 
-          if (locationsError) throw locationsError;
-        } // Handle compensation data
+          if (locationsError) {
+            console.error("Error inserting locations:", locationsError);
+            throw locationsError;
+          }
+          console.log("Employee locations inserted successfully");
+        }// Handle compensation data
         if (data.compensation) {
           // First delete any existing compensation records
           const { error: deleteCompError } = await supabase
@@ -401,12 +428,12 @@ export function StaffDialog({
         setVerificationStep("otp");
         setResendCountdown(30);
         toast.success("Verification code sent to " + data.phone);
-      }
-    } catch (error: any) {
+      }    } catch (error: any) {
       toast.error(error.message || "Failed to save staff member");
       console.error("Error in staff flow:", error);
       setError(error);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };
@@ -637,12 +664,15 @@ export function StaffDialog({
                 "Close"
               )}
             </Button>{" "}
-            {!isMobile && (
-              <Button
-                disabled={isLoading}
-                onClick={() => formRef.current?.submit()}
-                className="whitespace-nowrap"
-              >                {isLoading ? (
+            {!isMobile && (            <Button
+              disabled={isLoading}
+              onClick={() => {
+                console.log("=== Desktop Update button clicked ===");
+                console.log("formRef.current:", formRef.current);
+                formRef.current?.submit();
+              }}
+              className="whitespace-nowrap"
+            >{isLoading ? (
                   <LoaderCircle className="mr-2 h-4 w-4 animate-spin" size={16} strokeWidth={2} />
                 ) : null}
                 {employeeId ? "Update" : "Add"}
@@ -676,12 +706,15 @@ export function StaffDialog({
         {/* Sticky footer for mobile */}
         {isMobile && verificationStep === "form" && (
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-50 flex justify-end gap-3">
-            {" "}
-            <Button
-              onClick={() => formRef.current?.submit()}
+            {" "}            <Button
+              onClick={() => {
+                console.log("=== Mobile Update button clicked ===");
+                console.log("formRef.current:", formRef.current);
+                formRef.current?.submit();
+              }}
               disabled={isLoading}
               className="whitespace-nowrap px-6 flex-1"
-            >              {isLoading && (
+            >{isLoading && (
                 <LoaderCircle
                   className="animate-spin mr-2 h-4 w-4"
                   size={16}

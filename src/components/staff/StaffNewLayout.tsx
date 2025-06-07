@@ -5,6 +5,7 @@ import { LocationsSection } from "./sections/LocationsSection";
 import { ServicesSection } from "./sections/ServicesSection";
 import { CommissionsSection } from "./sections/CommissionsSection";
 import { CompensationSettings } from "./pay/CompensationSettings";
+import { EmploymentTypeValidator } from "./EmploymentTypeValidator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -32,10 +33,9 @@ const formSchema = z.object({
   employment_type_id: z.string().min(1, "Employment type is required"),
   // Skills is conditionally required based on employment_type having perform_services permission
   skills: z.array(z.string()).optional().default([]),
-  locations: z.array(z.string()).min(1, "At least one location is required"),
-  // Commission fields
+  locations: z.array(z.string()).min(1, "At least one location is required"),  // Commission fields
   service_commission_enabled: z.boolean().default(false),
-  commission_type: z.enum(["flat", "tiered", "template"]).optional(),
+  commission_type: z.enum(["flat", "tiered", "template"]).optional().nullable().transform((val) => val || undefined),
   service_commissions: z.record(z.string(), z.number()).optional(),
   global_commission_percentage: z.number().min(0).max(100).optional(),
 
@@ -46,6 +46,16 @@ const formSchema = z.object({
       effective_from: z.date(),
     })
     .optional(),
+}).refine((data) => {
+  // If service commission is enabled, commission_type is required
+  if (data.service_commission_enabled) {
+    return data.commission_type !== null && data.commission_type !== undefined;
+  }
+  // If service commission is disabled, commission_type should be optional
+  return true;
+}, {
+  message: "Commission type is required when service commission is enabled",
+  path: ["commission_type"],
 });
 
 type StaffFormData = z.infer<typeof formSchema>;
@@ -320,39 +330,81 @@ export function StaffNewLayout({
       setIsPhoneCheckLoading(false);
     }
   };
-
   // Helper function to check which sections have validation errors and count them
   const checkSectionsWithErrors = () => {
     const errors = form.formState.errors;
+    console.log("Checking sections with errors. Current form errors:", errors);
+    
     const errorSections: string[] = [];
-    const counts: Record<string, number> = {}; // Profile section errors (name, email, phone, employment_type_id)
+    const counts: Record<string, number> = {};
+
+    // Profile section errors (name, email, phone, employment_type_id)
     let profileErrorCount = 0;
-    if (errors.name) profileErrorCount++;
-    if (errors.email) profileErrorCount++;
-    if (errors.phone) profileErrorCount++;
-    if (errors.employment_type_id) profileErrorCount++;
+    if (errors.name) {
+      console.log("Name error:", errors.name);
+      profileErrorCount++;
+    }
+    if (errors.email) {
+      console.log("Email error:", errors.email);
+      profileErrorCount++;
+    }
+    if (errors.phone) {
+      console.log("Phone error:", errors.phone);
+      profileErrorCount++;
+    }
+    if (errors.employment_type_id) {
+      console.log("Employment type error:", errors.employment_type_id);
+      profileErrorCount++;
+    }
 
     if (profileErrorCount > 0) {
+      console.log("Adding profile to error sections, error count:", profileErrorCount);
       errorSections.push("profile");
       counts["profile"] = profileErrorCount;
     }
 
     // Services section errors - only count if the selected employment type requires services
     if (errors.skills && isServicesRequired) {
+      console.log("Skills error:", errors.skills, "Services required:", isServicesRequired);
       errorSections.push("services");
       counts["services"] = 1; // For array fields, we count it as 1 error
     }
 
     // Locations section errors
     if (errors.locations) {
+      console.log("Locations error:", errors.locations);
       errorSections.push("locations");
       counts["locations"] = 1; // For array fields, we count it as 1 error
-    } // Commission section errors
+    }    // Commission section errors - check for any commission-related field errors
     let commissionErrorCount = 0;
-    if (errors.global_commission_percentage) commissionErrorCount++;
-    if (errors.service_commissions) commissionErrorCount++;
+    
+    // Check for commission_type errors (this field might not have a ref if not rendered)
+    if (errors.commission_type) {
+      console.log("Commission type error:", errors.commission_type);
+      commissionErrorCount++;
+    }
+    
+    // Check for service_commission_enabled errors
+    if (errors.service_commission_enabled) {
+      console.log("Service commission enabled error:", errors.service_commission_enabled);
+      commissionErrorCount++;
+    }
+    
+    // Check for global_commission_percentage errors
+    if (errors.global_commission_percentage) {
+      console.log("Global commission error:", errors.global_commission_percentage);
+      commissionErrorCount++;
+    }
+    
+    // Check for service_commissions errors
+    if (errors.service_commissions) {
+      console.log("Service commissions error:", errors.service_commissions);
+      commissionErrorCount++;
+    }    // The commission_type validation is now handled by the schema's refine method
+    // No need for manual error checking here
 
     if (commissionErrorCount > 0) {
+      console.log("Adding commissions to error sections, error count:", commissionErrorCount);
       errorSections.push("commissions");
       counts["commissions"] = commissionErrorCount;
     }
@@ -366,9 +418,12 @@ export function StaffNewLayout({
 
     // Update the error counts state
     setErrorCounts(counts);
+    
+    console.log("Final error sections:", errorSections);
+    console.log("Final error counts:", counts);
 
     return errorSections;
-  }; // Handle form submission
+  };// Handle form submission
   const handleFormSubmit = React.useCallback(
     async (data: StaffFormData) => {
       if (isSubmitting || form.formState.isSubmitting) {
@@ -620,16 +675,28 @@ export function StaffNewLayout({
     } finally {
       setIsFormSubmitting(false);
     }
-  };
-  const handleButtonClick = async () => {
+  };  const handleButtonClick = async () => {
+    console.log("=== handleButtonClick called ===");
+    
     // Get form data without submitting the form
     const data = form.getValues();
+    console.log("Form data:", data);
+    
     const isValid = await form.trigger(); // Validate all fields
+    console.log("Form validation result:", isValid);
+    console.log("Form errors after trigger:", form.formState.errors);
     
     if (!isValid) {
+      console.log("Form validation failed");
+      
+      // Wait a brief moment for React to update the form state
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       // Show validation errors
       const errorSections = checkSectionsWithErrors();
       setSectionsWithErrors(errorSections);
+      console.log("Error sections:", errorSections);
+      console.log("Form errors when checking sections:", form.formState.errors);
       return;
     }
 
@@ -638,6 +705,7 @@ export function StaffNewLayout({
       return;
     }
 
+    console.log("Starting form submission...");
     setIsFormSubmitting(true);
     try {
       const phoneWithCountryCode = selectedCountry.code + data.phone.replace(/^\+/, "");
@@ -646,7 +714,8 @@ export function StaffNewLayout({
         ...data,
         phone: phoneWithCountryCode.replace(/^\+/, ""),
       };
-
+      
+      console.log("Final data to submit:", finalData);
       await onSubmit(finalData);
     } catch (error) {
       console.error('Form submission error:', error);
@@ -664,9 +733,15 @@ export function StaffNewLayout({
         submit: handleButtonClick
       };
     }
-  }, [formRef, form, handleButtonClick]);
-  return (
+  }, [formRef, form, handleButtonClick]);  return (
     <Form {...form}>
+      {/* Include the EmploymentTypeValidator to handle conditional validation */}
+      <EmploymentTypeValidator
+        form={form}
+        setSectionsWithErrors={setSectionsWithErrors}
+        setErrorCounts={setErrorCounts}
+        employmentTypes={employmentTypes || []}
+      />
       <div
         id="staff-form"
         className={cn("space-y-6 h-full flex flex-col", {

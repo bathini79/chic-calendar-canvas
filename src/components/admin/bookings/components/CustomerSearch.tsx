@@ -41,7 +41,7 @@ export const CustomerSearch: React.FC<CustomerSearchProps> = ({ onSelect }) => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'customer');
+        .eq('role', 'admin');
 
       if (error) throw error;
       // Convert the database profiles to Customer type

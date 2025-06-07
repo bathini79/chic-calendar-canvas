@@ -282,10 +282,11 @@ export default function useSaveAppointment({
         membership_discount:
           summaryParams?.membershipDiscount || membership_discount,
         membership_id: summaryParams?.membershipId || membership_id,
-        membership_name: summaryParams?.membershipName || membership_name,
-        points_earned: pointsEarnedFromParams,
+        membership_name: summaryParams?.membershipName || membership_name,        points_earned: pointsEarnedFromParams,
         points_redeemed: pointsRedeemedFromParams,
         points_discount_amount: pointsDiscountAmountFromParams,
+        referral_wallet_discount_amount: referralWalletDiscountAmountFromParams || 0,
+        referral_wallet_redeemed: referralWalletRedeemedFromParams || 0,
       };
 
       let createdAppointmentId;
