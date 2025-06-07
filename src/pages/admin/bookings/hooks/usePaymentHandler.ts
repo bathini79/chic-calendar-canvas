@@ -38,14 +38,17 @@ interface UsePaymentHandlerProps {
   adjustedPrices: Record<string, number>;
   onSaveAppointment: (params?: any) => Promise<string | null>;
   onPaymentComplete: (appointmentId?: string) => void;
+  setLoading?: (loading: boolean) => void;
 }
 
 export const usePaymentHandler = ({
   selectedCustomer,
   paymentMethod,
-  appointmentId,  taxes,
+  appointmentId,  
+  taxes,
   coupons,
-  membership,  loyalty,
+  membership,  
+  loyalty,
   referralWallet,
   referrerId,
   referralCashback,
@@ -56,8 +59,8 @@ export const usePaymentHandler = ({
   adjustedPrices,
   onSaveAppointment,
   onPaymentComplete,
-}: UsePaymentHandlerProps) => {
-  const handlePayment = async () => {
+  setLoading,
+}: UsePaymentHandlerProps) => {const handlePayment = async () => {
     try {
       if (!selectedCustomer) {
         toast.error("Please select a customer");
@@ -67,7 +70,12 @@ export const usePaymentHandler = ({
       if (!paymentMethod) {
         toast.error("Please select a payment method");
         return;
-      }      const roundedTotal = Math.round(total);
+      }
+      
+      // Set loading state to true at the start of payment processing
+      if (setLoading) {
+        setLoading(true);
+      }const roundedTotal = Math.round(total);
       const roundOffDifference = roundedTotal - total;      const saveAppointmentParams = {
         appointmentId,
         appliedTaxId: taxes.appliedTaxId,

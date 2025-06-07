@@ -2,7 +2,6 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -22,7 +21,6 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
 import type { Service, Package, Customer } from "../types";
 import {
   Popover,
@@ -32,9 +30,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import {
   getTotalPrice,
-  getTotalDuration,
   getFinalPrice,
-  calculatePackagePrice,
   getAdjustedServicePrices,
 } from "../utils/bookingUtils";
 import { useQuery } from "@tanstack/react-query";
@@ -72,9 +68,9 @@ interface CheckoutSectionProps {
   onRemoveService: (serviceId: string) => void;
   onRemovePackage: (packageId: string) => void;
   onBackToServices: () => void;  isExistingAppointment?: boolean;
-  customizedServices?: Record<string, string[]>;
-  locationId?: string;
+  customizedServices?: Record<string, string[]>;  locationId?: string;
   loadingPayment?: boolean;
+  setLoadingPayment?: (loading: boolean) => void;
   employees: any[];
   existingAppointment?: any; // For restoring referral wallet state
 }
@@ -100,10 +96,10 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onSaveAppointment,
   onRemoveService,
   onRemovePackage,
-  onBackToServices,
-  customizedServices = {},
+  onBackToServices,  customizedServices = {},
   locationId,
   loadingPayment = false,
+  setLoadingPayment,
   employees,
   existingAppointment,
 }) => {
@@ -326,7 +322,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         calculatedTotal - loyalty.pointsDiscountAmount
       );
     }
-
     // Subtract referral wallet only if:
     // 1. The feature is enabled (all validation checks passed)
     // 2. The user has checked the box
@@ -447,7 +442,13 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     total,
     adjustedPrices,
     onSaveAppointment,
-    onPaymentComplete,
+    onPaymentComplete,    // Pass a callback that can update the loading state in AppointmentManager
+    setLoading: (loading) => {
+      // This will be invoked by the usePaymentHandler hook
+      if (setLoadingPayment) {
+        setLoadingPayment(loading);
+      }
+    },
   });
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -458,27 +459,6 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
         scrollContainerRef.current.scrollHeight;
     }
   }, [selectedItems, subtotal, total]); // Update referral wallet validation when active discounts change
-  useEffect(() => {
-    console.log("Active discounts changed:", activeDiscounts);
-
-    // We don't need to force re-evaluation by toggling the amount anymore
-    // The hook will automatically re-evaluate based on activeDiscounts changes
-    // This just adds additional logging for debugging
-
-    if (
-      referralWallet.useReferralWallet &&
-      !referralWallet.isReferralWalletEnabled
-    ) {
-      console.log(
-        "Referral wallet is checked but validation failed - will be automatically unchecked"
-      );
-    }
-  }, [
-    activeDiscounts,
-    referralWallet.useReferralWallet,
-    referralWallet.isReferralWalletEnabled,
-  ]);
-
   return (
     <div className="h-full w-full bg-gray-50">
       <Card className="h-[calc(100vh-100px)] overflow-hidden flex flex-col">
@@ -788,18 +768,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                         {referralWallet.referralWalletDiscountAmount.toFixed(2)}
                       </span>
                     </div>
-                  )}{" "}
-                  {/* Temporarily disabled until referralDiscount is implemented
-                  {referral.referralDiscount > 0 && (
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span className="flex items-center">
-                        <Users className="mr-2 h-4 w-4" />
-                        Referral Discount
-                      </span>
-                      <span>-₹{referral.referralDiscount.toFixed(2)}</span>
-                    </div>
                   )}
-                  */}
                   {roundOffDifference > 0 ? (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Round Off</span>
@@ -842,15 +811,27 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                       : null}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
+              </div>{" "}
+              <div className="flex gap-2">                <Button
                   className="flex-1 flex items-center justify-center gap-2"
                   size="lg"
                   onClick={() => {
-                    if (!loadingPayment) {
-                      handlePayment();
+                    if (!loadingPayment && setLoadingPayment) {
+                      // Set loading state immediately when payment button is clicked
+                      setLoadingPayment(true);
+                      
+                      // Handle payment with proper error handling
+                      const handlePaymentWithLoading = async () => {
+                        try {
+                          await handlePayment();
+                        } catch (error) {
+                          console.error("Payment failed:", error);
+                          // Reset loading state on error
+                          setLoadingPayment(false);
+                        }
+                      };
+                      
+                      handlePaymentWithLoading();
                     }
                   }}
                   disabled={selectedItems.length === 0 || loadingPayment}
@@ -1123,3 +1104,4 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     </div>
   );
 };
+ 
