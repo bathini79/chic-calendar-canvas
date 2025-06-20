@@ -24,6 +24,7 @@ import ThirdParty from "./pages/admin/settings/ThirdParty";
 import Team from "./pages/admin/settings/Team";
 import Scheduling from "./pages/admin/settings/Scheduling";
 import Reports from "./pages/admin/Reports";
+import BIReports from "./pages/admin/BIReports";
 import VerifyEmployeePage from "./pages/verify";
 import { Toaster } from "@/components/ui/sonner"; // Import the Sonner Toaster
 import AdminProfile from "@/components/admin/AdminProfile"; // Import the AdminProfile component
@@ -84,9 +85,8 @@ export default function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="bookings" element={<AdminBookings />} />
             <Route path="services" element={<AdminServices />} />
-            <Route path="staff" element={<Staff />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="reports" element={<Reports />} />
+            <Route path="staff" element={<Staff />} />            <Route path="inventory" element={<Inventory />} />            <Route path="reports" element={<Navigate to="/admin/bi-reports" replace />} />
+            <Route path="bi-reports" element={<BIReports />} />
             <Route path="profile" element={<AdminProfile />} />
             <Route path="settings" element={<Settings />} />
             <Route path="settings/business-setup" element={<BusinessSetup />} />

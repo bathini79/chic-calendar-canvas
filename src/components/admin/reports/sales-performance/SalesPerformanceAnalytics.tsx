@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,7 +18,8 @@ import {
   PieChart as PieChartIcon,
   LineChart as LineChartIcon,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Filter
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, subDays, startOfDay, endOfDay, isSameDay, addDays, eachDayOfInterval } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, isSameDay, addDays, eachDayOfInterval, isToday } from 'date-fns';
 import { toast } from 'sonner';
 import { 
   BarChart, 
@@ -51,6 +51,9 @@ import {
   TabsTrigger,
   TabsContent
 } from "@/components/ui/tabs";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { DateRange } from 'react-day-picker';
 
 interface SalesPerformanceAnalyticsProps {
   employeeId: string;
@@ -60,34 +63,35 @@ interface SalesPerformanceAnalyticsProps {
 // Colors for the charts
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d', '#ffc658'];
 
-export function SalesPerformanceAnalytics({ employeeId, dateRange }: SalesPerformanceAnalyticsProps) {
-  const [activeTab, setActiveTab] = useState('trend');
-  
-  // Parse the date range and calculate the start and end dates
-  const getDateRange = () => {
+export function SalesPerformanceAnalytics({ employeeId, dateRange: propDateRange }: SalesPerformanceAnalyticsProps) {  const [activeTab, setActiveTab] = useState('trend');
+  const isMobile = useIsMobile();
+  // Use DateRange type instead of string for better date handling
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({ 
+    from: new Date(), // Default to today
+    to: new Date() 
+  });
+  // Get date range values for the query
+  const getQueryDateRange = () => {
     const today = new Date();
     
-    if (dateRange === 'custom') {
-      // For custom range, we'd typically have date pickers
-      // For now, default to last 30 days
+    if (!dateRange?.from) {
       return {
-        startDate: subDays(today, 30),
+        startDate: today, // Default to today
         endDate: today
       };
     }
     
-    const days = parseInt(dateRange, 10);
     return {
-      startDate: subDays(today, days),
-      endDate: today
+      startDate: dateRange.from,
+      endDate: dateRange.to || dateRange.from
     };
   };
   
-  const { startDate, endDate } = getDateRange();
+  const { startDate, endDate } = getQueryDateRange();
   
   // Fetch the sales performance data
   const { data: salesData, isLoading } = useQuery({
-    queryKey: ['sales-performance-analytics', employeeId, dateRange],
+    queryKey: ['sales-performance-analytics', employeeId, startDate, endDate],
     queryFn: async () => {
       let query = supabase
         .from('bookings')
@@ -158,8 +162,7 @@ export function SalesPerformanceAnalytics({ employeeId, dateRange }: SalesPerfor
     
     return dailyData;
   };
-  
-  // For the service distribution chart
+    // For the service distribution chart
   const prepareServiceData = () => {
     if (!salesData || salesData.length === 0) return [];
     
@@ -274,11 +277,69 @@ export function SalesPerformanceAnalytics({ employeeId, dateRange }: SalesPerfor
     // For CSV and Excel, we could use libraries like csv-stringify or xlsx
     // For PDF, we could use libraries like jspdf or react-pdf
     // For images, we could use html-to-image or similar libraries
-  };
-  
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  };  return (
+    <div className="space-y-6">
+      {/* Controls section - Improved layout for mobile and desktop */}
+      <div className="space-y-4">
+        {/* Top row - Calendar first, then Filter icon */}
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          {/* DateRangePicker - consistent with other reports */}
+          <DateRangePicker
+            dateRange={dateRange}
+            onChange={setDateRange}
+            isMobile={isMobile}
+            align={isMobile ? "end" : "center"}
+            className={isMobile ? "flex-1" : ""}
+          />
+          
+          {/* Filter button - icon only on mobile */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center h-8 gap-2"
+            onClick={() => {
+              // Add filter functionality here
+              toast.success("Filter options coming soon");
+            }}
+          >
+            <Filter className="h-4 w-4" />
+            {!isMobile && <span>Filters</span>}
+          </Button>
+          
+          {/* Export menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center h-8 gap-2">
+                <Download className="h-4 w-4" /> 
+                {!isMobile && <span>Export</span>}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => exportData('pdf')}>
+                <FileText className="h-4 w-4 mr-2" /> Export as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportData('csv')}>
+                <FileText className="h-4 w-4 mr-2" /> Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportData('excel')}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Export as Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportData('png')}>
+                <ImageIcon className="h-4 w-4 mr-2" /> Export as PNG
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportData('jpeg')}>
+                <ImageIcon className="h-4 w-4 mr-2" /> Export as JPEG
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportData('svg')}>
+                <ImageIcon className="h-4 w-4 mr-2" /> Export as SVG
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      
+      {/* Summary cards section */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
@@ -329,36 +390,6 @@ export function SalesPerformanceAnalytics({ employeeId, dateRange }: SalesPerfor
             )}
           </CardContent>
         </Card>
-      </div>
-      
-      <div className="flex justify-end">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="flex items-center">
-              <Download className="h-4 w-4 mr-2" /> Export
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => exportData('pdf')}>
-              <FileText className="h-4 w-4 mr-2" /> Export as PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportData('csv')}>
-              <FileText className="h-4 w-4 mr-2" /> Export as CSV
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportData('excel')}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" /> Export as Excel
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportData('png')}>
-              <ImageIcon className="h-4 w-4 mr-2" /> Export as PNG
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportData('jpeg')}>
-              <ImageIcon className="h-4 w-4 mr-2" /> Export as JPEG
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportData('svg')}>
-              <ImageIcon className="h-4 w-4 mr-2" /> Export as SVG
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>

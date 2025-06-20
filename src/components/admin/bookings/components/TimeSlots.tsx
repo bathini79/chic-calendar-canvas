@@ -237,7 +237,6 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
               WebkitOverflowScrolling: 'touch',
               scrollbarWidth: isMobile ? 'thin' : 'auto',
               msOverflowStyle: '-ms-autohiding-scrollbar',
-              scrollbarWidth: isMobile ? 'none' : 'auto' // Hide scrollbar on mobile
             }}>
             {isLoading ? (
               // Skeleton loaders for employee headers

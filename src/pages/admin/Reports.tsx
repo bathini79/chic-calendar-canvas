@@ -30,6 +30,8 @@ import { CustomerRetentionDashboard } from "@/components/admin/reports/CustomerR
 import { SalesPerformance } from "@/components/admin/reports/SalesPerformance";
 import { PaymentBySource } from "@/components/admin/reports/PaymentBySource";
 import { SalesByEmployee } from "@/components/admin/reports/sales-performance/SalesByEmployee";
+import { SalesSummaryReport } from "@/components/admin/bi-reports/reports/SalesSummaryReport";
+import { ReportsLayout } from "@/components/admin/bi-reports/layout/ReportsLayout";
 
 const reportCategories = [
   {
@@ -57,8 +59,8 @@ const reportCategories = [
   {
     id: "sales",
     name: "Sales Performance",
-    icon: <BarChart2 className="h-5 w-5" />,
-    reports: [
+    icon: <BarChart2 className="h-5 w-5" />,    reports: [
+      { id: "sales-summary", name: "Sales Summary", description: "Comprehensive sales summary with advanced grouping capabilities" },
       { id: "sales-trends", name: "Sales Trends", description: "Analyze sales performance over time" },
       { id: "service-popularity", name: "Service Popularity", description: "Most popular services and packages" },
       { id: "revenue-growth", name: "Revenue Growth", description: "Month-over-month and year-over-year growth" },
@@ -193,6 +195,14 @@ export default function Reports() {
       return (
         <div className="space-y-4">
           <PaymentBySource onBack={() => setExpandedReport(null)} />
+        </div>
+      );
+    }    if (expandedReport === "sales-summary") {
+      return (
+        <div className="space-y-4">
+          <ReportsLayout>
+            <SalesSummaryReport />
+          </ReportsLayout>
         </div>
       );
     }
