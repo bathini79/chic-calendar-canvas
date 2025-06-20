@@ -1,0 +1,130 @@
+/* Legacy calendar fix styles - DEPRECATED */
+/* Use date-range-picker.css instead for new implementations */
+/* This file is kept for backward compatibility only */
+
+/* DateRangePicker buttons will use default outline styling to match other buttons */
+
+/* Range end dates get right rounded corners */
+.rdp-cell:has(.rdp-day_range_end) {
+  background-color: #f1f1f1 !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+}
+
+/* When start and end are the same day (single day selection) */
+.rdp-cell:has(.rdp-day_range_start.rdp-day_range_end) {
+  border-radius: 8px !important;
+}
+
+/* Ensure cells are positioned relative and have no gaps */
+.rdp-cell {
+  position: relative !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Range middle days should be transparent to show the cell background */
+.rdp-day_range_middle {
+  background-color: transparent !important;
+  border: none !important;
+  color: black !important;
+  font-weight: 400 !important;
+}
+
+/* Container styling for seamless layout */
+.rdp-months {
+  border-spacing: 0 !important;
+}
+
+.rdp-table {
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+}
+
+.rdp-row {
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+
+/* Selected date specific styles - circular black buttons for start/end */
+.rdp-day_selected {
+  background-color: black !important;
+  color: white !important;
+  font-weight: 500 !important;
+  border-radius: 50% !important;
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  z-index: 10 !important;
+  position: relative !important;
+}
+
+/* Ensure date range has consistent styling */
+.rdp-day_range_middle {
+  background-color: transparent !important;
+}
+
+/* Force the hover state to always show black text */
+.rdp-day:hover {
+  color: black !important;
+}
+
+/* Additional fix for day elements */
+.rdp-day {
+  aspect-ratio: 1/1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem !important;
+  width: 1.75rem !important;
+  font-size: 0.875rem !important;
+  border-radius: 50%;
+  transition: background-color 0.15s ease;
+}
+
+/* Day hover state */
+.rdp-day:hover:not(.rdp-day_selected) {
+  background-color: #f3f4f6 !important;
+  color: black !important;
+}
+
+/* Fix weekday header alignment */
+.rdp-head_cell {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.5rem 0;
+  width: 2rem !important;
+}
+
+/* Improve overall calendar appearance */
+.rdp {
+  margin: 0 !important;
+}
+
+/* Ensure calendar inputs are consistent */
+.date-range-input {
+  font-size: 0.875rem;
+}
+
+/* Smooth out focus rings */
+.rdp-button:focus-visible {
+  outline-offset: 2px;
+  outline-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Improve spacing between months */
+.rdp-months {
+  gap: 1rem;
+}
+
+/* DateRangePicker buttons in SalesPerformanceAnalyticsReport will use default outline styling to match Filters button */

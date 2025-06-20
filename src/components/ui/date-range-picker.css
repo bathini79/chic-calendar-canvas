@@ -1,0 +1,227 @@
+/* DateRangePicker Component Styles - Self-contained and reusable */
+
+/* ===== CALENDAR DAY STYLING ===== */
+/* Override to ensure all calendar days have black text except explicitly white ones */
+.date-range-picker-container .rdp-day {
+  color: black !important;
+  aspect-ratio: 1/1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem !important;
+  width: 1.75rem !important;
+  font-size: 0.875rem !important;
+  border-radius: 50%;
+  transition: background-color 0.15s ease;
+}
+
+/* Only allow white text for explicitly selected days (start and end points) */
+.date-range-picker-container .rdp-day_selected {
+  background-color: black !important;
+  color: white !important;
+  font-weight: 500 !important;
+  border-radius: 50% !important;
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  z-index: 10 !important;
+  position: relative !important;
+}
+
+/* Range middle days must be black text */
+.date-range-picker-container .rdp-day_range_middle {
+  color: black !important;
+  background-color: transparent !important;
+  border: none !important;
+  font-weight: 400 !important;
+}
+
+/* Super specific selectors to ensure the range middle days are black */
+.date-range-picker-container [aria-selected="true"].rdp-day_range_middle {
+  color: black !important;
+}
+
+/* Ensure any range highlighting uses black text */
+.date-range-picker-container [class*="day_range_middle"] {
+  color: black !important;
+}
+
+/* Target the days within the range */
+.date-range-picker-container .rdp-day:not(.rdp-day_selected)[aria-selected="true"] {
+  color: black !important;
+}
+
+/* Day hover state */
+.date-range-picker-container .rdp-day:hover:not(.rdp-day_selected) {
+  background-color: #f3f4f6 !important;
+  color: black !important;
+}
+
+/* Force the hover state to always show black text */
+.date-range-picker-container .rdp-day:hover {
+  color: black !important;
+}
+
+/* ===== CALENDAR CELL STYLING FOR CONTINUOUS RANGE ===== */
+/* Create a continuous background for the range - ONLY for middle dates */
+.date-range-picker-container .rdp-cell:has(.rdp-day_range_middle) {
+  background-color: #f1f1f1 !important;
+  border-radius: 0 !important;
+  position: relative;
+}
+
+/* Range start dates get left rounded corners */
+.date-range-picker-container .rdp-cell:has(.rdp-day_range_start) {
+  background-color: #f1f1f1 !important;
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+/* Range end dates get right rounded corners */
+.date-range-picker-container .rdp-cell:has(.rdp-day_range_end) {
+  background-color: #f1f1f1 !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+}
+
+/* When start and end are the same day (single day selection) */
+.date-range-picker-container .rdp-cell:has(.rdp-day_range_start.rdp-day_range_end) {
+  border-radius: 8px !important;
+}
+
+/* ===== CALENDAR LAYOUT AND STRUCTURE ===== */
+/* Ensure cells are positioned relative and have no gaps */
+.date-range-picker-container .rdp-cell {
+  position: relative !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Container styling for seamless layout */
+.date-range-picker-container .rdp-months {
+  border-spacing: 0 !important;
+  gap: 1rem;
+}
+
+.date-range-picker-container .rdp-table {
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+}
+
+.date-range-picker-container .rdp-row {
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+/* Fix weekday header alignment */
+.date-range-picker-container .rdp-head_cell {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.5rem 0;
+  width: 2rem !important;
+}
+
+/* Improve overall calendar appearance */
+.date-range-picker-container .rdp {
+  margin: 0 !important;
+}
+
+/* ===== FOCUS AND ACCESSIBILITY ===== */
+/* Smooth out focus rings */
+.date-range-picker-container .rdp-button:focus-visible {
+  outline-offset: 2px;
+  outline-color: rgba(0, 0, 0, 0.2);
+}
+
+/* ===== INPUT STYLING ===== */
+/* Ensure calendar inputs are consistent */
+.date-range-picker-container .date-range-input {
+  font-size: 0.875rem;
+}
+
+/* ===== RESPONSIVE AND POSITIONING ===== */
+/* Dialog positioning - mobile */
+.date-range-picker-mobile-dialog {
+  position: fixed !important;
+  top: auto !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 100vw !important;
+  max-width: none !important;
+  border-radius: 1rem 1rem 0 0 !important;
+  height: 90vh !important;
+}
+
+/* Dialog positioning - desktop centered */
+.date-range-picker-desktop-dialog {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  border-radius: 0.5rem !important;
+}
+
+/* Popover positioning */
+.date-range-picker-popover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(229, 231, 235, 0.5);
+}
+
+/* ===== COMPACT MODE ===== */
+.date-range-picker-compact .rdp-cell {
+  width: 2rem !important;
+  height: 2rem !important;
+}
+
+.date-range-picker-compact .rdp-day {
+  height: 1.5rem !important;
+  width: 1.5rem !important;
+  font-size: 0.75rem !important;
+}
+
+.date-range-picker-compact .rdp-day_selected {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+}
+
+/* ===== TRIGGER BUTTON STYLING ===== */
+/* Trigger buttons use default outline button styling from the UI library */
+/* This ensures consistency with other outline buttons like "Filters" */
+.date-range-picker-trigger {
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+}
+
+/* ===== DARK MODE SUPPORT (if needed) ===== */
+@media (prefers-color-scheme: dark) {
+  .date-range-picker-container .rdp-day {
+    color: white !important;
+  }
+  
+  .date-range-picker-container .rdp-day_selected {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  .date-range-picker-container .rdp-day_range_middle {
+    color: white !important;
+  }
+  
+  .date-range-picker-container .rdp-cell:has(.rdp-day_range_middle),
+  .date-range-picker-container .rdp-cell:has(.rdp-day_range_start),
+  .date-range-picker-container .rdp-cell:has(.rdp-day_range_end) {
+    background-color: #374151 !important;
+  }
+}
