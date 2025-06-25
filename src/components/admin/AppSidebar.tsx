@@ -14,6 +14,7 @@ import {
   Map,
   ChevronLeft,
   ChevronRight,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,11 +54,10 @@ const sidebarNavItems = [
     href: "/admin/inventory",
     icon: <Package className="mr-2 h-4 w-4" />,
     permission: "inventory" as SectionPermission,
-  },
-  {
+  },  {
     title: "Reports",
-    href: "/admin/reports",
-    icon: <FileBarChart className="mr-2 h-4 w-4" />,
+    href: "/admin/bi-reports",
+    icon: <TrendingUp className="mr-2 h-4 w-4" />,
     permission: "reports" as SectionPermission,
   },
   {

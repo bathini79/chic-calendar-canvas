@@ -98,7 +98,6 @@ class PayRunService {
         name: name + suffix,
         pay_period_id: payPeriodId,
         status: 'draft',
-        is_supplementary: onlyUnpaid,
         location_id: locationId || null,
         is_supplementary: onlyUnpaid
       })

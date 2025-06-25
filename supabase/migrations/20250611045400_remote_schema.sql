@@ -2223,6 +2223,136 @@ $$;
 ALTER FUNCTION "public"."simple_create_profile"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."update_customer_analytics_cache"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+    customer_data RECORD;
+    segment_type TEXT;
+BEGIN
+    -- Get customer statistics
+    SELECT 
+        COUNT(*) as appointment_count,
+        COALESCE(SUM(final_total), 0) as total_spent,
+        COALESCE(AVG(final_total), 0) as avg_value,
+        MAX(appointment_date) as last_visit
+    INTO customer_data
+    FROM appointments 
+    WHERE customer_id = COALESCE(NEW.customer_id, OLD.customer_id)
+    AND status = 'completed';
+    
+    -- Determine customer segment
+    IF customer_data.appointment_count = 0 THEN
+        segment_type := 'new';
+    ELSIF customer_data.appointment_count >= 10 AND customer_data.avg_value > 100 THEN
+        segment_type := 'vip';
+    ELSIF customer_data.last_visit < NOW() - INTERVAL '6 months' THEN
+        segment_type := 'lost';
+    ELSIF customer_data.last_visit < NOW() - INTERVAL '3 months' THEN
+        segment_type := 'at_risk';
+    ELSE
+        segment_type := 'regular';
+    END IF;
+    
+    -- Update cache
+    INSERT INTO cache_customer_analytics (
+        customer_id, total_appointments, total_spent, 
+        avg_appointment_value, last_appointment_date, segment, last_updated
+    )
+    VALUES (
+        COALESCE(NEW.customer_id, OLD.customer_id),
+        customer_data.appointment_count,
+        customer_data.total_spent,
+        customer_data.avg_value,
+        customer_data.last_visit,
+        segment_type,
+        NOW()
+    )
+    ON CONFLICT (customer_id) 
+    DO UPDATE SET
+        total_appointments = EXCLUDED.total_appointments,
+        total_spent = EXCLUDED.total_spent,
+        avg_appointment_value = EXCLUDED.avg_appointment_value,
+        last_appointment_date = EXCLUDED.last_appointment_date,
+        segment = EXCLUDED.segment,
+        last_updated = NOW();
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_customer_analytics_cache"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_daily_metrics_cache"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+    target_date DATE;
+    target_location UUID;
+BEGIN
+    target_date := DATE(COALESCE(NEW.appointment_date, OLD.appointment_date));
+    target_location := COALESCE(NEW.location::UUID, OLD.location::UUID);
+    
+    -- Recalculate daily metrics for the affected date
+    INSERT INTO cache_daily_metrics (
+        metric_date, location_id, total_appointments, completed_appointments, 
+        cancelled_appointments, total_revenue, new_customers, returning_customers
+    )
+    SELECT 
+        target_date,
+        target_location,
+        COUNT(*) as total_appointments,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed_appointments,
+        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_appointments,
+        COALESCE(SUM(final_total) FILTER (WHERE status = 'completed'), 0) as total_revenue,
+        COUNT(DISTINCT customer_id) FILTER (WHERE 
+            customer_id IN (
+                SELECT customer_id FROM appointments 
+                WHERE customer_id = appointments.customer_id 
+                AND DATE(appointment_date) = target_date
+                AND appointment_date = (
+                    SELECT MIN(appointment_date) 
+                    FROM appointments a2 
+                    WHERE a2.customer_id = appointments.customer_id
+                )
+            )
+        ) as new_customers,
+        COUNT(DISTINCT customer_id) FILTER (WHERE 
+            customer_id NOT IN (
+                SELECT customer_id FROM appointments 
+                WHERE customer_id = appointments.customer_id 
+                AND DATE(appointment_date) = target_date
+                AND appointment_date = (
+                    SELECT MIN(appointment_date) 
+                    FROM appointments a2 
+                    WHERE a2.customer_id = appointments.customer_id
+                )
+            )
+        ) as returning_customers
+    FROM appointments
+    WHERE DATE(appointment_date) = target_date
+    AND location::UUID = target_location
+    GROUP BY target_date, target_location
+    ON CONFLICT (metric_date, location_id)
+    DO UPDATE SET
+        total_appointments = EXCLUDED.total_appointments,
+        completed_appointments = EXCLUDED.completed_appointments,
+        cancelled_appointments = EXCLUDED.cancelled_appointments,
+        total_revenue = EXCLUDED.total_revenue,
+        new_customers = EXCLUDED.new_customers,
+        returning_customers = EXCLUDED.returning_customers,
+        last_updated = NOW();
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_daily_metrics_cache"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."update_employment_type_permissions"("type_id" "uuid", "perms_json" "text") RETURNS "void"
     LANGUAGE "plpgsql"
     AS $$
@@ -2590,6 +2720,120 @@ CREATE TABLE IF NOT EXISTS "public"."cache" (
 
 
 ALTER TABLE "public"."cache" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."cache_customer_analytics" (
+    "id" integer NOT NULL,
+    "customer_id" "uuid",
+    "total_appointments" integer DEFAULT 0,
+    "total_spent" numeric(12,2) DEFAULT 0.00,
+    "avg_appointment_value" numeric(10,2) DEFAULT 0.00,
+    "last_appointment_date" timestamp with time zone,
+    "segment" "text" DEFAULT 'new'::"text",
+    "favorite_service_id" "uuid",
+    "last_updated" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "cache_customer_analytics_segment_check" CHECK (("segment" = ANY (ARRAY['new'::"text", 'regular'::"text", 'vip'::"text", 'at_risk'::"text", 'lost'::"text"])))
+);
+
+
+ALTER TABLE "public"."cache_customer_analytics" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."cache_customer_analytics_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE "public"."cache_customer_analytics_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."cache_customer_analytics_id_seq" OWNED BY "public"."cache_customer_analytics"."id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."cache_daily_metrics" (
+    "metric_date" "date" NOT NULL,
+    "location_id" "uuid",
+    "total_appointments" integer DEFAULT 0,
+    "completed_appointments" integer DEFAULT 0,
+    "cancelled_appointments" integer DEFAULT 0,
+    "total_revenue" numeric(12,2) DEFAULT 0.00,
+    "new_customers" integer DEFAULT 0,
+    "returning_customers" integer DEFAULT 0,
+    "last_updated" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."cache_daily_metrics" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."cache_employee_performance" (
+    "id" integer NOT NULL,
+    "employee_id" "uuid",
+    "month_year" "text" NOT NULL,
+    "location_id" "uuid",
+    "total_appointments" integer DEFAULT 0,
+    "total_revenue" numeric(12,2) DEFAULT 0.00,
+    "avg_rating" numeric(3,2) DEFAULT 0.00,
+    "punctuality_score" numeric(5,2) DEFAULT 0.00,
+    "utilization_rate" numeric(5,2) DEFAULT 0.00,
+    "last_updated" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."cache_employee_performance" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."cache_employee_performance_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE "public"."cache_employee_performance_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."cache_employee_performance_id_seq" OWNED BY "public"."cache_employee_performance"."id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."cache_service_performance" (
+    "id" integer NOT NULL,
+    "service_id" "uuid",
+    "month_year" "text" NOT NULL,
+    "location_id" "uuid",
+    "total_bookings" integer DEFAULT 0,
+    "total_revenue" numeric(12,2) DEFAULT 0.00,
+    "avg_rating" numeric(3,2) DEFAULT 0.00,
+    "completion_rate" numeric(5,2) DEFAULT 0.00,
+    "last_updated" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."cache_service_performance" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."cache_service_performance_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE "public"."cache_service_performance_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."cache_service_performance_id_seq" OWNED BY "public"."cache_service_performance"."id";
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."cart_items" (
@@ -3393,7 +3637,10 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "visit_count" integer DEFAULT 0 NOT NULL,
     "referrer_id" "uuid",
     "referral_wallet" numeric DEFAULT 0 NOT NULL,
+    "birth_date" "date",
+    "gender" "text",
     CONSTRAINT "profiles_communication_channel_check" CHECK (("communication_channel" = ANY (ARRAY['whatsapp'::"text", 'sms'::"text", 'email'::"text"]))),
+    CONSTRAINT "profiles_gender_check" CHECK (("gender" = ANY (ARRAY['male'::"text", 'female'::"text", 'other'::"text", 'prefer_not_to_say'::"text"]))),
     CONSTRAINT "user_id_matches_id_flexible" CHECK ((("user_id" IS NULL) OR ("user_id" = "id")))
 );
 
@@ -3692,6 +3939,18 @@ CREATE TABLE IF NOT EXISTS "public"."transactions" (
 ALTER TABLE "public"."transactions" OWNER TO "postgres";
 
 
+ALTER TABLE ONLY "public"."cache_customer_analytics" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."cache_customer_analytics_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "public"."cache_employee_performance" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."cache_employee_performance_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "public"."cache_service_performance" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."cache_service_performance_id_seq"'::"regclass");
+
+
+
 ALTER TABLE ONLY "public"."appointments"
     ADD CONSTRAINT "appointments_pkey" PRIMARY KEY ("id");
 
@@ -3707,8 +3966,43 @@ ALTER TABLE ONLY "public"."business_details"
 
 
 
+ALTER TABLE ONLY "public"."cache_customer_analytics"
+    ADD CONSTRAINT "cache_customer_analytics_customer_id_key" UNIQUE ("customer_id");
+
+
+
+ALTER TABLE ONLY "public"."cache_customer_analytics"
+    ADD CONSTRAINT "cache_customer_analytics_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."cache_daily_metrics"
+    ADD CONSTRAINT "cache_daily_metrics_metric_date_location_id_key" UNIQUE ("metric_date", "location_id");
+
+
+
+ALTER TABLE ONLY "public"."cache_employee_performance"
+    ADD CONSTRAINT "cache_employee_performance_employee_id_month_year_location__key" UNIQUE ("employee_id", "month_year", "location_id");
+
+
+
+ALTER TABLE ONLY "public"."cache_employee_performance"
+    ADD CONSTRAINT "cache_employee_performance_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."cache"
     ADD CONSTRAINT "cache_pkey" PRIMARY KEY ("key");
+
+
+
+ALTER TABLE ONLY "public"."cache_service_performance"
+    ADD CONSTRAINT "cache_service_performance_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."cache_service_performance"
+    ADD CONSTRAINT "cache_service_performance_service_id_month_year_location_id_key" UNIQUE ("service_id", "month_year", "location_id");
 
 
 
@@ -4161,6 +4455,34 @@ CREATE INDEX "idx_appointments_transaction_type" ON "public"."appointments" USIN
 
 
 
+CREATE INDEX "idx_cache_customer_analytics_customer_id" ON "public"."cache_customer_analytics" USING "btree" ("customer_id");
+
+
+
+CREATE INDEX "idx_cache_customer_analytics_last_updated" ON "public"."cache_customer_analytics" USING "btree" ("last_updated" DESC);
+
+
+
+CREATE INDEX "idx_cache_customer_analytics_segment" ON "public"."cache_customer_analytics" USING "btree" ("segment");
+
+
+
+CREATE INDEX "idx_cache_daily_metrics_date" ON "public"."cache_daily_metrics" USING "btree" ("metric_date" DESC);
+
+
+
+CREATE INDEX "idx_cache_daily_metrics_location" ON "public"."cache_daily_metrics" USING "btree" ("location_id");
+
+
+
+CREATE INDEX "idx_cache_employee_performance_employee_month" ON "public"."cache_employee_performance" USING "btree" ("employee_id", "month_year");
+
+
+
+CREATE INDEX "idx_cache_service_performance_service_month" ON "public"."cache_service_performance" USING "btree" ("service_id", "month_year");
+
+
+
 CREATE INDEX "idx_employee_compensation_effective_from" ON "public"."employee_compensation" USING "btree" ("effective_from");
 
 
@@ -4186,6 +4508,26 @@ CREATE INDEX "idx_pay_run_items_source_id" ON "public"."pay_run_items" USING "bt
 
 
 CREATE INDEX "idx_pay_run_items_status" ON "public"."pay_run_items" USING "btree" ("status");
+
+
+
+CREATE INDEX "idx_profiles_birth_date" ON "public"."profiles" USING "btree" ("birth_date");
+
+
+
+CREATE INDEX "idx_profiles_gender" ON "public"."profiles" USING "btree" ("gender");
+
+
+
+CREATE INDEX "idx_profiles_last_used" ON "public"."profiles" USING "btree" ("last_used");
+
+
+
+CREATE INDEX "idx_profiles_referrer_id" ON "public"."profiles" USING "btree" ("referrer_id");
+
+
+
+CREATE INDEX "idx_profiles_visit_count" ON "public"."profiles" USING "btree" ("visit_count" DESC);
 
 
 
@@ -4238,6 +4580,14 @@ CREATE OR REPLACE TRIGGER "trigger_appointment_booking_notification" AFTER INSER
 
 
 CREATE OR REPLACE TRIGGER "trigger_booking_auto_consumption" AFTER UPDATE ON "public"."bookings" FOR EACH ROW EXECUTE FUNCTION "public"."handle_booking_auto_consumption"();
+
+
+
+CREATE OR REPLACE TRIGGER "trigger_update_customer_analytics" AFTER INSERT OR DELETE OR UPDATE ON "public"."appointments" FOR EACH ROW EXECUTE FUNCTION "public"."update_customer_analytics_cache"();
+
+
+
+CREATE OR REPLACE TRIGGER "trigger_update_daily_metrics" AFTER INSERT OR DELETE OR UPDATE ON "public"."appointments" FOR EACH ROW EXECUTE FUNCTION "public"."update_daily_metrics_cache"();
 
 
 
@@ -4488,6 +4838,21 @@ ALTER TABLE ONLY "public"."bookings"
 
 ALTER TABLE ONLY "public"."bookings"
     ADD CONSTRAINT "bookings_service_id_fkey" FOREIGN KEY ("service_id") REFERENCES "public"."services"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."cache_customer_analytics"
+    ADD CONSTRAINT "cache_customer_analytics_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."cache_employee_performance"
+    ADD CONSTRAINT "cache_employee_performance_employee_id_fkey" FOREIGN KEY ("employee_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."cache_service_performance"
+    ADD CONSTRAINT "cache_service_performance_service_id_fkey" FOREIGN KEY ("service_id") REFERENCES "public"."services"("id") ON DELETE CASCADE;
 
 
 
@@ -6320,6 +6685,18 @@ GRANT ALL ON FUNCTION "public"."simple_create_profile"() TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."update_customer_analytics_cache"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_customer_analytics_cache"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_customer_analytics_cache"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_daily_metrics_cache"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_daily_metrics_cache"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_daily_metrics_cache"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."update_employment_type_permissions"("type_id" "uuid", "perms_json" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_employment_type_permissions"("type_id" "uuid", "perms_json" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_employment_type_permissions"("type_id" "uuid", "perms_json" "text") TO "service_role";
@@ -6416,6 +6793,48 @@ GRANT ALL ON TABLE "public"."business_details" TO "service_role";
 GRANT ALL ON TABLE "public"."cache" TO "anon";
 GRANT ALL ON TABLE "public"."cache" TO "authenticated";
 GRANT ALL ON TABLE "public"."cache" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."cache_customer_analytics" TO "anon";
+GRANT ALL ON TABLE "public"."cache_customer_analytics" TO "authenticated";
+GRANT ALL ON TABLE "public"."cache_customer_analytics" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."cache_customer_analytics_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."cache_customer_analytics_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."cache_customer_analytics_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."cache_daily_metrics" TO "anon";
+GRANT ALL ON TABLE "public"."cache_daily_metrics" TO "authenticated";
+GRANT ALL ON TABLE "public"."cache_daily_metrics" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."cache_employee_performance" TO "anon";
+GRANT ALL ON TABLE "public"."cache_employee_performance" TO "authenticated";
+GRANT ALL ON TABLE "public"."cache_employee_performance" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."cache_employee_performance_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."cache_employee_performance_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."cache_employee_performance_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."cache_service_performance" TO "anon";
+GRANT ALL ON TABLE "public"."cache_service_performance" TO "authenticated";
+GRANT ALL ON TABLE "public"."cache_service_performance" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."cache_service_performance_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."cache_service_performance_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."cache_service_performance_id_seq" TO "service_role";
 
 
 

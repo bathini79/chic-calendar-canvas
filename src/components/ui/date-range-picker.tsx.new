@@ -1,0 +1,408 @@
+import * as React from "react";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+
+const predefinedRanges = [
+  { label: "Today", value: "today" },
+  { label: "Yesterday", value: "yesterday" },
+  { label: "Last 7 days", value: "last7days" },
+  { label: "Last 30 days", value: "last30days" },
+  { label: "Last 90 days", value: "last90days" },
+  { label: "This month", value: "thisMonth" },
+  { label: "Last month", value: "lastMonth" },
+  { label: "This quarter", value: "thisQuarter" },
+  { label: "Last quarter", value: "lastQuarter" },
+  { label: "This year", value: "thisYear" },
+  { label: "Last year", value: "lastYear" },
+  { label: "All time", value: "allTime" },
+  { label: "Last 6 months", value: "last6months" },
+  { label: "Custom range", value: "custom" },
+];
+
+interface DateRangePickerProps {
+  dateRange: DateRange | undefined;
+  onChange: (dateRange: DateRange | undefined) => void;
+  className?: string;
+  align?: "start" | "end" | "center";
+  isMobile?: boolean;
+}
+
+export function DateRangePicker({
+  dateRange,
+  onChange,
+  className,
+  align = "start",
+  isMobile = false
+}: DateRangePickerProps) {
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isPopoverOpen, setIsPopoverOpen] = React.useState(false);
+  const [selectedPreset, setSelectedPreset] = React.useState<string | undefined>(undefined);
+  const [tempDateRange, setTempDateRange] = React.useState<DateRange | undefined>(dateRange);
+
+  // Format dates for input fields
+  const formatInputDate = (date: Date | undefined) => {
+    return date ? format(date, "yyyy-MM-dd") : "";
+  };
+
+  // Handle manual date input
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value ? new Date(e.target.value) : undefined;
+    if (newDate) {
+      setTempDateRange({
+        from: newDate,
+        to: tempDateRange?.to,
+      });
+    }
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value ? new Date(e.target.value) : undefined;
+    if (newDate) {
+      setTempDateRange({
+        from: tempDateRange?.from,
+        to: newDate,
+      });
+    }
+  };
+
+  // Handle preset selection
+  const handlePresetChange = (value: string) => {
+    setSelectedPreset(value);
+    
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const last7DaysStart = new Date(today);
+    last7DaysStart.setDate(last7DaysStart.getDate() - 6);
+    
+    const last30DaysStart = new Date(today);
+    last30DaysStart.setDate(last30DaysStart.getDate() - 29);
+    
+    const last90DaysStart = new Date(today);
+    last90DaysStart.setDate(last90DaysStart.getDate() - 89);
+    
+    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+    
+    const thisQuarterStart = new Date(
+      today.getFullYear(),
+      Math.floor(today.getMonth() / 3) * 3,
+      1
+    );
+    
+    const lastQuarterStart = new Date(
+      today.getFullYear(),
+      Math.floor(today.getMonth() / 3) * 3 - 3,
+      1
+    );
+    const lastQuarterEnd = new Date(
+      today.getFullYear(),
+      Math.floor(today.getMonth() / 3) * 3,
+      0
+    );
+    
+    const thisYearStart = new Date(today.getFullYear(), 0, 1);
+    
+    const lastYearStart = new Date(today.getFullYear() - 1, 0, 1);
+    const lastYearEnd = new Date(today.getFullYear(), 0, 0);
+    
+    const last6MonthsStart = new Date(today);
+    last6MonthsStart.setMonth(today.getMonth() - 6);
+
+    let newRange: DateRange | undefined;
+    
+    switch (value) {
+      case "today":
+        newRange = { from: today, to: today };
+        break;
+      case "yesterday":
+        newRange = { from: yesterday, to: yesterday };
+        break;
+      case "last7days":
+        newRange = { from: last7DaysStart, to: today };
+        break;
+      case "last30days":
+        newRange = { from: last30DaysStart, to: today };
+        break;
+      case "last90days":
+        newRange = { from: last90DaysStart, to: today };
+        break;
+      case "thisMonth":
+        newRange = { from: thisMonthStart, to: today };
+        break;
+      case "lastMonth":
+        newRange = { from: lastMonthStart, to: lastMonthEnd };
+        break;
+      case "thisQuarter":
+        newRange = { from: thisQuarterStart, to: today };
+        break;
+      case "lastQuarter":
+        newRange = { from: lastQuarterStart, to: lastQuarterEnd };
+        break;
+      case "thisYear":
+        newRange = { from: thisYearStart, to: today };
+        break;
+      case "lastYear":
+        newRange = { from: lastYearStart, to: lastYearEnd };
+        break;
+      case "allTime":
+        newRange = { from: new Date(2020, 0, 1), to: today };
+        break;
+      case "last6months":
+        newRange = { from: last6MonthsStart, to: today };
+        break;
+      case "custom":
+        return;
+      default:
+        return;
+    }
+    
+    setTempDateRange(newRange);
+  };
+
+  // Apply the selected date range
+  const handleApply = () => {
+    onChange(tempDateRange);
+    setIsDialogOpen(false);
+    setIsPopoverOpen(false);
+  };
+
+  // Format displayed date range
+  const formattedDateRange = React.useMemo(() => {
+    if (!dateRange?.from) {
+      return "Select date range";
+    }
+
+    if (dateRange.to) {
+      const isSameYear = dateRange.from.getFullYear() === dateRange.to.getFullYear();
+      if (isSameYear) {
+        return `${format(dateRange.from, "yyyy-MM-dd")} - ${format(dateRange.to, "yyyy-MM-dd")}`;
+      } else {
+        return `${format(dateRange.from, "yyyy-MM-dd")} - ${format(dateRange.to, "yyyy-MM-dd")}`;
+      }
+    }
+    
+    return format(dateRange.from, "yyyy-MM-dd");
+  }, [dateRange]);
+
+  // Content for both dialog (mobile) and popover (desktop)
+  const calendarContent = (
+    <div className="space-y-4">
+      <div>
+        <label className="text-sm font-medium mb-2 block">Date range</label>
+        <Select value={selectedPreset} onValueChange={handlePresetChange}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a preset range" />
+          </SelectTrigger>
+          <SelectContent>
+            {predefinedRanges.map((range) => (
+              <SelectItem key={range.value} value={range.value}>
+                {range.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-sm font-medium mb-2 block">Starting</label>
+          <Input
+            type="text"
+            value={tempDateRange?.from ? format(tempDateRange.from, "yyyy-MM-dd") : ""}
+            onChange={handleStartDateChange}
+            className="w-full"
+            placeholder="YYYY-MM-DD"
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-2 block">Ending</label>
+          <Input
+            type="text"
+            value={tempDateRange?.to ? format(tempDateRange.to, "yyyy-MM-dd") : ""}
+            onChange={handleEndDateChange}
+            className="w-full"
+            placeholder="YYYY-MM-DD"
+          />
+        </div>
+      </div>
+
+      {/* Calendar section - no labels, just show calendars in sequence */}
+      <div className="mt-2 space-y-4">
+        <Calendar
+          mode="single"
+          selected={tempDateRange?.from}
+          onSelect={(date) => setTempDateRange({ 
+            from: date || tempDateRange?.from, 
+            to: tempDateRange?.to 
+          })}
+          initialFocus
+          className="w-full"
+          showOutsideDays={false}
+          classNames={{
+            day: "h-10 w-10 p-0 font-normal hover:bg-muted/50",
+            day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground rounded-full",
+            day_today: "bg-accent text-accent-foreground",
+            head_cell: "text-muted-foreground font-normal",
+            caption_label: "text-base font-medium",
+            month: "space-y-4",
+            nav_button: "h-8 w-8 hover:bg-muted rounded-full",
+            cell: "text-center p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md"
+          }}
+          components={{
+            Head: ({ components: { HeadCell } }) => (
+              <tr className="flex">
+                <HeadCell className="text-left w-10 flex-1">Sat</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Sun</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Mon</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Tue</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Wed</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Thu</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Fri</HeadCell>
+              </tr>
+            ),
+          }}
+        />
+        
+        <Calendar
+          mode="single"
+          selected={tempDateRange?.to}
+          onSelect={(date) => setTempDateRange({ 
+            from: tempDateRange?.from, 
+            to: date || tempDateRange?.to
+          })}
+          initialFocus={false}
+          className="w-full"
+          showOutsideDays={false}
+          classNames={{
+            day: "h-10 w-10 p-0 font-normal hover:bg-muted/50",
+            day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground rounded-full",
+            day_today: "bg-accent text-accent-foreground",
+            head_cell: "text-muted-foreground font-normal",
+            caption_label: "text-base font-medium",
+            month: "space-y-4",
+            nav_button: "h-8 w-8 hover:bg-muted rounded-full",
+            nav_button_previous: "mr-1",
+            nav_button_next: "ml-1"
+          }}
+          components={{
+            Head: ({ components: { HeadCell } }) => (
+              <tr className="flex">
+                <HeadCell className="text-left w-10 flex-1">Sat</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Sun</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Mon</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Tue</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Wed</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Thu</HeadCell>
+                <HeadCell className="text-left w-10 flex-1">Fri</HeadCell>
+              </tr>
+            ),
+          }}
+        />
+      </div>
+
+      <div className={`${isMobile ? "sticky bottom-0 bg-white py-4 px-4 border-t mt-4" : "flex justify-end mt-6"}`}>
+        {isMobile ? (
+          <Button onClick={handleApply} className="w-full h-12 text-base font-medium">Apply</Button>
+        ) : (
+          <div className="flex space-x-3">
+            <Button variant="outline" onClick={() => {
+              setIsDialogOpen(false);
+              setIsPopoverOpen(false);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleApply} className="font-medium">Apply</Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={cn("flex items-center", className)}>
+      {/* Mobile - Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogTrigger asChild>
+          <Button
+            id="date-range-picker-mobile" 
+            variant={"outline"}
+            size="sm"
+            className="md:hidden h-8"
+          >
+            <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+            <span className="text-xs">{formattedDateRange}</span>
+          </Button>
+        </DialogTrigger>
+        <DialogContent className={`!top-auto !bottom-0 left-1/2 translate-x-[-50%] !translate-y-0 w-[95vw] max-w-none border shadow-xl rounded-t-2xl !rounded-b-none overflow-hidden flex flex-col
+          ${isMobile ? "h-[95vh] pt-0 px-0 pb-0" : "h-[98vh] pt-0 px-0 pb-0"}`}>
+          <DialogHeader className="px-4 pt-6 pb-0 flex justify-between items-center">
+            <DialogTitle className="text-2xl font-semibold">Select Period</DialogTitle>
+            <DialogClose asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 rounded-full flex items-center justify-center p-0 -mt-2" 
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </Button>
+            </DialogClose>
+          </DialogHeader>
+          <div className="px-4 flex-1 overflow-y-auto pt-2 pb-20">
+            {calendarContent}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Desktop - Popover */}
+      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            id="date-range-picker-desktop"
+            variant={"outline"}
+            size="sm"
+            className="hidden md:flex h-9"
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {formattedDateRange}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-6" align={align}>
+          {calendarContent}
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
