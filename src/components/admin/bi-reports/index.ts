@@ -14,6 +14,7 @@ export { MobileReportsNav } from './components/MobileReportsNav';
 // Report Components
 export { CustomerProfileSegmentation } from './reports/CustomerProfileSegmentation';
 export { SalesSummaryReport } from './reports/SalesSummaryReport';
+export { PaymentMethodsReport } from './reports/PaymentMethods';
 
 // Types
 export type { ReportItem } from './ReportsGrid';

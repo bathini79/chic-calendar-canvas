@@ -1,33 +1,24 @@
-import React, { useState ,useEffect} from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { useToast } from "@/hooks/use-toast";
-import { usePayroll } from "@/hooks/use-payroll";
-import {
-  CompensationFormData,
-  CompensationHistoryEntry,
-} from "@/types/payroll";
+import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { LoaderCircle, Plus, CalendarIcon } from "lucide-react";
+import { CalendarIcon, LoaderCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Database } from "@/types/supabase";
+
+type CompensationSetting = Database['public']['Tables']['employee_compensation_settings']['Row'];
+type CompensationSettingInsert = Database['public']['Tables']['employee_compensation_settings']['Insert'];
 
 interface CompensationSettingsProps {
-  employeeId: string;
-  onCompensationChange?: (data: CompensationFormData) => void;
+  employeeId?: string;
+  onCompensationChange?: (data: CompensationSettingInsert) => void;
   readOnly?: boolean;
 }
 
@@ -37,243 +28,341 @@ export function CompensationSettings({
   readOnly = false,
 }: CompensationSettingsProps) {
   const { toast } = useToast();
-  const { useEmployeeCompensation, addEmployeeCompensation } = usePayroll();
+  const queryClient = useQueryClient();
+  const [monthlySalary, setMonthlySalary] = useState<string>("");
+  const [workingDays, setWorkingDays] = useState<string>("26");
+  const [workingHours, setWorkingHours] = useState<string>("9");
+  const [effectiveDate, setEffectiveDate] = useState<Date>();
 
-  // Form state
-  const [newSalary, setNewSalary] = useState<string>("");
-  const [effectiveDate, setEffectiveDate] = useState<Date | null>(new Date());
-  
-  // Fetch employee's compensation history
-  const { data: compensationHistory, isLoading } =
-    useEmployeeCompensation(employeeId);
-
-  // Current salary is the most recent entry
-  const currentSalary =
-    compensationHistory && compensationHistory.length > 0
-      ? compensationHistory[0].base_amount
-      : null;
+  // Fetch compensation history
+  const { data: compensationHistory = [] } = useQuery<CompensationSetting[]>({
+    queryKey: ['compensation-history', employeeId],
+    queryFn: async () => {
+      if (!employeeId) return [];
       
-  // Update parent component when salary or date changes  
-  useEffect(() => {
-    if (onCompensationChange && effectiveDate) {
-      try {
-        // Only trigger if we have a valid number
-        const salaryValue = newSalary ? parseFloat(newSalary) : 0;
-        
-        if (!isNaN(salaryValue)) {
-          onCompensationChange({
-            monthly_salary: salaryValue, // Match the schema field name
-            effective_from: effectiveDate,
-          });
-        }
-      } catch (error) {
-        console.error("Error updating compensation:", error);
+      const { data, error } = await supabase
+        .from('employee_compensation_settings')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .order('effective_from', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching compensation history:', error);
+        throw error;
       }
+
+      return data;
+    },
+    enabled: !!employeeId
+  });
+
+  // Initialize form with current compensation if available
+  useState(() => {
+    if (compensationHistory.length > 0) {
+      const current = compensationHistory[0];
+      setMonthlySalary(current.base_amount.toString());
+      setWorkingDays(current.working_days.toString());
+      setWorkingHours(current.working_hours.toString());
+      setEffectiveDate(new Date(current.effective_from));
     }
-  }, [newSalary, effectiveDate, onCompensationChange]);
+  }, [compensationHistory]);
 
-  // Initialize salary and date from current compensation if available
-  useEffect(() => {
-    if (currentSalary !== null && compensationHistory && compensationHistory.length > 0) {
-      setNewSalary(currentSalary.toString());
-      setEffectiveDate(new Date(compensationHistory[0].effective_from));
-    }
-  }, [currentSalary, compensationHistory]);
-
-  const validateCompensationData = (): CompensationFormData | null => {
-    if (!newSalary || !effectiveDate) {
-      toast({
-        title: "Missing information",
-        description: "Please enter both salary and effective date",
-        variant: "destructive",
-      });
-      return null;
-    }
-
-    const salaryValue = parseFloat(newSalary);
-
-    if (isNaN(salaryValue) || salaryValue <= 0) {
-      toast({
-        title: "Invalid salary",
-        description: "Please enter a valid positive number for salary",
-        variant: "destructive",
-      });
-      return null;
-    }
-
-    return {
-      base_amount: salaryValue,
-      effective_from: effectiveDate,
-    };
+  const calculateHourlyRate = (salary: number, days: number, hours: number): string => {
+    if (isNaN(salary) || isNaN(days) || isNaN(hours) || !days || !hours) return "0";
+    return (salary / (days * hours)).toFixed(2);
   };
 
-  // This is now a local validation function, not making the API call directly
+  const hourlyRate = useMemo(() => {
+    return calculateHourlyRate(
+      parseFloat(monthlySalary),
+      parseFloat(workingDays),
+      parseFloat(workingHours)
+    );
+  }, [monthlySalary, workingDays, workingHours]);
+
+  // Add/Update mutation
+  const addEmployeeCompensation = useMutation({
+    mutationFn: async (data: CompensationSettingInsert) => {
+      if (!employeeId) throw new Error("Employee ID is required");
+
+      // If there's existing compensation, set effective_to on the current record
+      if (compensationHistory.length > 0) {
+        const currentRecord = compensationHistory[0];
+        const { error: updateError } = await supabase
+          .from('employee_compensation_settings')
+          .update({ effective_to: new Date().toISOString() })
+          .eq('id', currentRecord.id);
+
+        if (updateError) throw updateError;
+      }
+
+      // Insert new compensation record
+      const { data: newRecord, error: insertError } = await supabase
+        .from('employee_compensation_settings')
+        .insert({
+          employee_id: employeeId,
+          base_amount: data.base_amount,
+          working_days: data.working_days,
+          working_hours: data.working_hours,
+          hourly_rate: data.hourly_rate,
+          effective_from: data.effective_from,
+          effective_to: null
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      return newRecord;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['compensation-history', employeeId]);
+      toast({
+        title: "Success",
+        description: "Compensation settings updated successfully",
+      });
+
+      // Reset form if not controlled by parent
+      if (!onCompensationChange) {
+        setMonthlySalary("");
+        setWorkingDays("26");
+        setWorkingHours("9");
+        setEffectiveDate(undefined);
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update compensation settings",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleAddSalary = async () => {
-    // Only used when there's no parent handler (for backward compatibility)
-    if (!onCompensationChange) {
-      const data = validateCompensationData();
-      if (!data) return;
-
-      try {
-        await addEmployeeCompensation.mutateAsync({
-          employeeId,
-          data,
-        });
-
-        toast({
-          title: "Success",
-          description: "Compensation settings updated",
-        });
-        // Reset form
-        setNewSalary("");
-        setEffectiveDate(new Date());
-      } catch (error: any) {
-        toast({
-          title: "Error",
-          description: error.message || "Failed to update compensation settings",
-          variant: "destructive",
-        });
-      }
+    // Validate inputs
+    if (!monthlySalary || !effectiveDate) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter salary and effective date",
+        variant: "destructive",
+      });
+      return;
     }
-  };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-    }).format(amount);
+    const salary = parseFloat(monthlySalary);
+    const days = parseFloat(workingDays);
+    const hours = parseFloat(workingHours);
+
+    if (isNaN(salary) || salary <= 0) {
+      toast({
+        title: "Invalid Salary",
+        description: "Please enter a valid salary amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(days) || days < 1 || days > 31) {
+      toast({
+        title: "Invalid Working Days",
+        description: "Working days must be between 1 and 31",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(hours) || hours < 1 || hours > 24) {
+      toast({
+        title: "Invalid Working Hours",
+        description: "Working hours must be between 1 and 24",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const data: CompensationSettingInsert = {
+      employee_id: employeeId!,
+      base_amount: salary,
+      working_days: days,
+      working_hours: hours,
+      hourly_rate: parseFloat(hourlyRate),
+      effective_from: effectiveDate.toISOString()
+    };
+
+    if (onCompensationChange) {
+      onCompensationChange(data);
+    } else {
+      await addEmployeeCompensation.mutateAsync(data);
+    }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Compensation</CardTitle>
-        <CardDescription>
-          Configure employee's salary and view compensation history
-        </CardDescription>
-      </CardHeader>
+    <div className="flex flex-col w-full px-4 pt-6 pb-20 md:px-32 md:pr-8">
+      {/* Main Form Card */}
+      <div className="w-full bg-white p-4 rounded-xl shadow-sm md:border md:rounded-lg md:p-6 md:max-w-2xl">
+        <h3 className="text-lg font-medium mb-4 md:text-xl md:mb-6">
+          Compensation Settings
+        </h3>
 
-      <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center p-4">
-            <LoaderCircle className="animate-spin" />
-          </div>
-        ) : (
-          <>
-            {currentSalary !== null && (
-              <div className="mb-6 p-4 bg-gray-50 rounded-md">
-                <div className="text-sm text-gray-500">
-                  Current Monthly Salary
-                </div>
-                <div className="text-2xl font-bold">
-                  {formatCurrency(currentSalary)}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  Effective from:{" "}
-                  {compensationHistory && compensationHistory.length > 0
-                    ? format(
-                        compensationHistory[0].effective_from,
-                        "MMM dd, yyyy"
-                      )
-                    : ""}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Monthly Salary
-                </label>
-                <Input
-                  type="number"
-                  placeholder="Enter monthly salary"
-                  value={newSalary}
-                  onChange={(e) => setNewSalary(e.target.value)}
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Effective From
-                </label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !effectiveDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {effectiveDate ? (
-                        format(effectiveDate, "PPP")
-                      ) : (
-                        <span>Select effective date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={effectiveDate}
-                      onSelect={setEffectiveDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>              
-              {/* Save button only shown when no parent handler and not in readOnly mode */}
-              {!onCompensationChange && !readOnly && (
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={handleAddSalary}
-                    disabled={addEmployeeCompensation.isPending}
-                  >
-                    {addEmployeeCompensation.isPending && (
-                      <LoaderCircle className="animate-spin mr-2 h-4 w-4" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-              )}
+        <div className="flex flex-col gap-4 md:gap-6">
+          {/* Monthly Salary */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm font-medium md:text-base">
+              Monthly Salary
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-base">
+                ₹
+              </span>
+              <Input
+                type="number"
+                value={monthlySalary}
+                onChange={(e) => setMonthlySalary(e.target.value)}
+                className="pl-7 h-12 text-base md:h-10"
+                placeholder="Enter monthly salary"
+                disabled={readOnly}
+              />
             </div>
-            {/* Compensation History */}
-            {compensationHistory && compensationHistory.length > 0 && (
-              <div className="mt-8">
-                <h4 className="text-sm font-medium mb-2">
-                  Compensation History
-                </h4>
-                <div className="space-y-3">
-                  {compensationHistory.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="p-3 border rounded-md flex justify-between items-center"
-                    >
-                      <div>
-                        <div className="font-medium">
-                          {formatCurrency(entry.base_amount)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          From: {format(entry.effective_from, "MMM dd, yyyy")}
-                          {entry.effective_to && (
-                            <> to: {format(entry.effective_to, "MMM dd, yyyy")}</>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        {format(entry.created_at, "MMM dd, yyyy")}
-                      </div>
+          </div>
+
+          {/* Working Days and Hours */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-medium md:text-base">
+                Working Days per Month
+              </Label>
+              <Input
+                type="number"
+                value={workingDays}
+                onChange={(e) => setWorkingDays(e.target.value)}
+                className="h-12 text-base md:h-10"
+                placeholder="Working days"
+                min="1"
+                max="31"
+                disabled={readOnly}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-medium md:text-base">
+                Working Hours per Day
+              </Label>
+              <Input
+                type="number"
+                value={workingHours}
+                onChange={(e) => setWorkingHours(e.target.value)}
+                className="h-12 text-base md:h-10"
+                placeholder="Working hours"
+                min="1"
+                max="24"
+                disabled={readOnly}
+              />
+            </div>
+          </div>
+
+          {/* Hourly Rate Display */}
+          {monthlySalary && workingDays && workingHours && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600 md:text-base">
+                    Hourly Rate:
+                  </span>
+                  <span className="text-base font-medium md:text-lg">
+                    ₹{hourlyRate}/hr
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 md:text-sm">
+                  Based on {workingHours} hours/day, {workingDays} days/month
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Effective Date Picker */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm font-medium md:text-base">
+              Effective From
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !effectiveDate && "text-muted-foreground",
+                    "h-12 text-sm md:h-10"
+                  )}
+                  disabled={readOnly}
+                >
+                  <CalendarIcon className="mr-2 h-5 w-5" />
+                  {effectiveDate ? format(effectiveDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={effectiveDate}
+                  onSelect={setEffectiveDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      </div>
+
+      {/* Compensation History */}
+      {compensationHistory.length > 0 && (
+        <div className="w-full bg-white mt-6 p-4 rounded-xl shadow-sm md:border md:rounded-lg md:p-6 md:max-w-2xl">
+          <h3 className="text-lg font-medium mb-4 md:text-xl md:mb-6">
+            Compensation History
+          </h3>
+          <div className="flex flex-col gap-4">
+            {compensationHistory.map((record) => (
+              <div key={record.id} className="border rounded-lg p-4">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-medium md:text-lg">
+                        ₹{record.base_amount}/month
+                      </span>
+                      <span className="text-sm text-gray-500 md:text-base">
+                        (₹{calculateHourlyRate(
+                          record.base_amount,
+                          record.working_days,
+                          record.working_hours
+                        )}/hr)
+                      </span>
                     </div>
-                  ))}
+                    <Badge variant={record.effective_to ? "secondary" : "default"}>
+                      {record.effective_to ? "Previous" : "Current"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-gray-500 md:text-sm">
+                    From {format(new Date(record.effective_from), "PPP")}
+                  </p>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Save Button */}
+      {!onCompensationChange && !readOnly && (
+        <div className="mt-6 w-full md:max-w-2xl">
+          <Button
+            onClick={handleAddSalary}
+            disabled={addEmployeeCompensation.isPending}
+            className="w-full h-12 text-base md:w-auto md:h-10"
+          >
+            {addEmployeeCompensation.isPending && (
+              <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
             )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+            Save Changes
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

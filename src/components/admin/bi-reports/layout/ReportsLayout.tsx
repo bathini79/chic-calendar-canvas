@@ -30,10 +30,13 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SalesPerformanceAnalyticsReport } from "../reports/SalesPerformanceAnalyticsReport";
-import { PaymentMethodsReport } from "../reports/PaymentMethodsReport";
+import { PaymentMethodsReport } from "../reports/PaymentMethods";
 import { CustomerSalesReport } from "../reports/CustomerSalesReport";
 import { SalesSummaryReport } from "../reports/SalesSummaryReport";
 import { FinancialSummaryReport } from "../reports/FinancialSummaryReport";
+import { StaffWagesSummaryReport } from "../reports/StaffWagesSummaryReport";
+import { StaffCommissionsSummaryReport } from "../reports/StaffCommissionsSummaryReport";
+import { StaffPayoutSummaryReport } from "../reports/StaffPayoutSummaryReport";
 
 // Export utility functions
 const exportToCSV = (data: any[], filename: string = 'export') => {
@@ -132,14 +135,38 @@ const reports = [
     icon: CreditCard,
     category: "Finance",
     component: PaymentMethodsReport
-  },
-  {
+  },  {
     id: "customer-sales",
     title: "Customer Sales Report",
     description: "Customer segmentation with tier-based analysis and top customer identification",
     icon: UserCheck,
     category: "Clients",
     component: CustomerSalesReport
+  },
+  // Staff Reports
+  {
+    id: "staff-wages-summary",
+    title: "Staff Wages Summary",
+    description: "Detailed breakdown of staff wages, hours worked, and hourly rates",
+    icon: Users,
+    category: "Staff",
+    component: StaffWagesSummaryReport
+  },
+  {
+    id: "staff-commissions-summary",
+    title: "Staff Commissions Summary",
+    description: "Analysis of staff commissions and performance metrics",
+    icon: Users,
+    category: "Staff",
+    component: StaffCommissionsSummaryReport
+  },
+  {
+    id: "staff-payout-summary",
+    title: "Staff Payout Summary",
+    description: "Complete breakdown of staff payouts including wages, commissions, and adjustments",
+    icon: Users,
+    category: "Staff",
+    component: StaffPayoutSummaryReport
   }
 ];
 
@@ -148,7 +175,7 @@ const tabs = [
   "Sales", 
   "Finance",
   "Appointments",
-  "Team",
+  "Staff",
   "Clients", 
   "Inventory"
 ];

@@ -682,6 +682,7 @@ export const AppointmentManager: React.FC<AppointmentManagerProps> = ({
                   appointmentStatus={appointmentStatus}
                   loadingPayment={loadingPayment}
                   employees={employees}
+                  setLoadingPayment={setLoadingPayment}
                 />
               )}
               {currentScreen === SCREEN.SUMMARY && newAppointmentId && (

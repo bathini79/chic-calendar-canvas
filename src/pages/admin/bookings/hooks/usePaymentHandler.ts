@@ -62,20 +62,28 @@ export const usePaymentHandler = ({
   setLoading,
 }: UsePaymentHandlerProps) => {const handlePayment = async () => {
     try {
+      console.log("Payment handler started");
+      
       if (!selectedCustomer) {
         toast.error("Please select a customer");
+        if (setLoading) setLoading(false);
         return;
       }
 
       if (!paymentMethod) {
         toast.error("Please select a payment method");
+        if (setLoading) setLoading(false);
         return;
       }
       
       // Set loading state to true at the start of payment processing
+      // This is now redundant as we're setting it in the button click handler,
+      // but keeping it for safety
       if (setLoading) {
         setLoading(true);
-      }const roundedTotal = Math.round(total);
+      }
+      
+      console.log("Payment validation passed");const roundedTotal = Math.round(total);
       const roundOffDifference = roundedTotal - total;      const saveAppointmentParams = {
         appointmentId,
         appliedTaxId: taxes.appliedTaxId,
@@ -102,19 +110,49 @@ export const usePaymentHandler = ({
         referrerId: isReferralApplicable ? referrerId : null,
         referralCashback: isReferralApplicable && referrerId ? referralCashback : 0,
         customerCashback: isReferralApplicable && referrerId ? customerCashback : 0
-      };
-
-      const savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
+      };      console.log("About to save appointment with params:", saveAppointmentParams);
+      
+      // Make sure onSaveAppointment is safely handled
+      let savedAppointmentId;
+      try {
+        savedAppointmentId = await onSaveAppointment(saveAppointmentParams);
+        console.log("Saved appointment ID:", savedAppointmentId);
+      } catch (saveError) {
+        console.error("Error in onSaveAppointment:", saveError);
+        toast.error("Failed to save appointment");
+        if (setLoading) setLoading(false);
+        return;
+      }
+      
       if (!savedAppointmentId) {
-        toast.error("Failed to complete payment");
+        console.error("No appointment ID returned from save operation");
+        toast.error("Failed to complete payment - no appointment ID returned");
+        if (setLoading) setLoading(false);
         return;
       }
 
       toast.success("Payment completed successfully");
-      onPaymentComplete(savedAppointmentId);
+      
+      try {
+        await onPaymentComplete(savedAppointmentId);
+        console.log("Payment completion callback executed successfully");
+      } catch (callbackError) {
+        console.error("Error in payment completion callback:", callbackError);
+        // Don't show an error to the user here as the payment actually succeeded
+      }
+      
+      // Reset loading state on successful completion
+      if (setLoading) {
+        setLoading(false);
+      }
     } catch (error: any) {
       console.error("Error completing payment:", error);
       toast.error(error.message || "Failed to complete payment");
+      
+      // Ensure loading state is reset even on error
+      if (setLoading) {
+        setLoading(false);
+      }
     }
   };
 

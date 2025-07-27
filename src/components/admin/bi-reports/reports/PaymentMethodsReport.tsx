@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,8 @@ import {
   Smartphone,
   Wallet,
   MapPin,
+  BarChart3,
+  PieChart,
 } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -45,6 +47,7 @@ interface PaymentMethodData {
 }
 
 interface PaymentMethodSummary {
+  id: string;
   payment_method: string;
   total_amount: number;
   transaction_count: number;
@@ -84,8 +87,7 @@ export function PaymentMethodsReport() {
   });
   // Fetch payment methods configuration
   const { paymentMethods = [] } = usePaymentMethods();
-
-  // Fetch payment data from appointments
+  // Fetch payment data from appointments with optimized query
   const { data: appointmentData, isLoading: appointmentLoading } = useQuery({
     queryKey: ["payment-methods-appointments", dateRange, filters],
     queryFn: async () => {
@@ -99,17 +101,12 @@ export function PaymentMethodsReport() {
           start_time,
           payment_method,
           location,
-          status,
-          total_price,
-          bookings(
-            price_paid,
-            original_price
-          )
+          total_price
         `
         )
         .gte("start_time", startOfDay(startDate).toISOString())
         .lte("start_time", endOfDay(endDate).toISOString())
-        .in("status", ["completed"]);
+        .eq("status", "completed");
 
       // Apply location filter
       if (filters.location && filters.location !== "all") {
@@ -128,99 +125,102 @@ export function PaymentMethodsReport() {
         date: format(new Date(appointment.start_time), "yyyy-MM-dd"),
         location: appointment.location || "Unknown",
         total_amount: appointment.total_price || 0,
-        bookings_count: appointment.bookings?.length || 0,
       }));
     },
   });
+  // Calculate payment method summaries and overall statistics in one pass
+  const { paymentMethodSummaries, totalAmount, totalTransactions } = useMemo(() => {
+    if (!appointmentData || appointmentData.length === 0) 
+      return { paymentMethodSummaries: [], totalAmount: 0, totalTransactions: 0 };
 
-  // Calculate payment method summaries
-  const paymentMethodSummaries = useMemo(() => {
-    if (!appointmentData || appointmentData.length === 0) return [];
+    const summaryMap = new Map<string, { total_amount: number; transaction_count: number; }>();
+    let overallTotal = 0;
+    let overallCount = 0;
 
-    const summaryMap = new Map<
-      string,
-      {
-        total_amount: number;
-        transaction_count: number;
-      }
-    >();
-
+    // Aggregate data in a single pass
     appointmentData.forEach((item) => {
       const method = item.payment_method;
-      const existing = summaryMap.get(method) || {
-        total_amount: 0,
-        transaction_count: 0,
-      };
-
+      const existing = summaryMap.get(method) || { total_amount: 0, transaction_count: 0 };
+      
+      const amount = item.total_amount;
       summaryMap.set(method, {
-        total_amount: existing.total_amount + item.total_amount,
+        total_amount: existing.total_amount + amount,
         transaction_count: existing.transaction_count + 1,
       });
+
+      // Track overall totals
+      overallTotal += amount;
+      overallCount += 1;
     });
 
-    const totalAmount = Array.from(summaryMap.values()).reduce(
-      (sum, item) => sum + item.total_amount,
-      0
-    );
-
-    return Array.from(summaryMap.entries())
+    // Create summary entries with calculated fields
+    const summaries = Array.from(summaryMap.entries())
       .map(([method, data]) => ({
         id: method,
         payment_method: method,
         total_amount: data.total_amount,
         transaction_count: data.transaction_count,
-        average_amount:
-          data.transaction_count > 0
-            ? data.total_amount / data.transaction_count
-            : 0,
-        percentage:
-          totalAmount > 0 ? (data.total_amount / totalAmount) * 100 : 0,
+        average_amount: data.transaction_count > 0 ? data.total_amount / data.transaction_count : 0,
+        percentage: overallTotal > 0 ? (data.total_amount / overallTotal) * 100 : 0,
       }))
       .sort((a, b) => b.total_amount - a.total_amount);
-  }, [appointmentData]);
 
-  // Calculate day-wise data
+    return { 
+      paymentMethodSummaries: summaries, 
+      totalAmount: overallTotal, 
+      totalTransactions: overallCount 
+    };
+  }, [appointmentData]);
+  // Calculate day-wise data more efficiently
   const dayWiseData = useMemo(() => {
     if (!appointmentData || appointmentData.length === 0) return [];
 
-    const dayWiseMap = new Map<string, Map<string, number>>();
+    // Use a more efficient data structure to track both amount and count
+    const dayMethodMap = new Map<string, Map<string, { amount: number; count: number }>>();
 
+    // Process data in a single loop
     appointmentData.forEach((item) => {
       const date = item.date;
       const method = item.payment_method;
+      const amount = item.total_amount;
 
-      if (!dayWiseMap.has(date)) {
-        dayWiseMap.set(date, new Map<string, number>());
+      // Initialize date map if needed
+      if (!dayMethodMap.has(date)) {
+        dayMethodMap.set(date, new Map());
       }
-
-      const dayMap = dayWiseMap.get(date)!;
-      dayMap.set(method, (dayMap.get(method) || 0) + item.total_amount);
+      
+      const methodMap = dayMethodMap.get(date)!;
+      
+      // Initialize or update method data
+      if (!methodMap.has(method)) {
+        methodMap.set(method, { amount, count: 1 });
+      } else {
+        const current = methodMap.get(method)!;
+        methodMap.set(method, { 
+          amount: current.amount + amount, 
+          count: current.count + 1 
+        });
+      }
     });
 
+    // Convert to result array
     const result: PaymentMethodData[] = [];
-    let idCounter = 1;
 
-    dayWiseMap.forEach((methodMap, date) => {
-      methodMap.forEach((amount, method) => {
-        const transactionCount = appointmentData.filter(
-          (item) => item.date === date && item.payment_method === method
-        ).length;
-
+    dayMethodMap.forEach((methodMap, date) => {
+      methodMap.forEach((data, method) => {
         result.push({
-          id: `${date}-${method}-${idCounter++}`,
+          id: `${date}-${method}`,
           payment_method: method,
           date,
-          location: "Multiple", // Could be refined to show specific locations
-          total_amount: amount,
-          transaction_count: transactionCount,
-          average_amount: transactionCount > 0 ? amount / transactionCount : 0,
+          location: "Multiple",
+          total_amount: data.amount,
+          transaction_count: data.count,
+          average_amount: data.count > 0 ? data.amount / data.count : 0,
         });
       });
     });
 
-    return result.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [appointmentData]);
 
   // Payment method icon mapping
@@ -255,10 +255,9 @@ export function PaymentMethodsReport() {
 
   const activeFiltersCount = Object.values(filters).filter(
     (value) => value && value !== "all"
-  ).length;
-
-  // Set up export data
+  ).length;  // Set up export data
   useEffect(() => {
+    // Export payment method summaries for exports - the export context expects an array
     setExportData(paymentMethodSummaries);
     setReportName("payment-methods-report");
   }, [paymentMethodSummaries, setExportData, setReportName]);
@@ -320,16 +319,7 @@ export function PaymentMethodsReport() {
       type: "currency",
     },
   ];
-
   const isLoading = appointmentLoading;
-  const totalAmount = paymentMethodSummaries.reduce(
-    (sum, item) => sum + item.total_amount,
-    0
-  );
-  const totalTransactions = paymentMethodSummaries.reduce(
-    (sum, item) => sum + item.transaction_count,
-    0
-  );
 
   return (
     <div className="space-y-6">
@@ -365,99 +355,93 @@ export function PaymentMethodsReport() {
             )}
           </Button>
         </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {paymentMethodSummaries.slice(0, 4).map((summary) => {
-          const IconComponent = getPaymentMethodIcon(summary.payment_method);
-          return (
-            <Card key={summary.payment_method} className="overflow-hidden">
-              <CardContent className="p-5 flex flex-col">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <IconComponent className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm truncate">
-                      {summary.payment_method}
-                    </h3>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-2xl font-bold">
-                    ${summary.total_amount.toLocaleString()}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {summary.transaction_count} transactions •{" "}
-                    {summary.percentage.toFixed(1)}%
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Overall Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Total Revenue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${totalAmount.toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Total Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {totalTransactions.toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Average Transaction</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              $
-              {totalTransactions > 0
-                ? (totalAmount / totalTransactions).toFixed(2)
-                : "0.00"}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Payment Methods Summary Table */}
+      </div>      {/* Consolidated Payment Methods Dashboard */}
       <Card>
         <CardHeader>
-          <CardTitle>Payment Methods Summary</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle>Payment Methods Summary</CardTitle>              <CardDescription className="mt-1">
+                Showing {paymentMethodSummaries.length} payment methods with ₹{totalAmount.toLocaleString()} total from {totalTransactions} transactions
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">              <Badge variant="outline" className="py-1">
+                <BarChart3 className="h-3.5 w-3.5 mr-1" /> 
+                Avg. transaction: ₹{totalTransactions > 0 ? (totalAmount / totalTransactions).toFixed(2) : "0.00"}
+              </Badge>
+              <Badge variant="outline" className="py-1">
+                <PieChart className="h-3.5 w-3.5 mr-1" />
+                {paymentMethodSummaries.length} methods
+              </Badge>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          <ReportDataTable
-            data={paymentMethodSummaries}
-            columns={summaryColumns}
-            title=""
-            searchPlaceholder=""
-            loading={isLoading}
-            externalSearchTerm=""
-            totalCount={paymentMethodSummaries.length}
-          />
+        <CardContent>          {/* Top 3 payment methods in cards */}
+          {paymentMethodSummaries.length > 0 && (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-6">
+                {paymentMethodSummaries.slice(0, 3).map((summary) => {
+                  const IconComponent = getPaymentMethodIcon(summary.payment_method);
+                  return (
+                    <Card key={summary.id} className="border-muted bg-muted/5">
+                      <CardContent className="p-4 flex items-center gap-4">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <IconComponent className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold truncate">{summary.payment_method}</h3>
+                          <div className="text-lg font-bold">₹{summary.total_amount.toLocaleString()}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {summary.transaction_count} transactions • {summary.percentage.toFixed(1)}%
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+              
+              {/* Simplified table of other payment methods if more than 3 exist */}
+              {paymentMethodSummaries.length > 3 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2 text-muted-foreground">Other Payment Methods</h4>
+                  <div className="bg-muted/10 rounded-md p-3">
+                    <ul className="space-y-2">
+                      {paymentMethodSummaries.slice(3).map((summary) => {
+                        const IconComponent = getPaymentMethodIcon(summary.payment_method);
+                        return (
+                          <li key={summary.id} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <IconComponent className="h-4 w-4 text-muted-foreground" />
+                              <span>{summary.payment_method}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className="text-sm">₹{summary.total_amount.toLocaleString()}</span>
+                              <span className="text-xs text-muted-foreground">({summary.percentage.toFixed(1)}%)</span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
-      </Card>
-
-      {/* Day-wise Data Table */}
+      </Card>      {/* Day-wise Data Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Day-wise Payment Methods Breakdown</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle>Day-wise Payment Methods Breakdown</CardTitle>
+              <CardDescription className="mt-1">
+                Daily distribution of payment methods over the selected date range
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="py-1">
+              {dayWiseData.length} entries
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent>
           <ReportDataTable
@@ -522,7 +506,7 @@ export function PaymentMethodsReport() {
               className="flex-1 h-9"
             >
               Apply Filters
-            </Button>{" "}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -6,16 +6,26 @@
 
 /* Range end dates get right rounded corners */
 .rdp-cell:has(.rdp-day_range_end) {
-  background-color: #f1f1f1 !important;
+  background-color: #F6F6F6 !important;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 8px !important;
-  border-bottom-right-radius: 8px !important;
+  border-top-right-radius: 24px !important;
+  border-bottom-right-radius: 24px !important;
+}
+
+/* Range start dates get left rounded corners */
+.rdp-cell:has(.rdp-day_range_start) {
+  background-color: #F6F6F6 !important;
+  border-top-left-radius: 24px !important;
+  border-bottom-left-radius: 24px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
 }
 
 /* When start and end are the same day (single day selection) */
 .rdp-cell:has(.rdp-day_range_start.rdp-day_range_end) {
-  border-radius: 8px !important;
+  border-radius: 24px !important;
+  background-color: transparent !important;
 }
 
 /* Ensure cells are positioned relative and have no gaps */
@@ -31,9 +41,9 @@
   justify-content: center !important;
 }
 
-/* Range middle days should be transparent to show the cell background */
+/* Range middle days should have subtle highlighting */
 .rdp-day_range_middle {
-  background-color: transparent !important;
+  background-color: transparent !important; /* Cell handles background */
   border: none !important;
   color: black !important;
   font-weight: 400 !important;
@@ -57,7 +67,9 @@
 
 
 /* Selected date specific styles - circular black buttons for start/end */
-.rdp-day_selected {
+.rdp-day_selected,
+.rdp-day_range_start,
+.rdp-day_range_end {
   background-color: black !important;
   color: white !important;
   font-weight: 500 !important;

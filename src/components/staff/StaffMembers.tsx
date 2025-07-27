@@ -139,7 +139,10 @@ export function StaffMembers({ searchQuery, onEdit }: StaffMembersProps) {
       const employeeId = employeeToDelete.id;
       setShowDeleteDialog(false);
 
-      // Delete related records first
+      // Delete all related records in the correct order
+      // Note: Most tables have ON DELETE CASCADE, but we'll explicitly delete for better control and logging
+
+      // 1. Delete skills
       const { error: skillsError } = await supabase
         .from("employee_skills")
         .delete()
@@ -147,6 +150,7 @@ export function StaffMembers({ searchQuery, onEdit }: StaffMembersProps) {
 
       if (skillsError) throw skillsError;
 
+      // 2. Delete locations
       const { error: locationsError } = await supabase
         .from("employee_locations")
         .delete()
@@ -154,13 +158,94 @@ export function StaffMembers({ searchQuery, onEdit }: StaffMembersProps) {
 
       if (locationsError) throw locationsError;
 
-      // Delete the employee record
-      const { error } = await supabase
+      // 3. Delete compensation settings
+      const { error: compensationError } = await supabase
+        .from("employee_compensation_settings")
+        .delete()
+        .eq("employee_id", employeeId);
+
+      if (compensationError) throw compensationError;
+
+      // 4. Delete commission settings
+      const { error: commissionSettingsError } = await supabase
+        .from("employee_commission_settings")
+        .delete()
+        .eq("employee_id", employeeId);
+
+      if (commissionSettingsError) throw commissionSettingsError;
+
+      // 5. Delete flat commission rules
+      const { error: flatCommissionError } = await supabase
+        .from("flat_commission_rules")
+        .delete()
+        .eq("employee_id", employeeId);
+
+      if (flatCommissionError) throw flatCommissionError;
+
+      // 6. Delete tiered commission slabs
+      const { error: tieredCommissionError } = await supabase
+        .from("tiered_commission_slabs")
+        .delete()
+        .eq("employee_id", employeeId);
+
+      if (tieredCommissionError) throw tieredCommissionError;
+
+      // 7. Delete availability
+      const { error: availabilityError } = await supabase
+        .from("employee_availability")
+        .delete()
+        .eq("employee_id", employeeId);
+
+      if (availabilityError) throw availabilityError;
+
+      // 8. Delete recurring shifts
+      const { error: shiftsError } = await supabase
+        .from("recurring_shifts")
+        .delete()
+        .eq("employee_id", employeeId);
+
+      if (shiftsError) throw shiftsError;
+
+      // 9. Delete time off requests
+      const { error: timeOffError } = await supabase
+        .from("time_off_requests")
+        .delete()
+        .eq("employee_id", employeeId);
+
+      if (timeOffError) throw timeOffError;
+
+      // 10. Delete verification codes and links
+      const { error: verificationCodesError } = await supabase
+        .from("employee_verification_codes")
+        .delete()
+        .eq("employee_id", employeeId);
+
+      if (verificationCodesError) throw verificationCodesError;
+
+      const { error: verificationLinksError } = await supabase
+        .from("employee_verification_links")
+        .delete()
+        .eq("employee_id", employeeId);
+
+      if (verificationLinksError) throw verificationLinksError;
+
+      // Finally, delete the employee record
+      const { error: employeeError } = await supabase
         .from("employees")
         .delete()
         .eq("id", employeeId);
 
-      if (error) throw error;
+      if (employeeError) throw employeeError;
+
+      // Delete the auth user
+      const { error: authError } = await supabase.functions.invoke('delete-auth-user', {
+        body: { userId: employeeId }
+      });
+
+      if (authError) {
+        console.error("Error deleting auth user:", authError);
+        // Don't throw here as the employee data is already deleted
+      }
 
       toast.success(`${employeeToDelete.name} has been removed`);
       refetch();

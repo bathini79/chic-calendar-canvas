@@ -85,8 +85,7 @@ export default function Staff() {
         );
       case "scheduled-shifts":
         return <StaffShifts />;
-      case "timesheets":
-        return <Timesheets />;
+  
       case "pay-runs":
         return <PayRuns />;
       default:

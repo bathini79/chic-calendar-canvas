@@ -54,11 +54,6 @@ export function TeamSidebar({
       icon: <Calendar size={16} />
     },
     { 
-      label: "Timesheets", 
-      value: "timesheets" as TeamSection,
-      icon: <Clock size={16} />
-    },
-    { 
       label: "Pay runs", 
       value: "pay-runs" as TeamSection,
       icon: <IndianRupee size={16} />

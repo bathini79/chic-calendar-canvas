@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,8 +68,10 @@ interface CheckoutSectionProps {
   onSaveAppointment: (params?: any) => Promise<string | null>;
   onRemoveService: (serviceId: string) => void;
   onRemovePackage: (packageId: string) => void;
-  onBackToServices: () => void;  isExistingAppointment?: boolean;
-  customizedServices?: Record<string, string[]>;  locationId?: string;
+  onBackToServices: () => void;
+  isExistingAppointment?: boolean;
+  customizedServices?: Record<string, string[]>;
+  locationId?: string;
   loadingPayment?: boolean;
   setLoadingPayment?: (loading: boolean) => void;
   employees: any[];
@@ -96,7 +99,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
   onSaveAppointment,
   onRemoveService,
   onRemovePackage,
-  onBackToServices,  customizedServices = {},
+  onBackToServices,
+  customizedServices = {},
   locationId,
   loadingPayment = false,
   setLoadingPayment,
@@ -277,17 +281,19 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     membership.membershipDiscount,
     coupons.selectedCoupon,
     loyalty.usePoints,
-    loyalty.pointsDiscountAmount,  ]);  // Initialize the referral wallet hook with active discounts and initial values from existing appointment
-
+    loyalty.pointsDiscountAmount,
+  ]); // Initialize the referral wallet hook with active discounts and initial values from existing appointment
+  // Safely handle the referral wallet initialization
+  const safeDiscountedSubtotal = Math.max(0, (discountedSubtotal || 0) - (loyalty.pointsDiscountAmount || 0));
+  
   const referralWallet = useReferralWalletInCheckout({
-    customerId: selectedCustomer?.id,
-    discountedSubtotal: discountedSubtotal - loyalty.pointsDiscountAmount, // Apply after loyalty points
-    locationId,
-    activeDiscounts,
-    initialUseReferralWallet: existingAppointment?.referral_wallet_discount_amount > 0,
-    initialReferralWalletAmount: existingAppointment?.referral_wallet_redeemed || 0,
+    customerId: selectedCustomer?.id || undefined,
+    discountedSubtotal: safeDiscountedSubtotal, // Apply after loyalty points, ensure it's never negative
+    locationId: locationId || undefined,
+    activeDiscounts: activeDiscounts || [],
+    initialUseReferralWallet: Boolean(existingAppointment?.referral_wallet_discount_amount > 0),
+    initialReferralWalletAmount: Number(existingAppointment?.referral_wallet_redeemed || 0),
   });
- 
 
   const taxes = useTaxesInCheckout({
     locationId,
@@ -406,7 +412,8 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     getServiceDisplayPrice,
     getStylistName,
     formatDuration,
-  });  const { handlePayment } = usePaymentHandler({
+  });
+  const { handlePayment } = usePaymentHandler({
     selectedCustomer,
     paymentMethod,
     appointmentId,
@@ -442,7 +449,7 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     total,
     adjustedPrices,
     onSaveAppointment,
-    onPaymentComplete,    // Pass a callback that can update the loading state in AppointmentManager
+    onPaymentComplete, // Pass a callback that can update the loading state in AppointmentManager
     setLoading: (loading) => {
       // This will be invoked by the usePaymentHandler hook
       if (setLoadingPayment) {
@@ -812,26 +819,45 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
                   </SelectContent>
                 </Select>
               </div>{" "}
-              <div className="flex gap-2">                <Button
+              <div className="flex gap-2">
+                {" "}
+                <Button
                   className="flex-1 flex items-center justify-center gap-2"
-                  size="lg"
-                  onClick={() => {
-                    if (!loadingPayment && setLoadingPayment) {
+                  size="lg"                  onClick={() => {
+                    // Make sure setLoadingPayment is available, but don't check loadingPayment state here
+                    // This ensures the button click always processes even if state hasn't updated yet
+                    if (setLoadingPayment) {
                       // Set loading state immediately when payment button is clicked
                       setLoadingPayment(true);
+                      console.log("Payment process initiated");
                       
-                      // Handle payment with proper error handling
+                      // Directly run the function without wrapping in another Promise
                       const handlePaymentWithLoading = async () => {
                         try {
+                          console.log("Starting payment processing");
+                          // Remove timeout which might be causing issues
                           await handlePayment();
+                          console.log("Payment processing complete");
                         } catch (error) {
                           console.error("Payment failed:", error);
+                          toast.error(
+                            "Payment process failed. Please try again."
+                          );
                           // Reset loading state on error
                           setLoadingPayment(false);
                         }
                       };
-                      
-                      handlePaymentWithLoading();
+
+                      // Execute directly without Promise.resolve wrapper
+                      handlePaymentWithLoading().catch((error) => {
+                        console.error("Unhandled payment error:", error);
+                        toast.error(
+                          "An unexpected error occurred. Please try again."
+                        );
+                        setLoadingPayment(false);
+                      });
+                    } else {
+                      console.error("setLoadingPayment is not available");
                     }
                   }}
                   disabled={selectedItems.length === 0 || loadingPayment}
@@ -1104,4 +1130,3 @@ export const CheckoutSection: React.FC<CheckoutSectionProps> = ({
     </div>
   );
 };
- 

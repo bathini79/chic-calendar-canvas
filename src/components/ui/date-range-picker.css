@@ -1,9 +1,9 @@
 /* DateRangePicker Component Styles - Self-contained and reusable */
 
 /* ===== CALENDAR DAY STYLING ===== */
-/* Override to ensure all calendar days have black text except explicitly white ones */
+/* Calendar day styling with improved selection states */
 .date-range-picker-container .rdp-day {
-  color: black !important;
+  color: black;
   aspect-ratio: 1/1;
   display: flex;
   align-items: center;
@@ -13,9 +13,11 @@
   font-size: 0.875rem !important;
   border-radius: 50%;
   transition: background-color 0.15s ease;
+  margin: 0;
+  padding: 0;
 }
 
-/* Only allow white text for explicitly selected days (start and end points) */
+/* Start and end points of the range */
 .date-range-picker-container .rdp-day_selected {
   background-color: black !important;
   color: white !important;
@@ -23,26 +25,37 @@
   border-radius: 50% !important;
   width: 1.75rem !important;
   height: 1.75rem !important;
-  z-index: 10 !important;
+  z-index: 2 !important;
   position: relative !important;
 }
 
-/* Range middle days must be black text */
+/* Range middle days - ensure light gray background with BLACK text */
 .date-range-picker-container .rdp-day_range_middle {
   color: black !important;
-  background-color: transparent !important;
-  border: none !important;
+  background-color: #F6F6F6 !important; 
+  border-radius: 0 !important;
   font-weight: 400 !important;
+  position: relative !important;
 }
 
-/* Super specific selectors to ensure the range middle days are black */
-.date-range-picker-container [aria-selected="true"].rdp-day_range_middle {
-  color: black !important;
+/* Enhance the range selection appearance - BLACK buttons with WHITE text for start/end */
+.date-range-picker-container .rdp-day_range_start,
+.date-range-picker-container .rdp-day_range_end {
+  background-color: black !important;
+  color: white !important;
+  border-radius: 50% !important;
+  z-index: 2 !important; /* Higher z-index to appear above the background */
+  position: relative !important; /* Ensure position is relative for z-index */
 }
 
-/* Ensure any range highlighting uses black text */
-.date-range-picker-container [class*="day_range_middle"] {
-  color: black !important;
+/* Fix for range middle days */
+.date-range-picker-container [aria-selected="true"] {
+  font-weight: 500;
+}
+
+/* Fix for hover states */
+.date-range-picker-container .rdp-day:hover:not(.rdp-day_selected) {
+  background-color: #eaeaea !important;
 }
 
 /* Target the days within the range */
@@ -50,7 +63,7 @@
   color: black !important;
 }
 
-/* Day hover state */
+/* Day hover state - light gray hover with BLACK text */
 .date-range-picker-container .rdp-day:hover:not(.rdp-day_selected) {
   background-color: #f3f4f6 !important;
   color: black !important;
@@ -64,32 +77,37 @@
 /* ===== CALENDAR CELL STYLING FOR CONTINUOUS RANGE ===== */
 /* Create a continuous background for the range - ONLY for middle dates */
 .date-range-picker-container .rdp-cell:has(.rdp-day_range_middle) {
-  background-color: #f1f1f1 !important;
+  background-color: #F6F6F6 !important;
   border-radius: 0 !important;
   position: relative;
 }
+/* .rdp-button_reset{
+  color: black !important;
+} */
 
 /* Range start dates get left rounded corners */
 .date-range-picker-container .rdp-cell:has(.rdp-day_range_start) {
-  background-color: #f1f1f1 !important;
-  border-top-left-radius: 8px !important;
-  border-bottom-left-radius: 8px !important;
+  background-color: #F6F6F6 !important;
+  border-top-left-radius: 24px !important;
+  border-bottom-left-radius: 24px !important;
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
 }
 
 /* Range end dates get right rounded corners */
 .date-range-picker-container .rdp-cell:has(.rdp-day_range_end) {
-  background-color: #f1f1f1 !important;
+  background-color: #F6F6F6 !important;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 8px !important;
-  border-bottom-right-radius: 8px !important;
+  border-top-right-radius: 24px !important;
+  border-bottom-right-radius: 24px !important;
+  color:black !important; /* Ensure text is black for end dates */  
 }
 
 /* When start and end are the same day (single day selection) */
 .date-range-picker-container .rdp-cell:has(.rdp-day_range_start.rdp-day_range_end) {
-  border-radius: 8px !important;
+  border-radius: 24px !important;
+  background-color: transparent !important;
 }
 
 /* ===== CALENDAR LAYOUT AND STRUCTURE ===== */
@@ -104,6 +122,7 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  box-sizing: border-box !important; /* Ensure consistent box model */
 }
 
 /* Container styling for seamless layout */
@@ -195,7 +214,9 @@
   width: 1.5rem !important;
   height: 1.5rem !important;
 }
-
+.date-range-picker-container .rdp-cell:has(.rdp-day_range_middle) .rdp-day {
+  color: black !important; /* Ensure black text within the cell */
+}
 /* ===== TRIGGER BUTTON STYLING ===== */
 /* Trigger buttons use default outline button styling from the UI library */
 /* This ensures consistency with other outline buttons like "Filters" */
@@ -216,12 +237,76 @@
   }
   
   .date-range-picker-container .rdp-day_range_middle {
-    color: white !important;
+    color: black !important; /* Keep middle dates black even in dark mode */
   }
   
   .date-range-picker-container .rdp-cell:has(.rdp-day_range_middle),
-  .date-range-picker-container .rdp-cell:has(.rdp-day_range_start),
-  .date-range-picker-container .rdp-cell:has(.rdp-day_range_end) {
-    background-color: #374151 !important;
+  .date-range-picker-container .rdp-cell:has(.rdp-day_range_start:not(.rdp-day_range_end)),
+  .date-range-picker-container .rdp-cell:has(.rdp-day_range_end:not(.rdp-day_range_start)) {
+    background-color: #F6F6F6 !important; /* Consistent light gray background in all modes */
   }
+}
+
+/* ===== ADDITIONAL RANGE STYLING FIXES ===== */
+/* Ensure no gaps between cells in the range */
+.date-range-picker-container .rdp-cell {
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+/* Enhance the continuous range appearance */
+.date-range-picker-container .rdp-day_range_middle + .rdp-day_range_middle,
+.date-range-picker-container .rdp-day_range_start + .rdp-day_range_middle,
+.date-range-picker-container .rdp-day_range_middle + .rdp-day_range_end {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* Fix range appearance in Firefox/Safari */
+.date-range-picker-container .rdp-row:has(.rdp-day_range_start):has(.rdp-day_range_end) .rdp-cell,
+.date-range-picker-container .rdp-row:has(.rdp-day_range_middle) .rdp-cell {
+  position: relative;
+}
+
+/* Fix z-index issues with selected dates */
+.date-range-picker-container .rdp-day_selected {
+  z-index: 3 !important;
+}
+
+/* Ensure continuous background on rows with multiple range days */
+.date-range-picker-container .rdp-row:has(.rdp-day_range_middle) {
+  background: transparent;
+}
+
+.date-range-picker-container .rdp .rdp-day_range_middle {
+  color: black !important; /* Primary rule for middle range days */
+}
+
+.date-range-picker-container .rdp-cell:has(.rdp-day_range_middle) .rdp-day {
+  color: black !important; /* Fallback for cell-contained days */
+}
+
+/* Additional safeguard for aria-selected middle days */
+.date-range-picker-container .rdp-day:not(.rdp-day_selected)[aria-selected="true"] {
+  color: black !important; /* Targets middle days with aria-selected */
+}
+/* Highly specific rule targeting middle range days */
+.date-range-picker-container .rdp-table .rdp-day_range_middle {
+  color: black !important;
+}
+
+/* Fallback for cells containing middle range days */
+.date-range-picker-container .rdp-table .rdp-cell:has(.rdp-day_range_middle) .rdp-day {
+  color: black !important;
+}
+
+/* Catch any aria-selected middle days */
+.date-range-picker-container .rdp-table .rdp-day:not(.rdp-day_selected)[aria-selected="true"] {
+  color: black !important;
+}
+
+/* Inline style override (last resort) */
+.date-range-picker-container .rdp-table .rdp-day_range_middle {
+  color: black !important;
+  -webkit-text-fill-color: black !important; /* For Webkit browsers */
 }

@@ -1,0 +1,68 @@
+/* Ultra simple calendar range styles */
+
+/* Global styles for the calendar */
+.rdp {
+  --range-bg-color: #F6F6F6;
+  --date-text-color: black;
+  --selected-bg-color: black;
+  --selected-text-color: white;
+}
+
+/* Force black text color on ALL days */
+.rdp-day {
+  color: var(--date-text-color) !important;
+  position: relative !important;
+}
+
+/* Selected days (start and end) */
+.rdp-day_range_start,
+.rdp-day_range_end,
+.rdp-day_selected {
+  background-color: var(--selected-bg-color) !important;
+  color: var(--selected-text-color) !important;
+  border-radius: 50% !important;
+  z-index: 2 !important;
+  position: relative !important;
+}
+
+/* Range middle days */
+.rdp-day_range_middle {
+  background-color: var(--range-bg-color) !important;
+  color: var(--date-text-color) !important;
+  border-radius: 0 !important;
+  position: relative !important;
+}
+
+/* Fix hover states */
+.rdp-day:hover {
+  color: var(--date-text-color) !important;
+}
+
+/* Special class that we'll add to calendar container */
+.calendar-range-container {
+  position: relative;
+}
+
+/* We'll manually add rounded range backgrounds using pseudo-elements */
+.calendar-range-background {
+  background-color: var(--range-bg-color);
+  position: absolute;
+  height: 36px; /* Match day height */
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.calendar-range-start {
+  border-top-left-radius: 18px;
+  border-bottom-left-radius: 18px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.calendar-range-end {
+  border-top-right-radius: 18px;
+  border-bottom-right-radius: 18px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}

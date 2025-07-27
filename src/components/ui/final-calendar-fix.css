@@ -1,0 +1,7 @@
+/* Global styles override with highest specificity */
+html body .rdp .rdp-day_range_middle,
+html body .rdp .rdp-day_range_middle.rdp-day:not(.rdp-day_selected),
+html body .rdp .rdp-day_range_middle:not(.rdp-day_selected),
+.rdp-day_range_middle.rdp-day_range_middle {
+  background-color: #F6F6F6 !important; /* Very light gray background */
+  color: black !important;

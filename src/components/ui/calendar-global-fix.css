@@ -1,0 +1,230 @@
+/**
+ * Unified calendar styles for both mobile and desktop
+ * This is the single source of truth for all calendar styling
+ */
+
+:root {
+  --rdp-cell-size: 40px;
+  --range-bg-color: transparent;
+  --selected-bg-color: black;
+  --selected-text-color: white;
+  --day-text-color: black;
+  --border-radius: 50%;
+  --day-hover-color: rgba(0, 0, 0, 0.1);
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Global styles for the date range picker */
+.date-range-picker-container {
+  font-family: var(--font-family);
+}
+
+/* Calendar container */
+.rdp {
+  margin: 0;
+}
+
+/* Make calendar cells consistent size */
+.rdp-cell {
+  padding: 0 !important;
+  margin: 0 !important;
+  text-align: center !important;
+  height: var(--rdp-cell-size) !important;
+  width: var(--rdp-cell-size) !important;
+  position: relative !important;
+}
+
+/* Standard styling for all days */
+.rdp-day {
+  color: var(--day-text-color) !important;
+  height: calc(var(--rdp-cell-size) - 4px) !important;
+  width: calc(var(--rdp-cell-size) - 4px) !important;
+  font-size: 0.875rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: var(--border-radius) !important; /* Border radius for single days */
+  margin: 2px auto !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+  background-color: transparent !important; /* Ensure day backgrounds are transparent by default */
+}
+
+/* Override border-radius and border for range days */
+.rdp-day_range_middle, 
+.rdp-cell:has(.rdp-day_range_middle) .rdp-day {
+  border-radius: 0 !important; /* Force remove border-radius for days in range */
+  border: none !important; /* Remove any border from middle days */
+}
+
+/* Day in middle of range */
+.rdp-day_range_middle {
+  background-color: transparent !important; /* Remove background from day itself */
+  color: var(--day-text-color) !important;
+  border-radius: 0 !important; /* Critical: remove border radius for range middle days */
+  border: none !important; /* Critical: remove any borders for range middle days */
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+}
+
+/* Selected days (start and end) */
+.rdp-day_selected,
+.rdp-day_range_start,
+.rdp-day_range_end {
+  background-color: var(--selected-bg-color) !important;
+  color: var(--selected-text-color) !important;
+  font-weight: 500 !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* Fix hover states for all days */
+.rdp-day:hover {
+  background-color: var(--day-hover-color) !important;
+  color: var(--day-text-color) !important;
+}
+
+/* Calendar rows layout */
+.rdp-row {
+  display: flex !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Table layout */
+.rdp-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+}
+
+/* Header styles */
+.rdp-head_cell {
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  color: #6b7280 !important;
+  text-transform: uppercase !important;
+  text-align: center !important;
+  padding: 0.5rem 0 !important;
+}
+
+/* Fix range cells styling - completely transparent */
+.rdp-cell:has(.rdp-day_range_middle) {
+  background-color: transparent !important;
+  position: relative !important;
+  z-index: 1 !important; /* Ensure proper stacking context */
+}
+
+/* This prevents the white circles and borders from appearing between dates */
+.rdp-cell:has(.rdp-day_range_middle) .rdp-day {
+  background-color: transparent !important;
+  border-radius: 0 !important; /* Critical fix: remove border radius for day elements in range middle */
+  border: none !important; /* Explicitly remove borders from middle days */
+  margin: 0 !important; /* Remove any margin that might create gaps */
+  width: 100% !important; /* Ensure the day element fills its cell */
+  height: 100% !important;
+}
+
+/* Range start/end styling to ensure rounded corners */
+.rdp-cell:has(.rdp-day_range_start) {
+  background-color: var(--range-bg-color) !important;
+  border-top-left-radius: 24px !important;
+  border-bottom-left-radius: 24px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.rdp-cell:has(.rdp-day_range_end) {
+  background-color: var(--range-bg-color) !important;
+  border-top-right-radius: 24px !important;
+  border-bottom-right-radius: 24px !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
+/* When start and end are the same day (single day selection) */
+.rdp-cell:has(.rdp-day_range_start.rdp-day_range_end) {
+  border-radius: var(--border-radius) !important;
+  background-color: transparent !important;
+}
+
+/* Styling for today's date */
+.rdp-day_today:not(.rdp-day_selected) {
+  border: 1px solid #e5e7eb !important;
+}
+
+/* Fix for date input fields */
+.date-range-picker-container input {
+  font-size: 0.875rem;
+  height: 2.5rem;
+  border-color: rgba(0, 0, 0, 0.3);
+  border-width: 1px;
+}
+
+/* Consistent monthes spacing */
+.rdp-months {
+  display: flex !important;
+  gap: 1rem !important;
+}
+
+/* Improve month caption styling */
+.rdp-caption {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.5rem 0 !important;
+  position: relative !important;
+}
+
+/* Navigation buttons for month switching */
+.rdp-nav_button {
+  background: #f8f8fb !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #6b7280 !important;
+  transition: all 0.2s ease !important;
+  border-radius: 50% !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+.rdp-nav_button:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: black !important;
+}
+
+/* Mobile dialog specific fixes */
+@media (max-width: 768px) {
+  .date-range-picker-container .rdp {
+    width: 100%;
+  }
+  
+  .date-range-picker-container .rdp-month {
+    width: 100%;
+  }
+  
+  /* Ensure consistent spacing in mobile view */
+  .rdp-months {
+    flex-direction: column !important;
+    gap: 1.5rem !important;
+  }
+  
+  /* Add stronger borders for input fields in mobile view */
+  .date-range-picker-container input {
+    border: 1px solid rgba(0, 0, 0, 0.3) !important;
+    background-color: #FAFAFA !important;
+  }
+  
+  /* Add stronger borders for select in mobile view */
+  .date-range-picker-container .select-trigger {
+    border: 1px solid rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Make all headings consistent */
+  .date-range-picker-container .text-muted-foreground {
+    font-weight: 500 !important;
+  }
+}

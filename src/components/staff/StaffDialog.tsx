@@ -272,7 +272,9 @@ export function StaffDialog({
             .from("employee_compensation_settings")
             .insert({
               employee_id: employeeId,
-              base_amount: data.compensation.monthly_salary,
+              compensation_type: data.compensation.compensation_type,
+              base_amount: data.compensation.compensation_type === "monthly" ? data.compensation.monthly_salary : calculateMonthlyEquivalent(data.compensation.hourly_rate!),
+              hourly_rate: data.compensation.compensation_type === "hourly" ? data.compensation.hourly_rate : null,
               effective_from: data.compensation.effective_from,
               effective_to: null, // No end date for now
             });

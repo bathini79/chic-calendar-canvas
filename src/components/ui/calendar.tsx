@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
-import "./calendar-fix.css";
+import "./calendar-global-fix.css"; // Use the consolidated CSS file
 import { buttonVariants } from "@/components/ui/button";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
@@ -34,13 +34,15 @@ function Calendar({
           "text-muted-foreground w-9 h-8 font-normal text-[0.8rem] flex items-center justify-center",row: "grid grid-cols-7 w-full mt-0 gap-0",        cell: "h-9 w-9 text-center p-0 relative focus-within:relative focus-within:z-20 flex items-center justify-center text-black border-0 m-0",        day: cn(
           "h-8 w-8 p-0 font-normal aria-selected:opacity-100 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors !text-black [&.day_selected]:!text-white [&.day_range_end]:!text-white [&.day_range_start]:!text-white text-sm"
         ),
-        day_range_end: "day-range-end",        day_selected:
+        day_range_end: "day-range-end bg-black text-white rounded-full",
+        day_selected:
           "bg-black text-white hover:bg-black/90 hover:text-white focus:bg-black focus:text-white !text-white",
         day_today: "border border-gray-300 text-black font-medium",
         day_outside:
           "day-outside text-muted-foreground opacity-30",
         day_disabled: "text-muted-foreground opacity-30",        day_range_middle:
-          "aria-selected:bg-transparent aria-selected:!text-black rounded-none !text-black mx-0 w-full h-full hover:bg-gray-100 text-sm border-0",
+          "aria-selected:!text-black !rounded-none !text-black mx-0 w-full h-full hover:bg-gray-100 text-sm border-0 bg-transparent",
+        day_range_start: "day-range-start bg-black text-white rounded-full",
         day_hidden: "invisible",
         ...classNames,
       }}

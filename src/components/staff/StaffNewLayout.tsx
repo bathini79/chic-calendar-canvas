@@ -31,21 +31,35 @@ const formSchema = z.object({
   photo_url: z.string().optional(),
   status: z.enum(["active", "inactive"]).default("active"),
   employment_type_id: z.string().min(1, "Employment type is required"),
-  // Skills is conditionally required based on employment_type having perform_services permission
   skills: z.array(z.string()).optional().default([]),
-  locations: z.array(z.string()).min(1, "At least one location is required"),  // Commission fields
+  locations: z.array(z.string()).min(1, "At least one location is required"),
   service_commission_enabled: z.boolean().default(false),
   commission_type: z.enum(["flat", "tiered", "template"]).optional().nullable().transform((val) => val || undefined),
   service_commissions: z.record(z.string(), z.number()).optional(),
   global_commission_percentage: z.number().min(0).max(100).optional(),
 
-  // Compensation fields
+  // Updated compensation fields
   compensation: z
     .object({
-      monthly_salary: z.number().min(0, "Salary must be greater than 0"),
+      compensation_type: z.enum(["monthly", "hourly"]).default("monthly"),
+      monthly_salary: z.number().min(0, "Salary must be greater than 0").optional(),
+      hourly_rate: z.number().min(0, "Hourly rate must be greater than 0").optional(),
       effective_from: z.date(),
     })
-    .optional(),
+    .optional()
+    .refine(
+      (data) => {
+        if (!data) return true;
+        if (data.compensation_type === "monthly") {
+          return data.monthly_salary !== undefined && data.monthly_salary > 0;
+        } else {
+          return data.hourly_rate !== undefined && data.hourly_rate > 0;
+        }
+      },
+      {
+        message: "Please provide either monthly salary or hourly rate based on compensation type"
+      }
+    )
 }).refine((data) => {
   // If service commission is enabled, commission_type is required
   if (data.service_commission_enabled) {

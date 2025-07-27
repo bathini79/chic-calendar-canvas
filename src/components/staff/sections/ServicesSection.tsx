@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   FormField,
   FormItem,
@@ -15,6 +15,7 @@ import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ServicesSectionProps {
   form: UseFormReturn<any>;
@@ -27,9 +28,17 @@ interface ServicesSectionProps {
 interface Service {
   id: string;
   name: string;
-  description?: string;
-  price?: number;
-  duration?: number;
+  description: string | null;
+  duration: number;
+  original_price: number;
+  selling_price: number;
+  category_id: string | null;
+  category_name?: string;
+  status: 'active' | 'inactive' | 'archived';
+  created_at: string;
+  updated_at: string;
+  image_urls: string[] | null;
+  gender: string | null;
 }
 
 interface ServiceLocation {
@@ -50,9 +59,7 @@ export function ServicesSection({
   isMobile = false,
 }: ServicesSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [serviceLocations, setServiceLocations] = useState<
-    Record<string, string[]>
-  >({});
+  const [serviceLocations, setServiceLocations] = useState<Record<string, string[]>>({});
   const [locationError, setLocationError] = useState<string | null>(null);
   const [commonLocation, setCommonLocation] = useState<string | null>(null);
 
@@ -200,139 +207,163 @@ export function ServicesSection({
   };
 
   // Filter services based on search query
-  const filteredServices = services.filter((service) =>
-    service.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  return (
-    <div className={`${isMobile ? "p-3 min-h-[300px]" : "p-6 min-h-[500px]"}`}>
-      <div className={`${isMobile ? "mb-3" : "mb-6"}`}>
-        <h2 className="text-xl font-medium mb-1">Services</h2>
-        <p className="text-sm text-muted-foreground">
-          Manage services this staff member can provide
-        </p>
-      </div>
+  const filteredServices = useMemo(() => {
+    return services.filter((service) =>
+      service.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [services, searchQuery]);
 
-      <FormField
-        control={form.control}
-        name="skills"
-        render={() => (
-          <FormItem>
-            {" "}
-            <FormLabel className="mb-2">Services & Skills</FormLabel>{" "}
-            {form.formState.errors.skills && (
-              <FormMessage className="mt-1">
-                {form.formState.errors.skills.message?.toString()}
-              </FormMessage>
-            )}
-            <FormControl>
-              <div className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search services..."
-                    className="pl-9"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>{" "}
-                <div className="bg-muted/30 p-1 rounded-md border">
-                  {/* Selected services badges */}
-                  {selectedSkills.length > 0 && (
-                    <div className="flex flex-wrap gap-2 p-2 border-b mb-2">
-                      {selectedSkills.length === services.length ? (
-                        <Badge variant="secondary">All Services</Badge>
-                      ) : (
-                        services
-                          .filter((service) =>
-                            selectedSkills.includes(service.id)
-                          )
-                          .map((service) => (
-                            <Badge
-                              key={service.id}
-                              variant="secondary"
-                              className="pl-2 pr-1 py-1"
-                            >
-                              {service.name}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-4 w-4 ml-1 hover:bg-transparent"
-                                onClick={() =>
-                                  handleServiceSelect(service.id, false)
-                                }
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </Badge>
-                          ))
-                      )}
-                    </div>
-                  )}
-                  {/* Service list */}
-                  <div
-                    className={`${
-                      isMobile ? "min-h-[150px]" : "max-h-[300px]"
-                    } overflow-y-auto overflow-x-hidden`}
-                  >
-                    {filteredServices.length === 0 ? (
-                      <div className="p-4 text-center text-muted-foreground">
-                        No services match your search
-                      </div>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {/* Select All checkbox at the top */}
-                        <label className="grid grid-cols-[auto_1fr] items-center gap-2 px-3 py-2 rounded-sm hover:bg-muted/70 cursor-pointer bg-muted/30 border-b mb-1">
-                          <Checkbox
-                            id="select-all"
-                            checked={
-                              selectedSkills.length === services.length &&
-                              services.length > 0
-                            }
-                            onCheckedChange={(checked) =>
-                              handleServiceSelect("all", checked === true)
-                            }
-                          />
-                          <span className="font-medium">
-                            Select All Services
-                          </span>
-                        </label>{" "}
-                        <div className="grid grid-cols-[auto_1fr] px-3 py-1.5 text-xs uppercase text-muted-foreground font-medium">
-                          <div></div>
-                          <div>Name</div>
-                        </div>
+  return (
+    <div className={cn(
+      "space-y-6",
+      isMobile ? "px-4" : "pl-32 pr-8"
+    )}>
+      <div className={cn(
+        "border rounded-lg p-6 bg-white",
+        isMobile ? "max-w-full" : "max-w-[850px]"
+      )}>
+        <h3 className="text-lg font-semibold mb-4">Service Settings</h3>
+        
+        <div className="space-y-4">
+          <div className="grid gap-4">
+            <div className={cn(
+              isMobile ? "max-w-full" : "max-w-[800px]"
+            )}>
+              <div className={cn(
+                "flex items-center space-x-3 bg-gray-50 rounded-lg",
+                isMobile ? "mb-4 p-2" : "mb-6 p-3"
+              )}>
+                <Search className="w-5 h-5 text-gray-500" />
+                <Input
+                  type="text"
+                  placeholder="Search services..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="skills"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={cn(
+                      "text-base",
+                      isMobile ? "mb-2" : "mb-4"
+                    )}>Services *</FormLabel>
+                    <FormControl>
+                      <div className="space-y-3">
                         {filteredServices.map((service) => (
-                          <label
+                          <div
                             key={service.id}
-                            htmlFor={service.id}
-                            className={`grid grid-cols-[auto_1fr] items-center gap-2 px-3 py-2 rounded-sm hover:bg-muted/50 cursor-pointer ${
-                              selectedSkills.includes(service.id)
-                                ? "bg-muted/50"
-                                : ""
-                            }`}
+                            className={cn(
+                              "flex items-start space-x-3 rounded-lg transition-colors hover:bg-gray-50 border",
+                              isMobile ? "p-2" : "p-3"
+                            )}
                           >
                             <Checkbox
-                              id={service.id}
                               checked={selectedSkills.includes(service.id)}
-                              onCheckedChange={(checked) =>
-                                handleServiceSelect(
-                                  service.id,
-                                  checked === true
-                                )
-                              }
+                              onCheckedChange={(checked: boolean) => {
+                                const newSkills = checked
+                                  ? [...selectedSkills, service.id]
+                                  : selectedSkills.filter((id) => id !== service.id);
+                                setSelectedSkills(newSkills);
+                                field.onChange(newSkills);
+
+                                // Check service locations
+                                const serviceLocationsArray = serviceLocations[service.id] || [];
+                                if (checked && serviceLocationsArray.length === 0) {
+                                  setLocationError(
+                                    `Service "${service.name}" is not available at any location.`
+                                  );
+                                }
+                              }}
+                              className={cn(
+                                "h-5 w-5",
+                                isMobile ? "mt-0.5" : "mt-1"
+                              )}
                             />
-                            <span>{service.name}</span>
-                          </label>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <div className={cn(
+                                "flex justify-between items-start",
+                                isMobile ? "flex-col space-y-1" : "flex-row"
+                              )}>
+                                <div className="min-w-0">
+                                  <label
+                                    htmlFor={service.id}
+                                    className={cn(
+                                      "font-medium leading-none cursor-pointer block",
+                                      isMobile ? "text-[14px] pr-2" : "text-[15px]"
+                                    )}
+                                  >
+                                    {service.name}
+                                  </label>
+                                  {service.category_name && (
+                                    <span className={cn(
+                                      "block text-muted-foreground",
+                                      isMobile ? "text-xs mt-0.5" : "text-sm mt-1"
+                                    )}>
+                                      {service.category_name}
+                                    </span>
+                                  )}
+                                  <span className={cn(
+                                    "block text-muted-foreground",
+                                    isMobile ? "text-xs mt-0.5" : "text-sm mt-1"
+                                  )}>
+                                    Duration: {service.duration} mins
+                                  </span>
+                                </div>
+                                <div className={cn(
+                                  "text-right flex items-center",
+                                  isMobile ? "w-full justify-between mt-1 pt-1 border-t" : ""
+                                )}>
+                                  <span className={cn(
+                                    "font-medium text-primary",
+                                    isMobile ? "text-sm" : "text-base"
+                                  )}>
+                                    ₹{service.selling_price}
+                                  </span>
+                                  {service.original_price !== service.selling_price && (
+                                    <span className={cn(
+                                      "text-muted-foreground line-through",
+                                      isMobile ? "text-xs ml-2" : "text-sm block mt-1"
+                                    )}>
+                                      ₹{service.original_price}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         ))}
+                        {filteredServices.length === 0 && (
+                          <div className={cn(
+                            "text-center text-muted-foreground",
+                            isMobile ? "py-6" : "py-8"
+                          )}>
+                            No services found matching your search
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+                    </FormControl>
+                    <FormMessage className="mt-2" />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {locationError && (
+        <div className={cn(
+          "border rounded-lg p-4 bg-yellow-50 border-yellow-200",
+          isMobile ? "max-w-full" : "max-w-[850px]"
+        )}>
+          <p className="text-sm text-yellow-800">{locationError}</p>
+        </div>
+      )}
     </div>
   );
 }

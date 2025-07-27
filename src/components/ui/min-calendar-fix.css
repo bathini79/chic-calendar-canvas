@@ -1,0 +1,23 @@
+/* Direct styling approach - override everything */
+.rdp-day_range_middle {
+  background-color: #F6F6F6 !important;
+  color: #000000 !important;
+  border-radius: 0 !important;
+}
+
+.rdp-day_range_start,
+.rdp-day_range_end,
+.rdp-day_selected {
+  background-color: black !important;
+  color: white !important;
+}
+
+/* Make sure text remains black for days in range */
+.rdp-day {
+  color: black !important;
+}
+
+/* Ensure hover states have the right color */
+.rdp-day:hover {
+  color: black !important;
+}

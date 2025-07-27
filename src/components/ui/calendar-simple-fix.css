@@ -1,0 +1,67 @@
+/* Simple, targeted fix for date range picker */
+
+/* Reset all day styles first */
+.rdp-day {
+  color: black !important;
+  background-color: transparent !important;
+}
+
+/* Style for selected days (start/end) */
+.rdp-day_selected, 
+.rdp-day_range_start, 
+.rdp-day_range_end {
+  background-color: black !important;
+  color: white !important;
+  border-radius: 50% !important;
+  font-weight: 500 !important;
+}
+/* Ultra-specific rule for middle range days */
+.date-range-picker-container .rdp-table .rdp-row .rdp-cell .rdp-day_range_middle {
+  color: black !important;
+  -webkit-text-fill-color: black !important; /* Override Webkit text fill */
+  -moz-text-fill-color: black !important; /* Override Firefox text fill */
+}
+
+/* Fallback for any selected range day */
+.date-range-picker-container .rdp-table .rdp-row .rdp-cell .rdp-day[aria-selected="true"]:not(.rdp-day_selected) {
+  color: black !important;
+  -webkit-text-fill-color: black !important;
+  -moz-text-fill-color: black !important;
+}
+
+/* Global override for range cells (last resort) */
+.date-range-picker-container .rdp-table .rdp-row .rdp-cell:has(.rdp-day_range_middle) .rdp-day {
+  color: black !important;
+  -webkit-text-fill-color: black !important;
+  -moz-text-fill-color: black !important;
+}
+/* Style for days in the middle of range */
+.rdp-day_range_middle {
+  color: black !important;
+  background-color: #F6F6F6 !important;
+  border-radius: 0 !important;
+}
+
+/* Apply background color to cells */
+.rdp-cell:has(.rdp-day_range_middle) {
+  background-color: #F6F6F6 !important;
+}
+
+/* Left edge of range */
+.rdp-cell:has(.rdp-day_range_start):not(:has(.rdp-day_range_end)) {
+  background-color: #F6F6F6 !important;
+  border-top-left-radius: 24px !important;
+  border-bottom-left-radius: 24px !important;
+}
+
+/* Right edge of range */
+.rdp-cell:has(.rdp-day_range_end):not(:has(.rdp-day_range_start)) {
+  background-color: #F6F6F6 !important;
+  border-top-right-radius: 24px !important;
+  border-bottom-right-radius: 24px !important;
+}
+
+/* When the same day is both start and end */
+.rdp-cell:has(.rdp-day_range_start.rdp-day_range_end) {
+  background-color: transparent !important;
+}
