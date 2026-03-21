@@ -298,16 +298,30 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       )
     : packages, [packages, services, selectedCategory]);
 
-  const allItems = React.useMemo(() => [
-    ...(filteredPackages || []).map((pkg) => ({
-      type: "package" as const,
-      ...pkg,
-    })),
-    ...(filteredServices || []).map((service) => ({
-      type: "service" as const,
-      ...service,
-    })),
-  ], [filteredPackages, filteredServices]);
+  const allItems = React.useMemo(() => {
+    const items = [
+      ...(filteredPackages || []).map((pkg) => ({
+        type: "package" as const,
+        ...pkg,
+      })),
+      ...(filteredServices || []).map((service) => ({
+        type: "service" as const,
+        ...service,
+      })),
+    ];
+    // Sort selected items to the top
+    return items.sort((a, b) => {
+      const aSelected = a.type === "service"
+        ? selectedServices.includes(a.id)
+        : selectedPackages.includes(a.id);
+      const bSelected = b.type === "service"
+        ? selectedServices.includes(b.id)
+        : selectedPackages.includes(b.id);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      return 0;
+    });
+  }, [filteredPackages, filteredServices, selectedServices, selectedPackages]);
 
   const calculatePackagePrice = (pkg: any) => {
     const basePrice = pkg.price || 0;

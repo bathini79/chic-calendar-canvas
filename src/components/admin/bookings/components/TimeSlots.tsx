@@ -176,7 +176,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
           );
           
           // Use effectivePixelsPerHour for height calculations
-          const heightPx = Math.max(20, (duration / 60) * effectivePixelsPerHour); // Smaller minimum height on mobile
+          const heightPx = Math.max(isMobile ? 40 : 50, (duration / 60) * effectivePixelsPerHour);
 
           // Arrange bookings horizontally in columns
           const widthPerBooking = 100 / totalBookingsInSlot;
@@ -207,7 +207,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
                   <Flag className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'} text-red-600`} />
                 </div>
               )}
-              <div className={`${isMobile ? 'p-1' : 'p-2'} text-xs`}>
+              <div className={`${isMobile ? 'p-1' : 'p-2'} text-xs text-gray-800`}>
                 <div className="font-medium truncate" style={{ fontSize: isMobile ? '0.65rem' : 'inherit' }}>
                   {appointment.customer?.full_name || "No name"}
                 </div>

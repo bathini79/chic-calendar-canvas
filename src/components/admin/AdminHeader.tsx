@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User, ShoppingBag } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 export function AdminHeader() {
@@ -118,6 +118,10 @@ export function AdminHeader() {
           <DropdownMenuItem onClick={() => navigate("/admin/settings")}>
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate("/services")}>
+            <ShoppingBag className="mr-2 h-4 w-4" />
+            <span>Customer View</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>

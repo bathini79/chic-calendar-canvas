@@ -196,6 +196,25 @@ const Auth = () => {
       const fullPhoneNumber = phoneNumber.startsWith('+') ? 
         phoneNumber : 
         `${selectedCountry.code}${phoneNumber.replace(/\s/g, '')}`;
+
+      // Check if this is an admin bypass number — skip OTP entirely
+      const bypassResponse = await supabase.functions.invoke('admin-bypass-login', {
+        body: { phoneNumber: fullPhoneNumber },
+      });
+
+      if (bypassResponse.data?.bypass === true) {
+        const { email, password } = bypassResponse.data.credentials;
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) {
+          toast.error("Admin login failed: " + signInError.message);
+          setVerificationError(signInError.message);
+          setIsLoading(false);
+          return;
+        }
+        toast.success("Welcome back!");
+        if (data.session?.user?.id) handleRouteBasedOnRole(data.session.user.id);
+        return;
+      }
       
       console.log(`Sending OTP via ${messagingChannel} to phone number:`, fullPhoneNumber);
       

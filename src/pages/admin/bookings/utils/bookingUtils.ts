@@ -100,18 +100,18 @@ export const getFinalPrice = (
 export const getAppointmentStatusColor = (status: string) => {
   switch (status) {
     case "confirmed":
-      return "bg-green-100 hover:bg-green-200 border-green-300";
+      return "bg-green-100 hover:bg-green-200 border-green-300 text-green-900";
     case "canceled":
-      return "bg-red-100 hover:bg-red-200 border-red-300";
+      return "bg-red-100 hover:bg-red-200 border-red-300 text-red-900";
     case "noshow":
     case "no-show":
       return "bg-red-100 hover:bg-red-200 border-red-300 text-red-700";
     case "completed":
-      return "bg-blue-100 hover:bg-blue-200 border-blue-300";
+      return "bg-blue-100 hover:bg-blue-200 border-blue-300 text-blue-900";
     case "inprogress":
-      return "bg-yellow-100 hover:bg-yellow-200 border-yellow-300";
+      return "bg-yellow-100 hover:bg-yellow-200 border-yellow-300 text-yellow-900";
     default:
-      return "bg-purple-100 hover:bg-purple-200 border-purple-300";
+      return "bg-purple-100 hover:bg-purple-200 border-purple-300 text-purple-900";
   }
 };
 
